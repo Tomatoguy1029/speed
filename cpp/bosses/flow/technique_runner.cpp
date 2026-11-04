@@ -198,6 +198,18 @@ godot::Array TechniqueRunner::snapshot(const RunRuntime &run) {
         item["kind"]=run.content->boss_techniques[t.definition-1].kind;item["technique"]=godot::String(run.content->boss_techniques[t.definition-1].external_id.c_str());item["id"]=t.id;item["definition"]=t.definition;item["actor"]=run.state.enemy_handles.entity_id(t.actor);item["stage"]=int(t.stage);
         const auto &p=run.content->boss_techniques[t.definition-1];const double back=p.return_speed>0?godot::Math::PI/p.return_speed:0;
         item["windup_progress"]=std::clamp(t.elapsed/std::max(0.001,p.warn),0.0,1.0);item["active_progress"]=std::clamp((t.elapsed-p.warn)/std::max(0.001,p.active*0.4),0.0,1.0);item["settle_progress"]=t.stage==TechniqueStage::Recovery?(back>0?std::clamp((back+p.recover-t.remaining)/back,0.0,1.0):1.0):0.0;
+        // 試作の尾の噴射は技段階・移動距離・速さで長さと太さを求める。戦闘値は変更しない。
+        if (p.kind<=7) {
+            const char *stage="other";double travel=0,run_speed=0,approach_speed_max=0;
+            if (p.kind==0) {stage=t.stage==TechniqueStage::Active?"run":"other";travel=p.distance;run_speed=p.distance/std::max(p.active,0.001);}
+            else if (p.kind==2) {const auto &v=std::get<MonocerosSweepState>(t.detail);using Stage=MonocerosSweepState::Stage;stage=v.stage==Stage::Approach?"approach":v.stage==Stage::Stop?"stop":"other";run_speed=approach_speed_max=p.approach_speed_max;}
+            else if (p.kind==3) {const auto &v=std::get<MonocerosLanceState>(t.detail);using Stage=MonocerosLanceState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::Stop?"stop":"other";travel=p.distance;run_speed=p.speed;}
+            else if (p.kind==4) {const auto &v=std::get<MonocerosReturnState>(t.detail);using Stage=MonocerosReturnState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::Brake?"brake":"other";travel=v.travel;run_speed=p.distance/std::max(p.active,0.001);}
+            else if (p.kind==6) {const auto &v=std::get<MonocerosDanceState>(t.detail);using Stage=MonocerosDanceState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::End?"end":"other";travel=v.travel;run_speed=v.run_speed;}
+            if (t.stage!=TechniqueStage::Active && p.kind!=2) stage="other";
+            if (p.kind==2 && t.stage!=TechniqueStage::Windup && t.stage!=TechniqueStage::Active) stage="other";
+            item["fx_boost_stage"]=godot::String(stage);item["fx_boost_travel"]=travel;item["fx_boost_run_speed"]=run_speed;item["fx_boost_approach_speed_max"]=approach_speed_max;
+        }
         if (HydraTechnique::supports(p.kind)) {const auto value=HydraTechnique::snapshot(t,*run.content);for (const auto &key:value.keys()) item[key]=value[key];}
         if (p.kind==2) {const auto &v=std::get<MonocerosSweepState>(t.detail);item["stop_progress"]=std::clamp(v.elapsed/std::max(p.stop_time,0.001),0.0,1.0);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["side"]=v.side;item["speed"]=v.speed;item["glow"]=v.glow;item["booster"]=v.stage==MonocerosSweepState::Stage::Approach?0.55+1.95*v.speed/std::max(p.approach_speed_max,0.001):v.stage==MonocerosSweepState::Stage::Stop?0.3:0.55;}
         if (p.kind==3) {const auto &v=std::get<MonocerosLanceState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["form"]=v.form;item["glow"]=v.glow;item["traveled"]=v.traveled;item["boom_time"]=v.boom_time;item["speed"]=v.speed;item["head_length"]=p.head_length;item["booster"]=v.stage==MonocerosLanceState::Stage::Gather?0.55+0.45*v.form:v.stage==MonocerosLanceState::Stage::Run?3.5:1.0;}

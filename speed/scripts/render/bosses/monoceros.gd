@@ -1,6 +1,8 @@
 ## 世界時間で頭から胴体・尾へ旋回を伝え、攻撃の向きは戦闘方向へ同期する。
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
+const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
 @export var pixel_size := 3.0
 @export var booster_length_scale := 1.0
 @export var booster_core_color := Color("#e0fbff")
@@ -36,12 +38,18 @@ var _flame_facing := 0.0
 var _horn_source_seconds := 0.0
 var _horn_durations: PackedFloat32Array
 var _horn_lengths: PackedFloat32Array
+var _reference_canvas: RefCounted
+var _reference_boost: Node2D
+var _reference_id := "I-charge"
 @onready var parts: PartsVisual = $Parts
 @onready var horn: Sprite2D = $Parts/Head/Lower/Horn
 
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 	z_index = 8
+	_reference_boost = REFERENCE_BOOST.new()
+	_reference_boost.z_index = -1
+	add_child(_reference_boost)
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
 
 func frame_event(event: Dictionary) -> void:
@@ -210,31 +218,20 @@ func booster_strength() -> float:
 	if technique.has("booster"): return float(technique.booster)
 	return 2.5 if _mode() == &"active" and StringName(technique.get("technique","")) in [&"charge", &"return_charge"] else 0.55
 
-func _booster() -> void:
-	var strength := booster_strength()
-	if strength <= 0.0: return
-	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
-	var anchor := to_local(nozzle.to_global(Vector2(37, 0))) / (float(state.radius) / 96.0)
-	var length := (50.0 + sin(float(state.clock) * 27.0) * 9.0) * strength * booster_length_scale
-	var root_angle := _tail_facing - float(state.facing) + PI
-	var tip_angle := _flame_facing - float(state.facing) + PI
-	for layer in 3:
-		var factor := 1.0 - float(layer) * 0.24
-		var center := anchor
-		for j in 12:
-			var t := float(j) / 12.0
-			var height := maxf(pixel_size, (24.0 - t * 22.0) * factor)
-			var direction := Vector2.from_angle(lerp_angle(root_angle, tip_angle, t * t))
-			var next := center + direction * length * factor / 12.0
-			var side := direction.orthogonal()
-			var wobble := side * sin(float(state.clock) * 20.0 - t * 8.0) * 7.0 * t * factor
-			var thickness := side.abs() * height
-			var at := (center.min(next) + wobble - thickness * 0.5).snapped(Vector2.ONE * pixel_size)
-			var size := ((next - center).abs() + thickness).snapped(Vector2.ONE * pixel_size).max(Vector2.ONE * pixel_size)
-			draw_rect(Rect2(at, size), [Color("#245c96"), Color("#61c9ff"), booster_core_color][layer])
-			center = next
+## 共通ホストから画素変換を受け取り、技の値と本体の姿勢を同じフレームで描く。
+func set_reference_canvas(canvas: RefCounted) -> void:
+	_reference_canvas = canvas
 
-func _draw() -> void:
-	if state.is_empty(): return
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (float(state.radius) / 96.0))
-	_booster()
+func draw_reference(canvas: RefCounted, _real_dt: float) -> void:
+	if state.is_empty() or not is_instance_valid(_reference_boost): return
+	var move := String(technique.get("technique", ""))
+	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
+	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
+	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
+	var overlap := Vector2.from_angle(_tail_facing) * (24.0 * float(state.radius) / 96.0)
+	var anchor := to_local(nozzle.to_global(Vector2(37, 0)) + overlap)
+	_reference_boost.apply_reference_frame(float(state.clock), float(state.radius), move,
+		String(technique.get("fx_boost_stage", "other")), state.velocity,
+		float(technique.get("fx_boost_travel", 0.0)), float(technique.get("fx_boost_run_speed", 0.0)),
+		float(technique.get("fx_boost_approach_speed_max", 0.0)), values, float(canvas.world_scale),
+		anchor, _tail_facing - float(state.facing))
