@@ -109,27 +109,6 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     }
     const Transform2D body_world(enemy.facing,enemy.pos);
     transforms(nodes,body_world);
-    if (move=="kick" && t && int(t->stage)<=2 && horn_line.size()>=2) {
-        const Vector2 tip=body_world.affine_inverse().xform(Vector2(horn_line[1]));
-        const Vector2 target=(body_world.affine_inverse()*nodes[parts].world).affine_inverse().xform(tip);
-        const double wind=std::clamp(t->elapsed/std::max(0.001,attack->warn),0.0,1.0);
-        const double extend=std::clamp((t->elapsed-attack->warn)/std::max(0.001,attack->active*0.4),0.0,1.0);
-        const double back_time=attack->return_speed>0?godot::Math::PI/attack->return_speed:0;
-        const double back=t->stage==TechniqueStage::Recovery?(back_time>0?std::clamp((back_time+attack->recover-t->remaining)/back_time,0.0,1.0):1.0):0;
-        for (size_t i=2;i<4;++i) {
-            const std::string base=std::string("Parts/")+feet[i];const auto leg=find(nodes,base),foot=find(nodes,base+"/Foot"),art=find(nodes,base+"/Foot/Sprite");
-            if (!leg || !foot || !art) return false;
-            const Vector2 toward=target-nodes[leg].position;
-            double turn=std::fmod(toward.angle()-godot::Math::PI*0.5+godot::Math::TAU,godot::Math::TAU);if (turn<0) turn+=godot::Math::TAU;turn-=godot::Math::TAU;
-            if (t->stage==TechniqueStage::Windup) {nodes[leg].rotation=turn*wind;nodes[foot].position.y=40+(18-40)*wind;}
-            else {
-                const double amount=t->stage==TechniqueStage::Active?extend:1.0;
-                const auto &frame=data.gait[(i==3)?first:opposite];const double natural=40+nodes[art].position.y+frame.base_h;
-                nodes[leg].rotation=turn*(1-back);nodes[foot].position.y=(18+(40-18)*amount)*(1-back)+40*back;
-                nodes[leg].scale.y=(1+(std::max(1.0,double(toward.length())/natural)-1)*amount)*(1-back)+back;
-            }
-        }
-    }
     const bool aimed=move=="charge" || move=="return_charge" || move=="horn_dance";
     bool first_sequence=true,run_stage=false;double elapsed=0;
     if (t && attack) {
@@ -142,6 +121,25 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const double release=aimed && run_stage?1.0-godot::Math::smoothstep(0.035,0.14,elapsed):0;
     nodes[head].position+=Vector2(0,-prepare*5+release*3);nodes[torso].position+=Vector2(0,-prepare*2+release*2);
     for (size_t i=0;i<2;++i) {const auto foot=find(nodes,std::string("Parts/")+feet[i]+"/Foot");nodes[foot].position+=Vector2(0,-prepare*7+release*3);}
+    // 承認済みmonoKickPose：後脚を回転・伸縮せず、付け根から足を移動する。
+    if (move=="kick" && t && attack && int(t->stage)<=2) {
+        const double recovery_total=attack->hold+(attack->return_speed>0?godot::Math::PI/attack->return_speed:0)+attack->recover;
+        const double active_time=std::max(0.0,t->elapsed-attack->warn);
+        const double recovery_time=std::max(0.0,recovery_total-t->remaining);
+        const double fold=windup?godot::Math::smoothstep(0.05,attack->warn*0.55,t->elapsed):0;
+        const double kick=active?godot::Math::smoothstep(0.0,attack->active*0.25,active_time):
+            t->stage==TechniqueStage::Recovery?1.0-godot::Math::smoothstep(attack->hold,attack->hold+0.45,recovery_time):0.0;
+        for (size_t i=2;i<4;++i) {
+            const std::string base=std::string("Parts/")+feet[i];const auto leg=find(nodes,base),foot=find(nodes,base+"/Foot");
+            if (!leg || !foot) return false;
+            const auto &rest=data.nodes[foot-1];const double side=i==2?-1.0:1.0;
+            nodes[leg].rotation=0;nodes[leg].scale=Vector2(1,1);
+            nodes[foot].rotation=0;
+            nodes[foot].position=Vector2(rest.x+side*(kick*7-fold*3),rest.y+fold*14-kick*125);
+        }
+        nodes[head].position+=Vector2(0,fold*4-kick*3);
+        nodes[torso].position=Vector2(0,-37+fold*6+kick*5);
+    }
     transforms(nodes,body_world);
     const double phase_progress=body.phase>=2?(body.mode==BossMode::Phase?1.0-body.phase_remaining/std::max(0.001,body_def.phase_time):1.0):0.0;
     size_t horn_frame=0;
