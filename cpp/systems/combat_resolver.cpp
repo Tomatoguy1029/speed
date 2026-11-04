@@ -135,7 +135,11 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     run.combat_hooks.damage_applied(run,request,result);
     if (request.cause==Cause::Ram && result.applied>0 && state.enemy_handles.contains(result.target)) hit_stop(run,result.target,fresh,request.crit);
     if (!state.enemy_handles.contains(result.target)) return result;
-    if (!request.boss_ram_visual) state.enemies[result.target.slot].flash=0.12;
+    if (!request.boss_ram_visual) {
+        state.enemies[result.target.slot].flash=0.12;
+        if (result.applied>0) for (auto &body:state.bosses.bodies)
+            if (same_handle(body.actor,result.target)) body.hit_feedback_until=state.sim_time+run.content->boss_image_feedback.duration;
+    }
     auto resolved_request=request;resolved_request.amount=result.resolved;
     EventBuilder::enemy_hit(run,resolved_request,result.target);
     if (state.enemies[result.target.slot].hp<=0) result.killed=kill_enemy(run,request,result.resolved>=state.enemies[result.target.slot].max_hp*0.8).killed;

@@ -131,7 +131,9 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
         if (!HydraBody::validate(s,c,b)) return false;
         if (!DracoBody::validate(s,c,b)) return false;
         if (!CanisMajorBody::validate(s,c,b)) return false;
-        for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width}) if (!std::isfinite(value) || value<0) return false;
+        for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width,b.hit_feedback_until}) if (!std::isfinite(value) || value<0) return false;
+        for (const auto &slash:b.monoceros_slashes) if (!slash.from.is_finite() || !slash.to.is_finite() || !std::isfinite(slash.width) || slash.width<0 || !std::isfinite(slash.started) || slash.started<0 || slash.started>b.clock) return false;
+        for (const auto &part:b.image_parts) if (part.part==0 || part.mask==0 || part.mask>c.boss_image_masks.size() || part.region.size.x<=0 || part.region.size.y<=0 || !part.pixel_to_world.columns[0].is_finite() || !part.pixel_to_world.columns[1].is_finite() || !part.pixel_to_world.columns[2].is_finite()) return false;
         if (!CentaurusBody::validate(s,c,b)) return false;
         if (!std::isfinite(b.final_started) || (b.mode<BossMode::Defeated && (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead))) return false;
     }return true;
