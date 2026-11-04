@@ -7,6 +7,7 @@ const OPEN_TIME := 0.6
 const CLOSE_TIME := 1.0
 ## 絵の半径 ÷ 穴の半径（縁の外の光と四芒星を含める）
 const EXTENT := 1.35
+const NOISE := preload("res://assets/effects/build/burst_noise.tres")
 
 var _born := -1.0
 var _gone := -1.0
@@ -18,6 +19,7 @@ func _init() -> void:
 	var mat := ShaderMaterial.new()
 	mat.shader = preload("res://shaders/warp_hole.gdshader")
 	mat.set_shader_parameter("extent", EXTENT)
+	mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
 	material = mat
 	visible = false
 

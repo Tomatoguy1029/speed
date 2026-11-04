@@ -540,7 +540,7 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 - 画面外の演出は描画だけ省き、位置・寿命の更新は続ける（カメラが動けば同じ状態が見える）。
 - 画面の拡大縮小は、表示を伸ばす方式（`canvas_items`）と、縦横比に合わせて広げる設定（`expand`）を使う。カメラのズームは画面の短い辺を基準に計算する（仕様書 15）。
 
-ワープホールは `scripts/render/fx/warp_hole_visual.gd` が値型フレームの位置・半径・消える時刻と世界時刻から開閉と点滅を求め、1枚の四角形を `warp_hole.gdshader` で描く。ボーナスステージは `scripts/render/fx/bonus_stage_visual.gd` がUIの `bonus_remaining` の変化から、潜る演出・閃光・背景・画面効果を表示側だけで動かす。背景は地色の範囲へ `bonus_background.gdshader` を重ね、画面効果は `RenderPipeline.add_screen_layer()` で光のにじみの層と同じ順番へ置いた全画面の `bonus_screen.gdshader` が描く。トンネルの模様は `warp_tunnel.gdshaderinc` を共有する。どれもRunFrameViewとRunPresentationのpreloadから出撃前の準備へ含める。
+ワープホールは `scripts/render/fx/warp_hole_visual.gd` が値型フレームの位置・半径・消える時刻と世界時刻から開閉と点滅を求め、1枚の四角形を `warp_hole.gdshader` で描く。ボーナスステージは `scripts/render/fx/bonus_stage_visual.gd` がUIの `bonus_remaining` の変化から、潜る演出・閃光・背景・画面効果を表示側だけで動かす。背景は地色の範囲へ `bonus_background.gdshader` を重ね、画面効果は `RenderPipeline.add_screen_layer()` で光のにじみの層と同じ順番へ置いた全画面の `bonus_screen.gdshader` が描く。トンネルの模様は `warp_tunnel.gdshaderinc` を共有し、ノイズは[爆発のノイズ](#固定データ処理の生成と参照)の焼き込み済みの格子を読む。どれもRunFrameViewとRunPresentationのpreloadから出撃前の準備へ含める。
 
 ## 11. 保存
 
@@ -730,7 +730,7 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 | 装甲の領域と塗装 | `visual_transforms.gd` が透過の連結領域と任意の `<装甲画像名>.regions.json` から塗装領域を求め、濃淡を保って確定塗装を生成する。領域データは `.content/dev/armor_<外観名>.res` へ保存する | 部位キーと保存済み塗装の対応・濃淡・アルファを維持する。明示した分割領域は元の領域の塗装を継承する。実験場は変更対象の外観に不足する配色だけを同じ変換で補い、メモリ上の表示資源を差し替える。開始・履歴再構築でも描画開始前に未保存配色を補う。解析用スクリプトと領域データは配布から除外する |
 | 外観の索引 | `.content/visual_index.tres` の外観名と生成物パスをRunResourcesへ引き継ぎ、照明はその順序を使う | 外観の差し替え・追加・削除、照明の層順とHUDとの関係を維持し、資源は必要な種類の利用範囲で保持する |
 | 機雷・ポンプ着弾・自爆敵の爆発と圧縮弾 | `bake_burst_profiles.py`・`bake_pump_shell.py` が保存profileと可変shaderから専用shader・素材・時間や倍率の定数を生成する。共通ビルドは対象profileと入力・出力のハッシュを照合する。BlastBurstsと圧縮弾の表示スクリプトの依存参照から実行用資源を取得し、配布にも含める | 通常ゲームは固定値と必要な動的時刻・位置・種・収納物を使う。編集用プレビューは可変shaderと作業コピーを使い、寿命・到達域・粒の順番・色空間を共有する。制作時の反映手順は[ビジュアル編集](dev/tools/visual-editor.md#戦闘エフェクトの調整項目)に置く |
-| 爆発のノイズ | `tools/art/bake_burst_noise.py` が既存の格子点を `assets/effects/build/burst_noise_volume.png` に保存し、8×8のスライスとして64×64×64のTexture3Dへ取り込む。`burst_noise.tres` は版・入力と出力のハッシュ・画像参照を持ち、共通ビルドが照合する | L8・可逆圧縮・mipmapなしで格子値を保持する。`burst_noise.gdshaderinc` は周期64とsmoothstepの補間座標を使い、linear・repeatの1回の参照で読む。時刻・位置・seedによる動きとプラズマの3オクターブを保つ。BlastBurstsとPlasmaBurstsが同じ資源を依存として取得する |
+| 爆発のノイズ | `tools/art/bake_burst_noise.py` が既存の格子点を `assets/effects/build/burst_noise_volume.png` に保存し、8×8のスライスとして64×64×64のTexture3Dへ取り込む。`burst_noise.tres` は版・入力と出力のハッシュ・画像参照を持ち、共通ビルドが照合する | L8・可逆圧縮・mipmapなしで格子値を保持する。`burst_noise.gdshaderinc` は周期64とsmoothstepの補間座標を使い、linear・repeatの1回の参照で読む。時刻・位置・seedによる動きとプラズマの3オクターブを保つ。BlastBursts・PlasmaBursts・ワープホール・ボーナスステージの表示が同じ資源を依存として取得する。ワープホールのトンネルとボーナスステージの背景は `warp_tunnel.gdshaderinc` から同じ読み方で使う |
 
 共通生成の署名は画像とimport設定も含め、外観・領域データの欠落を出力一覧から検出する。外観の索引が指す生成物を配布し、開発用の領域データを分ける。実験場のランの外観・塗装はSessionの表示で保持・解放し、一覧の合成画像は実験場画面の上限付きキャッシュで保持する。
 

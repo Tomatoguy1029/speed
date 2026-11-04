@@ -14,6 +14,7 @@ const EXIT_LEAD := 0.4
 const EXIT_TIME := 0.8
 ## 背景と潜る演出のドットの粗さ（画面の高さのドット数）
 const CELLS := 216.0
+const NOISE := preload("res://assets/effects/build/burst_noise.tres")
 
 var _screen: ColorRect
 var _backdrop: DrawLayer
@@ -32,6 +33,7 @@ func setup(pipeline: RenderPipeline, background: Node2D) -> void:
 	_screen.set_anchors_preset(Control.PRESET_FULL_RECT)
 	var screen_mat := ShaderMaterial.new()
 	screen_mat.shader = preload("res://shaders/bonus_screen.gdshader")
+	screen_mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
 	_screen.material = screen_mat
 	_screen.visible = false
 	var layer := CanvasLayer.new()
@@ -40,6 +42,7 @@ func setup(pipeline: RenderPipeline, background: Node2D) -> void:
 	_backdrop = DrawLayer.new()
 	var back_mat := ShaderMaterial.new()
 	back_mat.shader = preload("res://shaders/bonus_background.gdshader")
+	back_mat.set_shader_parameter("value_noise", NOISE.get_meta("texture"))
 	_backdrop.material = back_mat
 	_backdrop.draw_fn = func(canvas: CanvasItem): canvas.draw_rect(_background.area, Color.WHITE)
 	_backdrop.visible = false

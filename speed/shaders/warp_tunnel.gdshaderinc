@@ -1,6 +1,8 @@
 // ワープホールの金色トンネル。ワープホール本体とボーナスステージへ潜る演出で共有する。
 // 穴の内側は奥行き z = 1/r の筒として描く。壁に銀河の腕を巻きつけ、金の輪を奥へ流し、出口を金と白で光らせる。
 
+#include "res://shaders/burst_noise.gdshaderinc"
+
 const vec3 WT_DEEP = vec3(0.10, 0.03, 0.06);
 const vec3 WT_WALL1 = vec3(1.0, 0.55, 0.18);
 const vec3 WT_WALL2 = vec3(1.0, 0.35, 0.50);
@@ -18,16 +20,9 @@ float wt_hash3(vec3 p) {
 	return fract(sin(dot(p, vec3(127.1, 311.7, 74.7))) * 43758.5453);
 }
 
+// 形の崩れ・星雲のノイズは、制作時に焼いた爆発と共通の64^3の格子（周期64）を1回の3D samplingで読む。
 float wt_noise(vec3 x) {
-	vec3 i = floor(x);
-	vec3 f = fract(x);
-	f = f * f * (3.0 - 2.0 * f);
-	return mix(
-		mix(mix(wt_hash3(i), wt_hash3(i + vec3(1.0, 0.0, 0.0)), f.x),
-			mix(wt_hash3(i + vec3(0.0, 1.0, 0.0)), wt_hash3(i + vec3(1.0, 1.0, 0.0)), f.x), f.y),
-		mix(mix(wt_hash3(i + vec3(0.0, 0.0, 1.0)), wt_hash3(i + vec3(1.0, 0.0, 1.0)), f.x),
-			mix(wt_hash3(i + vec3(0.0, 1.0, 1.0)), wt_hash3(i + vec3(1.0, 1.0, 1.0)), f.x), f.y),
-		f.z);
+	return vnoise(x);
 }
 
 float wt_fbm(vec3 x) {
