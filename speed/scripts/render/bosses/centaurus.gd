@@ -79,6 +79,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	position = body.position
 	rotation = body.facing
 	visible = body.mode<4
+	if is_instance_valid(_reference_overlay): _reference_overlay.visible = visible
 	if _parts==null:
 		z_index = 1
 		_parts = PARTS.instantiate()
