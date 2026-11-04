@@ -25,6 +25,9 @@ func _ready() -> void:
 	if not spec is Dictionary or not _valid_spec(spec):
 		_fail("撮影条件を読み取れません: " + spec_path)
 		return
+	if not _valid_identity(root,spec.build_identity):
+		_fail("撮影用ライブラリとビルド情報が一致しません")
+		return
 	var index_path: String = spec.index
 	var index = JSON.parse_string(FileAccess.get_file_as_string(index_path))
 	if not index is Dictionary or not index.get("input_sha256","") is String:
@@ -181,6 +184,12 @@ func _isolated(root: String) -> bool:
 	var launcher := FileAccess.get_file_as_string("res://addons/stage_launcher/launch_request.gd")
 	var recorder := FileAccess.get_file_as_string("res://scripts/dev/play_recorder.gd")
 	return launcher.contains('const PATH := "'+isolated.path_join("stage_launch.cfg")+'"') and recorder.contains('"'+isolated.path_join("recordings")+'"')
+
+func _valid_identity(root: String, identity: Dictionary) -> bool:
+	for key in ["source_sha256","dependencies_sha256","library_sha256"]:
+		if not identity.get(key) is String or identity[key].length()!=64: return false
+	if not identity.get("base_commit") is String or identity.base_commit.is_empty(): return false
+	return identity.dependencies_sha256==FileAccess.get_sha256(root.path_join("cpp/dependencies.json")) and identity.library_sha256==FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib")
 
 func _fail(message: String) -> void:
 	push_error(message)
