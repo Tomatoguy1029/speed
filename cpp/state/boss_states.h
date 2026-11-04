@@ -4,6 +4,7 @@
 #include "../bosses/centaurus/image_pose_state.h"
 #include "../bosses/canis_major/image_pose_state.h"
 #include "../bosses/monoceros/image_pose_state.h"
+#include "../bosses/monoceros/sweep_visual_state.h"
 #include "../content/generated/combat_ids.h"
 #include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
@@ -305,6 +306,7 @@ struct BossBodyState {
     CanisBodyState canis;
     CentaurusBodyState centaurus;
     MonocerosImagePoseClock monoceros_pose;
+    std::vector<MonocerosSweepVisual> monoceros_sweeps;
     std::vector<MonocerosSlashVisual> monoceros_slashes;
     std::vector<ParticipantState> participants;
     int64_t id=0;

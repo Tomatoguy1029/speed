@@ -60,7 +60,7 @@ static func _crescent(canvas, points: Array, head: float, tail: float, width: fl
 			p.glow(at.x,at.y,5.0+width,ramp[count-3],0.22*(1.0-age)*(float(b.v)-tail)/(head-tail))
 
 ## points は固定更新で記録した {center, tip, v, t}。粒は別途同じ時刻で描く。
-static func draw(canvas, points: Array, time: float, sweep: float, params: Dictionary) -> void:
+static func draw(canvas, points: Array, time: float, sweep: float, params: Dictionary, motes: Array = []) -> void:
 	if points.size()<2: return
 	var timing := float(params.timing)
 	var linger := 0.32*timing
@@ -87,4 +87,25 @@ static func draw(canvas, points: Array, time: float, sweep: float, params: Dicti
 		var inward: Vector2 = (canvas.to_logical(last.center)-tip).normalized()
 		var at := tip+inward*width/3.0
 		p.glow(at.x,at.y,40.0*width/12.0,ramp[3],0.5*(1.0-time/(0.3*timing)))
+	_draw_motes(canvas,motes,Color(params.color))
 	p.fade = fade
+
+## PX.Particles の MOTE 描画。座標と速度はC++の固定更新から受ける。
+static func _draw_motes(canvas, motes: Array, base: Color) -> void:
+	const UNIT := 225.0/1100.0
+	var bright := Color(roundf(lerpf(base.r,1.0,0.45)*255.0)/255.0,roundf(lerpf(base.g,1.0,0.45)*255.0)/255.0,roundf(lerpf(base.b,1.0,0.45)*255.0)/255.0)
+	var origin: Vector2 = canvas.to_logical(Vector2.ZERO)
+	var p = canvas.front
+	for q: Dictionary in motes:
+		var life := float(q.life)/float(q.maximum)
+		var at: Vector2 = origin+Vector2(q.position)*UNIT
+		var velocity := Vector2(q.velocity)*UNIT
+		var speed := velocity.length()
+		var direction := velocity/speed if speed>0.0 else Vector2.ZERO
+		var length := minf(16.0,0.5+speed*0.026)*0.6
+		var alpha := life/0.35 if life<0.35 else 1.0
+		var color := Color.WHITE if int(q.color)==4 else bright
+		var dark := Color(floorf(color.r*255.0*0.55)/255.0,floorf(color.g*255.0*0.55)/255.0,floorf(color.b*255.0*0.55)/255.0)
+		p.line(at.x-direction.x*length,at.y-direction.y*length,at.x-direction.x*length*0.35,at.y-direction.y*length*0.35,dark,alpha)
+		p.line(at.x-direction.x*length*0.4,at.y-direction.y*length*0.4,at.x,at.y,color,alpha)
+		p.glow(at.x,at.y,3.1,color,0.4*life)

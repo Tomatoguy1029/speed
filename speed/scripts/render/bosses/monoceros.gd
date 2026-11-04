@@ -4,6 +4,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
 const REFERENCE_SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
+const REFERENCE_SWEEP := preload("res://scripts/render/bosses/monoceros_sweep_slash.gd")
 const HORN_LIGHT_SHADER := preload("res://shaders/monoceros_horn_light.gdshader")
 const REFERENCE_WHITE_SHADER := preload("res://shaders/fx_reference_white.gdshader")
 @export var pixel_size := 3.0
@@ -359,6 +360,9 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
 	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
 	_draw_charge_tell(canvas, move)
+	var sweep_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sweep")
+	for sweep: Dictionary in state.get("sweep_visuals",[]):
+		REFERENCE_SWEEP.draw(canvas,sweep.points,float(state.clock)-float(sweep.started),float(sweep.duration),sweep_values,sweep.motes)
 	var slash_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sword_flash")
 	for slash: Dictionary in state.get("sword_slashes",[]):
 		REFERENCE_SLASH.draw(canvas,slash.from,slash.to,float(slash.width),float(state.clock)-float(slash.started),0.6,float(slash.seed),slash_values)

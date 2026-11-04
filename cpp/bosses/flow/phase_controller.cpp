@@ -133,6 +133,16 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
         if (!CanisMajorBody::validate(s,c,b)) return false;
         for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width,b.hit_feedback_until}) if (!std::isfinite(value) || value<0) return false;
         for (const auto &slash:b.monoceros_slashes) if (!slash.from.is_finite() || !slash.to.is_finite() || !std::isfinite(slash.width) || slash.width<0 || !std::isfinite(slash.started) || slash.started<0 || slash.started>b.clock) return false;
+        const auto &mp=b.monoceros_pose;
+        for (double value:{mp.last_body_clock,mp.body,mp.neck,mp.head,mp.tail,mp.flame,mp.gait,mp.feedback_white,mp.feedback_angle}) if (!std::isfinite(value)) return false;
+        if (mp.last_body_clock<0 || mp.last_body_clock>b.clock || mp.gait<0 || mp.feedback_white<0 || !mp.feedback_offset.is_finite()) return false;
+        for (const auto &node:mp.nodes) if (!node.node || node.node>c.monoceros_image_pose.nodes.size() || !node.transform.columns[0].is_finite() || !node.transform.columns[1].is_finite() || !node.transform.columns[2].is_finite()) return false;
+        for (const auto &visual:b.monoceros_sweeps) {
+            if (visual.technique_id<=0 || !std::isfinite(visual.started) || !std::isfinite(visual.last_clock) || visual.started<0 || visual.started>visual.last_clock || visual.last_clock>b.clock || !std::isfinite(visual.start_angle) || !std::isfinite(visual.last_angle) || !std::isfinite(visual.arc) || visual.arc<=0 || !std::isfinite(visual.duration) || visual.duration<=0 || (visual.side!=1 && visual.side!=-1)) return false;
+            double previous=-1;
+            for (const auto &point:visual.points) {if (!point.center.is_finite() || !point.tip.is_finite() || !std::isfinite(point.progress) || point.progress<0 || point.progress>1 || !std::isfinite(point.time) || point.time<previous || point.time>visual.last_clock-visual.started+0.000001) return false;previous=point.time;}
+            for (const auto &m:visual.motes) if (!m.position.is_finite() || !m.velocity.is_finite() || !std::isfinite(m.life) || !std::isfinite(m.maximum) || m.maximum<=0 || m.life<=0 || m.life>m.maximum || (m.color!=3 && m.color!=4)) return false;
+        }
         for (const auto &part:b.image_parts) if (part.part==0 || part.mask==0 || part.mask>c.boss_image_masks.size() || part.region.size.x<=0 || part.region.size.y<=0 || !part.pixel_to_world.columns[0].is_finite() || !part.pixel_to_world.columns[1].is_finite() || !part.pixel_to_world.columns[2].is_finite()) return false;
         if (!CentaurusBody::validate(s,c,b)) return false;
         if (!std::isfinite(b.final_started) || (b.mode<BossMode::Defeated && (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead))) return false;
@@ -143,6 +153,12 @@ godot::Array PhaseController::snapshot(const RunRuntime &r) {
         const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);if (definition.kind==4) DracoBody::snapshot(r,b,p);if (definition.kind==3) HydraBody::snapshot(r,b,p);if (definition.kind==2) {CanisMajorBody::snapshot(r,b,p);p["flames"]=CanisFlames::snapshot(r,b);p["lunges"]=CanisHoundLunge::snapshot(r,b);}p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
         godot::Array image_parts;for (const auto &part:b.image_parts) {godot::Dictionary v;v["part"]=part.part;v["region"]=part.region;v["pixel_to_world"]=part.pixel_to_world;v["visible"]=part.visible;image_parts.push_back(v);}p["image_parts"]=image_parts;
         godot::Array sword_slashes;for (const auto &slash:b.monoceros_slashes) {godot::Dictionary v;v["from"]=slash.from;v["to"]=slash.to;v["width"]=slash.width;v["started"]=slash.started;v["seed"]=slash.seed;sword_slashes.push_back(v);}p["sword_slashes"]=sword_slashes;
+        godot::Array sweep_visuals;for (const auto &visual:b.monoceros_sweeps) {
+            godot::Dictionary item;item["started"]=visual.started;item["duration"]=visual.duration;godot::Array points,motes;
+            for (const auto &point:visual.points) {godot::Dictionary v;v["center"]=point.center;v["tip"]=point.tip;v["v"]=point.progress;v["t"]=point.time;points.push_back(v);}
+            for (const auto &m:visual.motes) {godot::Dictionary v;v["position"]=m.position;v["velocity"]=m.velocity;v["life"]=m.life;v["maximum"]=m.maximum;v["color"]=m.color;motes.push_back(v);}
+            item["points"]=points;item["motes"]=motes;sweep_visuals.push_back(item);
+        }p["sweep_visuals"]=sweep_visuals;
         if (definition.kind==0) {
             godot::Array nodes;for (const auto &node:b.monoceros_pose.nodes) {godot::Dictionary v;v["node"]=node.node;v["transform"]=node.transform;v["visible"]=node.visible;nodes.push_back(v);}p["image_node_poses"]=nodes;
             godot::Dictionary feedback;feedback["white"]=b.monoceros_pose.feedback_white;feedback["angle"]=b.monoceros_pose.feedback_angle;feedback["offset"]=b.monoceros_pose.feedback_offset;p["image_feedback"]=feedback;

@@ -1,4 +1,5 @@
 #include "image_pose_system.h"
+#include "sweep_visual.h"
 #include "../flow/technique_runner.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
@@ -155,6 +156,7 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const double length=enemy.radius*(boss.horn_length_ratio+(boss.horn_length_ratio_p2-boss.horn_length_ratio)*phase_progress);
     nodes[horn].scale.y=std::max(1.0,length-double(origin.dot(axis)))/(k*data.horns[horn_frame].core_length);
     transforms(nodes,body_world);
+    MonocerosSweepVisualSystem::step(run,body,t,nodes[head].world.get_origin(),nodes[horn].world.xform(Vector2(0,data.horns[horn_frame].core_length)));
     pose.nodes.clear();body.image_parts.clear();
     for (size_t i=1;i<nodes.size();++i) pose.nodes.push_back({uint32_t(i),nodes[i].world,nodes[i].visible});
     for (const auto &sprite:data.sprites) {
