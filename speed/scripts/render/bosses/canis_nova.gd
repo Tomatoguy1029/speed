@@ -34,17 +34,13 @@ static func draw_field(canvas, nova: Dictionary, params: Dictionary) -> void:
 	var field_origin: Vector2 = canvas.to_logical(nova.field_origin)
 	var range_end := float(nova.ring_end)
 	var logical_size: Vector2i = canvas.logical_size
-	var x0 := maxi(0,floori(field_origin.x))
-	var y0 := maxi(0,floori(field_origin.y))
-	var x1 := mini(logical_size.x,ceili(field_origin.x+width*cell))
-	var y1 := mini(logical_size.y,ceili(field_origin.y+height*cell))
-	for y in range(y0,y1):
+	for y in logical_size.y:
 		var iy := floori((y-field_origin.y)/cell)
-		if iy<0 or iy>=height: continue
-		for x in range(x0,x1):
+		for x in logical_size.x:
 			var ix := floori((x-field_origin.x)/cell)
-			if ix<0 or ix>=width: continue
-			var visible := 1.0-float(alpha[iy*width+ix])/255.0
+			# 範囲外はC++の安全判定と同じく遮光なしとして扱う。
+			var shadow := float(alpha[iy*width+ix])/255.0 if ix>=0 and ix<width and iy>=0 and iy<height else 0.0
+			var visible := 1.0-shadow
 			var dx := x-source.x
 			var dy := y-source.y
 			var distance := sqrt(dx*dx+dy*dy)/canvas.world_scale
