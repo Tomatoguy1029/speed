@@ -55,8 +55,9 @@ void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
         const auto *fx=config(*r.content,jet.technique);if (!fx) continue;
         const bool sampled=jet.frame!=frame;
         if (!sampled && jet.field_origin==view_origin && jet.cell==cell && jet.field_width==uint32_t(width) && jet.field_height==height) continue;
-        const double age=body.clock-jet.started;
-        if (jet.continuous && age<jet.duration) {
+        if (sampled) jet.sample_age=body.clock-jet.started;
+        const double age=jet.sample_age;
+        if (sampled && jet.continuous && age<jet.duration) {
             const bool active=std::any_of(r.state.bosses.techniques.begin(),r.state.bosses.techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
             if (!active) jet.duration=std::max(0.0,age);
         }
@@ -111,7 +112,7 @@ void CanisFireVisualSystem::clear(BossBodyState &body) {body.canis.fire_visual={
 bool CanisFireVisualSystem::validate(const BossBodyState &body,const ContentBundle &content) {
     for (const auto &v:body.canis.fire_visual.jets) {
         if (!v.id || !config(content,v.technique) || !v.origin.is_finite() || !v.field_origin.is_finite() || !v.release_origin.is_finite() || v.length<0 || v.width<0 || v.duration<0 || v.speed<=0) return false;
-        for (double x:{v.angle,v.length,v.width,v.started,v.duration,v.speed,v.cell,v.history.cell,v.release_angle,v.release_length}) if (!std::isfinite(x)) return false;
+        for (double x:{v.angle,v.length,v.width,v.started,v.duration,v.speed,v.cell,v.history.cell,v.release_angle,v.release_length,v.sample_age}) if (!std::isfinite(x)) return false;
         for (const auto &d:v.history.deposits) {if (!d.position.is_finite() || !std::isfinite(d.updated)) return false;for (auto p:d.pixels) if (!p.is_finite()) return false;}
     }
     return true;
