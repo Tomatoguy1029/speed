@@ -13,6 +13,21 @@ godot::Vector2 RulerBehavior::beam_origin(const RunRuntime &r,uint32_t row) {
     const auto &e=r.state.enemies[row];const auto &p=r.content->rulers[r.content->definitions[e.definition].ruler_definition-1];
     return e.pos+godot::Vector2::from_angle(e.facing)*(e.radius+p.beam_width*0.5+p.beam_start_gap);
 }
+void RulerBehavior::after_tick(RunRuntime &r) {
+    // AI can be skipped while pushed, held or offscreen. Keep the live wall on
+    // its emitter after movement and field collision, independent of AI ticks.
+    const auto &s=r.state;
+    for (size_t group=0;group<s.behavior_kinds.size();++group) {
+        if (s.behavior_kinds[group]!=EnemyDefinition::Kind::Ruler) continue;
+        for (auto row:s.behavior_rows[group]) {
+            const auto &e=s.enemies[row];if (!e.alive || e.dead) continue;
+            const auto &v=std::get<RulerState>(e.behavior_state);
+            const auto *beam=AttackSystem::get(s,v.beam);
+            if (beam && same_handle(beam->spec.owner.live_source,s.enemy_handles.at(row)))
+                WallSystem::move(r,v.beam,beam_origin(r,row),e.facing);
+        }
+    }
+}
 void RulerBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     auto &s=r.state;auto &e=s.enemies[row];auto &v=std::get<RulerState>(e.behavior_state);const auto &d=r.content->definitions[e.definition];const auto &p=r.content->rulers[d.ruler_definition-1];const auto self=s.enemy_handles.at(row);
     const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};const auto owner=AttackBudgetSystem::owner(s,e.id,e.attack_group);AttackBudgetSystem budget(r);
@@ -40,7 +55,6 @@ void RulerBehavior::step(RunRuntime &r,uint32_t row,double dt) {
         v.beam=WallSystem::emit(r,wall);godot::Dictionary event;event["id"]=e.id;FrameBuilder::append(r,"enemy_laser_fire",event);e.charge=0;e.mode=EnemyMode::Recover;e.timer=p.beam_time;return;
     }
     if (e.mode==EnemyMode::Recover) {
-        WallSystem::move(r,v.beam,beam_origin(r,row),e.facing);
         if (e.timer<=0) {AttackSystem::end(s,v.beam,AttackEndReason::TechniqueEnd);v.beam={};e.mode=EnemyMode::Dash;e.timer=p.deploy_time;}
     }
 }

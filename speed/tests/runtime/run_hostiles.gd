@@ -1602,6 +1602,22 @@ func ruler_tick(core, dt: float) -> void:
 	core.step_hazards(dt)
 	core.advance_attack_budget(float(core.inspect().world_time))
 
+func check_ruler_beam_attachment(core, bridge, view: Rect2) -> void:
+	var walls: Array=core.hazards_snapshot()
+	check(walls.size()==2,"移動後も分裂した両側の壁を保持する")
+	var frame: Dictionary=bridge.read_render(view).value
+	for wall: Dictionary in walls:
+		var enemy: Dictionary=dolphin_enemy(core,wall.owner_id)
+		var direction:=Vector2.from_angle(enemy.facing)
+		var expected: Vector2=Vector2(enemy.pos[0],enemy.pos[1])+direction*(enemy.radius+wall.half_width+80.0)
+		check((wall.pos as Vector2).distance_to(expected)<0.01 and direction.dot(Vector2.from_angle(wall.angle))>0.99999,"両側の壁の判定始点・向きが移動後の各発射元と一致する")
+		var lines: Array=frame.shapes.filter(func(shape): return shape.kind==0 and shape.order==wall.row)
+		check(lines.size()==1,"各壁の描画を保持する")
+		if lines.size()==1:
+			var line: Dictionary=lines[0]
+			for i in line.widths.size():
+				check(line.points[line.offsets[i]].distance_to(expected)<0.01 and line.points[line.offsets[i]+1].distance_to(expected+direction*wall.length)<0.01,"壁の全描画層と当たり判定が同じ始点・終点を使う")
+
 func check_cpp_ruler() -> bool:
 	var cfg: GameConfig=ContentManager.base.duplicate(true)
 	cfg.start_radius=900.0
@@ -1674,7 +1690,7 @@ func check_cpp_ruler() -> bool:
 	for wall: Dictionary in walls:
 		var enemy: Dictionary=dolphin_enemy(core,wall.owner_id)
 		var expected: Vector2=Vector2(enemy.pos[0],enemy.pos[1])+Vector2.from_angle(enemy.facing)*(enemy.radius+13.0+80.0)
-		check((wall.pos as Vector2).distance_to(expected)<3.0,"発射元は本体半径・半幅・編集した隙間から決まる")
+		check((wall.pos as Vector2).distance_to(expected)<0.01,"発射元は本体半径・半幅・編集した隙間から決まる")
 	var output_frame: Dictionary=bridge.read_frame()
 	check(output_frame.ok,"分裂と予告・発射の通知を固定の封筒で受け取れる")
 	if output_frame.ok:
@@ -1686,6 +1702,22 @@ func check_cpp_ruler() -> bool:
 	var future: Array=core.enemy_motion_snapshot()
 	var future_walls: Array=core.hazards_snapshot()
 	mute_checks=false
+	check_ruler_beam_attachment(core,bridge,view)
+	for pushed in [true,false]:
+		for id in [first,second]:
+			var enemy: Dictionary=dolphin_enemy(core,id)
+			var velocity:=Vector2.from_angle(enemy.facing)*6000.0
+			var motion: Dictionary={"shove_time":0.3,"shove_vel":velocity} if pushed else {"knock_t":0.3,"vel":velocity}
+			check(core.set_enemy_motion(id,motion),"照射中の両個体に押し飛ばし・ノックバックを設定する")
+		ruler_tick(core,0.05)
+		check_ruler_beam_attachment(core,bridge,view)
+		check(bridge.restore(fired.value).ok,"移動追従確認後に照射開始状態を復帰する")
+	# AIを3tickに間引く画面外でも、毎tickの移動へ壁を同期する。
+	core.set_motion_context(target,target+Vector2(10000,10000),Vector2(10,10))
+	for id in [first,second]: check(core.set_enemy_motion(id,{"vel":Vector2(1000,0)}),"画面外の両個体へ残存速度を設定する")
+	ruler_tick(core,0.01)
+	check_ruler_beam_attachment(core,bridge,view)
+	check(bridge.restore(fired.value).ok,"画面外追従確認後に照射開始状態を復帰する")
 	for n in 5: ruler_tick(core,0.05)
 	check(core.hazards_snapshot().is_empty() and float(core.attack_budget_snapshot().used)==0.0 and pulse_motion(core,first).mode==RunIds.EnemyModeId.Dash,"照射の正常終了で壁と攻撃予算を解放し再展開する")
 	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before,"分裂後の左右・予告・予算を値から復帰する")
