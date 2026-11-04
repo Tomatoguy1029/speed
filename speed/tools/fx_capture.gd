@@ -157,7 +157,15 @@ func _decode(value: Variant) -> Variant:
 		if value.size()==1 and value.has("vector2"):
 			return Vector2(float(value.vector2[0]),float(value.vector2[1]))
 		if value.size()==1 and value.has("integer"): return int(value.integer)
-		if value.size()==1 and value.has("ref"): return values.get(str(value.ref))
+		if value.has("ref") and (value.size()==1 or value.size()==2 and value.has("path")):
+			var selected = values.get(str(value.ref))
+			var path = value.get("path",[])
+			if not path is Array: return null
+			for part in path:
+				if selected is Dictionary and selected.has(part): selected = selected[part]
+				elif selected is Array and (part is int or part is float) and float(part)==floorf(float(part)) and int(part)>=0 and int(part)<selected.size(): selected = selected[int(part)]
+				else: return null
+			return selected
 		var result := {}
 		for key in value: result[key] = _decode(value[key])
 		return result
