@@ -624,6 +624,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.ui.help | 操作のヒント | Controls |
 | lab.ui.help&#95;text | 中ドラッグで移動・ホイールで拡大縮小。Spaceで再生／停止。選択した敵はDeleteで削除、Q／Eで回転。 | Middle-drag to pan; wheel to zoom. Space to play/pause. Delete removes selected enemies; Q/E rotates them. |
 | lab.ui.enemies | 敵 | Enemies |
+| lab.look.snake | 蛇 | Snake |
 | lab.ui.search | 敵を検索 | Find an enemy |
 | lab.ui.all | すべて | All enemies |
 | lab.ui.drag&#95;hint | ドラッグして配置 | Drag onto the field |

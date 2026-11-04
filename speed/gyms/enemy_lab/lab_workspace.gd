@@ -193,6 +193,10 @@ func _palette(parent: Node) -> void:
 	lab._left.add_child(box)
 	var title: Label = lab._label(box, tr("lab.ui.enemies"))
 	title.add_theme_font_size_override("font_size", 16)
+	lab._stage = OptionButton.new()
+	for n in range(1, ContentManager.stage_count() + 1): lab._stage.add_item(tr("lab.message_c83172920b") % n, n)
+	box.add_child(lab._stage)
+	UI.button(box, tr("lab.message_dfa32d64eb"), lab._reset, "plus")
 	lab._filter = LineEdit.new()
 	lab._filter.placeholder_text = tr("lab.ui.search")
 	lab._filter.right_icon = UI.icon("search")
@@ -354,9 +358,6 @@ func _settings(parent: Node) -> void:
 
 func environment(parent: Node) -> void:
 	var box = UI.fold(parent, tr("lab.ui.field"), true)
-	lab._stage = OptionButton.new()
-	for n in range(1, ContentManager.stage_count() + 1): lab._stage.add_item(tr("lab.message_c83172920b") % n, n)
-	box.add_child(lab._stage)
 	var seed_row := HBoxContainer.new()
 	box.add_child(seed_row)
 	lab._label(seed_row, "Seed")
