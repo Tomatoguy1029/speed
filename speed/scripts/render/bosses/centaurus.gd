@@ -2,6 +2,7 @@
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const REFERENCE_WHITE := preload("res://shaders/fx_reference_white.gdshader")
+const REFERENCE_CUT := preload("res://scripts/render/bosses/centaurus_reference_cut.gd")
 @export var pixel_size := 3.0
 @export var sail_star_scale := 1.0
 @export var sail_star_color := Color("#fff6c8")
@@ -98,6 +99,11 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	_parts.set_bow_pose(StringName(technique.get("technique","")),_mode(),float(body.charge),dt,float(technique.get("pose_time",-1.0)))
 	_sync_reference_white()
 	queue_redraw()
+
+## 同じ進路を本体全体に通し、現在の見た目の入口・出口を返す。
+func reference_cut(from: Vector2, direction: Vector2) -> Dictionary:
+	if state.is_empty() or _white_sprites.is_empty(): return {}
+	return REFERENCE_CUT.cut(_white_sprites, state.position, float(state.radius), from, direction)
 
 ## 停止中と停止後の白を、本体の描画とは別の加算層で受ける。
 func set_reference_hit(white: float) -> void:
