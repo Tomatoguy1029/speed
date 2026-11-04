@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cmath>
 namespace speed {
+// 星を吸い込んで形になるまで（この間は動かず無敵）。表示の成長も同じ長さで進む（scripts/render/picaro_look.gd FORM_TIME）。
+constexpr double picaro_form_time=2.5;
 namespace {
 bool alive(const godot::RunState &s,EnemyHandle h) {return s.enemy_handles.contains(h) && !s.enemies[h.slot].dead;}
 void release(RunRuntime &r,const DracoPicaroMember &m) {for (const auto *parts:{&m.parts,&m.clone_parts}) for (auto h:*parts) EnemySystem::mark_dead(r,h);}
@@ -35,7 +37,7 @@ void DracoPicaro::tick(RunRuntime &r,BossBodyState &b) {
     d.picaro_pending.clear();
     for (const auto &m:d.picaro) if (!alive(s,m.actor)) release(r,m);
     d.picaro.erase(std::remove_if(d.picaro.begin(),d.picaro.end(),[&](const auto &m){return !alive(s,m.actor);}),d.picaro.end());
-    for (auto &m:d.picaro) {auto &e=s.enemies[m.actor.slot];const bool forming=b.clock-m.born<1;e.held=forming || !d.picaro_attacking;e.guard=forming?1:0;m.parts=e.parts;
+    for (auto &m:d.picaro) {auto &e=s.enemies[m.actor.slot];const bool forming=b.clock-m.born<picaro_form_time;e.held=forming || !d.picaro_attacking;e.guard=forming?1:0;m.parts=e.parts;
         for (auto h:e.parts) if (s.enemy_handles.contains(h)) s.enemies[h.slot].held=e.held;
         if (!m.clone_parts.empty()) {
             const auto &p=DracoBody::rule(r,b);std::vector<godot::Vector2> points{e.pos};
@@ -51,6 +53,6 @@ bool DracoPicaro::validate(const godot::RunState &s,const ContentBundle &c,const
     std::unordered_set<uint64_t> seen;for (const auto &m:b.draco.picaro) {const uint64_t key=uint64_t(m.actor.slot)<<32|m.actor.generation;if (!seen.insert(key).second || !std::isfinite(m.born) || m.born< -2 || m.born>b.clock || !std::isfinite(m.angle) || (!m.stars && m.clone_parts.empty())) return false;if (s.enemy_handles.contains(m.actor)) {const auto &e=s.enemies[m.actor.slot];if (m.clone_parts.empty() && (!same_handle(e.picaro_owner,b.actor) || e.source_definition==0 || e.source_definition>c.definitions.size())) return false;}}return true;
 }
 godot::Array DracoPicaro::snapshot(const RunRuntime &r,const BossBodyState &b) {
-    godot::Array out;for (const auto &e:r.state.enemies) if (e.alive && !e.dead && same_handle(e.picaro_owner,b.actor)) {godot::Dictionary p;p["id"]=e.id;p["source_definition"]=e.source_definition;p["source_type"]=r.content->definitions[e.source_definition-1].id;p["visual_id"]=r.content->definitions[e.source_definition-1].visual_id;p["position"]=e.pos;p["angle"]=e.facing+r.content->definitions[e.definition].sprite_angle;p["radius"]=e.radius;p["sprite_radius"]=e.radius*r.content->definitions[e.definition].sprite_scale;p["guard"]=e.guard;p["held"]=e.held;p["hp"]=e.hp;p["mode"]=int(e.mode);p["velocity"]=e.vel;p["color"]=r.content->definitions[e.definition].color;p["parent"]=e.parent_id;p["born_age"]=2.0;for (const auto &m:b.draco.picaro) if (r.state.enemy_handles.contains(m.actor) && r.state.enemy_handles.entity_id(m.actor)==e.id) p["born_age"]=std::max(0.0,b.clock-m.born);godot::PackedInt64Array parts;for (auto h:e.parts) if (r.state.enemy_handles.contains(h)) parts.push_back(r.state.enemy_handles.entity_id(h));p["parts"]=parts;out.push_back(p);}return out;
+    godot::Array out;for (const auto &e:r.state.enemies) if (e.alive && !e.dead && same_handle(e.picaro_owner,b.actor)) {godot::Dictionary p;p["id"]=e.id;p["source_definition"]=e.source_definition;p["source_type"]=r.content->definitions[e.source_definition-1].id;p["visual_id"]=r.content->definitions[e.source_definition-1].visual_id;p["position"]=e.pos;p["angle"]=e.facing+r.content->definitions[e.definition].sprite_angle;p["radius"]=e.radius;p["sprite_radius"]=e.radius*r.content->definitions[e.definition].sprite_scale;p["guard"]=e.guard;p["held"]=e.held;p["hp"]=e.hp;p["mode"]=int(e.mode);p["velocity"]=e.vel;p["color"]=r.content->definitions[e.definition].color;p["parent"]=e.parent_id;p["born_age"]=picaro_form_time+1;for (const auto &m:b.draco.picaro) if (r.state.enemy_handles.contains(m.actor) && r.state.enemy_handles.entity_id(m.actor)==e.id) p["born_age"]=std::max(0.0,b.clock-m.born);godot::PackedInt64Array parts;for (auto h:e.parts) if (r.state.enemy_handles.contains(h)) parts.push_back(r.state.enemy_handles.entity_id(h));p["parts"]=parts;out.push_back(p);}return out;
 }
 }

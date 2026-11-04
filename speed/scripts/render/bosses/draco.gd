@@ -51,6 +51,7 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 			var parts: Node2D=preload("res://scripts/bosses/draco_parts.gd").new()
 			add_child(parts);parts.top_level=true
 			parts.material=ShaderMaterial.new();parts.material.shader=preload("res://shaders/picaro.gdshader")
+			var noise: Texture2D=preload("res://scripts/render/picaro_look.gd").noise_texture();parts.material.set_shader_parameter("noise_smooth",noise);parts.material.set_shader_parameter("noise_dots",noise)
 			_clones[clone.id]=parts
 		var parts: Node2D=_clones[clone.id]
 		var clone_feedback := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}
@@ -215,35 +216,9 @@ func _draw_rift_walls() -> void:
 		draw_polyline(right,Color("#40315f"),3.0,false)
 		for j in range(0,count,3):draw_line(left[j].lerp(right[j],0.25),left[j+1],Color(0.68,0.74,1.0,0.45),2.0,false)
 
+## ピカロの生成は run_frame_view.gd の共通表示（星を吸い込んで育つ塊）で描く。円と輪で囲む古い到着表示は出さない。
 func _draw_picaro_arrivals() -> void:
-	if state.get("cinematic_hide_enemies",false): return
-	var retained := false
-	for impact: Dictionary in state.get("impacts",[]):
-		if impact.technique=="picaro_wall" and float(impact.age)<float(_styles.get("picaro_wall",{}).get("impact_lifetime",0.65)): retained = true
-	if attack.get("technique","")!="picaro_wall" and not retained: return
-	for member: Dictionary in state.get("picaro",[]):
-		var age := float(member.born_age)
-		if age>1.4: continue
-		var center := to_local(member.position)
-		var radius := maxf(125.0,float(member.radius)*2.35)
-		var alpha := clampf((1.4-age)*2.0,0.0,1.0)
-		var gather := clampf(age/0.8,0.0,1.0)
-		var swell := 1.0+0.06*sin(age*18.0)
-		draw_circle(center,radius*0.92*swell,Color(0.35,0.26,0.9,alpha*0.075))
-		draw_arc(center,radius*1.16,0.0,TAU,48,Color(0.58,0.74,1.0,alpha*0.2),8.0,false)
-		var membrane := PackedVector2Array()
-		for j in 49:
-			var angle := j*TAU/48.0
-			membrane.append(center+Vector2.from_angle(angle)*radius*swell*(1.0+sin(angle*5.0+age*12.0)*0.055))
-		draw_polyline(membrane,Color(0.68,0.54,1.0,alpha*0.85),7.0,false)
-		for j in 16:
-			var angle := j*TAU/16.0+age*4.0
-			var direction := Vector2.from_angle(angle)
-			var at := center+direction*radius*(1.55-0.72*gather)
-			var to := center+direction.rotated(0.36)*radius*(1.18-0.35*gather)
-			draw_line(at,to,Color(0.69,0.87,1.0,alpha*(0.55+0.35*gather)),3.0)
-			if j%2==0: draw_circle(at,3.5,Color(0.87,0.96,1.0,alpha))
-		preload("res://scripts/bosses/draco_form.gd").star(self,center,radius*0.3,Color(0.82,0.91,1.0,alpha*0.75))
+	pass
 
 func _draw_arrow_impacts() -> void:
 	for impact: Dictionary in attack.get("arrow_impacts",[]):

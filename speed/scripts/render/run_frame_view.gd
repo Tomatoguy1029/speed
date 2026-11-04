@@ -84,6 +84,9 @@ var _pulser_parent: Node2D
 var _phoenix_visual: EnemyVisual
 var _picaro_sprites := {}
 var _picaro_material: ShaderMaterial
+var _picaro_fx: Node2D
+var _picaro_fx_rows: Array[Dictionary] = []
+const PICARO_LOOK = preload("res://scripts/render/picaro_look.gd")
 const BOSS_FINAL_BEAM := preload("res://scenes/render/boss_final_beam.tscn")
 var _boss_final_beams := {}
 var _boss_body_displays := {}
@@ -1728,47 +1731,152 @@ func _draw_hero_values(canvas: CanvasItem) -> void:
 	preload("res://scripts/render/hero_constellation.gd").draw(canvas,_hero_frame.get("hero",{}),1.0/maxf(0.01,float(_hero_frame.get("camera_zoom",1.0))),float(_hero_frame.world_time),Rect2(_hero_frame.view_center-half,half*2.0),_hero_aura,_hero_material)
 
 ## 元の敵と同じ画像・形へ、既存のコズミック表示だけを重ねる。
+## ピカロは元の敵の絵を共通シェーダーで「星空の窓」に塗り直す。生まれてから FORM_TIME 秒は、紫の塊が星を吸い込んで育ち、敵の形へ変わる。
 func _sync_cpp_picaro(bodies: Array) -> void:
 	if _picaro_material==null:
 		_picaro_material = ShaderMaterial.new()
 		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
+		_picaro_material.set_shader_parameter("noise_smooth",PICARO_LOOK.noise_texture())
+		_picaro_material.set_shader_parameter("noise_dots",PICARO_LOOK.noise_texture())
+	if _picaro_fx==null:
+		_picaro_fx = Node2D.new()
+		_picaro_fx.draw.connect(_draw_picaro_fx)
+		_layer(8).add_child(_picaro_fx)
+	_picaro_fx_rows.clear()
 	var used := {}
 	for body: Dictionary in bodies:
+		var hidden: bool = body.get("cinematic_hide_enemies",false)
 		for member: Dictionary in body.get("picaro",[]):
 			var entry: Dictionary = visuals.get(member.visual_id,{})
 			if entry.is_empty(): continue
 			used[member.id] = true
+			var seed := float(int(member.id)%17)*1.37
 			if not _picaro_sprites.has(member.id):
 				var texture: Texture2D
 				var resource: Resource = _scope.resources.get(entry.path)
 				if resource is EnemyLook: texture = resource.previews.get(entry.get("hull_preview",""))
 				elif resource is Texture2D: texture = resource
+				var look: Dictionary = PICARO_LOOK.form(texture)
 				var node: Node2D
-				if texture!=null:
+				if not look.is_empty():
 					var sprite := Sprite2D.new()
-					sprite.texture = texture
+					sprite.texture = look.texture
+					sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+					var material: ShaderMaterial = _picaro_material.duplicate()
+					material.set_shader_parameter("form_field",look.sdf)
+					material.set_shader_parameter("blob_radius",look.radius)
+					material.set_shader_parameter("seed",seed)
+					sprite.material = material
+					sprite.set_meta("picaro_look",look)
 					node = sprite
 				else:
 					var shape := Polygon2D.new()
 					shape.polygon = entry.get("points",InstanceBatch.circle_points(24))
 					shape.color = member.color
+					shape.material = _picaro_material
 					node = shape
-				node.material = _picaro_material
 				_layer(8).add_child(node)
 				_picaro_sprites[member.id] = node
 			var node: Node2D = _picaro_sprites[member.id]
 			node.position = member.position
 			node.rotation = member.angle
-			node.visible = not body.get("cinematic_hide_enemies",false)
-			var forming := clampf(1.0-float(member.born_age),0.0,1.0)
-			var radius: float = lerpf(float(member.sprite_radius),maxf(float(member.sprite_radius)*1.8,70.0),forming*forming)
-			node.scale = Vector2.ONE*radius
-			if node is Sprite2D: node.scale *= 2.0/maxf(node.texture.get_width(),node.texture.get_height())
-			node.modulate = Color(1,1,1,0.7 if member.guard>0.0 else 1.0)
+			node.visible = not hidden
+			var age := float(member.born_age)
+			var grown: Dictionary = PICARO_LOOK.growth(age,seed)
+			var done: float = grown.done
+			var forming := age<done+0.35
+			var radius: float = float(member.sprite_radius)
+			if node.has_meta("picaro_look"):
+				var look: Dictionary = node.get_meta("picaro_look")
+				var g: float = grown.g
+				var jig: float = grown.jig
+				var size: Vector2 = look.source_size
+				var growth_scale := (0.18+0.82*smoothstep(0.0,1.0,g))*(1.0+0.08*jig) if forming else 1.0
+				node.scale = Vector2.ONE*radius*2.0/maxf(size.x,size.y)*growth_scale
+				var material: ShaderMaterial = node.material
+				material.set_shader_parameter("morphing",forming)
+				material.set_shader_parameter("form",smoothstep(0.35,1.0,g)*(0.85+0.15*smoothstep(done,done+0.3,age)))
+				material.set_shader_parameter("jig",jig)
+				material.set_shader_parameter("flash",maxf(0.0,1.0-absf(age-done)/0.12)*0.45)
+			else:
+				node.scale = Vector2.ONE*radius
+			node.modulate = Color(1,1,1,0.7 if member.guard>0.0 and not forming else 1.0)
+			if not hidden: _picaro_fx_rows.append({"position":member.position,"age":age,"seed":seed,"radius":radius,"done":done,"g":grown.g,"node":node})
 	for id in _picaro_sprites.keys():
 		if not used.has(id):
 			_picaro_sprites[id].queue_free()
 			_picaro_sprites.erase(id)
+	_picaro_fx.queue_redraw()
+
+## ピカロのまわりの粒：渦を巻いて飛び込む星と尾、紫のしずくと煙、形が決まる瞬間にはじける星、形ができたあとに縁から漂う星屑。
+## 論理ピクセル1つ分の四角で描く（粒ごとに Node を作らない）。
+func _draw_picaro_fx() -> void:
+	const PX := 5.0
+	var purple := [Color("#4a1a86"),Color("#7a2fc4"),Color("#b25cff"),Color("#e3b8ff")]
+	var tints := [Color("#ffb0f0"),Color("#9ff4ff"),Color("#d2c8ff")]
+	var now := Time.get_ticks_msec()/1000.0
+	for row: Dictionary in _picaro_fx_rows:
+		var age: float = row.age
+		var seed: float = row.seed
+		var center: Vector2 = row.position
+		var reach: float = float(row.radius)*1.3
+		var done: float = row.done
+		var g: float = row.g
+		if age<done:
+			for i in PICARO_LOOK.STARS:
+				var a := (age-PICARO_LOOK.star_start(i,seed))/PICARO_LOOK.FLY
+				if a<0.0 or a>=1.0: continue
+				var start_angle := PICARO_LOOK.hash01(i*7.7+seed)*TAU
+				var start_radius := reach*(2.6+1.4*PICARO_LOOK.hash01(i*2.1))
+				var tint: Color = tints[i%3]
+				for m in range(6,0,-1):
+					_picaro_dot(_picaro_star_at(center,start_angle,start_radius,reach,g,maxf(0.0,a-m*0.035)),PX,Color(tint,(1.0-m/7.0)*0.7))
+				_picaro_star(_picaro_star_at(center,start_angle,start_radius,reach,g,a),PX,tint,1.0)
+			for m in 14:
+				var phase := fmod(age*0.8+PICARO_LOOK.hash01(m*2.7),1.0)
+				var angle := PICARO_LOOK.hash01(m*5.3)*TAU+age
+				var at := center+Vector2.from_angle(angle)*reach*(0.3+0.7*g)*(0.8+phase)+Vector2(0,-phase*30.0)
+				_picaro_dot(at,PX,Color(purple[0],(1.0-phase)*0.5))
+		for m in 8:
+			var born := 0.3+PICARO_LOOK.hash01(m*3.3+seed)*(done-0.5)
+			var drip := age-born
+			if drip<0.0 or drip>0.45: continue
+			var at := center+Vector2.from_angle(PICARO_LOOK.hash01(m*7.1)*TAU)*reach*(0.4+0.6*g)*(1.0+drip*2.2)+Vector2(0,drip*drip*100.0)
+			_picaro_dot(at,PX,purple[3] if drip<0.18 else purple[2])
+		var pop := age-done
+		if pop>0.0 and pop<0.6:
+			for m in 12:
+				var at := center+Vector2.from_angle(PICARO_LOOK.hash01(m*4.1+9.0)*TAU)*reach*(0.8+pop*2.5*(0.5+PICARO_LOOK.hash01(m)))
+				_picaro_star(at,PX,tints[m%3],1.0-pop/0.6)
+		var node: Node2D = row.node
+		if age>done and is_instance_valid(node) and node.has_meta("picaro_look"):
+			var edges: PackedVector2Array = node.get_meta("picaro_look").edges
+			if edges.is_empty(): continue
+			var settle := clampf((age-done)/0.4,0.0,1.0) if age<done+1.0 else 1.0
+			for m in 16:
+				var life := 0.9+0.8*PICARO_LOOK.hash01(m*3.3+seed)
+				var cycle := floorf((now+PICARO_LOOK.hash01(m*7.1)*life)/life)
+				var phase := fmod(now+PICARO_LOOK.hash01(m*7.1)*life,life)/life
+				var from := node.transform*edges[int(PICARO_LOOK.hash01(m*5.7+seed+cycle*0.37)*edges.size())%edges.size()]
+				var out := (from-center).normalized()
+				var at := from+out*phase*26.0+Vector2(0,-phase*18.0)
+				var fade := (1.0-phase)*settle
+				if fade<0.05: continue
+				_picaro_dot(at,PX,Color(tints[m%3] if phase<0.3 else purple[2],fade))
+
+func _picaro_star_at(center: Vector2,start_angle: float,start_radius: float,reach: float,g: float,u: float) -> Vector2:
+	return center+Vector2.from_angle(start_angle+u*2.4)*(start_radius*pow(1.0-u,1.4)+reach*0.2*(0.15+0.85*g))
+
+func _picaro_dot(at: Vector2,size: float,color: Color) -> void:
+	var cell := (at/size).floor()*size
+	_picaro_fx.draw_rect(Rect2(cell,Vector2(size,size)),color)
+
+func _picaro_star(at: Vector2,size: float,tint: Color,alpha: float) -> void:
+	if alpha<=0.02: return
+	_picaro_dot(at,size,Color(1,1,1,alpha))
+	for direction in [Vector2.RIGHT,Vector2.LEFT,Vector2.UP,Vector2.DOWN]:
+		_picaro_dot(at+direction*size,size,Color(tint,alpha*0.8))
+		_picaro_dot(at+direction*size*2.0,size,Color(tint,alpha*0.35))
 
 ## 最終攻撃も、各ボスの戦闘状態を読み取る同じ表示経路へ通す。
 func _sync_cpp_boss_final_beams(bodies: Array) -> void:
