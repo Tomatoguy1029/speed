@@ -15,7 +15,7 @@ double distance(godot::Vector2 p,godot::Vector2 a,godot::Vector2 b) {const auto 
 }
 AttackHandle CanisHoundLunge::begin(RunRuntime &r,BossBodyState &b,EnemyHandle actor,int64_t action,const HoundLungeSettings &p) {
     auto &s=r.state;if (action<=0 || p.speed<0 || p.duration<=0 || p.damage<0 || !s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead || r.content->definitions[s.enemies[actor.slot].definition].kind!=EnemyDefinition::Kind::Hound || b.mode>=BossMode::Defeated) return {};
-    const auto *fx=CanisRoar::settings(*r.content,p.source_technique);const bool independent=fx && fx->has_hound_speed && (fx->external_id=="O-command" || fx->external_id=="O-howl" || fx->external_id=="O-stream" || fx->external_id=="O-hunt" || fx->external_id=="O-hunt_pounce");
+    const auto *fx=CanisRoar::settings(*r.content,p.source_technique);const bool independent=fx && fx->has_hound_speed && (fx->external_id=="O-command" || fx->external_id=="O-howl" || fx->external_id=="O-bay" || fx->external_id=="O-stream" || fx->external_id=="O-hunt" || fx->external_id=="O-hunt_pounce");
     const double rate=independent?fx->hound_speed:1.0;const double duration=p.duration/rate;
     auto &e=s.enemies[actor.slot];const auto aim=p.track_aim?TrackingPolicy{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)}.target(e.pos,e.facing,s.ship_pos):s.ship_pos;const auto velocity=(aim-e.pos).normalized()*(p.speed*rate);const double until=s.world_time+duration;
     if (p.quiet) GroupSystem::release_order(s,actor);GroupSystem::follow(s,actor,e.pos+velocity*(duration+0.2),until,p.speed*rate/std::max(e.speed,1.0));if (p.quiet) {GroupSystem::quiet(s,actor,until,true,velocity);e.facing=velocity.angle();}e.vel=velocity;
