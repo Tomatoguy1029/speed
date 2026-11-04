@@ -12,6 +12,8 @@ var _scope: ContentResourceScope
 var _visuals: Dictionary
 var _flashes := {}
 var _bodies := {}
+var _impacts: Array[Dictionary] = []
+var _last_clock := -1.0
 var _noise = JET.new()
 var _edges: Dictionary = EDGES.get_meta("edges")
 
@@ -20,7 +22,17 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 	_scope = scope
 	_visuals = visuals
 
-func render(owners: PackedFloat64Array, selected: Array, thrown: Array, canvas, clock: float) -> void:
+func render(owners: PackedFloat64Array, selected: Array, thrown: Array, events: Array, canvas, clock: float) -> void:
+	if _last_clock>=0.0 and clock<_last_clock: _impacts.clear()
+	_last_clock = clock
+	for event: Dictionary in events:
+		# RetireReason::CoronaThrowEnd。通常の退却や撃破には使わない。
+		if event.get("type") == &"enemy_retire" and int(event.get("reason",-1))==6:
+			_impacts.append({"pos":event.pos,"id":int(event.id),"time":float(event.get("world_t",clock))})
+	for impact: Dictionary in _impacts.duplicate():
+		var age := clock-float(impact.time)
+		if age>=0.35: _impacts.erase(impact)
+		elif age>=0.0: FX.sparks(canvas.front,canvas.to_logical(impact.pos),age,40+int(impact.id),10,Color(_settings.color),40,0.35)
 	var vortex := FX.ramp(Color("b6a2db"))
 	for i in range(0, owners.size(), 7):
 		var center: Vector2 = canvas.to_logical(Vector2(owners[i],owners[i+1]))
@@ -67,8 +79,7 @@ func _draw_thrown(row: Dictionary, canvas, clock: float) -> void:
 	var direction := velocity.normalized()
 	var normal := Vector2(-direction.y,direction.x)
 	var age := float(row.age)
-	var life := float(row.life)
-	var fade := 1.0-_smooth(life-0.25,life,age)
+	var fade := 1.0
 	var center: Vector2 = canvas.to_logical(row.pos)
 	var trail: float = minf(age*velocity.length(),260.0)*canvas.world_scale
 	var frame := floori(clock*30.0)
@@ -152,10 +163,6 @@ func _draw_body(row: Dictionary, fade: float, canvas, clock: float, direction: V
 		var k: float = r.next()
 		var end := point-direction*length+Vector2(r.between(-1,1),r.between(-1,1))
 		canvas.front.line(point.x,point.y,end.x,end.y,func(u: float): return colors[7] if u<0.3 else (colors[5] if u<0.6 else colors[3]),fade*(0.6+0.4*k))
-
-func _smooth(a: float, b: float, x: float) -> float:
-	var t := clampf((x-a)/(b-a),0.0,1.0)
-	return t*t*(3.0-2.0*t)
 
 func _flash(row: Dictionary, alpha: float) -> void:
 	var visual_id := int(row.visual_id)

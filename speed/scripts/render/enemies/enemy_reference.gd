@@ -95,7 +95,7 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 	if frame.has("cepheus_fx") and frame.has("cepheus_actors"):
 		_cepheus.render(frame.cepheus_actors, frame.cepheus_fx, canvas, world_time)
 	if frame.has("corona_selected") and frame.has("corona_thrown"):
-		_corona.render(frame.corona, frame.corona_selected, frame.corona_thrown, canvas, world_time)
+		_corona.render(frame.corona, frame.corona_selected, frame.corona_thrown, normalized, canvas, world_time)
 	if frame.has("aquila_actors") and frame.has("aquila_zones"):
 		_aquila.render(frame.aquila_actors, frame.aquila_zones, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))

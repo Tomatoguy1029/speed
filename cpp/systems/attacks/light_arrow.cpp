@@ -40,7 +40,9 @@ void LightArrowSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 vi
     PackedVector2Array points;points.push_back(s.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(s.radius*d.flight_scale);PackedColorArray colors;colors.push_back(Color(d.tint_r,d.tint_g,d.tint_b,d.tint_a));
     shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;
     shape["petrified_radius"]=s.stone>0?double(s.radius)*1.3:0.0;
-    shape["angle"]=double(s.vel.angle());shape["length"]=s.arrow.length*d.flight_scale;shape["world_time"]=run.state.world_time;shape["cosmic"]=d.cosmic;
+    const auto technique=record->spec.source_technique;
+    const bool power_shot=technique && technique<=run.content->boss_techniques.size() && run.content->boss_techniques[technique-1].kind==11;
+    shape["angle"]=double(s.vel.angle());shape["length"]=s.arrow.length*d.flight_scale;shape["world_time"]=run.state.world_time;shape["cosmic"]=d.cosmic && !power_shot;
     shape["shot_length_scale"]=d.shot_length_scale;shape["shot_width_scale"]=d.shot_width_scale;shape["core_width"]=d.core_width;shape["cosmic_speed"]=d.cosmic_speed;shape["cosmic_star_count"]=int64_t(d.cosmic_star_count);
     shape["arrow_color"]=Color(d.arrow_r,d.arrow_g,d.arrow_b,d.arrow_a);shape["cosmic_color_a"]=Color(d.cosmic_a_r,d.cosmic_a_g,d.cosmic_a_b,d.cosmic_a_a);shape["cosmic_color_b"]=Color(d.cosmic_b_r,d.cosmic_b_g,d.cosmic_b_b,d.cosmic_b_a);
     out.push_back(shape);

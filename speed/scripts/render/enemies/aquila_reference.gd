@@ -91,10 +91,12 @@ func _draw_zone(row: Dictionary, time: float, canvas, clock: float, colors: Arra
 	var intensity := float(_settings.intensity)
 	if time<delay:
 		var k := clampf(time/delay,0.0,1.0)
+		_draw_sky_bolt(canvas,center,seed,colors,time-delay)
 		_light.static_bolts(canvas.back,center,radius,roundi(3+7*k),radius*(0.2+0.25*k),clock,seed,colors,0.45+0.5*k)
 		canvas.back.glow(center.x,center.y,6+10*k,colors[5],(0.2+0.6*k)*intensity)
 		return
 	var age := time-delay
+	_draw_sky_bolt(canvas,center,seed,colors,age)
 	var heat := pow(clampf(1.0-age/1.2,0.0,1.0),1.4)
 	if heat>0:
 		for crack: Dictionary in _light.cracks(seed,radius):
@@ -113,8 +115,8 @@ func _draw_zone(row: Dictionary, time: float, canvas, clock: float, colors: Arra
 			var length: float = radius*rng.between(0.7,0.95)
 			paths.append_array(_light.zigzag(rng,center,center+Vector2.from_angle(angle)*length,0.22,0.6))
 		var bright: Array[Color] = []
-		for i in range(8): bright.append(colors[mini(7,i+2)] if age<1.0/30.0 else colors[i])
-		_light.ink(canvas.front,paths,flick,bright,1.25,false,0.8)
+		for i in range(8): bright.append(colors[mini(6,i)])
+		_light.ink(canvas.front,paths,flick,bright,0.85,false,0.18)
 	if age<0.5:
 		for j in range(16):
 			var r = JET.Rng.new(seed*7+j+1)
@@ -127,10 +129,46 @@ func _draw_zone(row: Dictionary, time: float, canvas, clock: float, colors: Arra
 			canvas.front.line(start.x,start.y,point.x,point.y,func(u: float): return colors[7] if u>0.5 else colors[5],1.0-age/life)
 	if age<0.3: canvas.back.glow(center.x,center.y,radius*1.2,colors[4],0.5*(1.0-age/0.3)*intensity)
 	if age<0.08:
-		canvas.front.glow(center.x,center.y,radius*1.1,colors[6],(1.0-age/0.08)*0.9*intensity)
-		canvas.front.glow(center.x,center.y,radius*0.4,colors[7],(1.0-age/0.08)*intensity)
+		canvas.front.glow(center.x,center.y,radius*1.1,colors[5],(1.0-age/0.08)*0.22*intensity)
+		canvas.front.glow(center.x,center.y,radius*0.4,colors[6],(1.0-age/0.08)*0.12*intensity)
 	var active := float(row.active)
 	if age>active and age<active+0.35: _light.static_bolts(canvas.back,center,radius*0.7,3,radius*0.18,clock,seed+5,colors,0.5*(1.0-(age-active)/0.35))
+
+# 上端の段階的な先行放電と、同じ経路を走る三度の落雷。
+func _draw_sky_bolt(canvas, center: Vector2, seed: int, colors: Array[Color], age: float) -> void:
+	if age < -0.18 or age >= 0.72 or center.y <= 1.0: return
+	var intensity := clampf(float(_settings.intensity),0.0,1.0)
+	if intensity <= 0.0: return
+	var rng = JET.Rng.new(seed*31+11)
+	var top := Vector2(center.x+rng.between(-15.0,15.0),-2.0)
+	var paths: Array = _light.zigzag(rng,top,center,0.17,0.5)
+	if age < 0.0:
+		var progress := clampf((age+0.18)/0.18,0.0,1.0)
+		var reach := lerpf(top.y,center.y-5.0,pow(progress,1.2))
+		for path: Dictionary in paths:
+			var points: Array = path.points
+			for i in range(points.size()-1):
+				var a: Vector2 = points[i]
+				var b: Vector2 = points[i+1]
+				if b.y > reach: break
+				canvas.front.line(a.x,a.y,b.x,b.y,colors[5] if b.y>reach-15.0 else colors[3],0.85*intensity)
+		return
+	var strength := 0.0
+	for stroke in [[0.0,1.0],[0.28,0.8],[0.5,0.55]]:
+		var elapsed: float = age-float(stroke[0])
+		if elapsed < 0: continue
+		var frame := floori(elapsed*30.0)
+		strength = float(FLICK[frame])*float(stroke[1]) if frame<FLICK.size() else 0.0
+	if strength > 0.0:
+		var restrained: Array[Color] = colors.duplicate()
+		restrained[7] = colors[6]
+		_light.ink(canvas.front,paths,strength*intensity,restrained,0.85,false,0.14)
+	elif age < 0.65:
+		var points: Array = paths[0].points
+		for i in range(points.size()-1):
+			var a: Vector2 = points[i]
+			var b: Vector2 = points[i+1]
+			canvas.front.line(a.x,a.y,b.x,b.y,colors[3],maxf(0.15,0.5-age*0.45)*intensity)
 
 func _wake(history: Array, canvas, clock: float, colors: Array[Color], strength: float) -> void:
 	if history.size()<2 or strength<=0: return
@@ -226,7 +264,7 @@ func _electrify(row: Dictionary, canvas, clock: float, colors: Array[Color], str
 			var point := a+Vector2.from_angle(dir)*d
 			var start := point-Vector2.from_angle(dir)*2.0
 			canvas.front.line(start.x,start.y,point.x,point.y,func(u: float): return colors[7] if u>0.5 else colors[5],strength)
-	canvas.front.glow(center.x,center.y,float(row.radius)*canvas.world_scale*2.2,colors[4],(0.45 if jolt else 0.15)*strength)
+	canvas.front.glow(center.x,center.y,float(row.radius)*canvas.world_scale*2.2,colors[4],(0.15 if jolt else 0.07)*strength)
 
 func _edge(row: Dictionary, point: Vector2, angle: float, scale: float, canvas) -> Vector2:
 	return canvas.to_logical(row.pos+point.rotated(angle)*scale)

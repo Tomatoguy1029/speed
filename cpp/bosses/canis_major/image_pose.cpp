@@ -1,6 +1,7 @@
 #include "image_pose.h"
 #include "nova.h"
 #include "pounce.h"
+#include "roar.h"
 #include "../../runtime/run_runtime.h"
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
@@ -76,6 +77,19 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
         c.nodes[6].rotation-=std::sin(c.walk_phase)*.07;
     }
     const auto *p=jump(t);const double land_age=c.landed_at>=0?b.clock-c.landed_at:-1;
+    if (t && !p) {
+        const auto *roar=CanisRoar::settings(*r.content,t->definition);
+        const auto *hunt=std::get_if<CanisHuntState>(&t->detail);
+        const auto *relay=std::get_if<CanisRelayState>(&t->detail);
+        const bool aiming=(hunt && hunt->aiming) || (relay && relay->aiming);
+        if (roar && roar->has_roar && roar->external_id!="O-nova" && !aiming) {
+            const double age=b.canis.roar_last_technique==t->id?b.clock-b.canis.roar_started:-1;
+            const double inhale=age>=0?0:std::clamp((t->stage==TechniqueStage::Windup?e.charge:0.0)*2.0,0.0,1.0);
+            const double push=age>=0?smooth(0,.035,age)*(1-smooth(.09,.24,age)):0;
+            c.nodes[6].rotation=-.045*inhale;c.nodes[6].position={0,42-inhale*9+push*13};c.nodes[6].scale={1+push*.035,1+push*.09};
+            c.nodes[5].position={0,-inhale*4-push*3};c.nodes[5].rotation=0;c.nodes[5].scale={1+inhale*.025-push*.02,1-inhale*.055+push*.04};
+        }
+    }
     if (p && !p->done) {
         const auto motion=CanisPounce::motion_snapshot(r,*p);
         const double span=double(motion[p->jumping?"active_time":"warn_time"]);
@@ -105,7 +119,7 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
 godot::Vector2 CanisImagePose::mouth(const RunRuntime &r,const BossBodyState &b) {
     if (!r.state.enemy_handles.contains(b.actor)) return {};
     const auto &enemy=r.state.enemies[b.actor.slot];const auto &head=b.canis.image_pose.nodes[6];
-    return enemy.pos+(head.position+godot::Vector2(0,59).rotated(head.rotation)).rotated(enemy.facing-godot::Math::PI/2)*(enemy.radius/100.0);
+    return enemy.pos+(head.position+(godot::Vector2(0,59)*head.scale).rotated(head.rotation)).rotated(enemy.facing-godot::Math::PI/2)*(enemy.radius/100.0);
 }
 godot::Array CanisImagePose::snapshot(const RunRuntime &,const BossBodyState &b) {
     godot::Array out;

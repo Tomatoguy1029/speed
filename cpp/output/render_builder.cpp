@@ -307,7 +307,18 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (const auto &e:state.enemies) {
         if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss)) continue;
         if (const auto *o=std::get_if<CoronaState>(&e.behavior_state)) if (o->ready && view.grow(200).has_point(e.pos)) {const auto &p=run.content->coronas[run.content->definitions[e.definition].corona_definition-1];for (double v:{double(e.pos.x),double(e.pos.y),p.ring,state.world_time*p.spin,e.radius,double(e.mode),e.charge}) corona.push_back(v);}
-        if (e.corona && view.grow(400).has_point(e.pos) && state.enemy_handles.contains(e.corona->owner)) {const auto &a=*e.corona;const auto &owner=state.enemies[a.owner.slot];const auto &o=std::get<CoronaState>(owner.behavior_state);const bool selected=state.enemy_handles.contains(o.selected) && state.enemy_handles.entity_id(o.selected)==e.id;for (double v:{double(e.pos.x),double(e.pos.y),e.radius*a.effect,a.thrown?1.0:0.0,double(e.vel.x),double(e.vel.y),selected?1.0:0.0,double(owner.pos.x),double(owner.pos.y),state.world_time}) corona_members.push_back(v);const auto &d=run.content->definitions[e.definition];if (selected && !a.thrown) {Dictionary fx;fx["id"]=e.id;fx["pos"]=e.pos;fx["from"]=owner.pos;fx["radius"]=e.radius*a.effect;fx["sprite_radius"]=e.radius*d.sprite_scale;fx["angle"]=e.facing;fx["charge"]=owner.charge;fx["visual_id"]=d.visual_id;corona_selected.push_back(fx);}if (a.thrown) {const auto &p=run.content->coronas[run.content->definitions[owner.definition].corona_definition-1];Dictionary fx;fx["id"]=e.id;fx["pos"]=e.pos;fx["velocity"]=e.vel;fx["radius"]=e.radius;fx["sprite_radius"]=e.radius*d.sprite_scale;fx["angle"]=e.facing;fx["seed_angle"]=a.angle;fx["age"]=std::max(0.0,p.throw_life-a.life);fx["life"]=p.throw_life;fx["visual_id"]=d.visual_id;fx["polygon"]=d.polygon_visual;corona_thrown.push_back(fx);}}
+        if (e.corona && view.grow(400).has_point(e.pos)) {
+            const auto &a=*e.corona;const bool has_owner=state.enemy_handles.contains(a.owner);
+            if (!has_owner && !a.thrown) continue;
+            const auto *owner=has_owner?&state.enemies[a.owner.slot]:nullptr;
+            const auto *o=owner?std::get_if<CoronaState>(&owner->behavior_state):nullptr;
+            const bool selected=o && state.enemy_handles.contains(o->selected) && state.enemy_handles.entity_id(o->selected)==e.id;
+            const auto origin=owner?owner->pos:e.pos;
+            for (double v:{double(e.pos.x),double(e.pos.y),e.radius*a.effect,a.thrown?1.0:0.0,double(e.vel.x),double(e.vel.y),selected?1.0:0.0,double(origin.x),double(origin.y),state.world_time}) corona_members.push_back(v);
+            const auto &d=run.content->definitions[e.definition];
+            if (selected && !a.thrown) {Dictionary fx;fx["id"]=e.id;fx["pos"]=e.pos;fx["from"]=origin;fx["radius"]=e.radius*a.effect;fx["sprite_radius"]=e.radius*d.sprite_scale;fx["angle"]=e.facing;fx["charge"]=owner->charge;fx["visual_id"]=d.visual_id;corona_selected.push_back(fx);}
+            if (a.thrown) {const auto &p=run.content->coronas[run.content->definitions[owner?owner->definition:a.slot].corona_definition-1];Dictionary fx;fx["id"]=e.id;fx["pos"]=e.pos;fx["velocity"]=e.vel;fx["radius"]=e.radius;fx["sprite_radius"]=e.radius*d.sprite_scale;fx["angle"]=e.facing;fx["seed_angle"]=a.angle;fx["age"]=std::max(0.0,p.throw_life-a.life);fx["life"]=p.throw_life;fx["visual_id"]=d.visual_id;fx["polygon"]=d.polygon_visual;corona_thrown.push_back(fx);}
+        }
     }
     Dictionary aquila;PackedFloat64Array aquila_values;Array aquila_actors,aquila_zones;
     for (const auto &e:state.enemies) {

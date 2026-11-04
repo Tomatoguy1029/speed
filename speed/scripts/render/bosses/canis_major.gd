@@ -263,18 +263,7 @@ func _draw() -> void:
 		var width := float(technique.beam_width) if technique.locked else lerpf(1.0,3.0,float(state.charge))
 		var mouth := Vector2(float(state.radius)*0.84,0.0)
 		draw_line(mouth,mouth+Vector2(float(technique.beam_length),0.0),Color(color,alpha),width)
-	draw_set_transform(Vector2.ZERO,0.0,Vector2.ONE*float(state.radius)/100.0)
-	if int(technique.get("stage",5))==2 and technique.get("technique","")!="nova":
-		var alpha := 0.45+sin(float(state.clock)*14.0)*0.25
-		draw_arc(Vector2(-6,0),106.0,0.0,TAU,32,Color(sirius_halo_color,alpha),pixel_size*2.0)
-	var calling: bool = state.get("calling",false) or state.get("barking",false)
-	var shouting: bool = technique.get("technique","") in ["command","stream","bay","hunt_pounce"] and int(technique.get("stage",5))==0 and not technique.get("jumping",false)
-	if not calling and not shouting:
-		draw_set_transform(Vector2.ZERO)
-		return
-	for ring in 2:
-		var grow := fmod(float(state.clock)*2.5+ring*0.5,1.0)
-		draw_arc(Vector2(84.0,0.0),20.0+grow*90.0,0.0,TAU,32,Color(Color("#f2b567"),1.0-grow),pixel_size)
+	# 咆哮はroar_post、着地は足元の土煙が描く。旧い輪は重ねない。
 	draw_set_transform(Vector2.ZERO)
 ## 閃光の遮蔽場は戦闘側から受け取り、描画側で再計算しない。
 const SIRIUS_COLOR := Color("#cfefff")

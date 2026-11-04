@@ -200,7 +200,6 @@ func _present_cpp(delta: float) -> void:
 	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
 	frame_view.update_reference_effects(frame,delta)
-	if _roar_post!=null: _roar_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center,cam_zoom)
 	shake=maxf(shake,frame_view.ruler_shake)
 	frame_view.ruler_shake=0.0
 	if frame_view.finish_shake>0.0:
@@ -219,6 +218,7 @@ func _present_cpp(delta: float) -> void:
 		shake = maxf(0.0,shake-delta*40.0)
 		_camera.offset = Vector2.ZERO if not view.is_empty() and not view.get("shake",false) else Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
 	else: _camera.offset = Vector2.ZERO
+	if _roar_post!=null: _roar_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center+_camera.offset,cam_zoom)
 	frame_view.perf.since(&"view_effects",effects_start)
 	var tail_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")

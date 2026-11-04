@@ -7,6 +7,7 @@ var _copy: BackBufferCopy
 var _image: ColorRect
 var _material: ShaderMaterial
 var _band_used := false
+var _buffer_size := Vector2.ZERO
 
 func _ready() -> void:
 	_copy = BackBufferCopy.new()
@@ -24,6 +25,10 @@ func _ready() -> void:
 
 func apply_frame(bodies: Array, size: Vector2, camera: Vector2, zoom: float) -> void:
 	hide()
+	if size!=_buffer_size:
+		_buffer_size = size
+		_band_used = false
+	if size.x<=0.0 or size.y<=0.0: return
 	for body: Dictionary in bodies:
 		var roar: Dictionary = body.get("roar",{})
 		if roar.is_empty(): continue
@@ -36,7 +41,8 @@ func apply_frame(bodies: Array, size: Vector2, camera: Vector2, zoom: float) -> 
 		var u := age/life
 		var envelope := smoothstep(0.0,0.08,u)*(1.0-smoothstep(0.35,1.0,u))
 		if envelope<=0.001: continue
-		var center: Vector2 = (Vector2(roar.mouth)-camera)*zoom+size*0.5
+		var logical_pixel := size.y/225.0
+		var center: Vector2 = (Vector2(roar.mouth)-camera)*zoom+Vector2(roundf(size.x/logical_pixel)*logical_pixel,size.y)*0.5
 		var unit := float(roar.radius)*zoom*float(params.size)*float(params.roarSize)
 		var clear := unit*float(params.roarClear)
 		var outer := maxf(clear*1.8,unit*float(params.roarRange)*(0.7+0.3*level/3.0))

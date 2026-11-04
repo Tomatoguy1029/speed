@@ -38,7 +38,7 @@ void BossImageSystem::refresh(RunRuntime &r) {
         switch (r.content->bosses[boss-1].kind) {
         case 0:MonocerosImagePoseSystem::refresh(r,body);break;
         case 1:CentaurusImagePoseSystem::refresh(r,body);CentaurusReferenceFx::update(r,body);break;
-        case 2:CanisImagePose::update(r,body);CanisRoar::update(r,body);break;
+        case 2:CanisRoar::update(r,body);CanisImagePose::update(r,body);break;
         default:break;
         }
     }

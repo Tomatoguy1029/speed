@@ -1,6 +1,6 @@
 shader_type canvas_item;
 render_mode unshaded, blend_disabled;
-uniform sampler2D snapshot : hint_screen_texture, filter_linear, repeat_disable;
+uniform sampler2D snapshot : hint_screen_texture, filter_nearest, repeat_disable;
 uniform sampler2D streaks : filter_linear, repeat_disable;
 uniform sampler2D lumps : filter_linear, repeat_disable;
 uniform vec2 viewport_size;
@@ -27,10 +27,19 @@ vec3 to_linear(vec3 c) {
 	return mix(c/12.92,pow(max((c+0.055)/1.055,vec3(0.0)),vec3(2.4)),step(vec3(0.04045),c));
 }
 
+vec4 snapshot_pixel(vec2 pixel,vec2 dimensions) {
+	vec2 at=clamp(pixel,vec2(0.0),dimensions-vec2(1.0));
+	vec4 value=texture(snapshot,(at+vec2(0.5))/dimensions);
+	return vec4(linear_target?to_srgb(value.rgb):value.rgb,value.a);
+}
 vec4 sample_snapshot(vec2 point) {
 	if (point.x<0.0 || point.y<0.0 || point.x>=viewport_size.x || point.y>=viewport_size.y) return vec4(0.0);
-	vec4 value=texture(snapshot,point/viewport_size);
-	return vec4(linear_target?to_srgb(value.rgb):value.rgb,value.a);
+	vec2 dimensions=vec2(textureSize(snapshot,0));
+	vec2 pixel=point/viewport_size*dimensions-vec2(0.5);
+	vec2 base=floor(pixel), f=fract(pixel);
+	vec4 top=mix(snapshot_pixel(base,dimensions),snapshot_pixel(base+vec2(1.0,0.0),dimensions),f.x);
+	vec4 bottom=mix(snapshot_pixel(base+vec2(0.0,1.0),dimensions),snapshot_pixel(base+vec2(1.0,1.0),dimensions),f.x);
+	return mix(top,bottom,f.y);
 }
 vec4 over(vec4 under, vec4 top, float opacity) {
 	float alpha=top.a*opacity;

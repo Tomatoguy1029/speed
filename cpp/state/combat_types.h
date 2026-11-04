@@ -14,7 +14,7 @@ struct ShipContactPolicy {
     HitPolicy hit_policy=HitPolicy::MarkAfter;
     bool add_ship_radius=true,ship_sweep=false;
 };
-enum class RetireReason { Outside, Relocate, Regenerate, BonusClear, Development, DeathCleanup };
+enum class RetireReason { Outside, Relocate, Regenerate, BonusClear, Development, DeathCleanup, CoronaThrowEnd };
 struct DamageRequest {
     EnemyHandle struck;
     double amount=0, knock=160;
