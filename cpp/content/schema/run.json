@@ -628,6 +628,11 @@
           "runtime": "control.boss_ram_hitstop"
         },
         {
+          "name": "fx_monoceros_slash_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
           "name": "fx_boss_touch_damage",
           "type": "f64",
           "min": 0,
@@ -3273,6 +3278,7 @@
     "centaurus.json",
     "boss_image.json",
     "canis_image.json",
+    "monoceros_image.json",
     "canis_major.json",
     "hydra.json",
     "draco.json"

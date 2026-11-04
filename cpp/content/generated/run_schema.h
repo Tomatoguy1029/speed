@@ -98,6 +98,7 @@ struct RunConfig {
     double pickup_life{};
     double trace_radius{};
     double fx_boss_ram_hitstop{};
+    double fx_monoceros_slash_life{};
     double fx_boss_touch_damage{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
@@ -276,6 +277,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.trace_radius < 0) return false;
     if (!input.read_f64(out.fx_boss_ram_hitstop)) return false;
     if (out.fx_boss_ram_hitstop < 0) return false;
+    if (!input.read_f64(out.fx_monoceros_slash_life)) return false;
+    if (out.fx_monoceros_slash_life < 0) return false;
     if (!input.read_f64(out.fx_boss_touch_damage)) return false;
     if (out.fx_boss_touch_damage < 0) return false;
     return true;
@@ -5400,6 +5403,148 @@ inline bool read(BinaryReader &input, CanisImagePartDefinition &out) {
     if (!input.read_bool(out.visible)) return false;
     return true;
 }
+struct MonocerosImageNode {
+    uint32_t id{};
+    uint32_t parent{};
+    std::string path{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    bool visible{};
+    bool editable{};
+    double offset_x{};
+    double offset_y{};
+};
+inline bool read(BinaryReader &input, MonocerosImageNode &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.parent)) return false;
+    if (!input.read_string(out.path)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_bool(out.editable)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    return true;
+}
+struct MonocerosImageSprite {
+    uint32_t id{};
+    uint32_t node{};
+    uint32_t mask{};
+    uint32_t region_x{};
+    uint32_t region_y{};
+    uint32_t region_w{};
+    uint32_t region_h{};
+    double offset_x{};
+    double offset_y{};
+    bool centered{};
+    bool flip_h{};
+    bool flip_v{};
+    uint32_t hframes{};
+    uint32_t vframes{};
+    uint32_t frame{};
+    int64_t gait_slot{};
+    bool gait_armor{};
+    bool horn{};
+};
+inline bool read(BinaryReader &input, MonocerosImageSprite &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_u32(out.mask)) return false;
+    if (!input.read_u32(out.region_x)) return false;
+    if (!input.read_u32(out.region_y)) return false;
+    if (!input.read_u32(out.region_w)) return false;
+    if (!input.read_u32(out.region_h)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    if (!input.read_bool(out.centered)) return false;
+    if (!input.read_bool(out.flip_h)) return false;
+    if (!input.read_bool(out.flip_v)) return false;
+    if (!input.read_u32(out.hframes)) return false;
+    if (!input.read_u32(out.vframes)) return false;
+    if (!input.read_u32(out.frame)) return false;
+    if (!input.read_i64(out.gait_slot)) return false;
+    if (!input.read_bool(out.gait_armor)) return false;
+    if (!input.read_bool(out.horn)) return false;
+    return true;
+}
+struct MonocerosImageGait {
+    uint32_t id{};
+    double duration{};
+    uint32_t base_mask{};
+    uint32_t base_x{};
+    uint32_t base_y{};
+    uint32_t base_w{};
+    uint32_t base_h{};
+    uint32_t armor_mask{};
+    uint32_t armor_x{};
+    uint32_t armor_y{};
+    uint32_t armor_w{};
+    uint32_t armor_h{};
+};
+inline bool read(BinaryReader &input, MonocerosImageGait &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_u32(out.base_mask)) return false;
+    if (!input.read_u32(out.base_x)) return false;
+    if (!input.read_u32(out.base_y)) return false;
+    if (!input.read_u32(out.base_w)) return false;
+    if (!input.read_u32(out.base_h)) return false;
+    if (!input.read_u32(out.armor_mask)) return false;
+    if (!input.read_u32(out.armor_x)) return false;
+    if (!input.read_u32(out.armor_y)) return false;
+    if (!input.read_u32(out.armor_w)) return false;
+    if (!input.read_u32(out.armor_h)) return false;
+    return true;
+}
+struct MonocerosImageHorn {
+    uint32_t id{};
+    double duration{};
+    double core_length{};
+};
+inline bool read(BinaryReader &input, MonocerosImageHorn &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_f64(out.core_length)) return false;
+    return true;
+}
+struct MonocerosImageTuning {
+    uint32_t id{};
+    std::string move{};
+    double body_follow{};
+    double neck_follow{};
+    double head_follow{};
+    double tail_follow{};
+    double flame_follow{};
+    double body_lag{};
+    double head_turn{};
+    double tail_turn{};
+};
+inline bool read(BinaryReader &input, MonocerosImageTuning &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.move)) return false;
+    if (!input.read_f64(out.body_follow)) return false;
+    if (!input.read_f64(out.neck_follow)) return false;
+    if (!input.read_f64(out.head_follow)) return false;
+    if (!input.read_f64(out.tail_follow)) return false;
+    if (!input.read_f64(out.flame_follow)) return false;
+    if (!input.read_f64(out.body_lag)) return false;
+    if (!input.read_f64(out.head_turn)) return false;
+    if (!input.read_f64(out.tail_turn)) return false;
+    return true;
+}
 struct CanisBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -7761,6 +7906,11 @@ struct ContentRecords {
     std::vector<CentaurusImageKey> CentaurusImageKey_rows;
     std::vector<CentaurusImagePose> CentaurusImagePose_rows;
     std::vector<CanisImagePartDefinition> CanisImagePartDefinition_rows;
+    std::vector<MonocerosImageNode> MonocerosImageNode_rows;
+    std::vector<MonocerosImageSprite> MonocerosImageSprite_rows;
+    std::vector<MonocerosImageGait> MonocerosImageGait_rows;
+    std::vector<MonocerosImageHorn> MonocerosImageHorn_rows;
+    std::vector<MonocerosImageTuning> MonocerosImageTuning_rows;
     std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
@@ -7827,7 +7977,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     switch(kind) {
     case 1: {
         if (version != 11) return false;
-        if (count > input.remaining()/688) return false;
+        if (count > input.remaining()/696) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8884,6 +9034,36 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CanisImagePartDefinition row; if (!read(input,row)) return false; out.CanisImagePartDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 410: {
+        if (version != 1) return false;
+        if (count > input.remaining()/78) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageNode row; if (!read(input,row)) return false; out.MonocerosImageNode_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 411: {
+        if (version != 1) return false;
+        if (count > input.remaining()/69) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageSprite row; if (!read(input,row)) return false; out.MonocerosImageSprite_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 412: {
+        if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageGait row; if (!read(input,row)) return false; out.MonocerosImageGait_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 413: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageHorn row; if (!read(input,row)) return false; out.MonocerosImageHorn_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 414: {
+        if (version != 1) return false;
+        if (count > input.remaining()/72) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageTuning row; if (!read(input,row)) return false; out.MonocerosImageTuning_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 340: {
         if (version != 1) return false;
         if (count > input.remaining()/164) return false;
@@ -9606,6 +9786,16 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusImagePose_rows) if (!CentaurusImagePose_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisImagePartDefinition_ids;
     for (const auto &row:data.CanisImagePartDefinition_rows) if (!CanisImagePartDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageNode_ids;
+    for (const auto &row:data.MonocerosImageNode_rows) if (!MonocerosImageNode_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageSprite_ids;
+    for (const auto &row:data.MonocerosImageSprite_rows) if (!MonocerosImageSprite_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageGait_ids;
+    for (const auto &row:data.MonocerosImageGait_rows) if (!MonocerosImageGait_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageHorn_ids;
+    for (const auto &row:data.MonocerosImageHorn_rows) if (!MonocerosImageHorn_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageTuning_ids;
+    for (const auto &row:data.MonocerosImageTuning_rows) if (!MonocerosImageTuning_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBodyDefinition_ids;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisFlameDefinition_ids;
@@ -10176,6 +10366,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["pickup_life"]=config.pickup_life;
     out["trace_radius"]=config.trace_radius;
     out["fx_boss_ram_hitstop"]=config.fx_boss_ram_hitstop;
+    out["fx_monoceros_slash_life"]=config.fx_monoceros_slash_life;
     out["fx_boss_touch_damage"]=config.fx_boss_touch_damage;
     return out;
 }
@@ -10224,5 +10415,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=237;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=242;
 }

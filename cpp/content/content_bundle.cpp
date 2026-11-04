@@ -65,6 +65,11 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->centaurus_image_pose.clips=records.CentaurusImageClip_rows;
     bundle->centaurus_image_pose.keys=records.CentaurusImageKey_rows;
     bundle->centaurus_image_pose.poses=records.CentaurusImagePose_rows;
+    bundle->monoceros_image_pose.nodes=records.MonocerosImageNode_rows;
+    bundle->monoceros_image_pose.sprites=records.MonocerosImageSprite_rows;
+    bundle->monoceros_image_pose.gait=records.MonocerosImageGait_rows;
+    bundle->monoceros_image_pose.horns=records.MonocerosImageHorn_rows;
+    bundle->monoceros_image_pose.tuning=records.MonocerosImageTuning_rows;
     bundle->canis_image_parts=records.CanisImagePartDefinition_rows;
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());

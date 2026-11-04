@@ -15,6 +15,7 @@ struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
     std::vector<BossImageMask> boss_image_masks;
     CentaurusImagePoseData centaurus_image_pose;
+    MonocerosImagePoseData monoceros_image_pose;
     std::vector<CanisImagePartDefinition> canis_image_parts;
     std::vector<DracoFinaleDefinition> draco_finales;
     std::vector<DracoFlowGateDefinition> draco_flow_gates;

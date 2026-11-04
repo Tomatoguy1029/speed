@@ -10,4 +10,11 @@ struct CentaurusImagePoseData {
     std::vector<CentaurusImageKey> keys;
     std::vector<CentaurusImagePose> poses;
 };
+struct MonocerosImagePoseData {
+    std::vector<MonocerosImageNode> nodes;
+    std::vector<MonocerosImageSprite> sprites;
+    std::vector<MonocerosImageGait> gait;
+    std::vector<MonocerosImageHorn> horns;
+    std::vector<MonocerosImageTuning> tuning;
+};
 }

@@ -14,7 +14,9 @@ static func _prepare_reference_fx(data: Dictionary) -> Error:
 	if error != OK: return error
 	error = preload("res://tools/content/build_boss_image_fx.gd").apply(data)
 	if error != OK: return error
-	return preload("res://tools/content/build_canis_image_fx.gd").apply(data)
+	error = preload("res://tools/content/build_canis_image_fx.gd").apply(data)
+	if error != OK: return error
+	return preload("res://tools/content/build_monoceros_image_fx.gd").apply(data)
 
 static func _write_reference_content(data: Dictionary, signature: PackedByteArray) -> PackedByteArray:
 	if _prepare_reference_fx(data) != OK: return PackedByteArray()
@@ -1417,6 +1419,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		elif field.has("value"): data.RunConfig[0][field.name] = field.value
 	data.RunConfig[0].fx_boss_ram_hitstop = float(preload("res://data/visuals/fx_reference.tres").for_id("G10-boss-hit").hitstop)
 	data.RunConfig[0].fx_boss_touch_damage = preload("res://data/visuals/fx_reference.tres").boss_touch_damage
+	data.RunConfig[0].fx_monoceros_slash_life = 0.6*float(preload("res://data/visuals/fx_reference.tres").for_id("I-sword_flash").timing)
 	data.RunConfig[0].world_tick_div = maxi(1,int(config.world_tick_div))
 	data.RunConfig[0].time_limit = stage.time_limit if stage != null else -1.0
 	if stage!=null:
