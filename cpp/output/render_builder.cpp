@@ -289,6 +289,19 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto *circle=std::get_if<CircleHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);if (!circle || !record) continue;
         Dictionary impact;impact["order"]=record->id;impact["owner_id"]=record->spec.owner.source_id;impact["pos"]=h.pos;impact["radius"]=double(circle->radius);impact["age"]=std::max(0.0,double(h.time-h.delay));phoenix_impacts.push_back(impact);
     }
+    Array beamer_fx;
+    for (const auto &h:state.hazards) {
+        if (!h.alive) continue;
+        const auto *beam=std::get_if<BeamHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
+        if (!beam || !record || beam->style!=uint32_t(BeamStyle::Guide)) continue;
+        const auto source=record->spec.owner.source_definition;
+        if (!source || source>run.content->definitions.size() || run.content->definitions[source-1].kind!=EnemyDefinition::Kind::Beamer) continue;
+        const auto owner=record->spec.owner.live_source;
+        if (!state.enemy_handles.contains(owner)) continue;
+        Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=h.pos;
+        fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["enemy_radius"]=state.enemies[owner.slot].radius;
+        fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);beamer_fx.push_back(fx);
+    }
     Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
     for (size_t i=0;i<state.enemies.size();++i) {
         const auto &e=state.enemies[i];if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
@@ -340,7 +353,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;
-    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
+    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
         for (const auto &entry:std::initializer_list<std::pair<const char *,int64_t>>{{"rows",int64_t(state.enemies.size())},{"live",live_rows},{"batched",batched_rows},{"bosses",bodies.size()},{"marked",marked_rows}}) {
