@@ -18,6 +18,14 @@ int64_t action(const RunRuntime &r,const BossBodyState &body,uint32_t technique)
     return 0;
 }
 }
+const CanisFireFxDefinition *CanisFireVisualSystem::settings(const ContentBundle &content,uint32_t technique) {return config(content,technique);}
+void CanisFireVisualSystem::begin_continuous(RunRuntime &r,BossBodyState &body,const TechniqueState &t,double duration) {
+    const auto *fx=config(*r.content,t.definition);if (!fx || fx->external_id!="O-sirius_flame" || duration<=0) return;
+    CanisFireVisual visual;visual.id=-t.id;visual.action=t.id;visual.technique=t.definition;visual.started=body.clock;visual.duration=duration;visual.continuous=true;visual.has_footprint=true;
+    const auto &enemy=r.state.enemies[body.actor.slot];visual.origin=enemy.pos+godot::Vector2::from_angle(enemy.facing)*enemy.radius*.84;
+    visual.history.origin=visual.origin;visual.history.angle=enemy.facing;visual.history.started=visual.started;
+    body.canis.fire_visual.jets.push_back(std::move(visual));
+}
 void CanisFireVisualSystem::begin(RunRuntime &r,BossBodyState &body,AttackHandle handle,uint32_t technique,EnemyHandle hound) {
     const auto *fx=config(*r.content,technique);const auto *attack=AttackSystem::get(r.state,handle);
     if (!fx || !attack || attack->row>=r.state.hazards.size()) return;
@@ -27,6 +35,7 @@ void CanisFireVisualSystem::begin(RunRuntime &r,BossBodyState &body,AttackHandle
     const int64_t owner=action(r,body,technique);
     if (state.action!=owner) {state.action=owner;state.next_ordinal=0;}
     CanisFireVisual visual;visual.id=attack->id;visual.action=owner;visual.technique=technique;visual.profile=source->definition;visual.ordinal=state.next_ordinal++;
+    const auto *trail=AttackSystem::get(r.state,source->trail);visual.trail_id=trail?trail->id:0;
     visual.hound=hound;visual.hound_jet=hound.generation && fx->has_hound_jet;
     visual.origin=hazard.pos;visual.angle=source->angle;visual.length=def.length*(visual.hound_jet?fx->hound_jet_length:fx->jet_length);
     visual.width=def.width*(visual.hound_jet?fx->hound_jet_width:fx->jet_width);
@@ -47,15 +56,39 @@ void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
         const bool sampled=jet.frame!=frame;
         if (!sampled && jet.field_origin==view_origin && jet.cell==cell && jet.field_width==uint32_t(width) && jet.field_height==height) continue;
         const double age=body.clock-jet.started;
-        auto source=jet.origin;
-        if (!jet.hound_jet && age<=jet.duration) source=CanisImagePose::mouth(r,body);
+        if (jet.continuous && age<jet.duration) {
+            const bool active=std::any_of(r.state.bosses.techniques.begin(),r.state.bosses.techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
+            if (!active) jet.duration=std::max(0.0,age);
+        }
+        auto source=jet.origin;double angle=jet.angle,length=jet.length;
+        if (jet.continuous) {
+            if (age<=jet.duration && r.state.enemy_handles.contains(body.actor)) {
+                source=CanisImagePose::mouth(r,body);angle=r.state.enemies[body.actor.slot].facing;
+                const auto forward=godot::Vector2::from_angle(angle);length=0;
+                for (const auto &hazard:r.state.hazards) if (hazard.alive) {
+                    const auto *flame=std::get_if<CanisFlameHazard>(&hazard.shape);const auto *record=AttackSystem::get(r.state,hazard.attack);
+                    if (!flame || !record || flame->kind!=CanisFlameHazard::Kind::Particle || !flame->harmful || flame->jet.generation || record->spec.source_technique!=jet.technique) continue;
+                    length=std::max(length,double((hazard.pos-source).dot(forward))+flame->radius);
+                }
+                jet.release_origin=source;jet.release_angle=angle;jet.release_length=length;jet.has_release=true;
+            } else if (jet.has_release) {source=jet.release_origin;angle=jet.release_angle;length=jet.release_length;}
+            else continue;
+        } else if (!jet.hound_jet && age<=jet.duration) source=CanisImagePose::mouth(r,body);
         const auto logical=(source-view_origin)*scale;
-        CanisFireFieldInput input;input.world_scale=scale;input.origin_x=logical.x;input.origin_y=logical.y;input.angle=jet.angle;
-        input.length=jet.length*fx->size;input.width=fx->size*(jet.hound_jet?fx->hound_jet_width:fx->jet_width);
-        input.age=age;input.duration=jet.duration;input.alpha=std::min(1.0,fx->intensity);input.seed=int32_t(5+jet.ordinal*13);
+        CanisFireFieldInput input;input.world_scale=scale;input.origin_x=logical.x;input.origin_y=logical.y;input.angle=angle;
+        input.length=length*fx->size;input.width=fx->size*(jet.hound_jet?fx->hound_jet_width:fx->jet_width);
+        input.age=age;input.duration=jet.duration;input.alpha=std::min(1.0,fx->intensity);input.seed=jet.continuous?11:int32_t(5+jet.ordinal*13);
         input.speed_rate=jet.speed;input.spikes=fx->jet_spikes;input.logical_width=width;input.logical_height=height;
         jet.pixels=CanisFireField::raster(input);jet.frame=frame;jet.field_origin=view_origin;jet.cell=cell;jet.field_width=width;jet.field_height=height;
-        if (sampled && jet.has_footprint && age>=0 && age<=jet.duration+.22/jet.speed) jet.history.stamp(jet.pixels,view_origin,scale,body.clock);
+        if (sampled && age>=0 && age<=jet.duration+.22/jet.speed) {
+            if (jet.has_footprint) jet.history.stamp(jet.pixels,view_origin,scale,body.clock);
+            else if (fx->external_id=="O-sirius") for (const auto &hazard:r.state.hazards) if (hazard.alive) {
+                const auto *flame=std::get_if<CanisFlameHazard>(&hazard.shape);
+                if (!flame || flame->kind!=CanisFlameHazard::Kind::Particle || !flame->jet.generation || flame->age>flame->life) continue;
+                const auto *owner=AttackSystem::get(r.state,flame->jet);
+                if (owner && owner->id==jet.id) jet.history.deposit(hazard.pos,body.clock,false);
+            }
+        }
     }
     // 1.0+hash*1.8秒の最長寿命と、その後のすす0.8秒を保持する。
     jets.erase(std::remove_if(jets.begin(),jets.end(),[&](const auto &jet){return body.clock-jet.started>jet.duration+.22/jet.speed+3.6;}),jets.end());
@@ -64,7 +97,7 @@ godot::Array CanisFireVisualSystem::snapshot(const RunRuntime &r,const BossBodyS
     godot::Array out;
     for (const auto &jet:body.canis.fire_visual.jets) {
         const auto *fx=config(*r.content,jet.technique);if (!fx) continue;
-        godot::Dictionary q;q["id"]=jet.id;q["settings"]=godot::String::utf8(fx->external_id.c_str());q["started"]=jet.started;q["duration"]=jet.duration;q["speed"]=jet.speed;
+        godot::Dictionary q;q["id"]=jet.id;q["trail_id"]=jet.trail_id;q["technique"]=jet.technique;q["continuous"]=jet.continuous;q["settings"]=godot::String::utf8(fx->external_id.c_str());q["started"]=jet.started;q["duration"]=jet.duration;q["speed"]=jet.speed;
         q["field_origin"]=jet.field_origin;q["cell"]=jet.cell;q["history_cell"]=jet.history.cell;
         godot::PackedInt32Array pixels;pixels.resize(jet.pixels.size()*3);
         for (size_t i=0;i<jet.pixels.size();++i) {pixels.set(i*3,jet.pixels[i].x);pixels.set(i*3+1,jet.pixels[i].y);pixels.set(i*3+2,jet.pixels[i].layer);}q["pixels"]=pixels;
@@ -77,8 +110,8 @@ godot::Array CanisFireVisualSystem::snapshot(const RunRuntime &r,const BossBodyS
 void CanisFireVisualSystem::clear(BossBodyState &body) {body.canis.fire_visual={};}
 bool CanisFireVisualSystem::validate(const BossBodyState &body,const ContentBundle &content) {
     for (const auto &v:body.canis.fire_visual.jets) {
-        if (v.id<=0 || !config(content,v.technique) || !v.origin.is_finite() || !v.field_origin.is_finite() || v.length<0 || v.width<0 || v.duration<=0 || v.speed<=0) return false;
-        for (double x:{v.angle,v.length,v.width,v.started,v.duration,v.speed,v.cell,v.history.cell}) if (!std::isfinite(x)) return false;
+        if (!v.id || !config(content,v.technique) || !v.origin.is_finite() || !v.field_origin.is_finite() || !v.release_origin.is_finite() || v.length<0 || v.width<0 || v.duration<0 || v.speed<=0) return false;
+        for (double x:{v.angle,v.length,v.width,v.started,v.duration,v.speed,v.cell,v.history.cell,v.release_angle,v.release_length}) if (!std::isfinite(x)) return false;
         for (const auto &d:v.history.deposits) {if (!d.position.is_finite() || !std::isfinite(d.updated)) return false;for (auto p:d.pixels) if (!p.is_finite()) return false;}
     }
     return true;

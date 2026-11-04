@@ -21,5 +21,6 @@ struct CanisFireHistory {
     std::vector<CanisFireDeposit> deposits;
     // 同じ論理画素のworld上の位置を記録し、45 world単位の元の粒へまとめる。
     void stamp(const std::vector<CanisFirePixel> &,godot::Vector2 view_origin,double world_scale,double clock);
+    void deposit(godot::Vector2 position,double clock,bool pixel);
 };
 }
