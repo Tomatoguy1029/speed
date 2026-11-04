@@ -83,10 +83,11 @@ func _ready() -> void:
 			if not _action(commands[next_command]): return
 			next_command += 1
 		if not _present(spec.camera,frame,images): return
+		# queue_redrawと表示変更を先に反映し、記録した状態と同じコマを保存する。
+		await get_tree().process_frame
 		# フォーカス外や他の撮影窓で隠れた場合も、本番viewportを必ず描画する。
 		RenderingServer.force_draw(false,0.0)
 		if not _save_frame(output,frame,images): return
-		await get_tree().process_frame
 		if frame+1==int(spec.frames): break
 		for offset in 2:
 			if offset==1:
