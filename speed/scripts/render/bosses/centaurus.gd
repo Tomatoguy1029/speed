@@ -42,7 +42,7 @@ const RAIN_ANGLE := PI * 0.5 - 0.35
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self, "boss/body/centaurus")
 func frame_event(event: Dictionary) -> void:
-	if event.get("type",&"")==&"combat_damage":
+	if event.get("type",&"")==&"combat_damage" and event.get("cause",&"")!=&"ram":
 		hit = 0.18
 		queue_redraw()
 
