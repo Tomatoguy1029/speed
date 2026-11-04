@@ -82,7 +82,9 @@ func _ready() -> void:
 	frame_material.shader = preload("res://assets/ui/map/selection_frame.gdshader")
 	frame.material = frame_material
 	for texture: Texture2D in STAR_PHASES:
-		_star_phases.append(_artwork(texture, self))
+		var layer := _artwork(texture, self)
+		layer.modulate.a = 0.4
+		_star_phases.append(layer)
 	_update_star_phases()
 	var projection := Node2D.new()
 	_projection = projection
