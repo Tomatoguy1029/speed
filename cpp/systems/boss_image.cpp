@@ -4,6 +4,8 @@
 #include "../bosses/canis_major/image_pose.h"
 #include "../bosses/monoceros/image_pose_system.h"
 #include <cmath>
+#include <algorithm>
+#include <limits>
 namespace speed {
 namespace {
 const BossBodyState *body_for(const RunRuntime &r,EnemyHandle actor) {
@@ -42,14 +44,31 @@ void BossImageSystem::refresh(RunRuntime &r) {
 bool BossImageSystem::available(const RunRuntime &r,EnemyHandle actor) {
     const auto *body=body_for(r,actor);return body && !body->image_parts.empty();
 }
-bool BossImageSystem::cut(const RunRuntime &r,EnemyHandle actor,godot::Vector2 from,godot::Vector2 direction,BossImageCut &result) {
+bool BossImageSystem::cut(const RunRuntime &r,EnemyHandle actor,godot::Vector2 from,godot::Vector2 direction,BossImageCut &result,double max_entry) {
     if (!r.state.enemy_handles.contains(actor) || !from.is_finite() || !direction.is_finite() || direction.length_squared()<1e-12) return false;
     const auto *body=body_for(r,actor);if (!body || body->image_parts.empty()) return false;
     const auto &enemy=r.state.enemies[actor.slot];
     const double radius=enemy.radius*2.0,limit=(from.distance_to(enemy.pos)+radius)*2.0;
     const int size=int(std::ceil(radius*2.0));
-    direction=direction.normalized();bool found=false;
-    for (double distance=0;distance<=limit;distance+=1.0) {
+    direction=direction.normalized();bool found=false,has_bounds=false;
+    godot::Vector2 low,high;
+    for (const auto &part:body->image_parts) if (part.visible) {
+        for (const auto corner:{godot::Vector2(),godot::Vector2(part.region.size.x,0),godot::Vector2(0,part.region.size.y),godot::Vector2(part.region.size)}) {
+            const auto point=part.pixel_to_world.xform(corner);
+            if (!has_bounds) {low=high=point;has_bounds=true;} else {low=low.min(point);high=high.max(point);}
+        }
+    }
+    if (!has_bounds) return false;
+    // 1画素の参照点への丸めを含める。走査の整数位相はfrom基準のまま保つ。
+    low-=godot::Vector2(1,1);high+=godot::Vector2(1,1);
+    double first=0,last=limit;
+    for (int axis=0;axis<2;++axis) {
+        if (std::abs(direction[axis])<1e-12) {if (from[axis]<low[axis] || from[axis]>high[axis]) return false;continue;}
+        double a=(low[axis]-from[axis])/direction[axis],b=(high[axis]-from[axis])/direction[axis];
+        if (a>b) std::swap(a,b);first=std::max(first,a);last=std::min(last,b);
+    }
+    if (first>last || (max_entry>=0 && first>max_entry)) return false;
+    for (double distance=std::ceil(first);distance<=last;distance+=1.0) {
         const auto point=from+direction*distance;
         const auto relative=point-enemy.pos+godot::Vector2(radius,radius);
         const int x=int(std::floor(relative.x)),y=int(std::floor(relative.y));

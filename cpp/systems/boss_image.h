@@ -8,6 +8,6 @@ class BossImageSystem {
 public:
     static void refresh(RunRuntime &);
     static bool available(const RunRuntime &,EnemyHandle);
-    static bool cut(const RunRuntime &,EnemyHandle,godot::Vector2 from,godot::Vector2 direction,BossImageCut &);
+    static bool cut(const RunRuntime &,EnemyHandle,godot::Vector2 from,godot::Vector2 direction,BossImageCut &,double max_entry=-1.0);
 };
 }

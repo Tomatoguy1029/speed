@@ -113,7 +113,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             if (length<=0) continue;
             const auto direction=delta/length;
             speed::BossImageCut cut;
-            if (!speed::BossImageSystem::cut(runtime,handle,from,direction,cut)) continue;
+            if (!speed::BossImageSystem::cut(runtime,handle,from,direction,cut,length+radius)) continue;
             const double distance=(cut.enter-direction*radius-from).dot(direction);
             if (distance<=length) hits.push_back({std::max(0.0,distance/length),row,true,cut});
         } else {
