@@ -8457,19 +8457,19 @@ function dSpiralBegin(S) {
 function dSpiralWindup(S, dt) {
   const sp = S.spiral; dSpiralCamera(S, dt); const half = V(W / Z / cam.zoom / 2, H / Z / cam.zoom / 2);
   if (sp.phase === 'exit') { sp.depart += dt; const angle = sp.exitAngle + angDiff(-Math.PI / 2, sp.exitAngle) * smooth(0, 0.55, sp.depart), speed = Math.max((DP.body_length + half.y * 2 + DP.body_width * 2) / clamp(S.r.exit_duration, 0.6, 3), 1100); dSetFollow(S, add(S.B.pos, mul(fromA(angle), speed * dt))); S.elapsed = Math.min(S.elapsed, S.r.warn - 1.01);
-    if (dOffscreen(S)) { sp.phase = 'entry'; sp.center = { ...S.ship.pos }; const margin = S.B.r + DP.body_width + 100; sp.outside = V(Math.min(sp.center.x - sp.horizontal - margin, cam.x - half.x - margin), Math.max(sp.center.y + sp.extent + margin, cam.y + half.y + margin)); sp.control = add(sp.center, V(-sp.horizontal * 0.52, sp.extent)); sp.inside = add(sp.center, V(0, sp.extent)); S.trail = Array.from({ length: DCOUNT + 1 }, (_, i) => add(sp.outside, V(-S.r.spiral_length * i / DCOUNT, 0))); S.points = S.trail; S.B.pos = sp.outside; S.elapsed = S.r.warn - 1; } return;
+    if (dOffscreen(S)) { sp.phase = 'entry'; sp.center = { ...S.ship.pos }; const margin = S.B.r + DP.body_width + 100; sp.outside = V(Math.max(sp.center.x + sp.horizontal + margin, cam.x + half.x + margin), Math.min(sp.center.y - sp.extent - margin, cam.y - half.y - margin)); sp.control = add(sp.center, V(sp.horizontal * 0.52, -sp.extent)); sp.inside = add(sp.center, V(0, -sp.extent)); S.trail = Array.from({ length: DCOUNT + 1 }, (_, i) => add(sp.outside, V(S.r.spiral_length * i / DCOUNT, 0))); S.points = S.trail; S.B.pos = sp.outside; S.elapsed = S.r.warn - 1; } return;
   }
   const shift0 = mul(sub(S.ship.pos, sp.center), 1 - Math.exp(-1.4 * dt)), shift = len(shift0) > 350 * dt ? mul(norm(shift0), 350 * dt) : shift0; sp.center = add(sp.center, shift); for (const key of ['outside', 'control', 'inside']) sp[key] = add(sp[key], shift); S.trail = S.trail.map(p => add(p, shift));
   const k = clamp(S.elapsed - (S.r.warn - 1)), head = lerpV(lerpV(sp.outside, sp.control, k), lerpV(sp.control, sp.inside, k), k); dSetFollow(S, head, S.r.spiral_length);
 }
 // 渦：中心へ行くほど半径が小さくなる螺旋（外周→内周を2周で一定に縮め、隣の周回との間に逃げ道を残す）。中心は巻き始めの自機の位置で固定し、ずらさない。
 function dSpiralHead(S, turns) {
-  const sp = S.spiral, angle = Math.PI / 2 - turns * TAU, radius = lerp(sp.extent, sp.extent * sp.inner, turns / 2);
+  const sp = S.spiral, angle = -Math.PI / 2 - turns * TAU, radius = lerp(sp.extent, sp.extent * sp.inner, turns / 2);
   return add(sp.center, V(Math.cos(angle) * radius, Math.sin(angle) * radius));
 }
-// 直進：頭が真上へ抜け、残りの胴は紐を結ぶように、引かれた分だけ渦ごと中心へ締まっていく
+// 直進：頭が真下へ抜け、残りの胴は紐を結ぶように、引かれた分だけ渦ごと中心へ締まっていく
 function dSpiralPull(S, pulled) {
-  const sp = S.spiral, L = S.r.spiral_length, d = V(0, -1), coil = sp.coilPoints, total = pathLength(coil), tight = smooth(0, L * 0.7, pulled);
+  const sp = S.spiral, L = S.r.spiral_length, d = V(0, 1), coil = sp.coilPoints, total = pathLength(coil), tight = smooth(0, L * 0.7, pulled);
   S.points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const s = i / DCOUNT * L; if (s <= pulled) return add(sp.pullFrom, mul(d, pulled - s));
     const rest = s - pulled, at = pathAt(coil, Math.min(total, rest)).pos, k = lerp(1, 1 - 0.8 * tight, smooth(0, 260, rest)); return add(sp.center, mul(sub(at, sp.center), k)); });
   dRound(S.points, Math.round(pulled / L * DCOUNT), 6, 14);
@@ -8487,9 +8487,11 @@ function dSpiralActive(S, dt) {
   if (t < shrinkAt) {
     let turns = t < sp.first ? t / sp.first : 1 + (t - sp.first) / sp.second; turns = clamp(turns, 0, 2);
     let head = dSpiralHead(S, turns);
-    // 巻き終わり：自機の真下で曲げて頭を上（y の負の向き）へ向ける。曲げた分だけ最後の4分の1周で寄せて、真上への直進が中心を通るようにする
-    const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(sp.bendRadius * Math.sin(bend) - sp.bendRadius * smooth(1.75, 2, turns), -sp.bendRadius * (1 - Math.cos(bend))));
-    dSetFollow(S, head, S.r.spiral_length); if (t > sp.first + sp.second) { S.points = S.points.map(q => ({ ...q })); dRound(S.points, 4, 4, 10); } if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, -sp.extent * 2))]];
+    // 巻き終わり：自機の真上で曲げて頭を画面の下へ向ける。曲げた分だけ最後の4分の1周で寄せて、真下への直進が中心を通るようにする
+    const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(-sp.bendRadius * Math.sin(bend) + sp.bendRadius * smooth(1.75, 2, turns), sp.bendRadius * (1 - Math.cos(bend))));
+    dSetFollow(S, head, S.r.spiral_length); if (t > sp.first + sp.second) { S.points = S.points.map(q => ({ ...q })); dRound(S.points, 4, 4, 10);
+      // 頭と首の付け根を真下へそろえる（曲げ終わるほど強く）
+      const w = smooth(0, 1, bend / (Math.PI / 2)), seg = S.r.spiral_length / DCOUNT; for (let i = 1; i <= 3; i++) S.points[i] = lerpV(S.points[i], sub(S.points[0], V(0, seg * i)), w * (1 - (i - 1) / 3)); S.B.facing = S.B.facing + angDiff(Math.PI / 2, S.B.facing) * w; } if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, sp.extent * 2))]];
     return;
   }
   if (!sp.coilPoints) { sp.coilPoints = S.points.map(p => ({ ...p })); sp.pullFrom = { ...S.points[0] }; }
@@ -8727,7 +8729,7 @@ function dDraw(S, R) {
 }
 // 状態欄：作り直した見た目の説明を足す
 for (const d of DEMOS) if (d.id.startsWith('D-')) d.status = { ...d.status, '状態': '見た目を作り直した試作（未承認）', '試作の見た目': '予兆は照準の光（白くしない）と部位へ光を運ぶ粒。ブレスは口から流れる光の筋の束と星、岩で止まると火花。爪はぎざぎざの空間の裂け目。星弾は回る星とまたたきの尾。着弾は白い光・冷える割れ目・土ぼこり・欠片。吸い込みは口へ流れる筋と星屑。突進は体の両脇の空気の筋。全身複製は分身の口からうみへびの技', '動き': '体の動き・技の時刻・軌道は以前の再生（現行の値）のまま。main の cpp/bosses/draco との行ごとの照合はしていない' };
-for (const d of DEMOS) if (d.id === 'D-spiral') d.status = { ...d.status, '螺旋（本人指示で変更）': '中心は巻き始めの自機の位置で固定し、外周から内周まで2周で一定に半径を縮める（中心へずらす補正をやめ、2周目が1周目に寄って通り道を塞がない）。下から入って下で巻き終わり、頭は自機の少し下で上（y の負の向き）へ向ける。直進では頭が真上へ抜け、残りの胴は紐を結ぶように渦ごと中心へ締まる', '本番との違い': '本番（spiral.cpp）は2周目に中心を自機へ寄せる補正があり、直進後の胴は通った道をたどってほどける。採用するなら本番の動きと判定を変える必要がある' };
+for (const d of DEMOS) if (d.id === 'D-spiral') d.status = { ...d.status, '螺旋（本人指示で変更）': '中心は巻き始めの自機の位置で固定し、外周から内周まで2周で一定に半径を縮める（中心へずらす補正をやめ、2周目が1周目に寄って通り道を塞がない）。上から入って上で巻き終わり、頭は自機の少し上で画面の下へ向ける。直進では頭が真下へ抜け、残りの胴は紐を結ぶように渦ごと中心へ締まる', '本番との違い': '本番（spiral.cpp）は2周目に中心を自機へ寄せる補正があり、直進後の胴は通った道をたどってほどける。採用するなら本番の動きと判定を変える必要がある' };
 for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []), { k: 'spiralScale', label: '渦の外周の大きさ（周回の間）', type: 'range', min: 1, max: 1.7, step: 0.05, def: 1.3 }];
 
 const CAT_ORDER = ['ボスへの命中 G10', '鳳凰 G11', '敵（ステージ1以外）G12', 'ケンタウルス座（C）', 'おおいぬ座（O）', 'いっかくじゅう座（I）', 'うみへび座（H）', 'りゅう座（D）', '参照（ステージ1）'];
