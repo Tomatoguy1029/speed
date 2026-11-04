@@ -4,6 +4,7 @@ extends RefCounted
 const PHOENIX := preload("res://scripts/render/enemies/phoenix_reference.gd")
 const BEAMER := preload("res://scripts/render/enemies/beamer_reference.gd")
 const LYNX := preload("res://scripts/render/enemies/lynx_reference.gd")
+const BITE := preload("res://scripts/render/enemies/bite_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -11,6 +12,7 @@ var _visuals: Dictionary
 var _phoenix = PHOENIX.new()
 var _beamer = BEAMER.new()
 var _lynx = LYNX.new()
+var _bite = BITE.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -25,13 +27,22 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_time: float) -> void:
 	var world_dt := 0.0 if _last_world_time < 0.0 or world_time < _last_world_time else world_time - _last_world_time
 	_last_world_time = world_time
+	var normalized: Array = []
+	for event: Dictionary in events:
+		var payload: Dictionary = event.get("payload", event).duplicate()
+		payload["type"] = event.get("type", "")
+		for key in ["world_t", "sequence", "epoch"]:
+			if event.has(key): payload[key] = event[key]
+		normalized.append(payload)
 	if frame.has("phoenix_fx") and frame.has("phoenix_impacts"):
 		var logical_pixel_size := _parent.get_viewport().get_visible_rect().size.y / 225.0
 		_phoenix.render(frame.phoenix_fx, frame.phoenix_impacts, canvas, world_dt, world_time, logical_pixel_size)
 	if frame.has("beamer_fx"):
-		_beamer.render(frame.beamer_fx, events, canvas, world_time)
+		_beamer.render(frame.beamer_fx, normalized, canvas, world_time)
 	if frame.has("lynx_fx") and frame.has("lynx_actors"):
 		_lynx.render(frame.lynx_fx, frame.lynx_actors, canvas, world_time)
+	if frame.has("bite_fx"):
+		_bite.render(frame.bite_fx, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -40,17 +51,25 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var phoenix := frame.has("phoenix_fx") and frame.has("phoenix_impacts")
 	var beamer := frame.has("beamer_fx")
 	var lynx := frame.has("lynx_fx") and frame.has("lynx_actors")
+	var bite := frame.has("bite_fx")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
-	if beamer or lynx:
+	if beamer or lynx or bite:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):
 			var row := source.duplicate()
 			if beamer: row.erase("beamer")
 			if lynx: row.erase("lynx")
+			if bite and row.has("reference_bite_indices"):
+				var indices: PackedInt32Array = row.reference_bite_indices
+				var old: PackedFloat32Array = row.get("gunner", PackedFloat32Array())
+				var kept := PackedFloat32Array()
+				for index in range(old.size() / 5):
+					if not indices.has(index): kept.append_array(old.slice(index * 5, index * 5 + 5))
+				row["gunner"] = kept
 			batches.append(row)
 		result.batches = batches
-	if phoenix or beamer or lynx:
+	if phoenix or beamer or lynx or bite:
 		var shapes: Array = []
 		for row: Dictionary in frame.get("shapes", []):
 			if phoenix and int(row.get("zone_style", -1)) == 5:
@@ -58,6 +77,8 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if beamer and bool(row.get("reference_beamer", false)):
 				continue
 			if lynx and bool(row.get("reference_lynx", false)):
+				continue
+			if bite and bool(row.get("reference_bite", false)):
 				continue
 			shapes.append(row)
 		result.shapes = shapes
@@ -73,9 +94,10 @@ func _draw_afterimages(rows: Array) -> void:
 			continue
 		var entry: Dictionary = _visuals[visual_id]
 		var look := _scope.resources.get(entry.path) as EnemyLook
-		if look == null or not look.previews.has(entry.hull_preview):
+		var preview: String = entry.get("hull_preview", "")
+		if look == null or not look.previews.has(preview):
 			continue
-		var texture := look.previews[entry.hull_preview] as Texture2D
+		var texture := look.previews[preview] as Texture2D
 		if texture == null:
 			continue
 		if not _ghost_layers.has(visual_id):
