@@ -5,6 +5,7 @@ const TICK := 1.0 / 120.0
 const SIZE := Vector2i(1280,720)
 var session: RunSession
 var viewport: SubViewport
+var capture_viewport: SubViewport
 var render: RunPresentation
 var values := {}
 var checkpoints: Array[int] = []
@@ -70,6 +71,7 @@ func _ready() -> void:
 	render = session.view.get_node("RunPresentation") as RunPresentation
 	render.set_process(false)
 	render.view_override = {"center":Vector2(float(spec.camera.center[0]),float(spec.camera.center[1])),"zoom":float(spec.camera.zoom),"shake":bool(spec.camera.get("shake",false))}
+	_setup_capture_output()
 	var setup: Dictionary = session.bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":false,"invincible":true,"empty":true,"level":1}})
 	if not setup.ok:
 		_fail("撮影場面の初期化に失敗しました: " + str(setup))
@@ -161,12 +163,35 @@ func _sync_camera(camera: Dictionary) -> bool:
 	render.view_override.center = center
 	return true
 
+## HDRの半精度値をGPU上でsRGBへ戻してから8bitへ保存し、暗い光の階調を保つ。
+func _setup_capture_output() -> void:
+	capture_viewport = viewport
+	if not viewport.use_hdr_2d: return
+	capture_viewport = SubViewport.new()
+	capture_viewport.world_2d = World2D.new()
+	capture_viewport.size = SIZE
+	capture_viewport.use_hdr_2d = false
+	capture_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	add_child(capture_viewport)
+	var image := TextureRect.new()
+	image.size = Vector2(SIZE)
+	image.texture = viewport.get_texture()
+	image.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var shader := Shader.new()
+	shader.code = """shader_type canvas_item;
+render_mode unshaded, blend_disabled;
+void fragment() {
+	vec4 pixel = texture(TEXTURE, UV);
+	vec3 rgb = mix(pixel.rgb*12.92,1.055*pow(max(pixel.rgb,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),pixel.rgb));
+	COLOR = vec4(clamp(rgb,0.0,1.0),pixel.a);
+}"""
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	image.material = material
+	capture_viewport.add_child(image)
+
 func _save_frame(output: String, frame: int, images: Array) -> bool:
-	var image := viewport.get_texture().get_image()
-	if viewport.use_hdr_2d:
-		# HDRの読み戻しは線形値。8bitへ落とす前に表示用のsRGBへ戻し、暗い予兆光の階調を保つ。
-		image.linear_to_srgb()
-	image.convert(Image.FORMAT_RGBA8)
+	var image := capture_viewport.get_texture().get_image()
 	if image.save_png(output.path_join(images[frame].file))!=OK:
 		_fail("コマを保存できません: %d" % frame)
 		return false
