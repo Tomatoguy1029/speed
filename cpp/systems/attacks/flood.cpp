@@ -19,6 +19,6 @@ void FloodSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,go
 }
 void FloodSystem::end_visual(RunRuntime &run,const FloodTailState &f,int64_t id) {
     if (run.content->floods.empty()) return;const auto &d=run.content->floods.front();if (f.age>=d.tail) return;
-    godot::Dictionary event;event["id"]=id;event["row"]=f.row;event["pos"]=f.pos;event["angle"]=f.angle;event["length"]=f.length;event["width"]=f.width;event["spread"]=f.spread;event["age"]=f.age;event["tail"]=d.tail;event["collapse"]=d.collapse;event["margin"]=d.margin;FrameBuilder::append(run,"flood_end",event);
+    godot::Dictionary event;event["id"]=id;event["row"]=f.row;event["pos"]=f.pos;event["angle"]=f.angle;event["length"]=f.length;event["width"]=f.width;event["spread"]=f.spread;event["age"]=f.age;event["tail"]=d.tail;event["collapse"]=d.collapse;event["margin"]=d.margin;if (f.reference_aquarius) {event["reference_aquarius"]=true;event["index"]=f.index;}FrameBuilder::append(run,"flood_end",event);
 }
 }

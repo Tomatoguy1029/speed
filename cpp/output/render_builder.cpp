@@ -339,7 +339,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (!source || source>run.content->definitions.size()) continue;
         const auto kind=run.content->definitions[source-1].kind;
         if (kind==EnemyDefinition::Kind::Aquarius && beam->style==uint32_t(BeamStyle::Flood)) {
-            const auto owner=record->spec.owner.live_source;Dictionary fx;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["spread"]=double(beam->arc);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);fx["index"]=beam->flood_index;fx["radius"]=state.enemy_handles.contains(owner)?state.enemies[owner.slot].radius:run.content->definitions[source-1].radius;aquarius_jets.push_back(fx);continue;
+            const auto owner=record->spec.owner.live_source;Dictionary fx;fx["order"]=record->id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["spread"]=double(beam->arc);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);fx["index"]=beam->flood_index;fx["radius"]=state.enemy_handles.contains(owner)?state.enemies[owner.slot].radius:run.content->definitions[source-1].radius;aquarius_jets.push_back(fx);continue;
         }
         if (kind==EnemyDefinition::Kind::Sniper && beam->style==uint32_t(BeamStyle::Telescope)) {
             Dictionary fx;fx["order"]=record->id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);telescope_beams.push_back(fx);continue;

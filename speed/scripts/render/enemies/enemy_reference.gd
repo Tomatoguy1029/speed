@@ -40,6 +40,7 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 	_visuals = visuals
 	_phoenix.setup_shadow(parent)
 	_telescope.setup(parent)
+	_aquarius.setup(parent, scope)
 
 func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_time: float) -> void:
 	var world_dt := 0.0 if _last_world_time < 0.0 or world_time < _last_world_time else world_time - _last_world_time
@@ -75,7 +76,7 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 	if frame.has("reticle_fx"):
 		_reticle.render(frame.reticle_fx, normalized, canvas, world_time)
 	if frame.has("aquarius_jets"):
-		_aquarius.render(frame.aquarius_jets, canvas, world_time)
+		_aquarius.render(frame.aquarius_jets, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -144,7 +145,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 				continue
 			if telescope and bool(row.get("reference_telescope", false)):
 				continue
-			if aquarius and bool(row.get("reference_aquarius", false)) and float(row.time) >= float(row.delay):
+			if aquarius and bool(row.get("reference_aquarius", false)):
 				continue
 			shapes.append(row)
 		result.shapes = shapes
