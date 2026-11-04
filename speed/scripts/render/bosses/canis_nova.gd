@@ -18,7 +18,7 @@ static func draw_field(canvas, nova: Dictionary, params: Dictionary) -> void:
 	var alpha: PackedByteArray = nova.get("field_alpha",PackedByteArray())
 	var width := int(nova.get("field_width",0))
 	var height := int(nova.get("field_height",0))
-	var cell := float(nova.get("field_cell",0.0))*canvas.world_scale
+	var cell: float = float(nova.get("field_cell",0.0))*canvas.world_scale
 	if width<=0 or height<=0 or cell<=0.0 or alpha.size()!=width*height: return
 	var age := float(nova.age)
 	var warn := float(nova.warn)
@@ -30,7 +30,7 @@ static func draw_field(canvas, nova: Dictionary, params: Dictionary) -> void:
 	var gain := minf(float(params.intensity),1.0)
 	var source: Vector2 = canvas.to_logical(nova.source)
 	var samples: PackedFloat32Array = EMISSION.get_meta("values")
-	var aperture := float(nova.radius)*canvas.world_scale*(0.18+0.28*tell*(1.0-0.65*smoothstep(0.83,1.0,tell)) if t<0.0 else 0.24+2.65*smoothstep(0.0,0.115,t))
+	var aperture: float = float(nova.radius)*canvas.world_scale*(0.18+0.28*tell*(1.0-0.65*smoothstep(0.83,1.0,tell)) if t<0.0 else 0.24+2.65*smoothstep(0.0,0.115,t))
 	var field_origin: Vector2 = canvas.to_logical(nova.field_origin)
 	var range_end := float(nova.ring_end)
 	var logical_size: Vector2i = canvas.logical_size
@@ -43,7 +43,7 @@ static func draw_field(canvas, nova: Dictionary, params: Dictionary) -> void:
 			var visible := 1.0-shadow
 			var dx := x-source.x
 			var dy := y-source.y
-			var distance := sqrt(dx*dx+dy*dy)/canvas.world_scale
+			var distance: float = sqrt(dx*dx+dy*dy)/canvas.world_scale
 			if visible<0.01 or distance>range_end: continue
 			var falloff := (1.0-smoothstep(range_end*0.8,range_end,distance))/(1.0+pow(distance/420.0,2.0))
 			var strength := visible*gain*falloff
