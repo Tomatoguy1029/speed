@@ -638,13 +638,18 @@
           "min": 0
         },
         {
+          "name": "fx_monoceros_kick_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
           "name": "fx_boss_touch_damage",
           "type": "f64",
           "min": 0,
           "runtime": "control.boss_touch_damage"
         }
       ],
-      "version": 13
+      "version": 14
     },
     {
       "name": "StringEntry",

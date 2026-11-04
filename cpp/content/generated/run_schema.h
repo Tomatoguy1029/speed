@@ -100,6 +100,7 @@ struct RunConfig {
     double fx_boss_ram_hitstop{};
     double fx_monoceros_sweep_timing{};
     double fx_monoceros_slash_life{};
+    double fx_monoceros_kick_life{};
     double fx_boss_touch_damage{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
@@ -282,6 +283,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.fx_monoceros_sweep_timing < 0) return false;
     if (!input.read_f64(out.fx_monoceros_slash_life)) return false;
     if (out.fx_monoceros_slash_life < 0) return false;
+    if (!input.read_f64(out.fx_monoceros_kick_life)) return false;
+    if (out.fx_monoceros_kick_life < 0) return false;
     if (!input.read_f64(out.fx_boss_touch_damage)) return false;
     if (out.fx_boss_touch_damage < 0) return false;
     return true;
@@ -8113,8 +8116,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 13) return false;
-        if (count > input.remaining()/704) return false;
+        if (version != 14) return false;
+        if (count > input.remaining()/712) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -10539,6 +10542,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["fx_boss_ram_hitstop"]=config.fx_boss_ram_hitstop;
     out["fx_monoceros_sweep_timing"]=config.fx_monoceros_sweep_timing;
     out["fx_monoceros_slash_life"]=config.fx_monoceros_slash_life;
+    out["fx_monoceros_kick_life"]=config.fx_monoceros_kick_life;
     out["fx_boss_touch_damage"]=config.fx_boss_touch_damage;
     return out;
 }
