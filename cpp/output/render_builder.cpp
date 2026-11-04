@@ -93,7 +93,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         out.marks.clear();out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
     PackedFloat32Array comet_values,crow_values,petrified_enemies,enemy_health,enemy_weak;
-    Array lynx_actors,lynx_afterimages,lynx_fx,bite_fx;
+    Array lynx_actors,lynx_afterimages,lynx_fx,bite_fx,cross_actors,cross_beams;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -169,6 +169,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (definition.kind==EnemyDefinition::Kind::Cross && enemy.mode==EnemyMode::Windup) {
             const auto &p=run.content->cross_enemies[definition.cross_definition-1];const auto c=definition.color.lightened(0.2);
             for (float v:{pose.position.x,pose.position.y,float(enemy.radius),float(enemy.charge),float(p.beam_length),c.r,c.g,c.b,c.a}) enemy_batch.cross.push_back(v);
+            Dictionary fx;fx["pos"]=pose.position;fx["radius"]=enemy.radius;fx["charge"]=enemy.charge;fx["length"]=p.beam_length;cross_actors.push_back(fx);
         }
         if (definition.kind==EnemyDefinition::Kind::Aquarius && enemy.charge>0) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.aquarius.push_back(value);
         if (definition.kind==EnemyDefinition::Kind::Reticle) {
@@ -314,9 +315,14 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (const auto &h:state.hazards) {
         if (!h.alive) continue;
         const auto *beam=std::get_if<BeamHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
-        if (!beam || !record || beam->style!=uint32_t(BeamStyle::Guide)) continue;
+        if (!beam || !record) continue;
         const auto source=record->spec.owner.source_definition;
-        if (!source || source>run.content->definitions.size() || run.content->definitions[source-1].kind!=EnemyDefinition::Kind::Beamer) continue;
+        if (!source || source>run.content->definitions.size()) continue;
+        const auto kind=run.content->definitions[source-1].kind;
+        if (kind==EnemyDefinition::Kind::Cross && beam->style==uint32_t(BeamStyle::Plain)) {
+            Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);cross_beams.push_back(fx);continue;
+        }
+        if (kind!=EnemyDefinition::Kind::Beamer || beam->style!=uint32_t(BeamStyle::Guide)) continue;
         const auto owner=record->spec.owner.live_source;
         if (!state.enemy_handles.contains(owner)) continue;
         Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=h.pos;
@@ -381,7 +387,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
-    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
+    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
         for (const auto &entry:std::initializer_list<std::pair<const char *,int64_t>>{{"rows",int64_t(state.enemies.size())},{"live",live_rows},{"batched",batched_rows},{"bosses",bodies.size()},{"marked",marked_rows}}) {
