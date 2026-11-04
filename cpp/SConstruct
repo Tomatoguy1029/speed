@@ -38,6 +38,9 @@ ARGUMENTS['api_version'] = api
 out = Path(ARGUMENTS.pop('output_dir', str(here / '../speed/extensions/run/bin'))).resolve()
 build = Path(ARGUMENTS.pop('build_dir', str(Path(tempfile.gettempdir()) / 'speed-run-build' / hashlib.sha256(str(here).encode()).hexdigest()[:12]))).resolve()
 SConsignFile(str(build / '.sconsign.dblite'))
+shared_cache = ARGUMENTS.pop('cache_dir', '')
+if shared_cache:
+    CacheDir(shared_cache)
 env = SConscript(str(sdk / 'SConstruct'))
 if env['platform'] not in ['macos', 'windows']:
     Exit('対応するビルド対象は macos と windows です')
@@ -51,13 +54,16 @@ sources = Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cp
 objects = []
 # ロード済みC++の実装を、録画時と配布時にソース全体を走査せず識別する。
 implementation = runtime_id(here)
+# 識別子を小さい生成ファイルへ閉じ込め、C++を変えても既存のobjectを再コンパイルしない。
+identity_source = build / 'generated' / 'build_identity.cpp'
+identity_source.parent.mkdir(parents=True, exist_ok=True)
+identity_text = 'namespace speed {const char *implementation_sha256() {return "' + implementation + '";}}\n'
+if not identity_source.is_file() or identity_source.read_text() != identity_text:
+    identity_source.write_text(identity_text)
 for source in sources:
     relative = Path(source.abspath).relative_to(here.parent)
     target = build / env['platform'] / env['arch'] / relative.with_suffix('')
-    object_env = env
-    if relative == Path('cpp/output/metrics_builder.cpp'):
-        object_env = env.Clone()
-        object_env.Append(CPPDEFINES=[('SPEED_IMPLEMENTATION_SHA256', '\\"' + implementation + '\\"')])
-    objects.extend(object_env.SharedObject(str(target), source))
+    objects.extend(env.SharedObject(str(target), source))
+objects.extend(env.SharedObject(str(build / env['platform'] / env['arch'] / 'generated' / 'build_identity'), str(identity_source)))
 library = env.SharedLibrary(str(out / name), objects)
 Default(library)

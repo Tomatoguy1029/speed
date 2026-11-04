@@ -11,6 +11,7 @@
 #include <climits>
 #include <map>
 #include <tuple>
+#include "build_identity.h"
 namespace speed {
 MetricsDetailTimer::~MetricsDetailTimer() {
     if (!sample) return;
@@ -201,7 +202,7 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         config["xp_base"]=c.progression.xp_base;config["xp_growth"]=c.progression.xp_growth;config["xp_curve"]=c.progression.xp_curve;out["xp_config"]=config;
         PackedByteArray digest;digest.resize(32);std::copy(c.payload_sha256.begin(),c.payload_sha256.end(),digest.ptrw());Dictionary identity;identity["payload_sha256"]=digest.hex_encode();
         std::copy(c.input_sha256.begin(),c.input_sha256.end(),digest.ptrw());identity["input_sha256"]=digest.hex_encode();
-        identity["implementation_sha256"]=SPEED_IMPLEMENTATION_SHA256;
+        identity["implementation_sha256"]=speed::implementation_sha256();
         identity["abi_version"]=ABI_VERSION;identity["state_schema_version"]=STATE_SCHEMA_VERSION;identity["stage_id"]=s.control.stage_id;out["identity"]=identity;
     }
     return out;
