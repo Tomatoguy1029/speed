@@ -12,6 +12,7 @@ class CanisImagePose {
 public:
     // 本体移動・技更新後、画像接触判定を使う前に呼ぶ。
     static void update(RunRuntime &,BossBodyState &);
+    static godot::Vector2 mouth(const RunRuntime &,const BossBodyState &);
     // 保存済みの部位姿勢を描画側に渡す。
     static godot::Array snapshot(const RunRuntime &,const BossBodyState &);
 };

@@ -98,6 +98,11 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
         b.image_parts.push_back(part);
     }
 }
+godot::Vector2 CanisImagePose::mouth(const RunRuntime &r,const BossBodyState &b) {
+    if (!r.state.enemy_handles.contains(b.actor)) return {};
+    const auto &enemy=r.state.enemies[b.actor.slot];const auto &head=b.canis.image_pose.nodes[6];
+    return enemy.pos+(head.position+godot::Vector2(0,59).rotated(head.rotation)).rotated(enemy.facing-godot::Math::PI/2)*(enemy.radius/100.0);
+}
 godot::Array CanisImagePose::snapshot(const RunRuntime &,const BossBodyState &b) {
     godot::Array out;
     for (const auto &node:b.canis.image_pose.nodes) {godot::Dictionary row;row["position"]=node.position;row["rotation"]=node.rotation;row["scale"]=node.scale;out.push_back(row);}

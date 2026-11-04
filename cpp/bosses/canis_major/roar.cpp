@@ -1,4 +1,5 @@
 #include "roar.h"
+#include "image_pose.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -45,8 +46,7 @@ godot::Dictionary CanisRoar::snapshot(const RunRuntime &r,const BossBodyState &b
     const double age=(body.clock-body.canis.roar_started)/p.timing;
     constexpr double lives[]={0,.24,.36,.52};
     if (!p.level || p.level>3 || age<0 || age>=lives[p.level]*p.roar_time) return out;
-    const auto &enemy=r.state.enemies[body.actor.slot];const auto &head=body.canis.image_pose.nodes[6];
-    const auto mouth=enemy.pos+(head.position+godot::Vector2(0,59).rotated(head.rotation)).rotated(enemy.facing-godot::Math::PI/2)*(enemy.radius/100.0);
+    const auto &enemy=r.state.enemies[body.actor.slot];const auto mouth=CanisImagePose::mouth(r,body);
     out["id"]=godot::String::utf8(p.external_id.c_str());out["age"]=age;out["seed"]=1+9*(body.canis.roar_serial-1);out["mouth"]=mouth;out["radius"]=enemy.radius;
     return out;
 }
