@@ -88,6 +88,7 @@ func _ready() -> void:
 				while next_command<commands.size() and int(commands[next_command].tick)==tick+1:
 					if not _action(commands[next_command]): return
 					next_command += 1
+			if not _sync_camera(spec.camera): return
 			var result: Dictionary = session.bridge.step(TICK,session.bridge.pack_intent(intent),{"logical_size":Vector2(SIZE)})
 			if not result.ok:
 				_fail("戦闘の固定更新に失敗しました: " + str(result))
@@ -107,12 +108,24 @@ func _ready() -> void:
 	get_tree().quit(0)
 
 func _present(camera: Dictionary, frame: int, images: Array) -> bool:
+	if not _sync_camera(camera): return false
 	var state: Dictionary = session.bridge.read_frame()
 	if not state.ok:
 		_fail("撮影時刻を読めません")
 		return false
+	var center: Vector2 = render.view_override.center
+	render._present_cpp(0.0 if frame==0 else 1.0/60.0)
+	images.append({"file":"%06d.png" % frame,"tick":frame*2,"seconds":frame/60.0,"world_time":state.value.ui.world_time,"camera_center":[center.x,center.y]})
+	return true
+
+## 撮影中はC++と表示の双方へ、同じ比較用カメラを各固定更新前に渡す。
+func _sync_camera(camera: Dictionary) -> bool:
 	var center := Vector2(float(camera.center[0]),float(camera.center[1]))
 	if camera.get("mode","fixed")=="boss_ship_midpoint":
+		var state: Dictionary = session.bridge.read_frame()
+		if not state.ok:
+			_fail("追従カメラの機体を読めません")
+			return false
 		var bodies: Dictionary = session.bridge.command("dev_boss_body_state")
 		var actor := int(values.get(str(camera.get("boss_ref","")),-1))
 		var found := false
@@ -125,9 +138,11 @@ func _present(camera: Dictionary, frame: int, images: Array) -> bool:
 		if not found:
 			_fail("追従カメラのボスを読めません")
 			return false
+	var updated: Dictionary = session.bridge.command("dev_edit",{"kind":"camera","payload":{"center":center,"size":Vector2(SIZE),"zoom":float(camera.zoom),"bars":0.0}})
+	if not updated.ok:
+		_fail("本番の比較用カメラを設定できません")
+		return false
 	render.view_override.center = center
-	render._present_cpp(0.0 if frame==0 else 1.0/60.0)
-	images.append({"file":"%06d.png" % frame,"tick":frame*2,"seconds":frame/60.0,"world_time":state.value.ui.world_time,"camera_center":[center.x,center.y]})
 	return true
 
 func _save_frame(output: String, frame: int, images: Array) -> bool:
