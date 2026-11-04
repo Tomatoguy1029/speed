@@ -5,11 +5,13 @@ const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 const JET := preload("res://scripts/render/enemies/aquarius_jet.gd")
 const WATER := preload("res://scripts/render/enemies/aquarius_water.gd")
+const STREAM := preload("res://scripts/render/enemies/aquarius_stream.gd")
 var _settings: Dictionary = SETTINGS.for_id("G12-aquarius")
 var _jet = JET.new()
 var _parent: Node2D
 var _noise: Texture2D
 var _waters := {}
+var _streams := {}
 var _tails := {}
 var _last_time := -1.0
 var _epoch := -1
@@ -30,6 +32,7 @@ func render(rows: Array, events: Array, canvas, clock: float) -> void:
 	var pixel_size := _parent.get_viewport().get_visible_rect().size.y / 225.0
 	var visible := {}
 	for node in _waters.values(): node.hide()
+	for node in _streams.values(): node.hide()
 	for row: Dictionary in rows:
 		var time := float(row.time)
 		var delay := float(row.delay)
@@ -44,7 +47,9 @@ func render(rows: Array, events: Array, canvas, clock: float) -> void:
 				var k := clampf(time/delay, 0.0, 1.0)
 				FX.gather(canvas.front, point, float(row.radius)*1.2*float(_settings.size)*canvas.world_scale, k*intensity, color, clock, 14, 4)
 		elif time < delay + float(row.active):
-			_jet.draw(canvas, origin, float(row.angle), float(row.length), float(row.half_width), tan(float(row.spread)), clock, 1.0, 7+index*13, color, minf(1.0,intensity))
+			visible[id] = true
+			_stream(id).update(row,canvas,clock,color,pixel_size,minf(1.0,intensity))
+			_jet.draw_particles(canvas, origin, float(row.angle), float(row.length), float(row.half_width), tan(float(row.spread)), clock, 7+index*13, color, minf(1.0,intensity))
 			if index == 0 and time-delay < 0.2:
 				var palette: Array[Color] = _jet._ramp(color)
 				canvas.front.glow(point.x,point.y,float(row.radius)*canvas.world_scale*3.0,palette[6],0.8*(1.0-(time-delay)/0.2)*intensity)
@@ -72,6 +77,18 @@ func render(rows: Array, events: Array, canvas, clock: float) -> void:
 		if not visible.has(id):
 			_waters[id].queue_free()
 			_waters.erase(id)
+
+	for id in _streams.keys():
+		if not visible.has(id) or not _streams[id].visible:
+			_streams[id].queue_free()
+			_streams.erase(id)
+
+func _stream(id: int):
+	if not _streams.has(id):
+		var node = STREAM.new()
+		_parent.add_child(node)
+		_streams[id] = node
+	return _streams[id]
 
 func _water(id: int):
 	if not _waters.has(id):

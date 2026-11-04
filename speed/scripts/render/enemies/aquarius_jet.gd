@@ -47,61 +47,15 @@ func _ramp(color: Color) -> Array[Color]:
 	var dark := Color("04101e")
 	return [_mix(dark,color,0.12), _mix(dark,color,0.25), _mix(dark,color,0.45), _mix(dark,color,0.7), color, _mix(color,Color.WHITE,0.35), _mix(color,Color.WHITE,0.7), Color.WHITE]
 
-func draw(canvas, world_origin: Vector2, angle: float, length: float, half0: float, slope: float, clock: float, strength: float, seed: int, color: Color, alpha: float) -> void:
+## 本体と加算光はGPUで描き、元の個別の水滴・霧だけを画素層へ置く。
+func draw_particles(canvas, world_origin: Vector2, angle: float, length: float, half0: float, slope: float, clock: float, seed: int, color: Color, alpha: float) -> void:
 	var p = canvas.front
 	var origin: Vector2 = canvas.to_logical(world_origin)
 	var scale: float = canvas.world_scale
 	var direction := Vector2.from_angle(angle)
-	var across := Vector2(-direction.y, direction.x)
-	var full_length := length * scale
-	var view := Vector2(p.width, p.height).length()
-	var maximum := minf(full_length, view * 1.2)
-	var count := ceili(maximum) + 1
-	var up := PackedFloat32Array()
-	var down := PackedFloat32Array()
-	up.resize(count)
-	down.resize(count)
-	for d in range(count):
-		var u := d / full_length
-		var rough := _smooth(0.1, 1.0, u)
-		var sd := fposmod(d - clock * 520.0, 150.0) - 75.0
-		var h := maxf(1.2, (half0 + d / scale * slope) * scale) * (0.55 + 0.45 * strength) * (1.0 + exp(-sd*sd/160.0)*0.12*(1.0-u*0.5))
-		up[d] = h * (1.0 + _noise(d*0.09-clock*30.0, 9, seed+1)*0.16*rough)
-		down[d] = h * (1.0 + _noise(d*0.09-clock*30.0, 3, seed+1)*0.16*rough)
-	var far := origin + direction * maximum
-	var ends := [origin, far + across * up[count-1], far - across * down[count-1]]
-	var lo := origin
-	var hi := origin
-	for point: Vector2 in ends:
-		lo = lo.min(point)
-		hi = hi.max(point)
 	var palette := _ramp(color)
-	for y in range(maxi(0, floori(lo.y-2)), mini(p.height, ceili(hi.y+2))):
-		for x in range(maxi(0, floori(lo.x-2)), mini(p.width, ceili(hi.x+2))):
-			var relative := Vector2(x+0.5,y+0.5)-origin
-			var d := relative.dot(direction)
-			if d < 1.0 or d >= maximum: continue
-			var q := relative.dot(across)
-			var edge: float = down[floori(d)] if q < 0 else up[floori(d)]
-			var aq := absf(q) / maxf(0.8, edge)
-			if aq > 1.0: continue
-			var u := d / full_length
-			if u > 0.5 and _noise(d*0.1-clock*25.0,q*0.18,seed+2) < -0.95 + 1.7*_smooth(0.5,1.0,u) + (1.0-strength)*0.8: continue
-			var streak := _noise(d*0.045-clock*46.0,q*0.55,seed)
-			var body := _noise(d*0.02-clock*12.0,q*0.06,seed+5)
-			var level := 2 if aq > 0.9 else (3 if aq > 0.72 else (5 if body > 0.2 else 4))
-			if aq < 0.07 + 0.05*(1.0-u): level = 7
-			elif streak > 0.42: level = mini(7,level+2)
-			elif streak > 0.25: level = mini(6,level+1)
-			p.dot(x,y,palette[level],alpha*(0.75 if aq > 0.9 else 1.0))
-			if level == 7 and (x & 3) == 0 and (y & 3) == 0: p.light(x,y,palette[5],0.12*alpha)
-	_droplets(p,origin,direction,full_length,half0,slope,scale,clock,strength,seed,palette,alpha)
-	_mist(p,origin,direction,full_length,half0,slope,scale,clock,seed,palette,alpha)
-	var d := 0.0
-	while d < minf(full_length,view):
-		var point := origin+direction*d
-		p.glow(point.x,point.y,10.0+d*0.06,palette[4],0.18*alpha*(1.0-d/full_length*0.6))
-		d += 12.0
+	_droplets(p,origin,direction,length*scale,half0,slope,scale,clock,1.0,seed,palette,alpha)
+	_mist(p,origin,direction,length*scale,half0,slope,scale,clock,seed,palette,alpha)
 
 func _droplets(p, origin: Vector2, direction: Vector2, length: float, half0: float, slope: float, scale: float, clock: float, strength: float, seed: int, palette: Array[Color], alpha: float) -> void:
 	var normal := Vector2(-direction.y,direction.x)
