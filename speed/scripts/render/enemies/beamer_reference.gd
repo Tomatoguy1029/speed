@@ -15,6 +15,9 @@ func render(rows: Array, events: Array, canvas, world_time: float) -> void:
 	for row: Dictionary in rows:
 		var id: int = row.order
 		present[id] = true
+		if not bool(row.get("owner_alive", true)) and _attacks.has(id):
+			row = row.duplicate()
+			row.enemy_radius = _attacks[id].row.enemy_radius
 		_attacks[id] = {"row": row, "clock": world_time}
 		_draw_active(row, canvas, world_time)
 	for event: Dictionary in events:

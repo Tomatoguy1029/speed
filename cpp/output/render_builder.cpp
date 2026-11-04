@@ -336,9 +336,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if (kind!=EnemyDefinition::Kind::Beamer || beam->style!=uint32_t(BeamStyle::Guide)) continue;
         const auto owner=record->spec.owner.live_source;
-        if (!state.enemy_handles.contains(owner)) continue;
         Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=h.pos;
-        fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["enemy_radius"]=state.enemies[owner.slot].radius;
+        fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["owner_alive"]=state.enemy_handles.contains(owner);fx["enemy_radius"]=state.enemy_handles.contains(owner)?state.enemies[owner.slot].radius:run.content->definitions[source-1].radius;
         fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);beamer_fx.push_back(fx);
     }
     for (const auto &shot:state.hostiles) {
