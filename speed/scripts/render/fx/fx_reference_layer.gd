@@ -3,6 +3,7 @@ extends RefCounted
 const CANVAS := preload("res://scripts/render/fx/fx_reference_canvas.gd")
 var canvas := CANVAS.new()
 var shadows: Node2D
+var overlay: Node2D
 var _sprites: Array[Sprite2D] = []
 var _size := Vector2.ZERO
 var _center := Vector2.ZERO
@@ -12,6 +13,9 @@ func setup(parent: Node2D) -> void:
 	shadows = Node2D.new()
 	shadows.z_index = -2
 	parent.add_child(shadows)
+	overlay = Node2D.new()
+	overlay.z_index = 9
+	parent.add_child(overlay)
 	for i in 4:
 		var sprite := Sprite2D.new()
 		sprite.centered = false

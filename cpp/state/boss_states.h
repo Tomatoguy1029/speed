@@ -2,6 +2,7 @@
 #include "entity_store.h"
 #include "combat_types.h"
 #include "../content/generated/combat_ids.h"
+#include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <string>
@@ -287,6 +288,7 @@ struct HydraNeckState {
 struct DracoCloneUnit {TechniqueState inner;HydraNeckState neck;std::vector<EnemyHandle> parts;std::vector<godot::Vector2> points;godot::Vector2 origin;uint32_t index=0;bool entry_hit=false;};
 struct HydraBodyState {std::unordered_map<int64_t,AttackHandle> final_beams;double major_cd=0,combo_left=0,major_padding_left=0;std::unordered_map<uint32_t,double> major_until;HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false,attack_field_advance=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
+    std::vector<BossImagePart> image_parts;
     int64_t final_observation_id=0;
     HydraBodyState hydra;
     DracoBodyState draco;

@@ -87,6 +87,7 @@ const BOSS_FINAL_BEAM := preload("res://scenes/render/boss_final_beam.tscn")
 var _boss_final_beams := {}
 var _boss_body_displays := {}
 var _reference_layer: RefCounted
+var _enemy_reference = preload("res://scripts/render/enemies/enemy_reference.gd").new()
 var _reference_render_frame: Dictionary = {}
 var _reference_events: Array = []
 var _ram_reference := preload("res://scripts/render/fx/boss_ram_reference.gd").new()
@@ -260,6 +261,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_pulser_parent = marlin_parent
 	_reference_layer = preload("res://scripts/render/fx/fx_reference_layer.gd").new()
 	_reference_layer.setup(marlin_parent)
+	_enemy_reference.setup(marlin_parent, _scope, visuals)
 	_pulser_visual = preload("res://scripts/render/enemies/pulser.gd").new()
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)
@@ -702,6 +704,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
 	_reference_render_frame = frame
+	frame = _enemy_reference.strip_legacy(frame)
 	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
 	_hero_power_visual.queue_redraw()
 	_update_marks(frame)
@@ -999,7 +1002,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			if value.actor==body.actor and value.stage<5: attack = value; break
 		var display: Node2D = _boss_body_displays[body.id]
 		var move := String(attack.get("technique",""))
-		if display.get_meta("visual_move",null)!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
+		if not display.has_meta("visual_move") or display.get_meta("visual_move")!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
 			EFFECT_SETTINGS.apply_body(display,["monoceros","centaurus","canis_major","hydra","draco"][body.kind],move)
 			display.set_meta("visual_move",move)
 			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
@@ -1008,6 +1011,8 @@ func apply_frame(frame: Dictionary) -> bool:
 			display.set_reference_hit(_ram_reference.white(ram) if int(ram.get("id",0))==int(body.id) else 0.0)
 		if display.has_method("set_reference_canvas"):
 			display.set_reference_canvas(_reference_layer.canvas)
+		if display.has_method("setup_reference_overlay"):
+			display.setup_reference_overlay(_reference_layer.overlay)
 		display.apply_frame(body,attack,entry.get("appearance",{}))
 	for id in _boss_body_displays.keys():
 		if not body_seen.has(id):
@@ -1171,8 +1176,9 @@ func receive_frame(frame: Dictionary) -> bool:
 		_reference_events.append(payload)
 	return true
 
-func update_reference_effects(_frame: Dictionary, real_dt: float) -> void:
+func update_reference_effects(frame: Dictionary, real_dt: float) -> void:
 	if _reference_layer == null: return
+	_enemy_reference.render(_reference_render_frame, frame.events, _reference_layer.canvas, real_dt, float(frame.ui.get("world_time",0.0)))
 	for display: Node2D in _boss_body_displays.values():
 		if display.visible and display.has_method("draw_reference"):
 			display.draw_reference(_reference_layer.canvas, 0.0 if authoring_paused else real_dt)

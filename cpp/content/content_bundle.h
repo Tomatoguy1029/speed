@@ -6,11 +6,13 @@
 #include "generated/run_schema.h"
 #include "population_data.h"
 #include "encounter_data.h"
+#include "boss_image_data.h"
 
 namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
 struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
+    std::vector<BossImageMask> boss_image_masks;
     std::vector<DracoFinaleDefinition> draco_finales;
     std::vector<DracoFlowGateDefinition> draco_flow_gates;
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};

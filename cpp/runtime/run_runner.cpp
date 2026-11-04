@@ -7,6 +7,7 @@
 #include "dev_commands.h"
 #include "../output/frame_builder.h"
 #include "../bosses/draco/finale.h"
+#include "../bosses/canis_major/nova.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "../behaviors/enemies/corona_vortex.h"
@@ -191,6 +192,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     state.ship_pos=state.ship.pos;
     if ((control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
+    if (world_step && state.phase==Phase::Play)
+        for (auto &body:state.bosses.bodies) CanisNova::field_tick(core.runtime,body);
     if (!core.check_run_end()) {
         if (state.loadout.ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);
