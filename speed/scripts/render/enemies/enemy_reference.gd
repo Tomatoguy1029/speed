@@ -16,6 +16,7 @@ const AQUARIUS := preload("res://scripts/render/enemies/aquarius_reference.gd")
 const SOLDIER := preload("res://scripts/render/enemies/soldier_reference.gd")
 const CEPHEUS := preload("res://scripts/render/enemies/cepheus_reference.gd")
 const CORONA := preload("res://scripts/render/enemies/corona_reference.gd")
+const AQUILA := preload("res://scripts/render/enemies/aquila_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -35,6 +36,7 @@ var _aquarius = AQUARIUS.new()
 var _soldier = SOLDIER.new()
 var _cepheus = CEPHEUS.new()
 var _corona = CORONA.new()
+var _aquila = AQUILA.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -49,6 +51,7 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 	_aquarius.setup(parent, scope)
 	_cepheus.setup(parent, scope, visuals)
 	_corona.setup(parent, scope, visuals)
+	_aquila.setup(parent, scope, visuals)
 
 func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_time: float) -> void:
 	var world_dt := 0.0 if _last_world_time < 0.0 or world_time < _last_world_time else world_time - _last_world_time
@@ -91,6 +94,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_cepheus.render(frame.cepheus_actors, frame.cepheus_fx, canvas, world_time)
 	if frame.has("corona_selected") and frame.has("corona_thrown"):
 		_corona.render(frame.corona, frame.corona_selected, frame.corona_thrown, canvas, world_time)
+	if frame.has("aquila_actors") and frame.has("aquila_zones"):
+		_aquila.render(frame.aquila_actors, frame.aquila_zones, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -111,12 +116,15 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var soldier := frame.has("soldier_fx") and frame.has("soldier_bolts")
 	var cepheus := frame.has("cepheus_fx") and frame.has("cepheus_actors")
 	var corona := frame.has("corona_selected") and frame.has("corona_thrown")
+	var aquila := frame.has("aquila_actors") and frame.has("aquila_zones")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
 		result.ruler = PackedFloat64Array()
 	if cepheus:
 		result.cepheus = {"values":PackedFloat64Array(), "marks":PackedFloat64Array()}
+	if aquila:
+		result.aquila = {"values":PackedFloat64Array(), "view":frame.aquila.view}
 	if corona:
 		result.corona = PackedFloat64Array()
 		var members: PackedFloat64Array = frame.get("corona_members", PackedFloat64Array())
@@ -149,7 +157,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 				row["gunner"] = kept
 			batches.append(row)
 		result.batches = batches
-	if phoenix or beamer or lynx or bite or cross or crab or ruler or dolphin or auriga or telescope or aquarius or soldier:
+	if phoenix or beamer or lynx or bite or cross or crab or ruler or dolphin or auriga or telescope or aquarius or soldier or aquila:
 		var shapes: Array = []
 		for row: Dictionary in frame.get("shapes", []):
 			if phoenix and int(row.get("zone_style", -1)) == 5:
@@ -175,6 +183,8 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if aquarius and bool(row.get("reference_aquarius", false)):
 				continue
 			if soldier and bool(row.get("reference_soldier_bolt", false)):
+				continue
+			if aquila and bool(row.get("reference_aquila", false)):
 				continue
 			shapes.append(row)
 		result.shapes = shapes
