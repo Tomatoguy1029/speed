@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cache-scope-only" in OS.get_cmdline_user_args():
+		check_cache_scope()
+		print("[生成キャッシュの依存範囲] failed=",failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--editor-process-only" in OS.get_cmdline_user_args():
 		check_editor_process()
 		print("[起動前の別プロセス生成] failed=",failed)
@@ -200,3 +205,63 @@ func _startup_only() -> void:
 		await get_tree().process_frame
 	print("[startup_title] engine_ms=",Time.get_ticks_msec()," complete=",app.get("startup_complete")," timings=",ContentManager.startup_timings)
 	get_tree().quit(0 if app.get("startup_complete") else 1)
+
+## 独立コピーの既存生成物を使い、入口・報告と実データの変更だけを照合する。
+func check_cache_scope() -> void:
+	var builder = load("res://addons/content_build/builder.gd")
+	var generator = load("res://tools/content/build_run_content.gd")
+	var incremental = load("res://addons/content_build/incremental.gd")
+	var before := {}
+	for number in range(1,6):
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://.content/run/stage_%d.json" % number))
+		before[number] = [index.payload_sha256,index.resources_sha256]
+	var compiled: RuntimeStage = load("res://.content/stage_1.tres")
+	var config := load("res://data/config.tres") as GameConfig
+	var prepared_key: String = generator.preparation_signature(compiled,config,{},[],{},{})
+	var started := Time.get_ticks_usec()
+	var changed := {}
+	for path in ["res://addons/content_build/builder.gd","res://addons/content_build/incremental.gd","res://addons/content_build/plugin.gd","res://addons/content_build/export.gd","res://tools/content/build_all.gd"]:
+		changed[path] = FileAccess.get_file_as_string(path)
+		FileAccess.open(path,FileAccess.WRITE).store_string(changed[path]+"\n# 入口・報告だけの変更。\n")
+	check(builder.build_for_editor()==OK,"入口・報告の変更後も通常の生成入口が成功する")
+	check(builder.last_build_report.size()>1 and builder.last_build_report.all(func(row): return not row.rebuilt),"入口・報告だけなら全単位を再利用する")
+	check(generator.preparation_signature(compiled,config,{},[],{},{})==prepared_key,"入口・報告は準備キャッシュを無効にしない")
+	print("[入口・報告変更] ms=",(Time.get_ticks_usec()-started)/1000.0," units=",builder.last_build_report)
+	for number in range(1,6):
+		var path := "res://.content/run/stage_%d.json" % number
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+		check([index.payload_sha256,index.resources_sha256]==before[number],"戦闘データと資源表を保持する: %d" % number)
+		check(not load("res://scripts/runtime/run_content_loader.gd").read_bundle(path,index.input_sha256).is_empty(),"再利用したデータを通常の読込経路で検査する: %d" % number)
+	for path: String in changed: FileAccess.open(path,FileAccess.WRITE).store_string(changed[path])
+	# 小さい音の生成単位で、実際の生成処理の変更と出力欠落を確かめる。
+	var audio_path := "res://tools/content/build_audio.gd"
+	var original_audio := FileAccess.get_file_as_string(audio_path)
+	FileAccess.open(audio_path,FileAccess.WRITE).store_string(original_audio+"\n# 音の生成処理の変更。\n")
+	started = Time.get_ticks_usec()
+	check(builder.build_for_editor()==OK,"音の生成処理の変更を反映する")
+	for row: Dictionary in builder.last_build_report:
+		check(row.rebuilt==(row.unit=="audio"),"音の生成処理変更が無関係な生成単位へ波及しない: "+row.unit)
+	print("[音の生成処理変更] ms=",(Time.get_ticks_usec()-started)/1000.0)
+	# 同じ生成入口で、実データ変更が対象のステージにだけ届くことも確かめる。
+	var stage_path := "res://data/stages/stage_1.tres"
+	var original_stage := FileAccess.get_file_as_string(stage_path)
+	var stage: StageDef = ResourceLoader.load(stage_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	stage.time_limit += 1.0
+	check(ResourceSaver.save(stage,stage_path)==OK,"独立コピーのステージ1の値を変更する")
+	started = Time.get_ticks_usec()
+	check(builder.build_for_editor()==OK,"変更した実データを生成する")
+	for row: Dictionary in builder.last_build_report:
+		check(row.rebuilt==(row.unit in ["catalog","stage_1"]),"ステージ1の値変更では索引と対象ステージだけ作り直す: "+row.unit)
+	print("[ステージ1の値変更] ms=",(Time.get_ticks_usec()-started)/1000.0)
+	FileAccess.open(stage_path,FileAccess.WRITE).store_string(original_stage)
+	FileAccess.open(audio_path,FileAccess.WRITE).store_string(original_audio)
+	# 全体生成を回さず、欠落した単位の再生成を既存キャッシュ経路で確かめる。
+	var cache = incremental.new()
+	var output := "res://.content/dev/cache_scope_probe.txt"
+	var callback := func():
+		FileAccess.open(output,FileAccess.WRITE).store_string("生成物")
+		return {"error":OK,"outputs":PackedStringArray([output])}
+	check(cache.run("probe",PackedStringArray([audio_path]),callback)==OK,"確認用の小さい出力を生成する")
+	DirAccess.remove_absolute(output)
+	check(cache.run("probe",PackedStringArray([audio_path]),callback)==OK and cache.report[-1].rebuilt,"出力欠落は入力が同じでも作り直す")
+	DirAccess.remove_absolute(output)
