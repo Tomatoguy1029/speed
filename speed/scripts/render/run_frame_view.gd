@@ -86,6 +86,8 @@ var _picaro_material: ShaderMaterial
 const BOSS_FINAL_BEAM := preload("res://scenes/render/boss_final_beam.tscn")
 var _boss_final_beams := {}
 var _boss_body_displays := {}
+var _reference_layer: RefCounted
+var _reference_render_frame: Dictionary = {}
 var _boss_technique_visual: Node2D
 var _boss_lance_visual: Node2D
 var _boss_wave_visual: Node2D
@@ -254,6 +256,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_phoenix_visual = preload("res://scripts/render/enemies/phoenix.gd").new()
 	_phoenix_visual.setup_frame(marlin_parent)
 	_pulser_parent = marlin_parent
+	_reference_layer = preload("res://scripts/render/fx/fx_reference_layer.gd").new()
+	_reference_layer.setup(marlin_parent)
 	_pulser_visual = preload("res://scripts/render/enemies/pulser.gd").new()
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)
@@ -688,10 +692,14 @@ func _update_marks(frame: Dictionary) -> void:
 			if (marks[i]&2)!=0: elite_crackle.add_body(body)
 	elite_crackle.end()
 
+func prepare_reference_view(size: Vector2, center: Vector2, zoom: float) -> void:
+	if _reference_layer != null: _reference_layer.begin_frame(size, center, zoom)
+
 func apply_frame(frame: Dictionary) -> bool:
 	if authoring_frame.is_valid(): frame = authoring_frame.call(frame)
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
+	_reference_render_frame = frame
 	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
 	_hero_power_visual.queue_redraw()
 	_update_marks(frame)
@@ -993,6 +1001,8 @@ func apply_frame(frame: Dictionary) -> bool:
 			EFFECT_SETTINGS.apply_body(display,["monoceros","centaurus","canis_major","hydra","draco"][body.kind],move)
 			display.set_meta("visual_move",move)
 			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
+		if display.has_method("set_reference_canvas"):
+			display.set_reference_canvas(_reference_layer.canvas)
 		display.apply_frame(body,attack,entry.get("appearance",{}))
 	for id in _boss_body_displays.keys():
 		if not body_seen.has(id):
@@ -1154,6 +1164,13 @@ func receive_frame(frame: Dictionary) -> bool:
 		payload["type"] = event.type
 		_queued_events.append(payload)
 	return true
+
+func update_reference_effects(_frame: Dictionary, real_dt: float) -> void:
+	if _reference_layer == null: return
+	for display: Node2D in _boss_body_displays.values():
+		if display.visible and display.has_method("draw_reference"):
+			display.draw_reference(_reference_layer.canvas, 0.0 if authoring_paused else real_dt)
+	_reference_layer.end_frame()
 
 func update_effects(frame: Dictionary, dt: float) -> void:
 	if authoring_clock >= 0.0:

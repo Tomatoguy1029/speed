@@ -187,6 +187,7 @@ func _present_cpp(delta: float) -> void:
 	var render: Dictionary = bridge.read_render(Rect2(cam_center-half,half*2.0),1.0)
 	frame_view.build_us = Time.get_ticks_usec()-began
 	frame_view.boss_hit_feedback.tick(0.0 if frame_view.authoring_paused or frame.ui.get("presentation_frozen",false) else delta)
+	frame_view.prepare_reference_view(get_viewport().get_visible_rect().size,cam_center,cam_zoom)
 	if not render.ok or not frame_view.apply_frame(render.value):
 		frame_view.hide()
 		return
@@ -194,6 +195,7 @@ func _present_cpp(delta: float) -> void:
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
+	frame_view.update_reference_effects(frame,delta)
 	shake=maxf(shake,frame_view.ruler_shake)
 	frame_view.ruler_shake=0.0
 	if frame_view.finish_shake>0.0:
