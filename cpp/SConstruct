@@ -52,18 +52,18 @@ else:
 name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
 sources = Glob('api/*.cpp') + Glob('state/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
 objects = []
-# 外部ヘッダーの解析結果を全ファイルで使い回す。
+# 外部ヘッダーの解析結果を全ファイルで使い回す。SDKのビルドには影響させない。
+run_env = env.Clone()
 if env.get('is_msvc', False):
-    env.Append(CPPPATH=[str(here)], CXXFLAGS=['/FIpch.h'])
-    env['PCHSTOP'] = 'pch.h'
-    precompiled = env.PCH(str(build / env['platform'] / env['arch'] / 'pch.pch'), 'pch.cpp')
-    env['PCH'] = precompiled[0]
+    run_env.Append(CPPPATH=[str(here)], CXXFLAGS=['/FIpch.h'])
+    run_env['PCHSTOP'] = 'pch.h'
+    precompiled = run_env.PCH(str(build / env['platform'] / env['arch'] / 'pch.pch'), 'pch.cpp')
+    run_env['PCH'] = precompiled[0]
     objects.append(precompiled[1])
 else:
     pch_file = build / env['platform'] / env['arch'] / 'pch.h.pch'
-    pch_env = env.Clone()
-    precompiled = pch_env.Command(str(pch_file), 'pch.h', '$SHCXX -x c++-header $SHCXXFLAGS $SHCCFLAGS $_CCCOMCOM -o $TARGET $SOURCE')
-    env.Append(CXXFLAGS=['$(', '-include-pch', str(pch_file), '$)'])
+    precompiled = env.Command(str(pch_file), 'pch.h', '$SHCXX -x c++-header $SHCXXFLAGS $SHCCFLAGS $_CCCOMCOM -o $TARGET $SOURCE')
+    run_env.Append(CXXFLAGS=['$(', '-include-pch', str(pch_file), '$)'])
 # ロード済みC++の実装を、録画時と配布時にソース全体を走査せず識別する。
 implementation = runtime_id(here)
 # 識別子を小さい生成ファイルへ閉じ込め、C++を変えても既存のobjectを再コンパイルしない。
@@ -75,8 +75,8 @@ if not identity_source.is_file() or identity_source.read_text() != identity_text
 for source in sources:
     relative = Path(source.abspath).relative_to(here.parent)
     target = build / env['platform'] / env['arch'] / relative.with_suffix('')
-    objects.extend(env.SharedObject(str(target), source))
-objects.extend(env.SharedObject(str(build / env['platform'] / env['arch'] / 'generated' / 'build_identity'), str(identity_source)))
+    objects.extend(run_env.SharedObject(str(target), source))
+objects.extend(run_env.SharedObject(str(build / env['platform'] / env['arch'] / 'generated' / 'build_identity'), str(identity_source)))
 if not env.get('is_msvc', False):
     Depends(objects, precompiled)
 library = env.SharedLibrary(str(out / name), objects)
