@@ -9,7 +9,7 @@ data_path, pixelfx_dir, out = sys.argv[1], sys.argv[2], sys.argv[3]
 shell = open(f'{B}/app/shell.html', encoding='utf-8').read()
 data = open(data_path, encoding='utf-8').read()
 px = subprocess.check_output([sys.executable, f'{B}/bundle_pixelfx.py', pixelfx_dir, 'src/core/index.js', 'src/fx/impacts/_lib.js', 'src/fx/melee/_lib.js', 'src/fx/fire/_lib.js'], text=True)
-order = ['core.js', 'fxlib.js', 'runtime.js', 'ledger.js', 'centaurus.js', 'enemies_a.js', 'enemies_b.js', 'enemies_c.js', 'bosses_common.js', 'roar.js', 'canis_fx.js', 'canis_light.js', 'canis.js', 'monoceros_fx.js', 'mono_boost.js', 'monoceros.js', 'hydra.js', 'hydra_major.js', 'draco.js']
+order = ['core.js', 'fxlib.js', 'runtime.js', 'ledger.js', 'centaurus.js', 'enemies_a.js', 'enemies_b.js', 'enemies_c.js', 'bosses_common.js', 'roar.js', 'canis_fx.js', 'canis_light.js', 'canis.js', 'monoceros_fx.js', 'mono_boost.js', 'monoceros.js', 'hydra.js', 'hydra_major.js', 'draco.js', 'draco_fx.js']
 app = '\n'.join(open(f'{B}/app/{f}', encoding='utf-8').read() for f in order)
 app += "\nconst CAT_ORDER = ['ボスへの命中 G10', '鳳凰 G11', '敵（ステージ1以外）G12', 'ケンタウルス座（C）', 'おおいぬ座（O）', 'いっかくじゅう座（I）', 'うみへび座（H）', 'りゅう座（D）', '参照（ステージ1）'];\nDEMOS.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));\n"
 lic = ('■ pixelFX（MIT） https://github.com/patch-gg/pixelfx\n' + open(f'{pixelfx_dir}/LICENSE', encoding='utf-8').read()
