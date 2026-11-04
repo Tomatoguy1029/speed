@@ -1,6 +1,6 @@
 ## ルートを先に回転・伸縮し、許可した領域の中だけで敵の配置を変える。
 extends Node
-const CONSTRUCT := preload("res://scripts/encounters/encounter_coordinator.gd")
+const EnemyGate := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.EnemyGate
 const SESSION := preload("res://gyms/enemy_lab/lab_session.gd")
 const CHECK := preload("res://scripts/encounters/route_constraints.gd")
 var cancelled := false
@@ -10,17 +10,17 @@ func capture(session, path: PackedVector2Array, jitter := 60.0, margin := 20.0) 
 	if path.size() < 2:
 		return {}
 	var regions := []
-	var t := session.run.enemies.table as EnemyTable
+	var t = session.run.enemies.table
 	var origin := path[0]
 	for i in t.alive.size():
 		if t.alive[i] and not t.dead[i]:
-			var offset := t.pos[i] - origin
+			var offset = t.pos[i] - origin
 			regions.append({"type": String(t.type[i]), "pos": [offset.x, offset.y], "jitter": maxf(0, jitter),
 				"angle": t.facing[i], "elite": t.elite[i] != 0,
-				"role": "fodder" if t.gate[i] == EnemyTable.Gate.NONE and t.hp[i] <= session.run.combat.attack_power() and t.armor[i] <= session.run.combat.attack_power() else "avoid"})
+				"role": "fodder" if t.gate[i] == EnemyGate.None and t.hp[i] <= session.run.combat.attack_power() and t.armor[i] <= session.run.combat.attack_power() else "avoid"})
 	var points := []
 	for point in path:
-		var offset := point - origin
+		var offset = point - origin
 		points.append([offset.x, offset.y])
 	return {"route": points, "regions": regions, "anchor": [origin.x, origin.y], "margin": margin,
 		"rotation": PI, "scale_min": 0.8, "scale_max": 1.0, "min_fodder": 1, "window": 0.0, "attempts": 32}
@@ -42,20 +42,20 @@ func generate(source, pattern: Dictionary, seed_value: int) -> Dictionary:
 		if cancelled:
 			break
 		await worker.seek(source.tick)
-		var candidate := CONSTRUCT.construct(pattern, rng, source.vector(pattern.get("anchor", [0, 0])))
+		var candidate := construct(pattern, rng, source.vector(pattern.get("anchor", [0, 0])))
 		if not candidate.get("valid", false): continue
 		var path: PackedVector2Array = candidate.route
 		var commands: Array = candidate.commands
 		var roles_valid := true
 		var positions := []
 		for command in commands:
-			var at := worker.vector(command.args.pos)
+			var at = worker.vector(command.args.pos)
 			for point in positions:
 				if at.distance_to(point) < float(pattern.get("min_spacing", 0)): roles_valid = false
 			positions.append(at)
 			worker.perform(command.kind, command.args)
 			if command.args.get("role") == "avoid":
-				var t: EnemyTable = worker.run.enemies.table
+				var t: Dictionary = worker.run.enemies.table
 				var row: int = worker.selected
 				if row >= 0 and CHECK.distance_to_path(t.pos[row], path) <= t.r[row] + CHECK.sweep_radius(worker.run, float(pattern.get("margin", 20))):
 					roles_valid = false
@@ -77,3 +77,23 @@ func generate(source, pattern: Dictionary, seed_value: int) -> Dictionary:
 		"route": last_candidate.get("route", PackedVector2Array()), "commands": last_candidate.get("commands", []),
 		"validation": last_validation, "seed": seed_value, "source_digest": source.digest(), "reasons": reasons,
 		"reason": TranslationServer.translate("lab.message_5931a7be25" )}
+
+static func construct(pattern: Dictionary, rng: RandomNumberGenerator, anchor: Vector2) -> Dictionary:
+	var angle := rng.randf_range(-float(pattern.get("rotation", PI)), float(pattern.get("rotation", PI)))
+	var scale_value := rng.randf_range(float(pattern.get("scale_min", 0.8)), float(pattern.get("scale_max", 1)))
+	var path := PackedVector2Array()
+	for point in pattern.get("route", []):
+		path.append(anchor + Vector2(float(point[0]), float(point[1])).rotated(angle) * scale_value)
+	var commands := []
+	for region in pattern.get("regions", []):
+		var type := StringName(region.get("type", ""))
+		if not ContentManager.enemies.has(type) and not ContentManager.bosses.has(type):
+			return {"valid": false, "reason": TranslationServer.translate("lab.message_461a6d1eec")}
+		var minimum := clampi(int(region.get("min_count", 1)), 0, 100)
+		var maximum := clampi(int(region.get("max_count", 1)), minimum, 100)
+		for n in rng.randi_range(minimum, maximum):
+			var point := Vector2(float(region.pos[0]), float(region.pos[1]))
+			point += Vector2.from_angle(rng.randf() * TAU) * sqrt(rng.randf()) * float(region.get("jitter", 0))
+			point = anchor + point.rotated(angle) * scale_value
+			commands.append({"kind": "boss" if ContentManager.bosses.has(type) else "spawn", "args": {"type": region.type, "pos": [point.x, point.y], "angle": float(region.get("angle", 0)) + angle, "role": region.get("role", "avoid"), "elite": region.get("elite", false)}})
+	return {"valid": path.size() >= 2, "route": path, "commands": commands}

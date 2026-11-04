@@ -1,6 +1,6 @@
 [gd_resource type="Resource" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/centaurus/techniques/combo_shower_shot.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/centaurus/combo_shower_shot.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/hunt_pounce.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/canis_major/hunt_pounce.gd" id="1"]
 
 [resource]
 script = ExtResource("1")

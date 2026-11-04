@@ -28,3 +28,12 @@ func compute(levels: Dictionary) -> Dictionary:
 		result.add[stat] = float(result.add.get(stat, 0.0)) + amount * level
 		result.reduce[stat] = float(result.reduce.get(stat, 1.0)) * pow(1.0 - amount, level)
 	return result
+
+## C++の公開契約へ、使用する係数だけを値として渡す。
+func for_cpp(lab: bool, overrides: Dictionary = {}) -> Dictionary:
+	var source := for_run(lab,overrides)
+	var result := {"mult":{},"add":{},"reduce":{}}
+	var fields := {"mult":["max_speed","attack","pickup","length","xp"],"add":["max_hp","reroll"],"reduce":["charge_time"]}
+	for group in fields:
+		for stat in fields[group]: result[group][stat] = source[group].get(stat,0.0 if group=="add" else 1.0)
+	return result

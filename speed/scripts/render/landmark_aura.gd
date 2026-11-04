@@ -2,7 +2,6 @@
 extends Node2D
 const ASSETS_PATH := "res://assets/effects/landmark/masks.tres"
 const MATERIAL_PATH := "res://data/visuals/landmark_aura_material.tres"
-var _rm: RunPresentation
 var _assets: Resource
 var _masks: Dictionary
 var _sprites: Array[Sprite2D] = []
@@ -11,13 +10,8 @@ var _clock := -INF
 var _pump_full := PackedFloat64Array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0])
 var _count := 0
 
-func setup(render: RunPresentation) -> void:
-	_rm = render
-	var scope := render.run.ctx.resources
+func setup(scope: ContentResourceScope) -> void:
 	for path in [ASSETS_PATH, MATERIAL_PATH]:
-		if not scope.resources.has(path) and render.state.lab_mode:
-			# 実験場だけは任意の追加対象を開始時に取得し、同じScopeへ渡す。
-			scope.provide(path, load(path))
 		assert(scope.resources.has(path), "目印オーラの事前準備が必要: " + path)
 	_assets = scope.resources.get(ASSETS_PATH)
 	var template := scope.resources.get(MATERIAL_PATH) as ShaderMaterial
@@ -49,59 +43,23 @@ func begin() -> void:
 	_count = 0
 	for sprite in _sprites: sprite.hide()
 
-func add_enemy(t: EnemyTable, row: int, deformation: Dictionary = {}) -> void:
-	if _sprites.is_empty(): return
-	if t.def[row] != null and t.def[row].behavior == &"triangle":
-		var parts := t.parts[row]
-		for n in range(0, parts.size(), 2):
-			var child := parts[n]
-			if _rm.run.enemies.is_same(child, parts[n + 1]) and t.dead[child] == 0:
-				_add_body(t, child, {})
-	else:
-		_add_body(t, row, deformation)
-
-func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
-	var type := t.type[row]
-	var look := _rm.look_of(type)
-	var key: String
-	var angle := _rm._enemy_sprite_angle(type, t.facing[row])
-	if look != null:
-		if look.split_other != null:
-			if t.buds[row] == 1: look = look.split_other
-			angle = t.facing[row] + look.angle
-		key = look.source_path
-		if look.split_other != null and t.buds[row] == 0: key += ":joined"
-	else:
-		key = "sprite:" + String(type)
-		if not _masks.has(key):
-			key = "shape:" + String(t.def[row].shape)
-			angle = t.facing[row]
-	assert(_masks.has(key), "目印マスクのベイクが必要: " + key)
-	if not _masks.has(key) or _count >= _sprites.size(): return
+## Frameの本体と同じ姿勢・寸法を使う。分離部位はC++が個別の行で返す。
+func add_body(body: Dictionary, clock: float) -> void:
+	if _sprites.is_empty() or _count >= _sprites.size(): return
+	var key: String = body.key
+	if not _masks.has(key): return
 	var entry: Dictionary = _masks[key]
-	var scale_px := _rm.enemy_sprite_radius(type, t.r[row]) / float(entry.source_radius)
-	var full := 0.0
-	if entry.get("pump", false):
-		var visual := _rm._visual_of(t, row)
-		scale_px = visual._source_scale(t, row)
-		full = 1.0 if t.mode[row] == EnemyTable.Mode.WINDUP else clampf((t.r[row] / maxf(visual._base_radius(t, row), 0.001) - 1.0) / maxf(float(t.def[row].params.grow), 0.001), 0.0, 1.0)
 	var slot := _count
 	var sprite := _sprites[slot]
 	_count += 1
 	if sprite.texture != entry.texture: configure(sprite, entry, true)
-	var pose := Transform2D(angle, t.pos[row]).scaled_local(Vector2.ONE * scale_px)
-	if not deformation.is_empty():
-		var radial: Vector2 = deformation.direction
-		if radial.length_squared() >= 0.0001:
-			var n := radial.normalized()
-			var side := n.orthogonal()
-			for column in 2:
-				var basis := pose[column]
-				pose[column] = n * basis.dot(n) * (1.0 - 0.5 * deformation.amount) + side * basis.dot(side) * (1.0 + 0.6 * deformation.amount)
+	var pose: Transform2D = body.pose
+	pose = pose.scaled_local(Vector2.ONE / float(entry.source_radius))
 	sprite.transform = pose
-	if _clock != _rm.state.world_time:
-		_clock = _rm.state.world_time
+	if _clock != clock:
+		_clock = clock
 		_material.set_shader_parameter("clock", _clock)
+	var full: float = body.get("pump_full",0.0)
 	if _pump_full[slot] != full:
 		_pump_full[slot] = full
 		sprite.set_instance_shader_parameter("pump_full", full)

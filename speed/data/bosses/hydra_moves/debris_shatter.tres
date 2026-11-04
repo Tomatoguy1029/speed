@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="HydraTechnique" format=3 uid="uid://c4ex4dw2hghn6"]
 
-[ext_resource type="Script" path="res://scripts/bosses/hydra/techniques/debris_shatter.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/hydra/debris_shatter.gd" id="1"]
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/hydra/debris_shatter_visual.tscn" id="visual"]
 

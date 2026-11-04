@@ -1,0 +1,739 @@
+{
+  "records": [
+    {
+      "name": "CentaurusBodyDefinition",
+      "section": 320,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "body",
+          "type": "u32",
+          "ref": "BossBodyDefinition"
+        },
+        {
+          "name": "guard",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "keep_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "keep_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_refill",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_search",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_scan",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sail_guard_wobble",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bow_reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_cos",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "path_hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_far",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retreat_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "leap_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "run_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "run_speed_p2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "guard_count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "guard_min",
+          "type": "u32",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CentaurusVolleyDefinition",
+      "section": 321,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "travel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusRearDefinition",
+      "section": 322,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "back_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CentaurusRainDefinition",
+      "section": 323,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "traces",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "arrows_per_step",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "arrow_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "circle_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drop_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "drop_height",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fade",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fall",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "forward",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "linger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_bend",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trace_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusPowerDefinition",
+      "section": 324,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "alert",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "travel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusStompDefinition",
+      "section": 325,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CentaurusStompFoot",
+      "section": 326,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "frame",
+          "type": "u32"
+        },
+        {
+          "name": "leg",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0.02
+        },
+        {
+          "name": "interpolate",
+          "type": "bool"
+        },
+        {
+          "name": "pivot",
+          "type": "bool"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "scale_x",
+          "type": "f64"
+        },
+        {
+          "name": "scale_y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "skew",
+          "type": "f64"
+        },
+        {
+          "name": "pivot_x",
+          "type": "f64"
+        },
+        {
+          "name": "pivot_y",
+          "type": "f64"
+        },
+        {
+          "name": "origin_x",
+          "type": "f64"
+        },
+        {
+          "name": "origin_y",
+          "type": "f64"
+        },
+        {
+          "name": "contact_x",
+          "type": "f64"
+        },
+        {
+          "name": "contact_y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusFanDefinition",
+      "section": 327,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "shots",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "travel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusShowerDefinition",
+      "section": 328,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "pattern",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "count",
+          "type": "u32"
+        },
+        {
+          "name": "mark_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rain_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "linger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "step",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wall_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wall_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "wall_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ahead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arrow_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusSailDefinition",
+      "section": 329,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "approach_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "travel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "LightArrowDefinition"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusComboDefinition",
+      "section": 330,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "first",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "second",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

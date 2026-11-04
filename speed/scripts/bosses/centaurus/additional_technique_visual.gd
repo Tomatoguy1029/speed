@@ -5,7 +5,6 @@ extends Node2D
 @export_range(0.0, 1.0, 0.01) var attack_opacity := 0.28
 @export var technique_id: StringName
 var visual_kind: StringName
-var actor: CentaurusBoss
 var _marks: Array[Dictionary] = []
 var _shower_rule := {}
 var _arrow_count := 2
@@ -17,74 +16,6 @@ const GOLD := Color("#f2b567")
 const RED := Color("#ff667d")
 const ARROW := preload("res://scripts/render/attacks/light_arrow.gd")
 
-func update_technique() -> void:
-	top_level = true
-	global_transform = Transform2D.IDENTITY
-	if not actor.body_alive() or actor.mode in [&"final", &"defeated"]:
-		_marks.clear()
-		return
-	if actor.technique == technique_id and visual_kind == &"arrow_shower" and actor.mode == &"rain":
-		_marks = actor._runner.marks.duplicate()
-		_shower_rule = actor.rule()
-		_arrow_count = 2 if actor.phase == 1 else 3
-	if not _shower_rule.is_empty():
-		_marks = _marks.filter(func(mark): return actor.clock < float(mark.at) + float(_shower_rule.mark_time) + float(_shower_rule.rain_time) + float(_shower_rule.linger) + FADE)
-
-func _draw() -> void:
-	if actor == null or not actor.has_body(): return
-	if visual_kind == &"arrow_shower":
-		if not _shower_rule.is_empty(): _draw_shower(_shower_rule)
-		return
-	if actor.technique != technique_id: return
-	var r := actor.rule()
-	if visual_kind == &"stomp" and actor.mode in [&"windup", &"strike"]:
-		# 動作の見た目は未決。仮表示。
-		var center := actor.stomp_center()
-		var angle := actor.table.facing[actor.body]
-		var half := deg_to_rad(float(r.half_angle))
-		var radius := float(r.range_radius)
-		var points := PackedVector2Array([center])
-		for j in 25: points.append(center + Vector2.from_angle(angle - half + half * 2.0 * j / 24.0) * radius)
-		draw_colored_polygon(points, Color(RED, warning_opacity if actor.mode == &"windup" else attack_opacity))
-		if actor.mode == &"strike":
-			var age: float = actor.clock - actor._runner.started_at - float(r.warn)
-			draw_arc(center, radius * clampf(age / maxf(float(r.active), 0.001), 0.0, 1.0), angle - half, angle + half, 24, RED, line_width)
-	elif visual_kind == &"fan_volley" and actor.mode == &"windup":
-		ARROW.draw_arrow(self, actor.bow_mouth(), actor.table.facing[actor.body], 10.0 + actor.table.charge[actor.body] * 6.0, false, actor.clock)
-
-func _draw_shower(r: Dictionary) -> void:
-	for mark: Dictionary in _marks:
-		var age := actor.clock - float(mark.at)
-		var warning := maxf(float(r.mark_time), 0.001)
-		var active_age := age - warning
-		if age < 0.0: continue
-		var center: Vector2 = mark.center
-		var radius := float(r.radius)
-		# 予兆は着弾前に消し、矢が残る間に追加の予兆を出さない。
-		if active_age < 0.0:
-			var strength := clampf(age / 0.12, 0.0, 1.0) * clampf(-active_age / 0.15, 0.0, 1.0)
-			draw_powder(self, center, radius, age, strength, float(mark.at))
-		var fall := warning * 0.3
-		if active_age < -fall: continue
-		var opacity := 1.0 - clampf((active_age - float(r.linger)) / FADE, 0.0, 1.0)
-		if opacity <= 0.0: continue
-		for j in _arrow_count:
-			var seed := float(mark.at) * 19.7 + center.x * 0.019 + center.y * 0.071
-			var target := center + scatter(seed, j) * radius * 0.85
-			var origin := fall_origin(self, target)
-			var progress := clampf((active_age + fall) / fall, 0.0, 1.0)
-			draw_rain_arrow(self, actor, origin.lerp(target, progress * progress), (target - origin).angle(), opacity)
-
-## 扇状連射と同じ描画・寸法・色を使う。
-static func draw_rain_arrow(canvas: CanvasItem, owner_actor: CentaurusBoss, at: Vector2, angle: float, opacity: float) -> void:
-	var fan: Dictionary = owner_actor._rules[&"fan_volley"]
-	var key: String = canvas.get_meta("visual_profile", "boss/move/centaurus/" + String(owner_actor.technique))
-	var values := EFFECT_SETTINGS.component_values(key, "projectile", "res://scenes/attacks/light_arrow.tscn")
-	var tint: Color = values.get("effect_tint", Color.WHITE)
-	var scale := float(values.get("flight_scale", 1.0))
-	ARROW.draw_arrow(canvas, at, angle, float(fan.radius) * scale, false, owner_actor.clock, opacity, tint, float(fan.length) * scale, values)
-
-## カメラの拡大率・移動・画面サイズに合わせ、画面上端の外を降下の始点にする。
 static func fall_origin(canvas: CanvasItem, target: Vector2, minimum_height := 0.0) -> Vector2:
 	var transform := canvas.get_canvas_transform()
 	var screen := transform * target

@@ -10,6 +10,9 @@ func _exit_tree() -> void:
 	remove_export_plugin(_export)
 	_export = null
 func _build() -> bool:
-	var error := BUILD.build_all()
+	var started := Time.get_ticks_usec()
+	var error := BUILD.build_for_editor()
+	var rebuilt := BUILD.last_build_report.filter(func(row): return row.rebuilt).size()
+	print("起動前の生成: %.2f秒（作り直し%d件）" % [(Time.get_ticks_usec()-started)/1000000.0,rebuilt])
 	if error != OK: push_error("実行用データの生成に失敗: %s" % error_string(error))
 	return error == OK

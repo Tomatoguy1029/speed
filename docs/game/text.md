@@ -45,6 +45,9 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 |  | キーが空の行はこの説明と見出しで、ゲームは読まない。 |  |
 |  | ■ 共通 |  |
 | common.back | 戻る | Back |
+| loading.resources | データを読み込んでいます… | Loading resources… |
+| loading.graphics | 画面を準備しています… | Preparing graphics… |
+| loading.failed | 準備できませんでした。ゲームを終了して、もう一度起動してください。 | Preparation failed. Please close the game and try again. |
 | common.cancel | キャンセル | Cancel |
 | common.to&#95;main&#95;menu | メインメニューに戻る | Back to Main Menu |
 | common.parts | 部品 {n} | Parts {n} |
@@ -98,6 +101,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | action.debug&#95;perf | 性能の表示（開発版） | Performance Overlay (Dev Build) |
 |  | ■ ステージ選択 |  |
 | stage&#95;select.stage | ステージ {n}　{name} | Stage {n}  {name} |
+| stage&#95;select.unlock&#95;all | デバッグ全開放 | Debug: Unlock all stages |
 | stage&#95;select.debug | 開発版：全ステージを選べます | Dev Build: All stages are available |
 | stage&#95;select.locked | ステージ {n}　（前のステージをクリアすると選べる） | Stage {n}  (Clear the previous stage to unlock) |
 | stage&#95;select.endless | エンドレス（準備中） | Endless (Coming Soon) |
@@ -620,6 +624,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.ui.help | 操作のヒント | Controls |
 | lab.ui.help&#95;text | 中ドラッグで移動・ホイールで拡大縮小。Spaceで再生／停止。選択した敵はDeleteで削除、Q／Eで回転。 | Middle-drag to pan; wheel to zoom. Space to play/pause. Delete removes selected enemies; Q/E rotates them. |
 | lab.ui.enemies | 敵 | Enemies |
+| lab.look.snake | 蛇 | Snake |
 | lab.ui.search | 敵を検索 | Find an enemy |
 | lab.ui.all | すべて | All enemies |
 | lab.ui.drag&#95;hint | ドラッグして配置 | Drag onto the field |

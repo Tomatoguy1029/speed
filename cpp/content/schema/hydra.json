@@ -1,0 +1,1867 @@
+{
+  "records": [
+    {
+      "name": "HydraBodyDefinition",
+      "section": 370,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "bite",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "vortex",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "debris",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "beam",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "thunder",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "engage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_refresh",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_deadzone",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_slack",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_wave_amplitude",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_wave_frequency",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_wave_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_response",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arena_x",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arena_y",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arena_wall_thickness",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "neck_segments",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "neck_iterations",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "HydraRegrowDefinition",
+      "section": 371,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "regrow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "regrow_per_head",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "regrow_combo",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fire_regrow_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "chance_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "growth_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "growth_first",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "growth_second",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "debris_dmg",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraNormalDefinition",
+      "section": 372,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "head_kind",
+          "type": "u32",
+          "max": 4
+        },
+        {
+          "name": "aim_tracking",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bite_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cost",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraSwimDefinition",
+      "section": 373,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "immortal",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "separation_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "immortal_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "snake_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "snake_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "snake_accel",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bearer_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "solo_bearer_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "look_player_turn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge_momentum",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraNormalGate",
+      "section": 374,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "minimum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "half_angle",
+          "type": "f64"
+        },
+        {
+          "name": "distance_origin",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "angle_origin",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "ignore_when_separated",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "HydraSquadDefinition",
+      "section": 375,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "counter_max",
+          "type": "f64"
+        },
+        {
+          "name": "counter_gap",
+          "type": "f64"
+        },
+        {
+          "name": "counter_sight",
+          "type": "f64"
+        },
+        {
+          "name": "counter_range_cap",
+          "type": "f64"
+        },
+        {
+          "name": "counter_extra",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wave_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wall_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wall_near_weight",
+          "type": "f64"
+        },
+        {
+          "name": "repeat_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wall_time_x",
+          "type": "f64"
+        },
+        {
+          "name": "wall_time_y",
+          "type": "f64"
+        },
+        {
+          "name": "tactic_time_x",
+          "type": "f64"
+        },
+        {
+          "name": "tactic_time_y",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_velocity",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_idle_noise",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_noise",
+          "type": "f64"
+        },
+        {
+          "name": "attack_arrival",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_timeout",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_gap_x",
+          "type": "f64"
+        },
+        {
+          "name": "pincer_gap_y",
+          "type": "f64"
+        },
+        {
+          "name": "initial_gap_x",
+          "type": "f64"
+        },
+        {
+          "name": "initial_gap_y",
+          "type": "f64"
+        },
+        {
+          "name": "wave_candidates",
+          "type": "f64"
+        },
+        {
+          "name": "wave_repeat_weight",
+          "type": "f64"
+        },
+        {
+          "name": "wave_separation",
+          "type": "f64"
+        },
+        {
+          "name": "wave_timeout",
+          "type": "f64"
+        },
+        {
+          "name": "wave_gap_x",
+          "type": "f64"
+        },
+        {
+          "name": "wave_gap_y",
+          "type": "f64"
+        },
+        {
+          "name": "pick_band",
+          "type": "f64"
+        },
+        {
+          "name": "pick_distance",
+          "type": "f64"
+        },
+        {
+          "name": "pick_rest",
+          "type": "f64"
+        },
+        {
+          "name": "pick_front_weight",
+          "type": "f64"
+        },
+        {
+          "name": "pick_front_distance",
+          "type": "f64"
+        },
+        {
+          "name": "lunge_momentum",
+          "type": "f64"
+        },
+        {
+          "name": "look_forward_noise",
+          "type": "f64"
+        },
+        {
+          "name": "look_forward_turn",
+          "type": "f64"
+        },
+        {
+          "name": "look_player_turn",
+          "type": "f64"
+        },
+        {
+          "name": "look_wave",
+          "type": "f64"
+        },
+        {
+          "name": "look_wave_speed",
+          "type": "f64"
+        },
+        {
+          "name": "look_near_extra",
+          "type": "f64"
+        },
+        {
+          "name": "alignment_cap",
+          "type": "f64"
+        },
+        {
+          "name": "alignment_weight",
+          "type": "f64"
+        },
+        {
+          "name": "arrival",
+          "type": "f64"
+        },
+        {
+          "name": "arrival_drift",
+          "type": "f64"
+        },
+        {
+          "name": "arrival_drift_distance",
+          "type": "f64"
+        },
+        {
+          "name": "attack_speed",
+          "type": "f64"
+        },
+        {
+          "name": "avoid_reduction",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_arrival",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_band_x",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_band_y",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_drift",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_near_speed",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_panic_speed",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_radius",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_replan",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_ring",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_speed",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_turn",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_wall_band_x",
+          "type": "f64"
+        },
+        {
+          "name": "bearer_wall_band_y",
+          "type": "f64"
+        },
+        {
+          "name": "block_arrival",
+          "type": "f64"
+        },
+        {
+          "name": "block_count",
+          "type": "f64"
+        },
+        {
+          "name": "block_distance",
+          "type": "f64"
+        },
+        {
+          "name": "block_force_cap",
+          "type": "f64"
+        },
+        {
+          "name": "block_fraction",
+          "type": "f64"
+        },
+        {
+          "name": "block_predict",
+          "type": "f64"
+        },
+        {
+          "name": "block_response",
+          "type": "f64"
+        },
+        {
+          "name": "block_separation",
+          "type": "f64"
+        },
+        {
+          "name": "block_speed",
+          "type": "f64"
+        },
+        {
+          "name": "block_spread",
+          "type": "f64"
+        },
+        {
+          "name": "block_turn",
+          "type": "f64"
+        },
+        {
+          "name": "body_length",
+          "type": "f64"
+        },
+        {
+          "name": "body_radius",
+          "type": "f64"
+        },
+        {
+          "name": "body_step",
+          "type": "f64"
+        },
+        {
+          "name": "body_weight",
+          "type": "f64"
+        },
+        {
+          "name": "chase_extra",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_0",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_1",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_2",
+          "type": "f64"
+        },
+        {
+          "name": "close_angles_3",
+          "type": "f64"
+        },
+        {
+          "name": "close_radii_0",
+          "type": "f64"
+        },
+        {
+          "name": "close_radii_1",
+          "type": "f64"
+        },
+        {
+          "name": "close_sight",
+          "type": "f64"
+        },
+        {
+          "name": "close_speed",
+          "type": "f64"
+        },
+        {
+          "name": "cohesion_cap",
+          "type": "f64"
+        },
+        {
+          "name": "cohesion_weight",
+          "type": "f64"
+        },
+        {
+          "name": "detour_radius",
+          "type": "f64"
+        },
+        {
+          "name": "detour_seek",
+          "type": "f64"
+        },
+        {
+          "name": "far_distance",
+          "type": "f64"
+        },
+        {
+          "name": "far_speed",
+          "type": "f64"
+        },
+        {
+          "name": "flee_candidates",
+          "type": "f64"
+        },
+        {
+          "name": "flee_distance_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_far_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_guard_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_margin",
+          "type": "f64"
+        },
+        {
+          "name": "flee_noise",
+          "type": "f64"
+        },
+        {
+          "name": "flee_view_weight",
+          "type": "f64"
+        },
+        {
+          "name": "flee_wall_weight",
+          "type": "f64"
+        },
+        {
+          "name": "force_cap",
+          "type": "f64"
+        },
+        {
+          "name": "front_count",
+          "type": "f64"
+        },
+        {
+          "name": "front_fraction",
+          "type": "f64"
+        },
+        {
+          "name": "front_loyalty",
+          "type": "f64"
+        },
+        {
+          "name": "front_near_count",
+          "type": "f64"
+        },
+        {
+          "name": "front_outer",
+          "type": "f64"
+        },
+        {
+          "name": "front_pick_distance",
+          "type": "f64"
+        },
+        {
+          "name": "front_radius_x",
+          "type": "f64"
+        },
+        {
+          "name": "front_radius_y",
+          "type": "f64"
+        },
+        {
+          "name": "front_sight",
+          "type": "f64"
+        },
+        {
+          "name": "front_spacing",
+          "type": "f64"
+        },
+        {
+          "name": "front_speed",
+          "type": "f64"
+        },
+        {
+          "name": "front_spread",
+          "type": "f64"
+        },
+        {
+          "name": "front_spread_max",
+          "type": "f64"
+        },
+        {
+          "name": "gain",
+          "type": "f64"
+        },
+        {
+          "name": "goal_response",
+          "type": "f64"
+        },
+        {
+          "name": "neighbor_radius",
+          "type": "f64"
+        },
+        {
+          "name": "neighbor_soft",
+          "type": "f64"
+        },
+        {
+          "name": "panic_cooldown",
+          "type": "f64"
+        },
+        {
+          "name": "panic_distance",
+          "type": "f64"
+        },
+        {
+          "name": "panic_radius",
+          "type": "f64"
+        },
+        {
+          "name": "panic_time",
+          "type": "f64"
+        },
+        {
+          "name": "predict",
+          "type": "f64"
+        },
+        {
+          "name": "reorient",
+          "type": "f64"
+        },
+        {
+          "name": "reorient_gap",
+          "type": "f64"
+        },
+        {
+          "name": "replan_x",
+          "type": "f64"
+        },
+        {
+          "name": "replan_y",
+          "type": "f64"
+        },
+        {
+          "name": "seek_cap",
+          "type": "f64"
+        },
+        {
+          "name": "separation_cap",
+          "type": "f64"
+        },
+        {
+          "name": "separation_radius",
+          "type": "f64"
+        },
+        {
+          "name": "separation_tau",
+          "type": "f64"
+        },
+        {
+          "name": "separation_weight",
+          "type": "f64"
+        },
+        {
+          "name": "sight_distance",
+          "type": "f64"
+        },
+        {
+          "name": "sight_floor",
+          "type": "f64"
+        },
+        {
+          "name": "slot_margin",
+          "type": "f64"
+        },
+        {
+          "name": "turn",
+          "type": "f64"
+        },
+        {
+          "name": "urgency",
+          "type": "f64"
+        },
+        {
+          "name": "velocity_cap",
+          "type": "f64"
+        },
+        {
+          "name": "velocity_floor",
+          "type": "f64"
+        },
+        {
+          "name": "view_margin_x",
+          "type": "f64"
+        },
+        {
+          "name": "view_margin_y",
+          "type": "f64"
+        },
+        {
+          "name": "wall_max",
+          "type": "f64"
+        },
+        {
+          "name": "wall_spread",
+          "type": "f64"
+        },
+        {
+          "name": "busy_windup",
+          "type": "f64"
+        },
+        {
+          "name": "busy_active",
+          "type": "f64"
+        },
+        {
+          "name": "busy_hold",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_attack_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_front_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_close_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_block_limit",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_on_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_on_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_off_x",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_off_y",
+          "type": "f64"
+        },
+        {
+          "name": "look_bearer_limit",
+          "type": "f64"
+        },
+        {
+          "name": "range_bite",
+          "type": "f64"
+        },
+        {
+          "name": "range_thunder",
+          "type": "f64"
+        },
+        {
+          "name": "range_vortex",
+          "type": "f64"
+        },
+        {
+          "name": "range_debris",
+          "type": "f64"
+        },
+        {
+          "name": "range_beam",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "HydraSweepDefinition",
+      "section": 376,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraBoltDefinition",
+      "section": 377,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraFixedBeamDefinition",
+      "section": 378,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraWindBladesDefinition",
+      "section": 379,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "size",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraCurveDefinition",
+      "section": 380,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lag",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraMajorDefinition",
+      "section": 387,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "combo",
+          "type": "bool"
+        },
+        {
+          "name": "timeline_available",
+          "type": "bool"
+        },
+        {
+          "name": "cost",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "global_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "combo_cd",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "major_recovery_padding",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraGridDefinition",
+      "section": 381,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "width",
+          "type": "f64"
+        },
+        {
+          "name": "delay",
+          "type": "f64"
+        },
+        {
+          "name": "time",
+          "type": "f64"
+        },
+        {
+          "name": "planning_width",
+          "type": "f64"
+        },
+        {
+          "name": "clearance",
+          "type": "f64"
+        },
+        {
+          "name": "tolerance",
+          "type": "f64"
+        },
+        {
+          "name": "formation_timeout",
+          "type": "f64"
+        },
+        {
+          "name": "minimum",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "HydraGridLayout",
+      "section": 384,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "name",
+          "type": "string"
+        },
+        {
+          "name": "region_mask",
+          "type": "u32",
+          "max": 31
+        }
+      ]
+    },
+    {
+      "name": "HydraGridSlot",
+      "section": 385,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "ref": "HydraGridLayout"
+        },
+        {
+          "name": "order",
+          "type": "u32"
+        },
+        {
+          "name": "from_x",
+          "type": "f64"
+        },
+        {
+          "name": "from_y",
+          "type": "f64"
+        },
+        {
+          "name": "to_x",
+          "type": "f64"
+        },
+        {
+          "name": "to_y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "HydraGridPath",
+      "section": 386,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "ref": "HydraGridLayout"
+        },
+        {
+          "name": "order",
+          "type": "u32"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "HydraRubbleDefinition",
+      "section": 390,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraPincerDefinition",
+      "section": 382,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "open_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "close_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraTornadoDefinition",
+      "section": 392,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraShatterDefinition",
+      "section": 393,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shard_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shard_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraThunderDefinition",
+      "section": 403,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_fraction",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lead",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraWindBandDefinition",
+      "section": 383,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "force",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraNorthDefinition",
+      "section": 404,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lock_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraSequenceDefinition",
+      "section": 405,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "lunge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "HydraSwarmDefinition",
+      "section": 406,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "formation_margin",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "formation_timeout",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "formation_tolerance",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "HydraHeadKind": [
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Vortex",
+        "value": "vortex"
+      },
+      {
+        "name": "Debris",
+        "value": "debris"
+      },
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Thunder",
+        "value": "thunder"
+      }
+    ]
+  }
+}

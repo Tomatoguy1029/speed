@@ -1,0 +1,824 @@
+{
+  "records": [
+    {
+      "name": "DracoBodyDefinition",
+      "section": 430,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "body_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_wave",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "approach_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "threshold_1",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "threshold_2",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "body_segments",
+          "type": "u32",
+          "min": 1,
+          "max": 2048
+        },
+        {
+          "name": "head_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "part_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "part_armor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "entrance_quiet",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoCycleDefinition",
+      "section": 431,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "collect_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        }
+      ]
+    },
+    {
+      "name": "DracoCycleCandidate",
+      "section": 432,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cycle",
+          "type": "u32",
+          "ref": "DracoCycleDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "excluded",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "DracoBiteDefinition",
+      "section": 433,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "retract",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoBreathDefinition",
+      "section": 434,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "rock_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "rocks",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "rock_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rock_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sweep",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoChargeDefinition",
+      "section": 435,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "overshoot",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoLeapDefinition",
+      "section": 436,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoTailSlamDefinition",
+      "section": 437,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoTailSweepDefinition",
+      "section": 438,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0,
+          "max": 3.141592653589793
+        }
+      ]
+    },
+    {
+      "name": "DracoStarFanDefinition",
+      "section": 439,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "StarBoltDefinition"
+        },
+        {
+          "name": "lead_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "arc",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoMeteorDefinition",
+      "section": 440,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "rock_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "rocks",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "rock_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rock_spacing",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoRiftsDefinition",
+      "section": 441,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "claw_count",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "claw_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "claw_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "claw_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "claw_overshoot",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "scratch_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "scratch_width",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoPicaroWallDefinition",
+      "section": 443,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "arrows",
+          "type": "u32",
+          "max": 2048
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "impact_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoPicaroWallCandidate",
+      "section": 446,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "DracoSpiralDefinition",
+      "section": 444,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "radius_factor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aspect_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "inner_radius_factor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "coil_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pause",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "head_offset",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "exit_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spiral_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shrink_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "touch_invuln",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DracoInhaleDefinition",
+      "section": 445,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "inhale_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pull_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "picaro_pull_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "mouth_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bite_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_extend",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "beam_warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "comets_per_star",
+          "type": "u32",
+          "max": 100000
+        },
+        {
+          "name": "comet_cap",
+          "type": "u32",
+          "max": 100000
+        },
+        {
+          "name": "comet_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile",
+          "type": "u32",
+          "ref": "BoltDefinition"
+        },
+        {
+          "name": "beam_definition",
+          "type": "u32",
+          "ref": "BeamDefinition"
+        }
+      ]
+    },
+    {
+      "name": "DracoInhaleArc",
+      "section": 447,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "offset_x",
+          "type": "f64"
+        },
+        {
+          "name": "offset_y",
+          "type": "f64"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle_degrees",
+          "type": "f64"
+        },
+        {
+          "name": "spread_degrees",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "max": 2048
+        }
+      ]
+    },
+    {
+      "name": "DracoFinaleDefinition",
+      "section": 448,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "finish_passes",
+          "type": "u32",
+          "min": 1,
+          "max": 1000000
+        },
+        {
+          "name": "finish_pass_time",
+          "type": "f64",
+          "min": 0.15
+        }
+      ]
+    },
+    {
+      "name": "DracoClonesDefinition",
+      "section": 442,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "technique",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "clone_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "part_enemy",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "bite",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "wind",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "rubble",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "beam",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "thunder",
+          "type": "u32",
+          "ref": "BossTechniqueDefinition"
+        },
+        {
+          "name": "clone_hp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clone_stars",
+          "type": "u32"
+        },
+        {
+          "name": "neck_rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hydra_source",
+          "type": "u32",
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "DracoFlowGateDefinition",
+      "section": 449,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "condition",
+          "type": "u32",
+          "ref": "BossFlowCondition"
+        },
+        {
+          "name": "maximum_phase",
+          "type": "u32",
+          "min": 1,
+          "max": 3
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

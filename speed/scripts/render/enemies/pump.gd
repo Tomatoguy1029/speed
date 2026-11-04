@@ -11,105 +11,120 @@ var _count := 0
 var _body_mesh: QuadMesh
 var _wind_mesh: QuadMesh
 
-func setup(render: RunPresentation, behavior_name: StringName) -> void:
-	super.setup(render, behavior_name)
-	events = [&"swallow"]
+var _frame_parent: Node
+var _frame_look: EnemyLook
+var _frame_paint: Texture2D
+var _frame_settings: Dictionary
+var _frame_targets := {}
+var _frame_swallow: DrawLayer
+var _frame_clock := -1.0
+var _frame_brightness_value := 1.0
+var _death_map: Texture2D
+
+func setup_frame(parent: Node, look: EnemyLook, paint: Texture2D, settings: Dictionary, death_map: Texture2D = null) -> void:
+	_death_map = death_map
+	_frame_parent = parent
+	_frame_look = look
+	_frame_paint = paint
+	_frame_settings = settings
 	_body_mesh = QuadMesh.new()
-	_body_mesh.size = Vector2(44, 54)
+	_body_mesh.size = Vector2(44,54)
 	_wind_mesh = QuadMesh.new()
-	_wind_mesh.size = Vector2(150, 150)
+	_wind_mesh.size = Vector2(150,150)
+	_frame_swallow = DrawLayer.new()
+	_frame_swallow.draw_fn = _draw_frame_swallow
+	parent.add_child(_frame_swallow)
 
-func on_event(ev: Dictionary) -> void:
-	if swallows.size() < 120:
-		swallows.append({"type": ev.enemy_type, "pos": ev.pos, "r": ev.r, "facing": ev.facing,
-			"row": ev.row, "id": ev.id, "life": SWALLOW_SECONDS})
+func _frame_nodes() -> void:
+	if _count<_bodies.size(): return
+	var body := MeshInstance2D.new()
+	body.mesh = _body_mesh
+	var material := ShaderMaterial.new()
+	material.shader = BODY_SHADER
+	if _death_map != null:
+		material.set_shader_parameter("death_enabled",true)
+		material.set_shader_parameter("death_map",_death_map)
+	material.set_shader_parameter("brightness",_frame_brightness_value)
+	material.set_shader_parameter("base_tex",_frame_look.base)
+	material.set_shader_parameter("armor_tex",_frame_paint)
+	material.set_shader_parameter("normal_tex",_frame_look.normal)
+	for k in 3: material.set_shader_parameter("enemy%d" % k,ENEMIES[k])
+	for key in ["normal_strength","ambient"]: material.set_shader_parameter(key,_frame_settings[key])
+	body.material = material
+	_frame_parent.add_child(body)
+	_bodies.append(body)
+	var wind := MeshInstance2D.new()
+	wind.mesh = _wind_mesh
+	var wind_material := ShaderMaterial.new()
+	wind_material.shader = WIND_SHADER
+	wind.material = wind_material
+	_frame_parent.add_child(wind)
+	_winds.append(wind)
 
-func update(dt: float) -> void:
-	for f in swallows: f.life -= dt
-	swallows = swallows.filter(func(f): return f.life > 0.0)
-
-func _base_radius(t: EnemyTable, i: int) -> float:
-	var def: EnemyDef = t.def[i]
-	return def.radius * (1.25 if t.elite[i] != 0 else 1.0) * rm.cfg.character_scale * def.visual_value("scale", 1.0) * def.visual_value("collision_scale", 1.0)
-
-func _source_scale(t: EnemyTable, i: int) -> float:
-	return rm.enemy_sprite_radius(t.type[i], _base_radius(t, i)) / 18.5
-
-func sprite_radius(t: EnemyTable, i: int) -> float:
-	return _source_scale(t, i) * 27.0
-
-func draw_body(_c: CanvasItem, t: EnemyTable, i: int, p: Vector2) -> bool:
-	var look := rm.look_of(t.type[i])
-	if look == null: return false
-	rm._ensure_enemy_batch(t.type[i])
-	if _count == _bodies.size():
-		var body_node := MeshInstance2D.new()
-		body_node.mesh = _body_mesh
-		var material := ShaderMaterial.new()
-		material.shader = BODY_SHADER
-		for k in 3: material.set_shader_parameter("enemy%d" % k, ENEMIES[k])
-		body_node.material = material
-		rm._batches[t.type[i]].get_parent().add_child(body_node)
-		_bodies.append(body_node)
-		var wind_node := MeshInstance2D.new()
-		wind_node.mesh = _wind_mesh
-		var wind_material := ShaderMaterial.new()
-		wind_material.shader = WIND_SHADER
-		wind_node.material = wind_material
-		rm._lit_enemy_marks.add_child(wind_node)
-		_winds.append(wind_node)
-	var body := _bodies[_count]
-	var wind := _winds[_count]
-	_count += 1
-	var lighting: Node = rm._batches[t.type[i]].get_parent()
-	if body.get_parent() != lighting: body.reparent(lighting)
-	var scale_px := _source_scale(t, i)
-	var angle := rm._enemy_sprite_angle(t.type[i], t.facing[i])
-	body.position = p + Vector2(0, 8.5 * scale_px).rotated(angle)
-	body.rotation = angle
-	body.scale = Vector2.ONE * scale_px
-	body.visible = not state.cinematic_hide_enemies
-	var mat := body.material as ShaderMaterial
-	mat.set_shader_parameter("base_tex", look.base)
-	mat.set_shader_parameter("armor_tex", (rm._armor_batches[t.type[i]].texture as CanvasTexture).diffuse_texture)
-	mat.set_shader_parameter("normal_tex", look.normal)
-	var swelling := clampf((t.r[i] / maxf(_base_radius(t, i), 0.001) - 1.0) / maxf(float(t.def[i].params.grow), 0.001), 0.0, 1.0)
-	mat.set_shader_parameter("full", 1.0 if t.mode[i] == EnemyTable.Mode.WINDUP else swelling)
-	mat.set_shader_parameter("stored_full", clampf(float(t.buds[i]) / float(t.def[i].params.store_max), 0.0, 1.0))
-	mat.set_shader_parameter("clock", state.world_time)
-	mat.set_shader_parameter("flash", minf(1.0, t.flash[i] * 10.0))
-	mat.set_shader_parameter("normal_strength", t.def[i].visual_value("normal_strength", rm.lighting_settings.normal_strength))
-	mat.set_shader_parameter("ambient", t.def[i].visual_value("ambient", rm.lighting_settings.ambient))
-	mat.set_shader_parameter("brightness", (rm._armor_batches[t.type[i]].material as ShaderMaterial).get_shader_parameter("brightness"))
-	wind.position = p + Vector2.from_angle(t.facing[i]) * (15.725 + 75.0) * scale_px
-	wind.rotation = t.facing[i]
-	wind.scale = Vector2.ONE * scale_px
-	wind.visible = body.visible and t.mode[i] == EnemyTable.Mode.MOVE and t.buds[i] < int(t.def[i].params.store_max)
-	(wind.material as ShaderMaterial).set_shader_parameter("clock", state.world_time)
-	return true
-
-func draw_marks(_c: CanvasItem, _t: EnemyTable, _i: int) -> void:
-	pass
-
-func draw_layer(c: CanvasItem, _view: Rect2) -> void:
-	for n in range(_count, _bodies.size()):
-		_bodies[n].hide()
-		_winds[n].hide()
+func apply_frame(row: Dictionary) -> void:
 	_count = 0
-	if state.cinematic_hide_enemies: return
-	var t := run.enemies.table
-	for sw in swallows:
-		if not run.enemies.is_same(sw.row, sw.id) or t.buds[sw.row] <= 0: continue
-		var k := clampf(1.0 - float(sw.life) / SWALLOW_SECONDS, 0.0, 1.0)
-		var scale_px := _source_scale(t, sw.row)
-		var u := Vector2.from_angle(t.facing[sw.row])
-		var mouth := t.pos[sw.row] + u * 15.725 * scale_px
-		var rear := t.pos[sw.row] - u * 8.5 * scale_px
-		var at: Vector2 = (sw.pos as Vector2).lerp(mouth, pow(minf(k / 0.625, 1.0), 2.0)) if k < 0.625 else mouth.lerp(rear, (k - 0.625) / 0.375)
-		var tex := rm._enemy_texture(sw.type)
-		if tex == null: continue
-		var r := rm.enemy_sprite_radius(sw.type, sw.r) * lerpf(1.0, 0.12, minf(k / 0.625, 1.0))
-		var size := tex.get_size() / maxf(tex.get_width(), tex.get_height()) * r * 2.0
-		c.draw_set_transform(at, rm._enemy_sprite_angle(sw.type, sw.facing))
-		c.draw_texture_rect(tex, Rect2(-size / 2, size), false, Color(1, 1, 1, minf(1.0, (1.0 - k) * 5.0)))
+	_frame_targets.clear()
+	var values: PackedFloat32Array = row.get("pump",PackedFloat32Array())
+	if not values.is_empty():
+		var now := values[6]
+		if now<_frame_clock: swallows.clear()
+		var elapsed := maxf(0.0,now-_frame_clock) if _frame_clock>=0.0 else 0.0
+		_frame_clock = now
+		for sw: Dictionary in swallows: sw.life-=elapsed
+		swallows = swallows.filter(func(sw): return sw.life>0.0)
+	for i: int in row.get("ids",PackedInt64Array()).size():
+		_frame_nodes()
+		var n := i*9
+		var p := Vector2(values[n],values[n+1])
+		var angle := values[n+2]
+		var scale_px := values[n+3]
+		var facing := angle-_frame_look.angle
+		var body := _bodies[_count]
+		body.position = p+Vector2(0,8.5*scale_px).rotated(angle)
+		body.rotation = angle
+		body.scale = Vector2.ONE*scale_px
+		body.show()
+		var material := body.material as ShaderMaterial
+		if _death_map != null: material.set_shader_parameter("death_age",row.colors[i].a)
+		material.set_shader_parameter("full",values[n+4])
+		material.set_shader_parameter("stored_full",values[n+5])
+		material.set_shader_parameter("clock",values[n+6])
+		material.set_shader_parameter("flash",values[n+7])
+		var wind := _winds[_count]
+		wind.position = p+Vector2.from_angle(facing)*(15.725+75.0)*scale_px
+		wind.rotation = facing
+		wind.scale = Vector2.ONE*scale_px
+		wind.visible = values[n+8]>0.0
+		(wind.material as ShaderMaterial).set_shader_parameter("clock",values[n+6])
+		_frame_targets[row.ids[i]] = {"pos":p,"facing":facing,"scale":scale_px,"stored":values[n+5]}
+		_count+=1
+	for n in range(_count,_bodies.size()): _bodies[n].hide(); _winds[n].hide()
+	_frame_swallow.queue_redraw()
+
+func frame_event(event: Dictionary, texture: Texture2D) -> void:
+	if event.type!=&"swallow" or not _frame_targets.has(event.id) or texture==null or swallows.size()>=120: return
+	var sw := event.duplicate()
+	sw.life = SWALLOW_SECONDS
+	sw.texture = texture
+	swallows.append(sw)
+	_frame_swallow.queue_redraw()
+
+func frame_brightness(value: float) -> void:
+	_frame_brightness_value = value
+	for body in _bodies: body.material.set_shader_parameter("brightness",value)
+
+func _draw_frame_swallow(c: CanvasItem) -> void:
+	for sw: Dictionary in swallows:
+		if not _frame_targets.has(sw.id) or _frame_targets[sw.id].stored<=0.0: continue
+		var owner: Dictionary = _frame_targets[sw.id]
+		var k := clampf(1.0-float(sw.life)/SWALLOW_SECONDS,0.0,1.0)
+		var u := Vector2.from_angle(owner.facing)
+		var mouth: Vector2 = owner.pos+u*15.725*owner.scale
+		var rear: Vector2 = owner.pos-u*8.5*owner.scale
+		var at: Vector2 = sw.pos.lerp(mouth,pow(minf(k/0.625,1.0),2.0)) if k<0.625 else mouth.lerp(rear,(k-0.625)/0.375)
+		var texture: Texture2D = sw.texture
+		var radius: float = sw.sprite_radius*lerpf(1.0,0.12,minf(k/0.625,1.0))
+		var size := texture.get_size()/maxf(texture.get_width(),texture.get_height())*radius*2.0
+		c.draw_set_transform(at,sw.sprite_angle)
+		c.draw_texture_rect(texture,Rect2(-size/2,size),false,Color(1,1,1,minf(1.0,(1.0-k)*5.0)))
 		c.draw_set_transform(Vector2.ZERO)

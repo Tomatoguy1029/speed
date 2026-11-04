@@ -1,0 +1,3247 @@
+{
+  "schema_version": 1,
+  "format_version": 1,
+  "abi_version": 1,
+  "records": [
+    {
+      "name": "RunConfig",
+      "section": 1,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "aim_lag",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "aim_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "crystal_low",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "crystal_mid",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "crystal_high",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "ship_config_start_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.start_radius",
+          "config": "start_radius"
+        },
+        {
+          "name": "ship_config_base_max_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.base_max_speed",
+          "config": "base_max_speed"
+        },
+        {
+          "name": "ship_config_stick_dead_zone",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.stick_dead_zone",
+          "config": "stick_dead_zone"
+        },
+        {
+          "name": "ship_config_mouse_dead_zone",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.mouse_dead_zone",
+          "config": "mouse_dead_zone"
+        },
+        {
+          "name": "ship_config_steer_cruise",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.steer_cruise",
+          "config": "steer_cruise"
+        },
+        {
+          "name": "ship_config_glide_hold",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.glide_hold",
+          "config": "glide_hold"
+        },
+        {
+          "name": "ship_config_glide_fade",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.glide_fade",
+          "config": "glide_fade"
+        },
+        {
+          "name": "ship_config_cruise_floor",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.cruise_floor",
+          "config": "cruise_floor"
+        },
+        {
+          "name": "ship_config_energy_cut",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.energy_cut",
+          "config": "energy_cut"
+        },
+        {
+          "name": "ship_config_cruise_drag",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.cruise_drag",
+          "config": "cruise_drag"
+        },
+        {
+          "name": "ship_config_overcap_decay",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.overcap_decay",
+          "config": "overcap_decay"
+        },
+        {
+          "name": "ship_config_field_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.field_radius",
+          "config": "field_radius"
+        },
+        {
+          "name": "ship_config_boundary_push",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.boundary_push",
+          "config": "boundary_push"
+        },
+        {
+          "name": "ship_config_ship_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.ship_radius",
+          "config": "ship_radius"
+        },
+        {
+          "name": "ship_config_crash_restitution",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.crash_restitution",
+          "config": "crash_restitution"
+        },
+        {
+          "name": "ship_config_ship_hurt_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.ship_hurt_time",
+          "config": "ship_hurt_time"
+        },
+        {
+          "name": "ship_config_max_hp",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.max_hp",
+          "config": "base_hp"
+        },
+        {
+          "name": "ship_config_max_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.max_speed",
+          "config": "base_max_speed"
+        },
+        {
+          "name": "ship_config_turn_rate",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.turn_rate",
+          "config": "steer_rate"
+        },
+        {
+          "name": "ship_config_acceleration",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.acceleration",
+          "config": "steer_accel"
+        },
+        {
+          "name": "ship_config_glide_duration_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.glide_duration_mult",
+          "value": 1.0
+        },
+        {
+          "name": "ship_config_invulnerability",
+          "type": "f64",
+          "min": 0,
+          "runtime": "ship_config.invulnerability",
+          "config": "invuln_time"
+        },
+        {
+          "name": "draw_config_min_charge",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.min_charge",
+          "config": "draw_min_charge"
+        },
+        {
+          "name": "draw_config_length",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.length",
+          "config": "draw_length"
+        },
+        {
+          "name": "draw_config_point_step",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.point_step",
+          "config": "draw_step"
+        },
+        {
+          "name": "draw_config_confirm_delay",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.confirm_delay",
+          "config": "draw_confirm_delay"
+        },
+        {
+          "name": "draw_config_run_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.run_time",
+          "config": "draw_run_time"
+        },
+        {
+          "name": "draw_config_time_scale",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.time_scale",
+          "config": "draw_time_scale"
+        },
+        {
+          "name": "draw_config_slow_ref",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.slow_ref",
+          "config": "draw_run_slow_ref"
+        },
+        {
+          "name": "draw_config_scale_min",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.scale_min",
+          "config": "draw_run_scale_min"
+        },
+        {
+          "name": "draw_config_boost_duration",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.boost_duration",
+          "config": "boost_duration"
+        },
+        {
+          "name": "draw_config_carry",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.carry",
+          "config": "carry"
+        },
+        {
+          "name": "draw_config_launch_ratio",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.launch_ratio",
+          "config": "launch_ratio"
+        },
+        {
+          "name": "draw_config_glide_ratio",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.glide_ratio",
+          "config": "glide_speed_ratio"
+        },
+        {
+          "name": "draw_config_capacity",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.capacity",
+          "value": 1.0
+        },
+        {
+          "name": "draw_config_charge_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.charge_time",
+          "config": "dash_charge_time"
+        },
+        {
+          "name": "draw_config_length_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.length_mult",
+          "value": 1.0
+        },
+        {
+          "name": "camera_base_view",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.base_view",
+          "config": "base_view"
+        },
+        {
+          "name": "camera_zoom_ref_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.zoom_ref_speed",
+          "config": "zoom_ref_speed"
+        },
+        {
+          "name": "camera_zoom_exp",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.zoom_exp",
+          "config": "zoom_exp"
+        },
+        {
+          "name": "camera_zoom_min",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.zoom_min",
+          "config": "zoom_min"
+        },
+        {
+          "name": "camera_look_ahead",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.look_ahead",
+          "config": "look_ahead"
+        },
+        {
+          "name": "world_tick_div",
+          "type": "u32",
+          "min": 1,
+          "config": "world_tick_div",
+          "runtime": "control.world_tick_div"
+        },
+        {
+          "name": "grid_cell",
+          "type": "f64",
+          "min": 0,
+          "config": "grid_cell",
+          "runtime": "frame_grid_cell"
+        },
+        {
+          "name": "time_limit",
+          "type": "f64",
+          "value": -1,
+          "runtime": "control.time_limit"
+        },
+        {
+          "name": "combat_base_attack",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.base_attack",
+          "config": "base_attack"
+        },
+        {
+          "name": "combat_atk_scale",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.atk_scale",
+          "config": "atk_scale"
+        },
+        {
+          "name": "combat_ram_speed_ratio",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.ram_speed_ratio",
+          "config": "ram_speed_ratio"
+        },
+        {
+          "name": "combat_crit_armor",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.crit_armor",
+          "config": "crit_armor"
+        },
+        {
+          "name": "combat_touch_damage",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.touch_damage",
+          "config": "touch_damage"
+        },
+        {
+          "name": "combat_contact_cooldown",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.contact_cooldown",
+          "config": "contact_cooldown"
+        },
+        {
+          "name": "combat_bounce_keep",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.bounce_keep",
+          "config": "bounce_keep"
+        },
+        {
+          "name": "combat_bounce_min_speed",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.bounce_min_speed",
+          "config": "bounce_min_speed"
+        },
+        {
+          "name": "combat_kill_hitstop",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.kill_hitstop",
+          "config": "kill_hitstop"
+        },
+        {
+          "name": "combat_kill_hitstop_cap",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.kill_hitstop_cap",
+          "config": "kill_hitstop_cap"
+        },
+        {
+          "name": "combat_kill_hitstop_regen",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.kill_hitstop_regen",
+          "config": "kill_hitstop_regen"
+        },
+        {
+          "name": "combat_hitstop_big_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.hitstop_big_mult",
+          "config": "hitstop_big_mult"
+        },
+        {
+          "name": "combat_hitstop_crit_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.hitstop_crit_mult",
+          "config": "hitstop_crit_mult"
+        },
+        {
+          "name": "combat_max_enemy_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.max_enemy_radius",
+          "config": "max_enemy_radius"
+        },
+        {
+          "name": "combat_attack_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.attack_mult",
+          "value": 1
+        },
+        {
+          "name": "combat_crit_chance",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.crit_chance",
+          "config": "base_crit_chance"
+        },
+        {
+          "name": "combat_crit_mult",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.crit_mult",
+          "config": "crit_mult"
+        },
+        {
+          "name": "combat_ready",
+          "type": "bool",
+          "runtime": "combat_ready",
+          "value": true
+        },
+        {
+          "name": "pickups_ready",
+          "type": "bool",
+          "runtime": "pickups_ready",
+          "value": true
+        },
+        {
+          "name": "gem_max",
+          "type": "i64",
+          "min": 1,
+          "config": "gem_max",
+          "runtime": "pickup_config.gem_max"
+        },
+        {
+          "name": "gem_draw_max",
+          "type": "i64",
+          "min": 1,
+          "config": "gem_draw_max",
+          "runtime": "pickup_config.gem_draw_max"
+        },
+        {
+          "name": "strong_gold_chance",
+          "type": "f64",
+          "min": 0,
+          "config": "strong_gold_chance",
+          "runtime": "pickup_config.strong_gold_chance"
+        },
+        {
+          "name": "coin_radius",
+          "type": "f64",
+          "min": 0,
+          "config": "pickup_radius",
+          "runtime": "pickup_config.coin_radius"
+        },
+        {
+          "name": "pickup_xp_mult",
+          "type": "f64",
+          "min": 0,
+          "value": 1,
+          "runtime": "pickup_config.xp_mult"
+        },
+        {
+          "name": "pickup_speed_mult",
+          "type": "f64",
+          "min": 0,
+          "value": 1,
+          "runtime": "pickup_config.speed_mult"
+        },
+        {
+          "name": "pickup_xp_radius",
+          "type": "f64",
+          "min": 0,
+          "runtime": "pickup_config.xp_radius",
+          "config": "pickup_radius"
+        },
+        {
+          "name": "fixed_rewards",
+          "type": "bool",
+          "value": true,
+          "runtime": "pickup_config.fixed_rewards"
+        },
+        {
+          "name": "character_scale",
+          "type": "f64",
+          "min": 0,
+          "config": "character_scale"
+        },
+        {
+          "name": "projectiles_ready",
+          "type": "bool",
+          "value": true,
+          "runtime": "projectile_config.ready"
+        },
+        {
+          "name": "debris_life",
+          "type": "f64",
+          "min": 0,
+          "config": "hull_debris_life",
+          "runtime": "projectile_config.debris_life"
+        },
+        {
+          "name": "debris_knock",
+          "type": "f64",
+          "min": 0,
+          "config": "hull_debris_knock",
+          "runtime": "projectile_config.debris_knock"
+        },
+        {
+          "name": "trail_points",
+          "type": "i64",
+          "min": 0,
+          "config": "corpse_trail_points",
+          "runtime": "projectile_config.trail_points"
+        },
+        {
+          "name": "ship_visual",
+          "type": "u32",
+          "value": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "shot_visual",
+          "type": "u32",
+          "value": 2,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "crystal_visual",
+          "type": "u32",
+          "value": 3,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "coin_visual",
+          "type": "u32",
+          "value": 4,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "cannon_visual",
+          "type": "u32",
+          "value": 5,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "enemy_face_move",
+          "type": "f64",
+          "min": 0,
+          "config": "enemy_face_move"
+        },
+        {
+          "name": "pickup_repair_fraction",
+          "type": "f64",
+          "min": 0,
+          "max": 1,
+          "config": "meteor_heal_frac",
+          "runtime": "pickup_config.repair_fraction"
+        },
+        {
+          "name": "pickup_life",
+          "type": "f64",
+          "min": 0,
+          "config": "pickup_life",
+          "runtime": "pickup_config.pickup_life"
+        },
+        {
+          "name": "trace_radius",
+          "type": "f64",
+          "min": 0,
+          "config": "trace_radius",
+          "runtime": "trace_radius"
+        }
+      ],
+      "version": 10
+    },
+    {
+      "name": "StringEntry",
+      "section": 2,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "DefinitionIndex",
+      "section": 3,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "StringEntry"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "EnemyRecord",
+      "section": 4,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "StringEntry"
+        },
+        {
+          "name": "hp",
+          "type": "f64",
+          "native": "hp",
+          "min": 0
+        },
+        {
+          "name": "armor",
+          "type": "f64",
+          "native": "armor",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "native": "radius",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "native": "speed",
+          "min": 0
+        },
+        {
+          "name": "fire_interval",
+          "type": "f64",
+          "native": "fire_interval",
+          "min": 0
+        },
+        {
+          "name": "xp",
+          "type": "f64",
+          "native": "xp",
+          "min": 0
+        },
+        {
+          "name": "knockback",
+          "type": "f64",
+          "native": "knockback",
+          "min": 0
+        },
+        {
+          "name": "hitstop_multiplier",
+          "type": "f64",
+          "native": "hitstop_multiplier",
+          "min": 0
+        },
+        {
+          "name": "attack_value",
+          "type": "f64",
+          "native": "attack_value",
+          "min": 0
+        },
+        {
+          "name": "attack_priority",
+          "type": "f64",
+          "native": "attack_priority"
+        },
+        {
+          "name": "attack_weight",
+          "type": "f64",
+          "native": "attack_weight",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "native": "attack_telegraph",
+          "min": 0,
+          "source": "telegraph"
+        },
+        {
+          "name": "attack_managed",
+          "type": "bool",
+          "native": "attack_managed"
+        },
+        {
+          "name": "rank",
+          "type": "i64",
+          "min": 0,
+          "native": "rank"
+        },
+        {
+          "name": "size_var",
+          "type": "bool",
+          "native": "size_var"
+        },
+        {
+          "name": "color_r",
+          "type": "f32",
+          "native": "color.r"
+        },
+        {
+          "name": "color_g",
+          "type": "f32",
+          "native": "color.g"
+        },
+        {
+          "name": "color_b",
+          "type": "f32",
+          "native": "color.b"
+        },
+        {
+          "name": "color_a",
+          "type": "f32",
+          "native": "color.a"
+        },
+        {
+          "name": "scaling_radius",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.radius"
+        },
+        {
+          "name": "scaling_hp",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.hp"
+        },
+        {
+          "name": "scaling_armor",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.armor"
+        },
+        {
+          "name": "scaling_hp_mult",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.hp_mult"
+        },
+        {
+          "name": "scaling_armor_mult",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.armor_mult"
+        },
+        {
+          "name": "scaling_character",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.character"
+        },
+        {
+          "name": "scaling_visual",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.visual"
+        },
+        {
+          "name": "scaling_collision",
+          "type": "f64",
+          "min": 0,
+          "native": "scaling.collision"
+        },
+        {
+          "name": "fixed_sprite",
+          "type": "bool",
+          "native": "scaling.fixed_sprite"
+        },
+        {
+          "name": "reward_low",
+          "type": "u32",
+          "native": "xp_rewards[0]"
+        },
+        {
+          "name": "reward_mid",
+          "type": "u32",
+          "native": "xp_rewards[1]"
+        },
+        {
+          "name": "reward_high",
+          "type": "u32",
+          "native": "xp_rewards[2]"
+        },
+        {
+          "name": "gold_eligible",
+          "type": "bool",
+          "native": "gold_eligible"
+        },
+        {
+          "name": "visual_id",
+          "type": "u32",
+          "ref": "ResourceKey",
+          "native": "visual_id"
+        },
+        {
+          "name": "sprite_scale",
+          "type": "f64",
+          "min": 0,
+          "native": "sprite_scale"
+        },
+        {
+          "name": "sprite_angle",
+          "type": "f64",
+          "native": "sprite_angle"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 43
+        },
+        {
+          "name": "turn",
+          "type": "f64",
+          "min": 0,
+          "native": "turn"
+        },
+        {
+          "name": "reward_scattered",
+          "type": "bool",
+          "native": "reward_scattered"
+        },
+        {
+          "name": "reward_burst",
+          "type": "bool",
+          "native": "reward_burst"
+        },
+        {
+          "name": "gate",
+          "type": "u32",
+          "max": 7
+        },
+        {
+          "name": "gate_arc",
+          "type": "f64",
+          "min": 0,
+          "native": "gate_arc"
+        },
+        {
+          "name": "weak_arc",
+          "type": "f64",
+          "native": "weak_arc",
+          "min": 0,
+          "value": 0.0
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "LoadoutDefinition",
+      "section": 5,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 1
+        },
+        {
+          "name": "maximum_level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "comet_only",
+          "type": "bool"
+        }
+      ],
+      "version": 4
+    },
+    {
+      "name": "HeroDefinition",
+      "section": 6,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "stage",
+          "type": "u32"
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "FieldDefinition",
+      "section": 7,
+      "enabled": false,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "PopulationDefinition",
+      "section": 8,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "name": "density",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "bonus_pop",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boss_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "recycle_scale",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "region_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "margin",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "field_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "planet_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "total_cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "refill_time",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "FormationDefinition",
+      "section": 9,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "base_view",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "BossFlowDefinition",
+      "section": 10,
+      "enabled": false,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "TechniqueDefinition",
+      "section": 11,
+      "enabled": false,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "ResourceKey",
+      "section": 12,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "role",
+          "type": "u32",
+          "max": 16
+        }
+      ],
+      "version": 12
+    },
+    {
+      "name": "ForwardDefinition",
+      "section": 13,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pierce",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "BiteDefinition",
+      "section": 14,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "reach",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "warn",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual_key",
+          "type": "u32",
+          "min": 1,
+          "ref": "ResourceKey"
+        },
+        {
+          "name": "hit",
+          "type": "bool"
+        },
+        {
+          "name": "fade",
+          "type": "bool"
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "LifecycleDefinition",
+      "section": 20,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "death_freeze_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "death_explosion_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "death_game_over_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clear_bonus",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "legendary",
+          "type": "string"
+        },
+        {
+          "name": "death_world_dim",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        }
+      ]
+    },
+    {
+      "name": "EnemyTuningValue",
+      "section": 250,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "key",
+          "type": "string"
+        },
+        {
+          "name": "value",
+          "type": "f64"
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "Cause": [
+      {
+        "name": "None",
+        "value": ""
+      },
+      {
+        "name": "Ram",
+        "value": "ram"
+      },
+      {
+        "name": "Touch",
+        "value": "touch"
+      },
+      {
+        "name": "Bump",
+        "value": "bump"
+      },
+      {
+        "name": "Shot",
+        "value": "shot"
+      },
+      {
+        "name": "Debris",
+        "value": "debris"
+      },
+      {
+        "name": "Fire",
+        "value": "fire"
+      },
+      {
+        "name": "Blast",
+        "value": "blast"
+      },
+      {
+        "name": "Afterimage",
+        "value": "afterimage"
+      },
+      {
+        "name": "FinalStrike",
+        "value": "final_strike"
+      },
+      {
+        "name": "Debug",
+        "value": "debug"
+      },
+      {
+        "name": "Missile",
+        "value": "missile"
+      },
+      {
+        "name": "Homing",
+        "value": "homing"
+      },
+      {
+        "name": "Slash",
+        "value": "slash"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Chain",
+        "value": "chain"
+      },
+      {
+        "name": "PumpBurst",
+        "value": "pump_burst"
+      },
+      {
+        "name": "Marlin",
+        "value": "marlin"
+      },
+      {
+        "name": "Collapse",
+        "value": "collapse"
+      },
+      {
+        "name": "Rain",
+        "value": "rain"
+      },
+      {
+        "name": "ArrowShower",
+        "value": "arrow_shower"
+      },
+      {
+        "name": "InhaleBite",
+        "value": "inhale_bite"
+      },
+      {
+        "name": "SwordFlash",
+        "value": "sword_flash"
+      },
+      {
+        "name": "HoundLunge",
+        "value": "hound_lunge"
+      },
+      {
+        "name": "Pounce",
+        "value": "pounce"
+      },
+      {
+        "name": "FlameJet",
+        "value": "flame_jet"
+      },
+      {
+        "name": "Bullet",
+        "value": "bullet"
+      },
+      {
+        "name": "Reflected",
+        "value": "reflected"
+      },
+      {
+        "name": "HullDebris",
+        "value": "hullDebris"
+      },
+      {
+        "name": "Saw",
+        "value": "saw"
+      },
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Wall",
+        "value": "wall"
+      },
+      {
+        "name": "Bolt",
+        "value": "bolt"
+      },
+      {
+        "name": "Arrow",
+        "value": "arrow"
+      },
+      {
+        "name": "StarBolt",
+        "value": "star_bolt"
+      },
+      {
+        "name": "Barrier",
+        "value": "barrier"
+      },
+      {
+        "name": "Corpse",
+        "value": "corpse"
+      },
+      {
+        "name": "TowShot",
+        "value": "towShot"
+      },
+      {
+        "name": "Interceptor",
+        "value": "interceptor"
+      },
+      {
+        "name": "EndBlast",
+        "value": "endBlast"
+      },
+      {
+        "name": "CritBeam",
+        "value": "critBeam"
+      },
+      {
+        "name": "RunUp",
+        "value": "runUp"
+      },
+      {
+        "name": "Mine",
+        "value": "mine"
+      },
+      {
+        "name": "Vortex",
+        "value": "vortex"
+      },
+      {
+        "name": "Horn",
+        "value": "horn"
+      },
+      {
+        "name": "CoronaThrow",
+        "value": "corona_throw"
+      },
+      {
+        "name": "ContactWave",
+        "value": "contactWave"
+      },
+      {
+        "name": "Sonic",
+        "value": "sonic"
+      },
+      {
+        "name": "ContactArc",
+        "value": "contactArc"
+      },
+      {
+        "name": "KillSonic",
+        "value": "killSonic"
+      },
+      {
+        "name": "HornWave",
+        "value": "horn_wave"
+      },
+      {
+        "name": "Bipolar",
+        "value": "bipolar"
+      },
+      {
+        "name": "DashRangeDrone",
+        "value": "dashRangeDrone"
+      },
+      {
+        "name": "Finale",
+        "value": "finale"
+      },
+      {
+        "name": "FlashSlash",
+        "value": "flashSlash"
+      },
+      {
+        "name": "RearAttack",
+        "value": "rear_attack"
+      },
+      {
+        "name": "SiriusFlame",
+        "value": "sirius_flame"
+      },
+      {
+        "name": "SiriusTrail",
+        "value": "sirius_trail"
+      },
+      {
+        "name": "Stomp",
+        "value": "stomp"
+      },
+      {
+        "name": "Blaze",
+        "value": "blaze"
+      },
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Nova",
+        "value": "nova"
+      },
+      {
+        "name": "Breath",
+        "value": "breath"
+      },
+      {
+        "name": "Charge",
+        "value": "charge"
+      },
+      {
+        "name": "Leap",
+        "value": "leap"
+      },
+      {
+        "name": "WindBlade",
+        "value": "wind_blade"
+      },
+      {
+        "name": "TailSweep",
+        "value": "tail_sweep"
+      },
+      {
+        "name": "Rubble",
+        "value": "rubble"
+      },
+      {
+        "name": "Tornado",
+        "value": "tornado"
+      },
+      {
+        "name": "TornadoCharge",
+        "value": "tornado_charge"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Wind",
+        "value": "wind"
+      },
+      {
+        "name": "Spiral",
+        "value": "spiral"
+      },
+      {
+        "name": "DracoFinale",
+        "value": "draco_finale"
+      },
+      {
+        "name": "CloneLeap",
+        "value": "clone_leap"
+      }
+    ],
+    "VisualRole": [
+      {
+        "name": "EnemySprite",
+        "value": "enemy_sprite"
+      },
+      {
+        "name": "Ship",
+        "value": "ship"
+      },
+      {
+        "name": "ForwardShot",
+        "value": "forward_shot"
+      },
+      {
+        "name": "Crystal",
+        "value": "crystal"
+      },
+      {
+        "name": "Coin",
+        "value": "coin"
+      },
+      {
+        "name": "Cannon",
+        "value": "cannon"
+      },
+      {
+        "name": "EnemyLook",
+        "value": "enemy_look"
+      },
+      {
+        "name": "Equipment",
+        "value": "equipment"
+      },
+      {
+        "name": "AttackScene",
+        "value": "attack_scene"
+      },
+      {
+        "name": "Planet",
+        "value": "planet"
+      },
+      {
+        "name": "Moon",
+        "value": "moon"
+      },
+      {
+        "name": "HostileShot",
+        "value": "hostile_shot"
+      },
+      {
+        "name": "StoneShot",
+        "value": "stone_shot"
+      },
+      {
+        "name": "ReflectedShot",
+        "value": "reflected_shot"
+      },
+      {
+        "name": "EnemyPolygon",
+        "value": "enemy_polygon"
+      },
+      {
+        "name": "StarBolt",
+        "value": "star_bolt"
+      },
+      {
+        "name": "BossFinish",
+        "value": "boss_finish"
+      }
+    ],
+    "EventType": [
+      {
+        "name": "AttackStart",
+        "value": "attack_start"
+      },
+      {
+        "name": "AttackEnd",
+        "value": "attack_end"
+      },
+      {
+        "name": "AttackRetired",
+        "value": "attack_retired"
+      },
+      {
+        "name": "AttackVisualEnd",
+        "value": "attack_visual_end"
+      },
+      {
+        "name": "Bonus",
+        "value": "bonus"
+      },
+      {
+        "name": "BlockImpact",
+        "value": "block_impact"
+      },
+      {
+        "name": "Bounce",
+        "value": "bounce"
+      },
+      {
+        "name": "ClipGroupEnd",
+        "value": "clip_group_end"
+      },
+      {
+        "name": "ClipGroup",
+        "value": "clip_group"
+      },
+      {
+        "name": "CombatDamage",
+        "value": "combat_damage"
+      },
+      {
+        "name": "CombatPlayerDamage",
+        "value": "combat_player_damage"
+      },
+      {
+        "name": "CriticalHit",
+        "value": "critical_hit"
+      },
+      {
+        "name": "DebrisTrail",
+        "value": "debris_trail"
+      },
+      {
+        "name": "DrawStart",
+        "value": "draw_start"
+      },
+      {
+        "name": "Duplicate",
+        "value": "duplicate"
+      },
+      {
+        "name": "EnemyRetire",
+        "value": "enemy_retire"
+      },
+      {
+        "name": "GameOver",
+        "value": "game_over"
+      },
+      {
+        "name": "GaugeFull",
+        "value": "gauge_full"
+      },
+      {
+        "name": "Hit",
+        "value": "hit"
+      },
+      {
+        "name": "HullScatter",
+        "value": "hull_scatter"
+      },
+      {
+        "name": "Hurt",
+        "value": "hurt"
+      },
+      {
+        "name": "Kill",
+        "value": "kill"
+      },
+      {
+        "name": "Launch",
+        "value": "launch"
+      },
+      {
+        "name": "LevelBonus",
+        "value": "level_bonus"
+      },
+      {
+        "name": "Levelup",
+        "value": "levelup"
+      },
+      {
+        "name": "Phase",
+        "value": "phase"
+      },
+      {
+        "name": "Pickup",
+        "value": "pickup"
+      },
+      {
+        "name": "Reroll",
+        "value": "reroll"
+      },
+      {
+        "name": "ShieldBlock",
+        "value": "shield_block"
+      },
+      {
+        "name": "ShieldExpired",
+        "value": "shield_expired"
+      },
+      {
+        "name": "ShieldReflect",
+        "value": "shield_reflect"
+      },
+      {
+        "name": "ShieldStolen",
+        "value": "shield_stolen"
+      },
+      {
+        "name": "ShipDeath",
+        "value": "ship_death"
+      },
+      {
+        "name": "ShipExplode",
+        "value": "ship_explode"
+      },
+      {
+        "name": "ShotHit",
+        "value": "shot_hit"
+      },
+      {
+        "name": "StrongSpawn",
+        "value": "strong_spawn"
+      },
+      {
+        "name": "Text",
+        "value": "text"
+      },
+      {
+        "name": "TimeLimitReached",
+        "value": "time_limit_reached"
+      },
+      {
+        "name": "TraceEnd",
+        "value": "trace_end"
+      },
+      {
+        "name": "Upgrade",
+        "value": "upgrade"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "WeaponFire",
+        "value": "weapon_fire"
+      },
+      {
+        "name": "Offer",
+        "value": "offer"
+      },
+      {
+        "name": "Choice",
+        "value": "choice"
+      },
+      {
+        "name": "Loadout",
+        "value": "loadout"
+      },
+      {
+        "name": "RunFinished",
+        "value": "run_finished"
+      },
+      {
+        "name": "Crash",
+        "value": "crash"
+      },
+      {
+        "name": "Ring",
+        "value": "ring"
+      },
+      {
+        "name": "Shoot",
+        "value": "shoot"
+      },
+      {
+        "name": "EnemyLaserCharge",
+        "value": "enemy_laser_charge"
+      },
+      {
+        "name": "EnemyLaserFire",
+        "value": "enemy_laser_fire"
+      },
+      {
+        "name": "EnemyLaserCancel",
+        "value": "enemy_laser_cancel"
+      },
+      {
+        "name": "CrystalDrop",
+        "value": "xp_drop"
+      },
+      {
+        "name": "CrystalGoldRoll",
+        "value": "xp_gold_roll"
+      },
+      {
+        "name": "GemBurst",
+        "value": "gem_burst"
+      },
+      {
+        "name": "CrystalAbsorb",
+        "value": "xp_absorb"
+      },
+      {
+        "name": "CrystalAbsorber",
+        "value": "xp_absorber"
+      },
+      {
+        "name": "CrystalTransfer",
+        "value": "xp_transfer"
+      },
+      {
+        "name": "CrystalLost",
+        "value": "xp_lost"
+      },
+      {
+        "name": "CrystalCollect",
+        "value": "xp_collect"
+      },
+      {
+        "name": "BarrierHit",
+        "value": "barrier_hit"
+      },
+      {
+        "name": "BarrierRestore",
+        "value": "barrier_restore"
+      },
+      {
+        "name": "TelescopeCharge",
+        "value": "telescope_charge"
+      },
+      {
+        "name": "TelescopeFire",
+        "value": "telescope_fire"
+      },
+      {
+        "name": "Explode",
+        "value": "explode"
+      },
+      {
+        "name": "FullBurstReady",
+        "value": "full_burst_ready"
+      },
+      {
+        "name": "FloodEnd",
+        "value": "flood_end"
+      },
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "CriticalLance",
+        "value": "critical_lance"
+      },
+      {
+        "name": "CriticalLanceHit",
+        "value": "critical_lance_hit"
+      },
+      {
+        "name": "RockBreak",
+        "value": "rock_break"
+      },
+      {
+        "name": "RunUpHit",
+        "value": "run_up_hit"
+      },
+      {
+        "name": "EndHole",
+        "value": "end_hole"
+      },
+      {
+        "name": "HoleCapture",
+        "value": "hole_capture"
+      },
+      {
+        "name": "HoleRecover",
+        "value": "hole_recover"
+      },
+      {
+        "name": "AquariusAim",
+        "value": "aquarius_aim"
+      },
+      {
+        "name": "BomberExplode",
+        "value": "bomber_explode"
+      },
+      {
+        "name": "SummonMark",
+        "value": "summon_mark"
+      },
+      {
+        "name": "CepheusSummon",
+        "value": "cepheus_summon"
+      },
+      {
+        "name": "RulerSplit",
+        "value": "ruler_split"
+      },
+      {
+        "name": "BossSpawn",
+        "value": "boss_spawn"
+      },
+      {
+        "name": "BossPhase",
+        "value": "boss_phase"
+      },
+      {
+        "name": "BossDefeated",
+        "value": "boss_defeated"
+      },
+      {
+        "name": "BossCancelled",
+        "value": "boss_cancelled"
+      },
+      {
+        "name": "FinalStrike",
+        "value": "final_strike"
+      },
+      {
+        "name": "Swallow",
+        "value": "swallow"
+      },
+      {
+        "name": "SpaceQuake",
+        "value": "space_quake"
+      },
+      {
+        "name": "SonicPush",
+        "value": "sonic_push"
+      },
+      {
+        "name": "SonicImpact",
+        "value": "sonic_impact"
+      },
+      {
+        "name": "ContactBolt",
+        "value": "bolt"
+      },
+      {
+        "name": "LanceLaunch",
+        "value": "lance_launch"
+      },
+      {
+        "name": "SonicBoom",
+        "value": "sonic_boom"
+      },
+      {
+        "name": "LanceShatter",
+        "value": "lance_shatter"
+      },
+      {
+        "name": "ChainShock",
+        "value": "chain_shock"
+      },
+      {
+        "name": "WaveRelease",
+        "value": "wave_release"
+      },
+      {
+        "name": "AnchorCapture",
+        "value": "anchor_capture"
+      },
+      {
+        "name": "AnchorFire",
+        "value": "anchor_fire"
+      },
+      {
+        "name": "BipolarCharge",
+        "value": "bipolar_charge"
+      },
+      {
+        "name": "RouteOpportunity",
+        "value": "route_opportunity"
+      },
+      {
+        "name": "EncounterDeferred",
+        "value": "encounter_deferred"
+      },
+      {
+        "name": "SlashRelease",
+        "value": "slash_release"
+      },
+      {
+        "name": "EscortDeploy",
+        "value": "escort_deploy"
+      },
+      {
+        "name": "EscortSlash",
+        "value": "escort_slash"
+      },
+      {
+        "name": "EnemyTuningChanged",
+        "value": "enemy_tuning_changed"
+      },
+      {
+        "name": "EnemyTuningSaved",
+        "value": "enemy_tuning_saved"
+      },
+      {
+        "name": "BossFinish",
+        "value": "boss_finish"
+      },
+      {
+        "name": "BossExplode",
+        "value": "boss_explode"
+      },
+      {
+        "name": "ClearBanner",
+        "value": "clear_banner"
+      },
+      {
+        "name": "SlashMark",
+        "value": "slash_mark"
+      },
+      {
+        "name": "FlashSlash",
+        "value": "flash_slash"
+      },
+      {
+        "name": "MonocerosSlashRelease",
+        "value": "monoceros_slash_release"
+      },
+      {
+        "name": "HeroDiscovered",
+        "value": "hero_discovered"
+      },
+      {
+        "name": "HeroLink",
+        "value": "hero_link"
+      },
+      {
+        "name": "HeroFreed",
+        "value": "hero_freed"
+      },
+      {
+        "name": "HeroPower",
+        "value": "hero_power"
+      },
+      {
+        "name": "HeroPowerEnd",
+        "value": "hero_power_end"
+      },
+      {
+        "name": "Landmark",
+        "value": "landmark"
+      },
+      {
+        "name": "TwinFirst",
+        "value": "twin_first"
+      },
+      {
+        "name": "CentaurusCue",
+        "value": "centaurus_cue"
+      },
+      {
+        "name": "CanisIgniteArrived",
+        "value": "canis_ignite_arrived"
+      },
+      {
+        "name": "CanisCue",
+        "value": "canis_cue"
+      },
+      {
+        "name": "HydraCue",
+        "value": "hydra_cue"
+      },
+      {
+        "name": "DracoRoar",
+        "value": "draco_roar"
+      },
+      {
+        "name": "BossAction",
+        "value": "boss_action"
+      },
+      {
+        "name": "DracoCue",
+        "value": "draco_cue"
+      },
+      {
+        "name": "BossDecision",
+        "value": "boss_decision"
+      },
+      {
+        "name": "BossEffect",
+        "value": "boss_effect"
+      },
+      {
+        "name": "LabSpawn",
+        "value": "lab_spawn"
+      }
+    ],
+    "ResultKind": [
+      {
+        "name": "Clear",
+        "value": "Clear"
+      },
+      {
+        "name": "Death",
+        "value": "Death"
+      },
+      {
+        "name": "Abort",
+        "value": "Abort"
+      }
+    ],
+    "RenderShapeKind": [
+      {
+        "name": "Polyline",
+        "value": "polyline"
+      },
+      {
+        "name": "Circle",
+        "value": "circle"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Blast",
+        "value": "blast"
+      },
+      {
+        "name": "LightArrow",
+        "value": "light_arrow"
+      },
+      {
+        "name": "FriendDebris",
+        "value": "friend_debris"
+      },
+      {
+        "name": "FriendHull",
+        "value": "friend_hull"
+      },
+      {
+        "name": "Zone",
+        "value": "zone"
+      },
+      {
+        "name": "Flood",
+        "value": "flood"
+      },
+      {
+        "name": "Shell",
+        "value": "shell"
+      }
+    ],
+    "Phase": [
+      {
+        "name": "Play",
+        "value": "play"
+      },
+      {
+        "name": "Levelup",
+        "value": "levelup"
+      },
+      {
+        "name": "Paused",
+        "value": "paused"
+      },
+      {
+        "name": "Dying",
+        "value": "dying"
+      },
+      {
+        "name": "Finishing",
+        "value": "finishing"
+      },
+      {
+        "name": "Ended",
+        "value": "ended"
+      }
+    ],
+    "HazardKind": [
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Zone",
+        "value": "zone"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Wall",
+        "value": "wall"
+      }
+    ],
+    "GemKind": [
+      {
+        "name": "Low",
+        "value": "low"
+      },
+      {
+        "name": "Mid",
+        "value": "mid"
+      },
+      {
+        "name": "High",
+        "value": "high"
+      }
+    ],
+    "PickupKind": [
+      {
+        "name": "Heal",
+        "value": "heal"
+      },
+      {
+        "name": "Magnet",
+        "value": "magnet"
+      },
+      {
+        "name": "CometWeapon",
+        "value": "comet_weapon"
+      }
+    ],
+    "EnemyGate": [
+      {
+        "name": "None",
+        "value": "none"
+      },
+      {
+        "name": "Back",
+        "value": "back"
+      },
+      {
+        "name": "Membrane",
+        "value": "membrane"
+      },
+      {
+        "name": "Claw",
+        "value": "claw"
+      },
+      {
+        "name": "Guard",
+        "value": "guard"
+      },
+      {
+        "name": "Solid",
+        "value": "solid"
+      },
+      {
+        "name": "Ghost",
+        "value": "ghost"
+      },
+      {
+        "name": "Immortal",
+        "value": "immortal"
+      }
+    ],
+    "EnemyGateResult": [
+      {
+        "name": "Allow",
+        "value": "allow"
+      },
+      {
+        "name": "Pass",
+        "value": "pass"
+      },
+      {
+        "name": "Bounce",
+        "value": "bounce"
+      }
+    ],
+    "EnemyModeId": [
+      {
+        "name": "Move",
+        "value": "move"
+      },
+      {
+        "name": "Windup",
+        "value": "windup"
+      },
+      {
+        "name": "Dash",
+        "value": "dash"
+      },
+      {
+        "name": "Recover",
+        "value": "recover"
+      }
+    ],
+    "HazardStyleId": [
+      {
+        "name": "Plain",
+        "value": "plain"
+      },
+      {
+        "name": "Reticle",
+        "value": "reticle"
+      },
+      {
+        "name": "Lightning",
+        "value": "lightning"
+      },
+      {
+        "name": "Blast",
+        "value": "blast"
+      },
+      {
+        "name": "Ray",
+        "value": "ray"
+      },
+      {
+        "name": "Bite",
+        "value": "bite"
+      },
+      {
+        "name": "Ripple",
+        "value": "ripple"
+      },
+      {
+        "name": "Flood",
+        "value": "flood"
+      },
+      {
+        "name": "Trail",
+        "value": "trail"
+      },
+      {
+        "name": "Telescope",
+        "value": "telescope"
+      },
+      {
+        "name": "Phoenix",
+        "value": "phoenix"
+      },
+      {
+        "name": "Guide",
+        "value": "guide"
+      },
+      {
+        "name": "Aquila",
+        "value": "aquila"
+      },
+      {
+        "name": "Draco",
+        "value": "draco"
+      },
+      {
+        "name": "Pulser",
+        "value": "pulser"
+      }
+    ]
+  },
+  "event_fields": {
+    "lab_spawn": [
+      "pos",
+      "enemy_type"
+    ],
+    "attack_start": [
+      "owner",
+      "row",
+      "id",
+      "categories",
+      "token"
+    ],
+    "attack_end": [
+      "token",
+      "owner"
+    ],
+    "attack_retired": [
+      "pos",
+      "id",
+      "source_id",
+      "reason"
+    ],
+    "attack_visual_end": [
+      "scene",
+      "phase",
+      "pos",
+      "visual_key",
+      "duration",
+      "tint"
+    ],
+    "bonus": [
+      "enter",
+      "pos"
+    ],
+    "block_impact": [
+      "pos",
+      "normal",
+      "enemy_pos",
+      "r",
+      "armor_bounce"
+    ],
+    "bounce": [
+      "pos"
+    ],
+    "clip_group_end": [
+      "clip",
+      "key"
+    ],
+    "clip_group": [
+      "clip",
+      "key",
+      "n"
+    ],
+    "combat_damage": [
+      "pos",
+      "target",
+      "struck_id",
+      "target_id",
+      "cause",
+      "weapon_id",
+      "requested",
+      "resolved",
+      "applied",
+      "overkill",
+      "discarded",
+      "hp_before",
+      "hp_after",
+      "reason",
+      "impact",
+      "shatter_depth"
+    ],
+    "combat_player_damage": [
+      "pos",
+      "cause",
+      "source",
+      "technique",
+      "requested",
+      "amount",
+      "accepted",
+      "reason",
+      "hp_before",
+      "hp_after",
+      "observation_id",
+      "effect_id"
+    ],
+    "critical_hit": [
+      "pos",
+      "enemy_pos",
+      "r",
+      "dir"
+    ],
+    "debris_trail": [
+      "points",
+      "color",
+      "life"
+    ],
+    "draw_start": [],
+    "duplicate": [
+      "pos",
+      "directions"
+    ],
+    "enemy_retire": [
+      "pos",
+      "id",
+      "reason",
+      "enemy_type",
+      "spawn_origin",
+      "spawn_role"
+    ],
+    "game_over": [],
+    "gauge_full": [],
+    "hit": [
+      "pos",
+      "crit",
+      "dmg",
+      "cause",
+      "id"
+    ],
+    "hull_scatter": [
+      "pos",
+      "count",
+      "visual_key"
+    ],
+    "hurt": [
+      "pos",
+      "amount",
+      "cause",
+      "source",
+      "hp_after"
+    ],
+    "kill": [
+      "pos",
+      "id",
+      "r",
+      "crit",
+      "enemy_type",
+      "meteor_index",
+      "facing",
+      "elite",
+      "cause",
+      "dir",
+      "color",
+      "silent",
+      "death_visual"
+    ],
+    "launch": [
+      "pos",
+      "dir",
+      "gauge"
+    ],
+    "level_bonus": [
+      "kind",
+      "id",
+      "level",
+      "count"
+    ],
+    "levelup": [
+      "level"
+    ],
+    "phase": [
+      "id"
+    ],
+    "pickup": [
+      "kind"
+    ],
+    "reroll": [],
+    "shield_block": [
+      "pos"
+    ],
+    "shield_expired": [
+      "pos"
+    ],
+    "shield_reflect": [
+      "pos",
+      "normal"
+    ],
+    "shield_stolen": [
+      "pos",
+      "facing",
+      "r",
+      "arc",
+      "enemy_type"
+    ],
+    "ship_death": [
+      "pos"
+    ],
+    "ship_explode": [
+      "pos"
+    ],
+    "shot_hit": [
+      "pos",
+      "dir",
+      "visual_key",
+      "kind"
+    ],
+    "strong_spawn": [
+      "id",
+      "enemy_type"
+    ],
+    "text": [
+      "pos",
+      "text",
+      "color",
+      "size"
+    ],
+    "time_limit_reached": [
+      "t"
+    ],
+    "trace_end": [
+      "completed"
+    ],
+    "upgrade": [
+      "card"
+    ],
+    "wave": [],
+    "weapon_fire": [
+      "id",
+      "pos",
+      "angle",
+      "visual_key"
+    ],
+    "offer": [
+      "offer_id",
+      "initial",
+      "count"
+    ],
+    "choice": [
+      "offer_id",
+      "candidate_id",
+      "kind",
+      "id",
+      "level"
+    ],
+    "loadout": [
+      "kind",
+      "id",
+      "level"
+    ],
+    "run_finished": [
+      "result_id",
+      "kind"
+    ],
+    "crash": [
+      "pos",
+      "power"
+    ],
+    "ring": [
+      "pos",
+      "radius",
+      "color",
+      "life",
+      "visual_key"
+    ],
+    "shoot": [
+      "pos",
+      "kind"
+    ],
+    "enemy_laser_charge": [
+      "id",
+      "row"
+    ],
+    "enemy_laser_fire": [
+      "id"
+    ],
+    "enemy_laser_cancel": [
+      "id"
+    ],
+    "xp_drop": [
+      "id",
+      "kind",
+      "base_xp",
+      "source",
+      "enemy",
+      "enemy_id",
+      "spawn_t",
+      "spawn_world_t",
+      "pos",
+      "new_supply",
+      "ground_count",
+      "carrier_id",
+      "origin",
+      "xp"
+    ],
+    "xp_gold_roll": [
+      "enemy",
+      "enemy_id",
+      "chance",
+      "won"
+    ],
+    "gem_burst": [
+      "pos",
+      "r"
+    ],
+    "xp_absorb": [
+      "id",
+      "kind",
+      "base_xp",
+      "source",
+      "enemy",
+      "enemy_id",
+      "spawn_t",
+      "spawn_world_t",
+      "new_supply",
+      "target_id",
+      "target_kind",
+      "before_base_xp",
+      "after_base_xp",
+      "requested_pos",
+      "ground_count",
+      "carrier_id",
+      "origin",
+      "xp"
+    ],
+    "xp_absorber": [
+      "reason",
+      "id",
+      "previous_id",
+      "before_kind",
+      "after_kind",
+      "before_base_xp",
+      "after_base_xp"
+    ],
+    "xp_transfer": [
+      "id",
+      "kind",
+      "base_xp",
+      "method",
+      "enemy_id",
+      "enemy",
+      "spawn_t",
+      "spawn_world_t",
+      "was_absorber",
+      "origin",
+      "xp"
+    ],
+    "xp_lost": [
+      "id",
+      "kind",
+      "base_xp",
+      "method",
+      "enemy_id",
+      "enemy",
+      "spawn_t",
+      "spawn_world_t",
+      "reason",
+      "origin",
+      "xp"
+    ],
+    "xp_collect": [
+      "method",
+      "base_xp",
+      "xp",
+      "actual_xp",
+      "multiplier",
+      "count",
+      "gems",
+      "id",
+      "kind",
+      "origin"
+    ],
+    "barrier_hit": [
+      "pos",
+      "hit",
+      "angle",
+      "radius",
+      "broken"
+    ],
+    "barrier_restore": [
+      "pos"
+    ],
+    "telescope_charge": [
+      "pos"
+    ],
+    "telescope_fire": [
+      "pos",
+      "angle",
+      "length",
+      "width"
+    ],
+    "explode": [
+      "pos",
+      "radius",
+      "cause",
+      "color",
+      "life"
+    ],
+    "full_burst_ready": [
+      "pos"
+    ],
+    "flood_end": [
+      "id",
+      "row",
+      "pos",
+      "angle",
+      "length",
+      "width",
+      "spread",
+      "age",
+      "tail",
+      "collapse",
+      "margin"
+    ],
+    "beam": [
+      "from",
+      "to",
+      "width",
+      "life",
+      "color",
+      "visual_key",
+      "width_scale"
+    ],
+    "critical_lance": [
+      "from",
+      "to",
+      "width"
+    ],
+    "critical_lance_hit": [
+      "pos",
+      "radius",
+      "direction"
+    ],
+    "rock_break": [
+      "pos",
+      "r",
+      "meteor_index",
+      "facing",
+      "dir",
+      "color"
+    ],
+    "run_up_hit": [
+      "pos",
+      "dir",
+      "strength"
+    ],
+    "end_hole": [
+      "pos",
+      "life"
+    ],
+    "hole_capture": [
+      "pos",
+      "radius",
+      "enemy_type",
+      "color",
+      "facing"
+    ],
+    "hole_recover": [
+      "pos",
+      "amount"
+    ],
+    "aquarius_aim": [
+      "pos",
+      "angle",
+      "count",
+      "length",
+      "width",
+      "spread",
+      "delay",
+      "active",
+      "color",
+      "row",
+      "id"
+    ],
+    "bomber_explode": [
+      "pos"
+    ],
+    "summon_mark": [
+      "pos",
+      "king",
+      "life",
+      "color"
+    ],
+    "cepheus_summon": [
+      "pos",
+      "color"
+    ],
+    "ruler_split": [
+      "pos",
+      "angle",
+      "color"
+    ],
+    "boss_spawn": [
+      "pos"
+    ],
+    "boss_phase": [
+      "id",
+      "boss",
+      "phase",
+      "reason"
+    ],
+    "boss_defeated": [
+      "pos",
+      "id",
+      "dir",
+      "cause"
+    ],
+    "boss_cancelled": [
+      "id",
+      "boss"
+    ],
+    "final_strike": [
+      "t"
+    ],
+    "swallow": [
+      "enemy_type",
+      "pos",
+      "r",
+      "facing",
+      "color",
+      "row",
+      "id",
+      "visual_id",
+      "sprite_radius",
+      "sprite_angle"
+    ],
+    "space_quake": [
+      "pos",
+      "radius",
+      "life"
+    ],
+    "sonic_push": [
+      "pos",
+      "dir",
+      "row",
+      "id"
+    ],
+    "sonic_impact": [
+      "pos",
+      "dir",
+      "dead"
+    ],
+    "bolt": [
+      "segments"
+    ],
+    "lance_launch": [
+      "pos",
+      "direction",
+      "horn",
+      "head_length"
+    ],
+    "sonic_boom": [
+      "pos",
+      "direction",
+      "horn",
+      "head_length"
+    ],
+    "lance_shatter": [
+      "pos",
+      "direction",
+      "horn",
+      "head_length"
+    ],
+    "chain_shock": [
+      "pos",
+      "radius",
+      "life",
+      "generation"
+    ],
+    "wave_release": [
+      "pos"
+    ],
+    "anchor_capture": [
+      "id",
+      "pos",
+      "to"
+    ],
+    "anchor_fire": [
+      "pos",
+      "dir",
+      "radius"
+    ],
+    "bipolar_charge": [
+      "from",
+      "to"
+    ],
+    "route_opportunity": [
+      "route",
+      "status",
+      "start",
+      "window",
+      "margin"
+    ],
+    "encounter_deferred": [
+      "reason"
+    ],
+    "slash_release": [
+      "path",
+      "count",
+      "sweep",
+      "pause"
+    ],
+    "escort_deploy": [
+      "pos",
+      "targets"
+    ],
+    "escort_slash": [
+      "pos",
+      "dir"
+    ],
+    "enemy_tuning_changed": [
+      "values"
+    ],
+    "enemy_tuning_saved": [
+      "path",
+      "values"
+    ],
+    "boss_finish": [
+      "pos"
+    ],
+    "boss_explode": [
+      "pos"
+    ],
+    "clear_banner": [],
+    "slash_mark": [
+      "pos",
+      "radius",
+      "id",
+      "dash"
+    ],
+    "flash_slash": [
+      "pos",
+      "length",
+      "width",
+      "id",
+      "dash",
+      "cut"
+    ],
+    "monoceros_slash_release": [
+      "line",
+      "width"
+    ],
+    "hero_discovered": [
+      "id"
+    ],
+    "hero_link": [
+      "from",
+      "to"
+    ],
+    "hero_freed": [
+      "id",
+      "pos"
+    ],
+    "hero_power": [
+      "id",
+      "pos"
+    ],
+    "hero_power_end": [
+      "id"
+    ],
+    "landmark": [
+      "pos"
+    ],
+    "twin_first": [],
+    "centaurus_cue": [
+      "id",
+      "technique",
+      "cue",
+      "position",
+      "angle",
+      "world_time"
+    ],
+    "canis_ignite_arrived": [
+      "id",
+      "boss_id",
+      "target",
+      "profile",
+      "pos",
+      "from",
+      "life",
+      "observation"
+    ],
+    "canis_cue": [
+      "id",
+      "technique",
+      "cue",
+      "position",
+      "angle",
+      "world_time",
+      "radius",
+      "profile",
+      "age"
+    ],
+    "hydra_cue": [
+      "id",
+      "cue",
+      "technique",
+      "neck",
+      "position",
+      "duration",
+      "damage",
+      "next_count",
+      "target",
+      "kind"
+    ],
+    "draco_roar": [
+      "pos",
+      "radius"
+    ],
+    "boss_action": [
+      "action_id",
+      "body_id",
+      "action",
+      "boss",
+      "observed_start",
+      "step",
+      "checks",
+      "contacts",
+      "applied",
+      "outcome",
+      "reason",
+      "origin",
+      "decision_id",
+      "ship_position",
+      "ship_velocity",
+      "aim",
+      "direction",
+      "phase",
+      "pass",
+      "stage",
+      "body_position",
+      "facing",
+      "distance",
+      "observation_scope",
+      "row",
+      "section",
+      "flow_clock",
+      "node",
+      "technique",
+      "requested_action"
+    ],
+    "draco_cue": [
+      "cue",
+      "pos",
+      "radius",
+      "boss"
+    ],
+    "boss_decision": [
+      "action_id",
+      "body_id",
+      "action",
+      "boss",
+      "observed_start",
+      "origin",
+      "decision_id",
+      "ship_position",
+      "ship_velocity",
+      "aim",
+      "direction",
+      "phase",
+      "pass",
+      "stage",
+      "body_position",
+      "facing",
+      "distance",
+      "row",
+      "section",
+      "flow_clock",
+      "request",
+      "stamina",
+      "maximum_stamina",
+      "stamina_reserved",
+      "cap",
+      "section_spent",
+      "section_budget",
+      "remaining_budget",
+      "history",
+      "candidates",
+      "selection",
+      "selected",
+      "reason"
+    ],
+    "boss_effect": [
+      "action_id",
+      "body_id",
+      "action",
+      "boss",
+      "observed_start",
+      "origin",
+      "decision_id",
+      "ship_position",
+      "ship_velocity",
+      "aim",
+      "direction",
+      "phase",
+      "pass",
+      "stage",
+      "body_position",
+      "facing",
+      "distance",
+      "effect_id",
+      "step",
+      "spawn_position",
+      "position",
+      "checks",
+      "contacts",
+      "applied",
+      "observation_scope",
+      "outcome",
+      "reason",
+      "row"
+    ]
+  },
+  "includes": [
+    "attacks.json",
+    "population.json",
+    "progression.json",
+    "enemies.json",
+    "field.json",
+    "loadout.json",
+    "bosses.json",
+    "boss_flow.json",
+    "heroes.json",
+    "centaurus.json",
+    "canis_major.json",
+    "hydra.json",
+    "draco.json"
+  ]
+}

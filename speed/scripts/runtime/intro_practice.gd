@@ -1,7 +1,8 @@
 ## 導入の星・練習相手・見本線。線との一致や失敗回数は判定しない。
 extends RefCounted
 
-var run: RunSimulation
+var run: RefCounted
+var sequence: RefCounted
 var presentation: IntroPresentation
 var stars := PackedVector2Array()
 ## 敵の ID → {row, star}。行が解放されても撃破イベントを照合できる。
@@ -9,8 +10,9 @@ var enemies: Dictionary = {}
 var released: Array[Dictionary] = []
 var guide_points := PackedVector2Array()
 
-func setup(simulation: RunSimulation, visuals: IntroPresentation, origin: Vector2) -> void:
-	run = simulation
+func setup(owner: RefCounted, visuals: IntroPresentation, origin: Vector2) -> void:
+	sequence = owner
+	run = owner.run
 	presentation = visuals
 	var arrival: Vector2 = origin + Vector2(32, 0) * presentation.flight_time
 	for offset: Vector2 in presentation.practice_offsets:
@@ -22,33 +24,35 @@ func relocate(origin: Vector2) -> void:
 
 func spawn() -> void:
 	for star in stars:
-		var row: int = run.enemies.spawn(presentation.practice_enemy, star,
-			{"facing": (run.state.ship_pos - star).angle()})
-		var id: int = run.enemies.table.id[row]
-		enemies[id] = {"row": row, "star": star}
+		var result: Dictionary = sequence.command("dev_spawn",{"definition_id":String(presentation.practice_enemy.id),"position":star,"facing":(run.state.ship_pos-star).angle()})
+		if not result.ok: return
+		enemies[int(result.value)] = {"row":row_for_id(int(result.value)),"star":star}
+
+func row_for_id(id: int) -> int:
+	return run.enemies.table.id.find(id)
 
 func approach(progress: float) -> void:
 	var i := 0
-	for record: Dictionary in enemies.values():
+	for id in enemies:
+		var record: Dictionary = enemies[id]
 		var target: Vector2 = run.state.ship_pos + presentation.practice_offsets[i]
-		run.enemies.table.pos[record.row] = record.star.lerp(target, progress)
+		sequence.command("dev_edit",{"kind":"move","payload":{"entity_id":int(id),"position":record.star.lerp(target,progress)}})
 		i += 1
 
 func update() -> void:
-	var state: RunState = run.state
-	for record: Dictionary in enemies.values():
-		var row: int = record.row
-		if run.enemies.table.pos[row].distance_to(state.ship_pos) > 950.0:
-			run.enemies.table.speed[row] = maxf(presentation.practice_enemy.speed,state.stats.max_speed*0.9)
-		else:
-			run.enemies.table.speed[row] = presentation.practice_enemy.speed
-	if not state.drawing and not state.tracing:
-		build_guide()
+	for id in enemies:
+		var row := row_for_id(int(id))
+		if row<0: continue
+		var distant: bool = run.enemies.table.pos[row].distance_to(run.state.ship_pos)>950.0
+		var speed: float = maxf(presentation.practice_enemy.speed,run.state.stats.max_speed*0.9) if distant else presentation.practice_enemy.speed
+		sequence.command("dev_edit",{"kind":"enemy_motion","payload":{"entity_id":int(id),"speed":speed}})
+	if not run.state.drawing and not run.state.tracing: build_guide()
 
 func build_guide() -> void:
 	var points := PackedVector2Array([run.state.ship_pos + Vector2(80, -20)])
-	for record: Dictionary in enemies.values():
-		points.append(run.enemies.table.pos[record.row])
+	for id in enemies:
+		var row := row_for_id(int(id))
+		if row>=0: points.append(run.enemies.table.pos[row])
 	if points.size() < 2:
 		guide_points.clear()
 		return
@@ -77,4 +81,5 @@ func record_kill(event: Dictionary) -> bool:
 
 func dispose() -> void:
 	run = null
+	sequence = null
 	presentation = null

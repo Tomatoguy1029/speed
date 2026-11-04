@@ -5,7 +5,6 @@ const ASSETS := "res://assets/effects/landmark/elite_contacts.tres"
 const RUNTIME := "res://data/visuals/elite_runtime.tres"
 const MAX_SEGMENTS := 8192
 const STRIDE := 16 # transform 8, normalized appearance 4, source segment 4
-var _rm: RunPresentation
 var _assets: Resource
 var _entries: Dictionary
 var _runtime: Resource
@@ -23,11 +22,8 @@ var _capacity := 0
 var _epoch := 0
 var _clock := -INF
 
-func setup(render: RunPresentation) -> void:
-	_rm = render
-	var scope := render.run.ctx.resources
+func setup(scope: ContentResourceScope) -> void:
 	for path in [ASSETS, RUNTIME]:
-		if not scope.resources.has(path) and render.state.lab_mode: scope.provide(path, load(path))
 		assert(scope.resources.has(path), "エリート描画の事前準備が必要: " + path)
 	_assets = scope.resources.get(ASSETS)
 	_runtime = scope.resources.get(RUNTIME)
@@ -78,33 +74,19 @@ func _timing(values: Dictionary) -> void:
 	_arc_count = int(values.arc_count)
 	_spark_count = int(values.spark_count)
 
-func begin() -> void:
+func begin(clock: float) -> void:
 	_count = 0
 	_epoch += 1
-	if _rm.state.world_time < _clock: _states.clear()
-	_clock = _rm.state.world_time
+	if clock < _clock: _states.clear()
+	_clock = clock
 
-func add_enemy(t: EnemyTable, row: int, deformation: Dictionary) -> void:
+func add_body(body: Dictionary) -> void:
 	if _runtime == null: return
-	if t.def[row].behavior == &"triangle":
-		for k in range(0,t.parts[row].size(),2):
-			var child: int = t.parts[row][k]
-			if _rm.run.enemies.is_same(child,t.parts[row][k+1]) and t.dead[child] == 0: _add_body(t,child,{})
-	else:
-		_add_body(t,row,deformation)
-
-func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
-	var look := _rm.look_of(t.type[row])
-	var key: String = look.source_path if look != null else "sprite:" + String(t.type[row])
-	if look != null and look.split_other != null:
-		if t.buds[row] == 1: key = look.split_other.source_path
-		elif t.buds[row] == 0: key += ":joined"
-	if not _entries.has(key): key = "shape:" + String(t.def[row].shape)
-	assert(_entries.has(key), "エリート接点のベイクが必要: " + key)
+	var key: String = body.key
 	if not _entries.has(key): return
 	var entry: Dictionary = _entries[key]
 	var patterns: Array = entry.patterns
-	var id: int = t.id[row]
+	var id: int = body.id
 	if not _states.has(id) or _states[id].key != key:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = id * 104729 + 17041
@@ -118,15 +100,8 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 		if events.size() < 4: events.append(_event(state.rng,patterns,entry.origin))
 		var wait := _interval_min-log(maxf(0.001,1.0-state.rng.randf()))*_interval_random
 		state.next = _clock+minf(maxf(_interval_min,_interval_max),wait)
-	var visual := _rm._visual_of(t,row)
-	var scale_px := _rm.enemy_sprite_radius(t.type[row],t.r[row])/float(entry.source_radius)
-	if entry.pump: scale_px = visual._source_scale(t,row)
-	var pose := Transform2D(_rm._enemy_sprite_angle(t.type[row],t.facing[row]),t.pos[row]).scaled_local(Vector2.ONE*scale_px)
-	if not deformation.is_empty() and deformation.direction.length_squared() > 0.0001:
-		var normal: Vector2 = deformation.direction.normalized()
-		var side := normal.orthogonal()
-		for column in 2:
-			pose[column] = normal*pose[column].dot(normal)*(1.0-0.5*deformation.amount)+side*pose[column].dot(side)*(1.0+0.6*deformation.amount)
+	var pose: Transform2D = body.pose
+	pose = pose.scaled_local(Vector2.ONE / float(entry.source_radius))
 	pose.origin -= pose.basis_xform(entry.origin)
 	var remaining := 4
 	for event: Dictionary in events:
@@ -138,14 +113,14 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 				if remaining <= 0: break
 				remaining -= 1
 				var path: Dictionary = patterns[index]
-				var path_pose := _part_pose(pose,entry,visual,t,row,path.part,deformation)
+				var path_pose := _part_pose(pose,entry,body,path.part)
 				var segments: PackedVector2Array = path.frames[mini(frame,3)]
 				for n in range(0,segments.size(),3):
-					var a := _point(segments[n],path.part,entry,visual,t,row)
-					var b := _point(segments[n+1],path.part,entry,visual,t,row)
+					var a := _point(segments[n],entry,body)
+					var b := _point(segments[n+1],entry,body)
 					_segment(a,b,path_pose,1.0,power*float(segments[n+2].x),false)
 		var anchor: Dictionary = patterns[event.paths[0]]
-		var spark_pose := _part_pose(pose,entry,visual,t,row,anchor.part,deformation)
+		var spark_pose := _part_pose(pose,entry,body,anchor.part)
 		var sparks: PackedFloat32Array = event.sparks
 		for n in range(0,sparks.size(),5):
 			var life := float(sparks[n])
@@ -156,7 +131,7 @@ func _add_body(t: EnemyTable, row: int, deformation: Dictionary) -> void:
 			var drag := exp(-2.2*spark_age)
 			var point := start+velocity*((1.0-drag)/2.2)
 			var tail := point-velocity.normalized()*minf(9.0,1.0+velocity.length()*drag*0.022)
-			_segment(_point(tail,anchor.part,entry,visual,t,row),_point(point,anchor.part,entry,visual,t,row),spark_pose,1.0-spark_age/life,0.9,true)
+			_segment(_point(tail,entry,body),_point(point,entry,body),spark_pose,1.0-spark_age/life,0.9,true)
 
 func _event(rng: RandomNumberGenerator, patterns: Array, origin: Vector2) -> Dictionary:
 	var amount := rng.randf()
@@ -175,13 +150,15 @@ func _event(rng: RandomNumberGenerator, patterns: Array, origin: Vector2) -> Dic
 		sparks.append_array(PackedFloat32Array([rng.randf_range(0.10,0.24),rng.randf_range(0,0.025),endpoint,velocity.x,velocity.y]))
 	return {"born":_clock,"frames":rng.randi_range(2,4),"power":power,"paths":paths,"sparks":sparks}
 
-func _part_pose(pose: Transform2D, entry: Dictionary, visual: EnemyVisual, t: EnemyTable, row: int, part: int, deformation: Dictionary) -> Transform2D:
-	if entry.biter and visual != null and visual.has_method("elite_pose"): return visual.call("elite_pose",t,row,part,deformation)
+func _part_pose(pose: Transform2D, entry: Dictionary, body: Dictionary, part: int) -> Transform2D:
+	if entry.biter and body.has("parts"):
+		var parts: Array = body.parts
+		if part >= 0 and part < parts.size(): return parts[part]
 	return pose
 
-func _point(point: Vector2, _part: int, entry: Dictionary, visual: EnemyVisual, t: EnemyTable, row: int) -> Vector2:
+func _point(point: Vector2, entry: Dictionary, body: Dictionary) -> Vector2:
 	if entry.pump and point.y >= 18.0:
-		var full := 1.0 if t.mode[row] == EnemyTable.Mode.WINDUP else clampf((t.r[row]/maxf(visual._base_radius(t,row),0.001)-1.0)/maxf(float(t.def[row].params.grow),0.001),0.0,1.0)
+		var full: float = body.get("pump_full",0.0)
 		var delta := point-Vector2(12,27)
 		var index := posmod(roundi(fposmod(delta.angle(),TAU)/TAU*72.0),72)
 		var original: float = _assets.get_meta("pump_outline")[index]

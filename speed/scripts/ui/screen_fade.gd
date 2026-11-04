@@ -8,6 +8,7 @@ var _discard: Dictionary = {}
 
 func _ready() -> void:
 	layer = 128
+	preload("res://scripts/ui/canvas_order.gd").register(self,3)
 	_veil.color = Color.BLACK
 	_veil.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_veil)

@@ -1,0 +1,97 @@
+#include "../api/run_core.h"
+#include "motion_math.h"
+#include "enemy_system.h"
+#include "../behaviors/enemies/defender.h"
+#include "../behaviors/enemies/crow.h"
+#include "attack_system.h"
+#include <algorithm>
+#include <cmath>
+using namespace godot;
+
+void SpeedRunCore::update_pushed(Enemy &enemy, double dt) {
+    if (enemy.shove_time > 0) {
+        enemy.shove_from = enemy.pos; enemy.shoved = true;
+        enemy.shove_time = speed::remaining_time(enemy.shove_time,dt); enemy.vel = enemy.shove_vel;
+        enemy.shove_vel = speed::exponential_deceleration(enemy.shove_vel,0.8,dt);
+    } else {
+        enemy.knock_t = speed::remaining_time(enemy.knock_t,dt); enemy.vel = speed::exponential_deceleration(enemy.vel,2.0,dt);
+    }
+    enemy.pos += enemy.vel * dt;
+}
+
+// 比較・実験場からの操作口。通常の更新では所有している個体へ直接適用する。
+bool SpeedRunCore::set_enemy_motion(int64_t id, const Dictionary &state) {
+    if (!runtime.state.started || runtime.state.closed) return false;
+    const auto found = runtime.state.rows_by_id.find(id); if (found == runtime.state.rows_by_id.end()) return false;
+    const Array keys = state.keys();
+    for (int i = 0; i < keys.size(); ++i) {
+        if (keys[i].get_type() != Variant::STRING && keys[i].get_type() != Variant::STRING_NAME) return false;
+        const String key = keys[i]; const Variant value = state[keys[i]];
+        if (key == "pump_owner") { if (value.get_type()!=Variant::INT || int64_t(value)<0 || (int64_t(value)>0 && !runtime.state.rows_by_id.count(int64_t(value)))) return false; }
+        else if (key == "held" || key == "slash_hold") { if (value.get_type() != Variant::BOOL) return false; }
+        else if (key == "stone" || key == "knock_t" || key == "shove_time" || key=="fire_t" || key=="charge" || key=="facing") {
+            if ((value.get_type() != Variant::FLOAT && value.get_type() != Variant::INT) || !std::isfinite(double(value))) return false;
+        } else if (key == "vel" || key == "shove_vel") {
+            if (value.get_type() != Variant::VECTOR2 || !Vector2(value).is_finite()) return false;
+        } else return false;
+    }
+    auto &enemy = runtime.state.enemies[found->second];
+    if (state.has("pump_owner")) {
+        const int64_t owner=state["pump_owner"];
+        enemy.pump_owner=owner>0?runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(owner))):speed::EnemyHandle();
+    }
+    if (state.has("fire_t")) enemy.fire_t=double(state["fire_t"]);
+    if (state.has("charge")) enemy.charge=double(state["charge"]);
+    if (state.has("facing")) enemy.facing=double(state["facing"]);
+    if (state.has("held")) enemy.held = state["held"];
+    if (state.has("slash_hold")) enemy.slash_hold = state["slash_hold"];
+    if (state.has("stone")) enemy.stone = state["stone"];
+    if (state.has("knock_t")) enemy.knock_t = state["knock_t"];
+    if (state.has("shove_time")) enemy.shove_time = state["shove_time"];
+    if (state.has("vel")) enemy.vel = state["vel"];
+    if (state.has("shove_vel")) enemy.shove_vel = state["shove_vel"];
+    return true;
+}
+
+Array SpeedRunCore::enemy_motion_snapshot() const {
+    std::vector<const Enemy *> ordered;
+    for (const auto &enemy : runtime.state.enemies) if (enemy.alive) ordered.push_back(&enemy);
+    std::sort(ordered.begin(), ordered.end(), [](const auto *a, const auto *b) { return a->id < b->id; });
+    Array out;
+    for (const auto *e : ordered) {
+        Dictionary row; row["id"] = e->id;row["spawn_origin"]=int64_t(e->origin);row["spawn_role"]=int64_t(e->role); row["stone"] = e->stone; row["knock_t"] = e->knock_t;
+        row["shove_time"] = e->shove_time; row["shove_vel"] = e->shove_vel; row["shove_from"] = e->shove_from;
+        row["turn_locked"]=runtime.state.draw.tracing && !e->held && !runtime.state.enemy_handles.contains(e->pump_owner);
+        row["held"] = int(e->held); row["slash_hold"] = int(e->slash_hold); row["shoved"] = int(e->shoved);
+        row["fire_hit"]=e->fire_hit;row["age"] = e->age; row["fire_t"] = e->fire_t;
+        row["guard"]=e->guard;row["hit_cd"]=e->hit_cd;row["attack_priority"]=e->attack_priority;
+        if (runtime.content->definitions[e->definition].kind==speed::EnemyDefinition::Kind::Drift) row["spin"]=e->spin;
+        if (e->parent_id) {row["parent_id"]=e->parent_id;row["parent_alive"]=runtime.state.enemy_handles.contains(e->parent) && !runtime.state.enemies[e->parent.slot].dead;}
+        if (!e->parts.empty()) row["parts_alive"]=int64_t(speed::EnemySystem::parts_alive(runtime.state,runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)))));
+        if (const auto *sniper=std::get_if<speed::SniperState>(&e->behavior_state)) {PackedFloat32Array rays;for (float value:sniper->rays) rays.push_back(value);row["sight_rays"]=rays;}
+        if (const auto *reticle=std::get_if<speed::ReticleState>(&e->behavior_state)) {row["target_id"]=reticle->rock_id;row["target_alive"]=runtime.state.enemy_handles.contains(reticle->rock) && !runtime.state.enemies[reticle->rock.slot].dead;}
+        if (const auto *clock=std::get_if<speed::ClockState>(&e->behavior_state)) {row["spin"]=e->spin;godot::PackedInt64Array hands;for (auto hand:clock->hands) {const auto *record=speed::AttackSystem::get(runtime.state,hand);hands.push_back(record?record->id:0);}row["hands"]=hands;}
+        if (const auto *triangle=std::get_if<speed::TriangleState>(&e->behavior_state)) {row["spin"]=e->spin;row["buds"]=triangle->buds;}
+        if (const auto *ruler=std::get_if<speed::RulerState>(&e->behavior_state)) {row["side"]=ruler->side;row["facing"]=e->facing;const auto *beam=speed::AttackSystem::get(runtime.state,ruler->beam);row["beam_id"]=beam?beam->id:0;}
+        if (const auto *king=std::get_if<speed::CepheusState>(&e->behavior_state)) {row["tier"]=king->tier;row["formation_anchor"]=king->anchor;row["volley"]=king->volley;}
+        if (const auto *soldier=std::get_if<speed::SoldierState>(&e->behavior_state)) {row["king_id"]=soldier->king_id;row["slot"]=soldier->slot;row["formation_anchor"]=soldier->formation.anchor;}
+        if (std::holds_alternative<speed::CrowState>(e->behavior_state)) {const auto carried=speed::CrowBehavior::cargo(runtime,runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id))));row["carry"]=carried.amount;row["buds"]=carried.count;}
+        if (const auto *defender=std::get_if<speed::DefenderState>(&e->behavior_state)) {
+            row["guard_target_id"]=0;row["guard_goal"]=Vector2();const auto handle=runtime.state.enemy_handles.at(uint32_t(runtime.state.rows_by_id.at(e->id)));
+            if (const auto *post=speed::DefenderBehavior::post(runtime,handle)) {row["guard_target_id"]=runtime.state.enemy_handles.entity_id(post->target);row["guard_goal"]=post->position;}
+            row["boost_active"]=defender->boost.active;row["boost_speed"]=defender->boost.speed;row["boost_wobble"]=defender->boost.wobble;row["boost_until"]=defender->boost.until;row["boost_phase"]=defender->boost.phase;
+        }
+        if (const auto *split=std::get_if<speed::SplitState>(&e->behavior_state)) {row["buds"]=split->buds;row["bud_t"]=split->bud_t;}
+        if (const auto *lynx=std::get_if<speed::LynxState>(&e->behavior_state)) row["buds"]=lynx->buds;
+        row["pump_owner_id"]=runtime.state.enemy_handles.entity_id(e->pump_owner);
+        if (const auto *corona=std::get_if<speed::CoronaState>(&e->behavior_state)) {row["corona_count"]=corona->count;row["corona_selected"]=runtime.state.enemy_handles.entity_id(corona->selected);row["corona_wait"]=corona->wait;row["corona_center"]=corona->center;row["corona_capture_t"]=corona->capture_t;}
+        if (e->corona) {const auto &c=*e->corona;row["corona_owner"]=runtime.state.enemy_handles.entity_id(c.owner);row["corona_serial"]=int64_t(c.serial);row["corona_angle"]=c.angle;row["corona_radius"]=c.radius;row["corona_thrown"]=c.thrown;row["corona_life"]=c.life;row["corona_damage"]=c.damage;row["corona_effect"]=c.effect;row["corona_token"]=c.attack_token;row["corona_from"]=c.from;row["corona_ship_from"]=c.ship_from;row["corona_release_fraction"]=c.release_fraction;}
+        if (const auto *pump=std::get_if<speed::PumpState>(&e->behavior_state)) {godot::PackedStringArray contents;for (auto id:pump->contents) contents.push_back(runtime.content->definitions[id-1].source_id());row["stored_types"]=contents;row["buds"]=int64_t(pump->contents.size());row["bud_t"]=pump->bud_t;}
+        if (const auto *crab=std::get_if<speed::CrabState>(&e->behavior_state)) {row["buds"]=crab->buds;const auto *sweep=speed::AttackSystem::get(runtime.state,crab->sweep);row["sweep"]=sweep?sweep->id:0;}
+        if (const auto *aquila=std::get_if<speed::AquilaState>(&e->behavior_state)) {row["anchor"]=aquila->anchor;row["bud_t"]=aquila->bud_t;}
+        if (const auto *phoenix=std::get_if<speed::PhoenixState>(&e->behavior_state)) row["anchor"]=phoenix->anchor;
+        if (const auto *marlin=std::get_if<speed::MarlinState>(&e->behavior_state)) row["anchor"]=marlin->anchor;
+        row["mode"] = int(e->mode); row["timer"] = e->timer; row["charge"] = e->charge; out.append(row);
+    }
+    return out;
+}

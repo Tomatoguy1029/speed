@@ -1,6 +1,5 @@
 ## 開発用の機能を、アプリとランの入口から足す。
 extends Node
-const COMMANDS := preload("res://scripts/dev/run_commands.gd")
 const RECORDER := preload("res://scripts/dev/play_recorder.gd")
 const DEBUG_PANEL := preload("res://scripts/dev/debug_panel.gd")
 const PERF_OVERLAY := preload("res://scripts/dev/perf_overlay.gd")
@@ -16,29 +15,8 @@ func _ready() -> void:
 	recorder.name = "PlayRecorder"
 	add_child(recorder)
 func _on_session_created(session: RunSession) -> void:
-	var commands := COMMANDS.new()
-	commands.setup(session.sim)
-	session.sim.command_extension = func(name: StringName, args: Dictionary) -> bool: return commands.handle(name, args)
-	if not session.sim.options.get("lab", false): session.add_to_group("recordable_runs")
-	session.started.connect(_decorate.bind(weakref(session)), CONNECT_ONE_SHOT)
-func _decorate(reference: WeakRef) -> void:
-	var session := reference.get_ref() as RunSession
-	if session == null or session.view == null or session.sim.state.lab_mode: return
-	var panel := DEBUG_PANEL.new()
-	panel.name = "DebugPanel"
-	panel.run = session.sim
-	panel.position = Vector2(16, 110)
-	panel.size = Vector2(420, 580)
-	session.view.get_node("Hud").add_child(panel)
-	var overlay := PERF_OVERLAY.new()
-	overlay.name = "PerfOverlay"
-	overlay.run = session.sim
-	overlay.view = session.view.get_node("RunPresentation")
-	session.view.get_node("Hud").add_child(overlay)
-	var tuning := ENEMY_TUNING.new()
-	tuning.name = "StageEnemyTuning"
-	tuning.run = session.sim
-	session.view.get_node("Hud").add_child(tuning)
+	session.add_to_group("recordable_runs")
+	session.started.connect(_decorate_cpp.bind(weakref(session)),CONNECT_ONE_SHOT)
 
 func _on_screen_ready(view: Control) -> void:
 	var path: String = view.get_script().resource_path
@@ -78,5 +56,27 @@ func _consume_launch_request() -> bool:
 	GameManager.reset_to_main_menu()
 	GameManager.run_start_time = StageLaunchRequest.start_time
 	GameManager.run_start_source = StageLaunchRequest.source
+	GameManager.run_start_content = StageLaunchRequest.content.duplicate(true)
 	GameManager.start_run(stage)
 	return true
+
+func _decorate_cpp(reference: WeakRef) -> void:
+	var session := reference.get_ref() as RunSession
+	if session==null or session.view==null: return
+	var hud := session.view.get_node_or_null("Hud")
+	if hud==null: return
+	var panel := DEBUG_PANEL.new()
+	panel.name = "DebugPanel"
+	panel.cpp_session = session
+	panel.position = Vector2(16,110)
+	panel.size = Vector2(420,580)
+	hud.add_child(panel)
+	var tuning := ENEMY_TUNING.new()
+	tuning.name = "StageEnemyTuning"
+	tuning.cpp_session = session
+	hud.add_child(tuning)
+	var overlay := PERF_OVERLAY.new()
+	overlay.name = "PerfOverlay"
+	overlay.bridge = session.bridge
+	overlay.view = session.view.get_node("RunPresentation")
+	hud.add_child(overlay)

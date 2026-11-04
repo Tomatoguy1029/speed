@@ -1,0 +1,1706 @@
+{
+  "records": [
+    {
+      "name": "NumericTraitLevel",
+      "section": 30,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "area_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "full_gauge_rate",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "capacity_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "crit_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "attack_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pickup_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "length_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "glide_bonus",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 9
+    },
+    {
+      "name": "PostMaxChargeDefinition",
+      "section": 31,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_time",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxCritDefinition",
+      "section": 32,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "trait_maximum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "trained_bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxMotionDefinition",
+      "section": 33,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "max_speed_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxWeaponPowerDefinition",
+      "section": 34,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "damage_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "followup_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxPickupDefinition",
+      "section": 35,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "xp_radius_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PostMaxDrawDefinition",
+      "section": 36,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "line_length_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ScatterDefinition",
+      "section": 40,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shots",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ScatterPostDefinition",
+      "section": 41,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "RearDefinition",
+      "section": 45,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pierce",
+          "type": "u32"
+        },
+        {
+          "name": "color",
+          "type": "u32"
+        },
+        {
+          "name": "mount_x",
+          "type": "f64"
+        },
+        {
+          "name": "mount_y",
+          "type": "f64"
+        },
+        {
+          "name": "muzzle_distance",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "RearPostDefinition",
+      "section": 46,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BarrierDefinition",
+      "section": 52,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "durability",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "revive",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shell_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BarrierPostDefinition",
+      "section": 53,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "FullChargeDefinition",
+      "section": 56,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "multiplier",
+          "type": "f64",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "RampageDefinition",
+      "section": 58,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "bonus",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "kills",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "half_life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "DuplicatorDefinition",
+      "section": 67,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "chance",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "angle_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle_max",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "EndBlastDefinition",
+      "section": 75,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "secondary_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "secondary_step",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "RunUpDefinition",
+      "section": 78,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "multiplier",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "MinesDefinition",
+      "section": 79,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "u32",
+          "min": 0
+        },
+        {
+          "name": "trigger",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "spread",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "range_min",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "range_max",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual_life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "VortexDefinition",
+      "section": 82,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "kills",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "collapse",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "CritBeamDefinition",
+      "section": 95,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "KnockbackDefinition",
+      "section": 96,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "chance",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "chain_limit",
+          "type": "u32",
+          "max": 2147483646
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "base_damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "base_attack",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "base_knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "base_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ContactWaveDefinition",
+      "section": 200,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "SonicDefinition",
+      "section": 201,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "emit_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "nose",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pulse",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "side_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "ContactArcDefinition",
+      "section": 202,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "chains",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "branches",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "cooldown",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual_life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "KillSonicDefinition",
+      "section": 240,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "equipment",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "kills",
+          "type": "i64"
+        },
+        {
+          "name": "limit",
+          "type": "i64"
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage_decay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "MassTowDefinition",
+      "section": 203,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "capture_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "follow",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "size_ref",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "clump_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visible",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "BipolarDefinition",
+      "section": 204,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "width",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius_factor",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knock",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "min_length",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "visual_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "knockback_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "color",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "InterceptorDefinition",
+      "section": 205,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burst_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "range",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "orbit_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "target_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shot_speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "projectile_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "duration_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "interval_increment",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "burst",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "color",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "DashRangeDroneDefinition",
+      "section": 206,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "min": 1,
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 2
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "tail",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "deploy_distance",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "idle_spacing",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "idle_back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "return_rate",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "area_increment",
+          "type": "f64",
+          "min": 0
+        }
+      ],
+      "version": 2
+    },
+    {
+      "name": "AfterimageDefinition",
+      "section": 207,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "count",
+          "type": "u32",
+          "min": 1,
+          "max": 8
+        },
+        {
+          "name": "total",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0.02,
+          "max": 0.5
+        }
+      ]
+    },
+    {
+      "name": "FlashSlashDefinition",
+      "section": 208,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "weapon",
+          "type": "u32",
+          "ref": "LoadoutDefinition"
+        },
+        {
+          "name": "level",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "cuts",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "streaks",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "multiplier",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "pause",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sweep",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "FriendHitKind": [
+      {
+        "name": "None",
+        "value": "none"
+      },
+      {
+        "name": "Interceptor",
+        "value": "interceptor"
+      }
+    ]
+  }
+}

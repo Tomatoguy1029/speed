@@ -1,0 +1,372 @@
+{
+  "records": [
+    {
+      "name": "BossFlowProgram",
+      "section": 153,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "boss",
+          "type": "u32",
+          "ref": "BossDefinition"
+        },
+        {
+          "name": "maximum_stamina",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "partial_rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "empty_rest",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "idle_only",
+          "type": "bool"
+        },
+        {
+          "name": "allow_parallel",
+          "type": "bool"
+        },
+        {
+          "name": "has_bias",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "BossFlowSection",
+      "section": 154,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "flow",
+          "type": "u32",
+          "ref": "BossFlowProgram"
+        },
+        {
+          "name": "order",
+          "type": "u32"
+        },
+        {
+          "name": "request",
+          "type": "u32",
+          "max": 3
+        },
+        {
+          "name": "cap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "has_budget",
+          "type": "bool"
+        },
+        {
+          "name": "budget",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "action_count",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "action_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "has_timeout",
+          "type": "bool"
+        },
+        {
+          "name": "timeout",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "has_fallback",
+          "type": "bool"
+        },
+        {
+          "name": "fallback",
+          "type": "u32"
+        },
+        {
+          "name": "next",
+          "type": "u32"
+        },
+        {
+          "name": "filter_groups",
+          "type": "bool"
+        },
+        {
+          "name": "filter_allowed",
+          "type": "bool"
+        },
+        {
+          "name": "avoid_repeat",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "BossFlowCondition",
+      "section": 155,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "minimum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "maximum",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "half_angle",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "minimum_phase",
+          "type": "u32",
+          "min": 1
+        }
+      ]
+    },
+    {
+      "name": "BossFlowNode",
+      "section": 156,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "flow",
+          "type": "u32",
+          "ref": "BossFlowProgram"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 4
+        },
+        {
+          "name": "seconds",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "technique",
+          "type": "u32"
+        },
+        {
+          "name": "condition",
+          "type": "u32"
+        },
+        {
+          "name": "participant",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "BossFlowChild",
+      "section": 157,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "parent",
+          "type": "u32",
+          "ref": "BossFlowNode"
+        },
+        {
+          "name": "child",
+          "type": "u32",
+          "ref": "BossFlowNode"
+        },
+        {
+          "name": "order",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "BossFlowAction",
+      "section": 158,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "flow",
+          "type": "u32",
+          "ref": "BossFlowProgram"
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "node",
+          "type": "u32",
+          "ref": "BossFlowNode"
+        },
+        {
+          "name": "condition",
+          "type": "u32",
+          "ref": "BossFlowCondition"
+        },
+        {
+          "name": "category",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "label",
+          "type": "u32",
+          "max": 2
+        },
+        {
+          "name": "group",
+          "type": "string"
+        },
+        {
+          "name": "cost",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "post_gap",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "exclusive",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "BossFlowFilter",
+      "section": 159,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "section",
+          "type": "u32",
+          "ref": "BossFlowSection"
+        },
+        {
+          "name": "kind",
+          "type": "u32",
+          "max": 3
+        },
+        {
+          "name": "value",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "BossFlowWeight",
+      "section": 160,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "section",
+          "type": "u32",
+          "ref": "BossFlowSection"
+        },
+        {
+          "name": "previous",
+          "type": "i64",
+          "min": -1,
+          "max": 3
+        },
+        {
+          "name": "category",
+          "type": "u32",
+          "max": 3
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "BossFlowForbidden",
+      "section": 161,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "section",
+          "type": "u32",
+          "ref": "BossFlowSection"
+        },
+        {
+          "name": "left",
+          "type": "string"
+        },
+        {
+          "name": "right",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

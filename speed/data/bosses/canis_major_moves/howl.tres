@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="BossTechnique" format=3]
 
-[ext_resource type="Script" path="res://scripts/bosses/canis_major/techniques/howl.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_techniques/canis_major/howl.gd" id="1"]
 
 [ext_resource type="PackedScene" path="res://scenes/bosses/canis_major/howl_visual.tscn" id="visual"]
 

@@ -3,9 +3,11 @@
 extends RefCounted
 const TRANSFORM := preload("res://tools/content/visual_transforms.gd")
 
-static func build(output: String) -> Error:
+static func validate() -> Error:
 	var profiles_error: Error = preload("res://tools/content/build_effect_profiles.gd").validate()
 	if profiles_error != OK: return profiles_error
+	var death_error := _validate_elite_death()
+	if death_error != OK: return death_error
 	var burst_error := _validate_burst_noise()
 	if burst_error != OK: return burst_error
 	var mask_error := _validate_landmark_masks()
@@ -14,6 +16,11 @@ static func build(output: String) -> Error:
 	if elite_error != OK: return elite_error
 	var biter_error := _validate_biter_parts()
 	if biter_error != OK: return biter_error
+	return OK
+
+static func build(output: String) -> Error:
+	var validation := validate()
+	if validation!=OK: return validation
 	TRANSFORM._layouts.clear()
 	var palettes: Array[Dictionary] = [{}]
 	for file in DirAccess.get_files_at("res://data/enemies"):
@@ -174,3 +181,13 @@ static func _build_meteor_pieces(output: String) -> Error:
 			piece.set_meta("offset", source.region.get_center() - source.atlas.get_size() * 0.5)
 			frames.set_frame(animation, i, piece)
 	return ResourceSaver.save(frames, output.path_join("meteor_pieces.res"))
+
+static func _validate_elite_death() -> Error:
+	var baked := ResourceLoader.load("res://assets/effects/elite_death/masks.tres","",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if baked == null or baked.get_meta("bake_version",0)!=2: return ERR_INVALID_DATA
+	for group in ["inputs","outputs"]:
+		for path: String in baked.get_meta(group,{}):
+			if not FileAccess.file_exists(path) or FileAccess.get_sha256(path)!=baked.get_meta(group)[path]:
+				push_error("撃破マスクをtools/art/bake_elite_death.pyでベイクしてください: "+path)
+				return ERR_INVALID_DATA
+	return OK

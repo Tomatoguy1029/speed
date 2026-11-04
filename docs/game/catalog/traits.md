@@ -6,24 +6,24 @@
 
 | No. | 名称 | 発動・効果 | ルートへの影響 | 参照先 | 未決事項 |
 |---|---|---|---|---|---|
-| No.01 | 快進撃 | 1回のブーストで倒した数が多いほど、次のブーストまですべての攻撃の威力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T33_rampage.tres`、`scripts/traits/rampage.gd` | 英語・素材・見た目は確認待ち |
+| No.01 | 快進撃 | 1回のブーストで倒した数が多いほど、次のブーストまですべての攻撃の威力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T33_rampage.tres`、`scripts/traits/rampage.gd`。C++ランは `cpp/behaviors/traits/rampage.cpp` が撃破数・終了後の倍率と減衰・復帰を扱い、表示は `scripts/render/equipment/rampage.gd` が受け持つ | 英語・素材・見た目は確認待ち |
 | No.02 | チェインショック | ブースト中に一定数倒すたびに、倒した敵から衝撃波が出て連鎖する。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T05_killSonic.tres`、`scripts/traits/killSonic.gd` | 英語・素材・見た目は確認待ち |
 | No.03 | 大容量チャージ | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。 | 能力値を伸ばす | `data/traits/T08_capacity.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.04 | 軌跡延長 | 描ける線の長さが伸びる。 | 能力値を伸ばす | `data/traits/T14_length.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.05 | ギアアップ | ブースト中、進むほど攻撃力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T04_fullCharge.tres`、`scripts/traits/fullCharge.gd` | 英語・素材・見た目は確認待ち |
-| No.06 | クリティカルランス | クリティカルのたびに、光の槍が前へ貫く。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T06_critBeam.tres`、`scripts/traits/critBeam.gd`、`scripts/attacks/light_lances.gd` | 英語・素材・見た目は確認待ち |
+| No.05 | ギアアップ | ブースト中、進むほど攻撃力が上がる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T04_fullCharge.tres`、`scripts/traits/fullCharge.gd`。C++ランは `cpp/behaviors/traits/fullCharge.cpp` が距離係数・発進と終了・命中直前の倍率・復帰を扱い、表示は `scripts/render/equipment/fullCharge.gd` が受け持つ | 英語・素材・見た目は確認待ち |
+| No.06 | クリティカルランス | クリティカルのたびに、光の槍が前へ貫く。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T06_critBeam.tres`、`scripts/traits/critBeam.gd`、`scripts/attacks/light_lances.gd`。C++ランは `cpp/behaviors/traits/critBeam.cpp` が会心時のラン秒クールダウンから共通の光の槍を発動し、表示の実秒と世界秒の寿命を別々に保持する | 英語・素材・見た目は確認待ち |
 | No.07 | 急所見切り | クリティカルが出やすくなる。 | 能力値を伸ばす | `data/traits/T09_critRate.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.08 | 助走 | 最初の敵に当たるまでの距離が長いほど、強い一撃と範囲攻撃になる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T32_runUp.tres`、`scripts/traits/runUp.gd` | 英語・素材・見た目は確認待ち |
-| No.09 | エンドホール | ブーストが終わると機体を中心に重力が生まれ、周りの敵を引きずり込む。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T03_vortex.tres`、`scripts/traits/vortex.gd` | 英語・素材・見た目は確認待ち |
+| No.08 | 助走 | 最初の敵に当たるまでの距離が長いほど、強い一撃と範囲攻撃になる。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T32_runUp.tres`、`scripts/traits/runUp.gd`。C++ランは `cpp/behaviors/traits/runUp.cpp` が最初の接触までの助走倍率と実際の減少HPに応じた範囲攻撃を扱う | 英語・素材・見た目は確認待ち |
+| No.09 | エンドホール | ブーストが終わると機体を中心に重力が生まれ、周りの敵を引きずり込む。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T03_vortex.tres`、`scripts/traits/vortex.gd`。C++ランは `cpp/behaviors/traits/vortex.cpp` が追従する渦・一度だけの命中・捕捉・回復と表示の残留列を保持する | 英語・素材・見た目は確認待ち |
 | No.10 | 急速充填 | ゲージがたまるのが速くなる。 | 能力値を伸ばす | `data/traits/T07_quickCharge.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.11 | 大振り | すべての攻撃の範囲が広がる。 | 能力値を伸ばす | `data/traits/T34_bigSwing.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.12 | 最高速度 | 最高速度が上がる。 | 能力値を伸ばす | `data/traits/T10_speed.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.13 | 慣性航行 | ブーストのあとの高速と減速の時間が延びる。 | 能力値を伸ばす | `data/traits/T31_glideDuration.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.14 | マルチショット | すべての射撃の弾数が増える。 | 能力値を伸ばす | `data/traits/T35_multiShot.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.15 | フルバースト | ゲージが満タンの間、射撃の連射が上がる。 | 能力値を伸ばす | `data/traits/T36_fullBurst.tres`、`scripts/traits/fullBurst.gd` | 英語・素材・見た目は確認待ち |
+| No.15 | フルバースト | ゲージが満タンの間、射撃の連射が上がる。 | 能力値を伸ばす | `data/traits/T36_fullBurst.tres`、`scripts/traits/fullBurst.gd`。C++ランは `cpp/behaviors/traits/fullBurst.cpp` が満充填への移行を保持し、共通の射撃倍率と表示へ渡す | 英語・素材・見た目は確認待ち |
 | No.16 | 攻撃力 | すべての攻撃の威力が上がる。 | 能力値を伸ばす | `data/traits/T11_attack.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
 | No.17 | 広域回収 | アイテムを拾える範囲が広がる。 | 能力値を伸ばす | `data/traits/T12_pickup.tres`、`LoadoutSystem` | 英語・素材・見た目は確認待ち |
-| No.18 | デュプリケーター | 弾・破片・光の槍の生成時に、元の攻撃ごとに確率で複製を2つ加える。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T37_duplicator.tres`、`scripts/runtime/systems/loadout_system.gd`、`scripts/runtime/systems/projectile_system.gd`、`scripts/attacks/light_lances.gd`、`scripts/render/equipment/duplicator.gd` | 英語・素材・見た目は確認待ち |
+| No.18 | デュプリケーター | 弾・破片・光の槍の生成時に、元の攻撃ごとに確率で複製を2つ加える。 | 条件に合う経路や攻撃を選ぶ | `data/traits/T37_duplicator.tres`、`scripts/runtime/systems/loadout_system.gd`、`scripts/runtime/systems/projectile_system.gd`、`scripts/attacks/light_lances.gd`、`scripts/render/equipment/duplicator.gd`。C++ランは `cpp/behaviors/traits/duplicator.cpp` が通常の味方攻撃の出生列・複製情報・予約上限を扱う | 英語・素材・見た目は確認待ち |
 
 ### 発動条件と倍率
 
@@ -32,7 +32,7 @@
 - チェインショックはブースト中の撃破を、衝撃波による撃破も含めて数える。規定数ごとに倒れた敵から波を出し、連鎖ごとに半径と威力を減らす。上限はLv別の配列に従う。波と命中候補の配列を再利用し、更新開始時の波だけを進める。命中中に増えた波は次の更新から進める。
 - クリティカルランスの待機列は発射順に位置を進めて消費し、未処理数で同時数上限を判定する。槍の寿命は配列内で順序を保って整理する。
 - 快進撃はブースト中の撃破数から、終了後の全攻撃の倍率を求める。`T33_rampage.tres` の `kills` で最大効果に達し、`half_life` の時間ごとに強化分が半分になる。次のブーストの開始時に解除する。
-- エンドホールは機体と一緒に動く。重力レンズの歪みは円形の範囲に収め、外周へ近づくほど弱める。倒しきれる通常敵を引き込み、倒しきれない敵とボスへはダメージを与える。消えた瞬間、そこで倒した数を `T03_vortex.tres` のLv別の `kills_by_level` で割り、ゲージを基本容量までの範囲で戻す。回復時の光と粒は `scripts/render/equipment/vortex.gd` がブーストゲージの通常色で描く。渦と命中候補の配列を再利用し、捕獲用データは倒しきれる通常敵だけに作る。
+- エンドホールは機体と一緒に動く。重力レンズの歪みは円形の範囲に収め、外周へ近づくほど弱める。倒しきれる通常敵を引き込み、倒しきれない敵とボスへはダメージを与える。消えた瞬間、そこで倒した数を `T03_vortex.tres` のLv別の `kills_by_level` で割り、ゲージを基本容量までの範囲で戻す。回復時の光と粒は `scripts/render/equipment/vortex.gd` がブーストゲージの通常色で描く。図鑑の固定実演 `data/codex/vortex.res` も同じ色を使い、内側の光は白へ近づける。渦と命中候補の配列を再利用し、捕獲用データは倒しきれる通常敵だけに作る。
 - 大振りはすべての攻撃範囲へ掛ける。マルチショットは射撃武器の基準弾数へ掛け、端数を確率で加える。増えた弾は扇に並べる。
 - フルバーストはゲージが基本容量以上の間、ゲージ量に応じて射撃頻度を上げる。容量を増やした分も使う。
 - デュプリケーターは元の射撃弾・牽引船体・星屑・光の槍について、生成時に個体ごとに1回発動を抽選する。星砕きなどの星屑は一束の元の破片を生成してから、各片を抽選する。成功すると元の攻撃を保ち、同じ生成位置から左右へ複製を2つ加える。角度と速さをばらつかせ、威力を減らす。抽選対象は元の攻撃だけとし、複製はそのまま飛ばす。Lv別の確率と、元の威力に対する各複製の倍率は `T37_duplicator.tres` の `chance_by_level`・`damage_by_level` に従う。光の槍は生成位置から元と同じ長さを持つ。複製も同時数の共通上限と星屑の上限に従い、命中履歴を独立して持つ。

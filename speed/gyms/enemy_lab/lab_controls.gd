@@ -66,7 +66,7 @@ func _appearance(page: Node) -> void:
 	_appearance_angle = _number(page, tr("lab.appearance.rotation"), 0, -180, 180, 5, _rotate_appearance)
 	_appearance_reset = _button(page, tr("lab.appearance.restore_saved"), _restore_appearance)
 	_appearance_save = _button(page, tr("lab.appearance.save_type"), _save_appearance)
-	var paint_box := UI.fold(page, tr("lab.armor.title"), true)
+	var paint_box = UI.fold(page, tr("lab.armor.title"), true)
 	_text(paint_box, tr("lab.armor.help"))
 	_armor_part = OptionButton.new()
 	_armor_part.add_item(tr("lab.armor.upper"))
@@ -75,7 +75,7 @@ func _appearance(page: Node) -> void:
 	paint_box.add_child(_armor_part)
 	var paint_row := HBoxContainer.new()
 	paint_box.add_child(paint_row)
-	var paint_label := _text(paint_row, tr("lab.armor.color"))
+	var paint_label = _text(paint_row, tr("lab.armor.color"))
 	paint_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_armor_color = ColorPickerButton.new()
 	_armor_color.color = Color("#cba36e")
@@ -105,16 +105,13 @@ func _open_boss_parts() -> void:
 		existing.grab_focus()
 		return
 	lab.session.playing = false
-	var owner: BossActor
-	for actor in lab.session.run.bosses.actors:
-		if actor.has_body() and actor.def.id == &"monoceros":
-			owner = actor
-			break
-	if owner == null:
-		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260, 0)
-		lab.session.perform("boss", {"type": "monoceros", "pos": [point.x, point.y]})
+	var table = lab.session.run.enemies.table
+	var row: int = table.type.find(&"monoceros")
+	if row < 0:
+		var point: Vector2 = lab.session.run.state.ship_pos + Vector2(260,0)
+		lab.session.perform("boss",{"type":"monoceros","pos":[point.x,point.y]})
 	else:
-		lab.session.selected = owner.body
+		lab.session.selected = row
 	_focus_appearance()
 	var editor := BOSS_PARTS.new()
 	editor.name = "BossPartsEditor"
@@ -140,17 +137,11 @@ func _paint_armor_piece(region: int, restore: bool) -> void:
 	if colors == def.armor_colors:
 		return
 	lab.session.perform("armor_paint", {"type": String(_appearance_type), "colors": colors})
-	var render := _render()
-	if render != null:
-		render._apply_lighting()
 
 func _set_visual(value: float, key: String) -> void:
 	if _appearance_type == &"":
 		return
 	lab.session.perform("parameter", {"type": String(_appearance_type), "key": "visual." + key, "value": value})
-	var render := _render()
-	if render != null:
-		render._apply_lighting()
 
 ## 実験場の表示付きのランの描画（表示のない試行では null）。
 func _render() -> RunPresentation:
@@ -163,8 +154,8 @@ func _sync_appearance() -> void:
 	if _committing_appearance: return
 	_appearance_pending.text = tr("lab.appearance.pending_count").format({"count": _pending_appearances().size()})
 	var row: int = lab.session.selected
-	var table: EnemyTable = lab.session.run.enemies.table
-	var supported := row >= 0 and table.is_boss[row] == 0 and table.meteor_index[row] < 0 and table.type[row] not in [&"iron", &"saw"]
+	var table: Dictionary = lab.session.run.enemies.table
+	var supported = row >= 0 and table.is_boss[row] == 0 and table.meteor_index[row] < 0 and table.type[row] not in [&"iron", &"saw"]
 	var type: StringName = table.type[row] if supported else &""
 	var switched := _appearance_type != type
 	_appearance_type = type
@@ -184,7 +175,7 @@ func _sync_appearance() -> void:
 		return
 	var def: EnemyDef = lab.session.run.enemies.def_of(type)
 	var original: EnemyDef = ContentManager.enemies[type]
-	var look := RunPresentation.load_look(type, lab.session.run.state.stage)
+	var look = RunPresentation.load_look(type, lab.session.run.state.stage)
 	_armor_part.visible = look != null and look.split_other != null
 	if switched:
 		_armor_part.select(0)
@@ -319,7 +310,7 @@ func _focus_appearance() -> void:
 	if not is_instance_valid(lab.session.run):
 		return
 	var i: int = lab.session.selected
-	var table: EnemyTable = lab.session.run.enemies.table
+	var table: Dictionary = lab.session.run.enemies.table
 	if i < 0 or i >= table.alive.size() or not table.alive[i] or table.dead[i]:
 		lab._messages.text = tr("lab.appearance.select_enemy")
 		return
@@ -328,7 +319,7 @@ func _focus_appearance() -> void:
 	lab.canvas.follow = false
 	lab.canvas.center = table.pos[i]
 	var available: float = maxf(40.0, minf(lab.canvas.size.x, lab.canvas.size.y) - 80.0)
-	lab.canvas.zoom = minf(8.0, available / maxf(1.0, _render().enemy_sprite_radius(table.type[i], table.r[i]) * 2.0 * sqrt(2.0)))
+	lab.canvas.zoom = minf(8.0, available / maxf(1.0, _appearance_radius(table.type[i], table.r[i]) * 2.0 * sqrt(2.0)))
 	lab.canvas.show_ranges = false
 	lab.canvas.show_ids = false
 	lab.canvas.selection.assign([table.id[i]])
@@ -336,11 +327,19 @@ func _focus_appearance() -> void:
 	lab._sync_view()
 	lab._refresh()
 
+func _appearance_radius(type: StringName, collision_radius: float) -> float:
+	var run = lab.session.run
+	var definition: EnemyDef = run.enemies.def_of(type)
+	var look := RunPresentation.load_look(type,run.state.stage)
+	var radius := collision_radius/(definition.visual_value("collision_scale",1.0) if definition!=null else 1.0)
+	if look==null or look.size_from_collision: return radius
+	return maxf(look.base.get_width(),look.base.get_height())*0.5*radius/maxf(definition.radius if definition!=null else radius,0.001)
+
 func _rotate_appearance(degrees: float) -> void:
 	if not is_instance_valid(lab.session.run):
 		return
 	var i: int = lab.session.selected
-	var table: EnemyTable = lab.session.run.enemies.table
+	var table: Dictionary = lab.session.run.enemies.table
 	if i >= 0 and i < table.alive.size() and table.alive[i] and not table.dead[i]:
 		lab.session.playing = false
 		lab.session.perform("move", {"id": table.id[i], "pos": [table.pos[i].x, table.pos[i].y], "angle": deg_to_rad(degrees)})
@@ -385,18 +384,18 @@ func _button(parent: Node, title: String, action: Callable) -> Button:
 
 func _conditions(page: Node) -> void:
 	lab.workspace.environment(page)
-	var box := UI.fold(page, tr("lab.ui.player"), true)
+	var box = UI.fold(page, tr("lab.ui.player"), true)
 	var invincible := CheckButton.new()
 	invincible.text = TranslationServer.translate("lab.message_9e4c412d75")
 	invincible.button_pressed = true
 	invincible.toggled.connect(func(value): lab.session.perform("invincible", {"value": value}))
 	box.add_child(invincible)
 	_ship_level = _number(box, tr("lab.ship_level"), 1, 1, 1000, 1, func(value): lab.session.perform("level", {"value": int(value)}))
-	var gauge := _number(box, TranslationServer.translate("lab.message_d79714f205"), 1, 0, 1, 0.05)
+	var gauge = _number(box, TranslationServer.translate("lab.message_d79714f205"), 1, 0, 1, 0.05)
 	_button(box, TranslationServer.translate("lab.message_cdff100dfe"), func(): lab.session.perform("ship", {"pos": [lab.canvas.center.x, lab.canvas.center.y], "gauge": gauge.value}))
 	_formations(page)
 	box = UI.fold(page, tr("lab.ui.stage_time"))
-	var time := _number(box, TranslationServer.translate("lab.message_c66777f550"), 0, 0, 10000, 1)
+	var time = _number(box, TranslationServer.translate("lab.message_c66777f550"), 0, 0, 10000, 1)
 	_button(box, TranslationServer.translate("lab.message_54036730a6"), func(): lab.session.perform("time", {"value": time.value}))
 	var phase_set := OptionButton.new()
 	phase_set.add_item(TranslationServer.translate("lab.message_568b393d89"))
@@ -408,7 +407,7 @@ func _conditions(page: Node) -> void:
 			ids = ["build1", "pressure", "build2", "rampage", "tension", "escape"]
 		else:
 			for suffix in ["early", "mid", "late"]:
-				var id := "s%d_%s" % [int(lab.session.spec.stage), suffix]
+				var id = "s%d_%s" % [int(lab.session.spec.stage), suffix]
 				if ContentManager.phases.has(StringName(id)): ids.append(id)
 		lab.session.perform("phase_set", {"ids": ids}))
 	box = UI.fold(page, tr("lab.ui.player_stats"))
@@ -420,7 +419,7 @@ func _conditions(page: Node) -> void:
 	for id in ContentManager.meta_upgrades:
 		meta.add_item(String(id))
 		meta.set_item_metadata(meta.item_count - 1, String(id))
-	var meta_level := _number(box, TranslationServer.translate("lab.message_761cc8db45"), 0, 0, 100)
+	var meta_level = _number(box, TranslationServer.translate("lab.message_761cc8db45"), 0, 0, 100)
 	_button(box, TranslationServer.translate("lab.message_c2080e1bd3"), func(): lab.session.perform("meta", {"id": meta.get_item_metadata(meta.selected), "level": int(meta_level.value)}))
 	var kind := OptionButton.new()
 	kind.add_item(TranslationServer.translate("lab.message_6f0f16e0c0"))
@@ -435,7 +434,7 @@ func _conditions(page: Node) -> void:
 			definitions.set_item_metadata(definitions.item_count - 1, String(def.id))
 	kind.item_selected.connect(fill)
 	fill.call(0)
-	var level := _number(box, TranslationServer.translate("lab.message_5c146b19a7"), 1, 1, 100)
+	var level = _number(box, TranslationServer.translate("lab.message_5c146b19a7"), 1, 1, 100)
 	_button(box, TranslationServer.translate("lab.message_030e3f7f9b"), func(): lab.session.perform("loadout", {"kind": "weapon" if kind.selected == 0 else "trait", "id": definitions.get_item_metadata(definitions.selected), "level": int(level.value)}))
 	_button(box, TranslationServer.translate("lab.message_c1f482ed04"), func(): lab.session.perform("loadout", {"reset": true}))
 	var heroes := OptionButton.new()
@@ -455,7 +454,7 @@ func _conditions(page: Node) -> void:
 
 ## 敵の組み合わせ（res://data/formations/*.tscn）の配置と出現位置を選んで、機体のまわりに並べる。
 func _formations(page: Node) -> void:
-	var box := UI.fold(page, tr("lab.ui.formation"))
+	var box = UI.fold(page, tr("lab.ui.formation"))
 	var files := OptionButton.new()
 	var layouts := OptionButton.new()
 	var entries := OptionButton.new()
@@ -498,9 +497,11 @@ func _attacks(box: Node) -> void:
 	_attack_budget = _number(box, TranslationServer.translate("lab.message_f4a90d8530"), 4, 0, 100, 0.25, func(value): _settings.budget = value; _apply_director())
 	_number(box, tr("lab.attack.jitter"), 0.3, 0, 3, 0.05, func(value): _settings.jitter = value; _apply_director())
 	# 通常敵の攻撃の重さ（種類ごと。正の値だけ予算管理へ入る）
-	var heavy := UI.fold(box, tr("lab.attack.danger"))
+	var heavy = UI.fold(box, tr("lab.attack.danger"))
+	# 分類は固定の表示用定義。ランを生成する前の画面構築でも使う。
+	var director := preload("res://scripts/runtime/run_read_model.gd").Values.new()
 	for def in ContentManager.sorted(ContentManager.enemies):
-		if preload("res://scripts/encounters/attack_director.gd").BEHAVIORS.has(String(def.behavior)):
+		if not director.categories(def.behavior).is_empty():
 			_number(heavy, "%s %s" % [def.display_name, def.id], def.attack_weight, 0, 20, 0.25,
 				func(value): lab.session.perform("parameter", {"type": String(def.id), "key": "attack_weight", "value": value}))
 	var meter = load("res://gyms/enemy_lab/lab_attack_meter.gd").new()
@@ -516,11 +517,11 @@ func _apply_director() -> void:
 
 func _spawns(box: Node) -> void:
 	box.tooltip_text = tr("lab.message_dc8d5ae40c")
-	var start := _number(box, TranslationServer.translate("lab.message_5fdbd8f764"), 0, 0, 3600, 0.1)
-	var end := _number(box, TranslationServer.translate("lab.message_51b9d6157a"), 30, 0, 3600, 0.1)
-	var interval := _number(box, TranslationServer.translate("lab.message_274c228534"), 2, 0.1, 300, 0.1)
-	var probability := _number(box, tr("lab.spawn_probability"), 1, 0, 1, 0.05)
-	var radius := _number(box, tr("lab.spawn_radius"), 0, 0, 2000, 10)
+	var start = _number(box, TranslationServer.translate("lab.message_5fdbd8f764"), 0, 0, 3600, 0.1)
+	var end = _number(box, TranslationServer.translate("lab.message_51b9d6157a"), 30, 0, 3600, 0.1)
+	var interval = _number(box, TranslationServer.translate("lab.message_274c228534"), 2, 0.1, 300, 0.1)
+	var probability = _number(box, tr("lab.spawn_probability"), 1, 0, 1, 0.05)
+	var radius = _number(box, tr("lab.spawn_radius"), 0, 0, 2000, 10)
 	var entries := ItemList.new()
 	_spawn_entries = entries
 	entries.custom_minimum_size.y = 140
@@ -553,11 +554,11 @@ func _spawns(box: Node) -> void:
 	_button(box, TranslationServer.translate("lab.message_0113c8102f"), func(): lab.session.perform("schedule", {"entries": []}))
 
 func _patterns(page: Node) -> void:
-	var box := UI.fold(page, tr("lab.ui.route_settings"))
+	var box = UI.fold(page, tr("lab.ui.route_settings"))
 	draw_seconds = _number(box, TranslationServer.translate("lab.message_d144e6855f"), 0.5, 0.05, 20, 0.05)
 	margin = _number(box, TranslationServer.translate("lab.message_2fcfd99d3b"), 20, 0, 1000, 1)
 	exit_clearance = _number(box, tr("lab.exit_clearance"), 0, 0, 1000, 10, func(value): lab.canvas.exit_clearance = value; lab.canvas.result.clear())
-	var spacing := _number(box, tr("lab.min_spacing"), 0, 0, 1000, 10)
+	var spacing = _number(box, tr("lab.min_spacing"), 0, 0, 1000, 10)
 	window_seconds = _number(box, TranslationServer.translate("lab.message_e10ded50d8"), 0, 0, 20, 0.1)
 	_button(box, TranslationServer.translate("lab.message_f7df32cd04"), lab._validate_route)
 	_button(box, TranslationServer.translate("lab.message_fb60080a99"), lab._evaluate)
@@ -575,7 +576,7 @@ func _patterns(page: Node) -> void:
 	box.add_child(result_list)
 	result_list.item_selected.connect(lab._select_comparison)
 	box = UI.fold(page, tr("lab.ui.pattern_settings"), true)
-	var jitter := _number(box, TranslationServer.translate("lab.message_0a50b49bd2"), 60, 0, 1000)
+	var jitter = _number(box, TranslationServer.translate("lab.message_0a50b49bd2"), 60, 0, 1000)
 	_button(box, TranslationServer.translate("lab.message_4855e0d71e"), func():
 		lab.canvas.finish_route()
 		lab.pattern = lab.generator.capture(lab.session, lab.canvas.route, jitter.value, margin.value)
@@ -590,8 +591,8 @@ func _patterns(page: Node) -> void:
 	roles.add_item(TranslationServer.translate("lab.message_facbd979fc"))
 	roles.add_item(TranslationServer.translate("lab.message_098b17ccc2"))
 	box.add_child(roles)
-	var min_count := _number(box, TranslationServer.translate("lab.message_1dafdf40bb"), 1, 0, 100)
-	var max_count := _number(box, TranslationServer.translate("lab.message_482249e12a"), 1, 0, 100)
+	var min_count = _number(box, TranslationServer.translate("lab.message_1dafdf40bb"), 1, 0, 100)
+	var max_count = _number(box, TranslationServer.translate("lab.message_482249e12a"), 1, 0, 100)
 	_button(box, TranslationServer.translate("lab.message_21716b1b31"), func():
 		var index: int = lab.canvas.selected_region
 		if index < 0 or index >= lab.pattern.get("regions", []).size(): return
@@ -601,9 +602,9 @@ func _patterns(page: Node) -> void:
 		region.min_count = int(min_count.value)
 		region.max_count = maxi(int(min_count.value), int(max_count.value))
 		lab.canvas.queue_redraw())
-	var rotation := _number(box, TranslationServer.translate("lab.message_6ffb4b865c"), 180, 0, 180)
-	var min_scale := _number(box, TranslationServer.translate("lab.message_2abddd7072"), 0.8, 0.1, 1, 0.05)
-	var min_fodder := _number(box, TranslationServer.translate("lab.message_66086de6d6"), 1, 0, 10000)
+	var rotation = _number(box, TranslationServer.translate("lab.message_6ffb4b865c"), 180, 0, 180)
+	var min_scale = _number(box, TranslationServer.translate("lab.message_2abddd7072"), 0.8, 0.1, 1, 0.05)
+	var min_fodder = _number(box, TranslationServer.translate("lab.message_66086de6d6"), 1, 0, 10000)
 	_button(box, TranslationServer.translate("lab.message_d8cfb525ed"), func():
 		if lab.pattern.is_empty(): lab._messages.text = TranslationServer.translate("lab.message_a19b200d4f"); return
 		lab.pattern.rotation = deg_to_rad(rotation.value)
@@ -649,7 +650,7 @@ func _files(box: Node) -> void:
 func sync_from_session() -> void:
 	if not is_instance_valid(lab.session.run): return
 	_sync_appearance()
-	var run: RunSimulation = lab.session.run
+	var run = lab.session.run
 	for key in _condition_fields:
 		var box: SpinBox = _condition_fields[key]
 		if not box.get_line_edit().has_focus() and not is_equal_approx(box.value, float(run.cfg.get(key))): box.set_value_no_signal(float(run.cfg.get(key)))
@@ -660,7 +661,7 @@ func sync_from_session() -> void:
 	_attack_meter.queue_redraw()
 	_settings = director.settings.duplicate(true)
 	_settings["enabled"] = director.enabled
-	var schedule_hash := hash(var_to_bytes(lab.session.schedule))
+	var schedule_hash = hash(var_to_bytes(lab.session.schedule))
 	if _schedule_hash != schedule_hash:
 		_schedule_hash = schedule_hash
 		var indices := _spawn_entries.get_selected_items()

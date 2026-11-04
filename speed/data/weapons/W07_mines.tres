@@ -6,8 +6,8 @@
 script = ExtResource("1")
 level_steps = PackedInt32Array(1, 3, 5, 6, 8)
 params = {
-"count_by_level": [10, 14, 14, 18, 24],
-"damage_by_level": [1.8, 1.95, 2.1, 2.25, 2.4],
+"count_by_level": [10, 12, 12, 15, 18],
+"damage_by_level": [1.0, 1.05, 1.1, 1.15, 1.2],
 "radius_by_level": [110.0, 110.0, 110.0, 110.0, 145.0],
 "life_by_level": [4.0, 4.0, 4.0, 6.0, 6.0],
 "max": 60,

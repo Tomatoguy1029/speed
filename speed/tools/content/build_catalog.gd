@@ -31,13 +31,14 @@ static func build(output := "res://data/content_catalog.tres") -> Error:
 				var paths := {}
 				var dependencies = load("res://tools/content/build_stage_resources.gd")
 				dependencies._add(paths, path)
-				dependencies._script(paths, "res://scripts/%s/%s.gd" % [category, entry.code_id])
 				dependencies._script(paths, "res://scripts/render/equipment/%s.gd" % entry.code_id)
 				entry.resources = PackedStringArray(paths.keys())
 				entry.resources.sort()
+				for resource_path in entry.resources:
+					hashes.append(resource_path+":"+FileAccess.get_sha256(resource_path))
 			catalog.entries.append(entry)
 	catalog.source_signature = "\n".join(hashes).sha256_text()
 	if FileAccess.file_exists(output):
-		var previous := load(output) as ContentCatalog
+		var previous := ResourceLoader.load(output,"",ResourceLoader.CACHE_MODE_IGNORE) as ContentCatalog
 		if previous != null and previous.source_signature == catalog.source_signature: return OK
 	return ResourceSaver.save(catalog, output)

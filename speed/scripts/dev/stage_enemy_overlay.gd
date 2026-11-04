@@ -3,7 +3,9 @@ extends PanelContainer
 
 const PANEL := preload("res://scripts/dev/stage_enemy_panel.gd")
 static var saved_rect := Rect2()
-var run: RunSimulation
+var cpp_session: RunSession
+var content_edit: RefCounted
+var _display_epoch := -1
 var panel: Control
 var _mode := ""
 var _start_rect := Rect2()
@@ -57,11 +59,29 @@ func _ensure_contents() -> void:
 	header.add_child(close)
 	panel = PANEL.new()
 	panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	panel.bind_run(run.state.stage, run.cfg, run.enemies.stage_tuning)
+	if cpp_session!=null:
+		content_edit = load("res://scripts/dev/run_content_edit.gd").for_session(cpp_session)
+		if not content_edit.error.is_empty():
+			var problem := Label.new()
+			problem.text = content_edit.error
+			problem.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			box.add_child(problem)
+			panel.free()
+			panel = problem
+			content_edit = null
+			return
+		panel.definition_source = func(id): return content_edit.definitions[StringName(id)] if content_edit.definitions.has(StringName(id)) else PANEL.IO.definition(id)
+		panel.bind_run(content_edit.source,content_edit.config,content_edit.values)
 	box.add_child(panel)
-	panel.tuning_changed.connect(func(values): run.enemies.update_stage_tuning(values))
-	panel.saved.connect(func(stage):
-		run.state.emit(&"enemy_tuning_saved", {"path": panel.stage_path, "values": stage.enemy_tuning.duplicate(true)}))
+	panel.tuning_changed.connect(func(values):
+		if cpp_session!=null:
+			var applied: Dictionary = content_edit.apply(values)
+			if not applied.ok: panel._status.text = applied.message
+)
+	panel.saved.connect(func(_stage):
+		if cpp_session!=null:
+			var notified: Dictionary = content_edit.notify_saved(panel.stage_path)
+			if not notified.ok: panel._status.text = "保存済み / 通知失敗: "+notified.message)
 	_grip = Control.new()
 	_grip.top_level = true
 	_grip.size = Vector2(22, 22)
@@ -72,6 +92,16 @@ func _ensure_contents() -> void:
 		for n in [6, 11, 16]: _grip.draw_line(Vector2(n, 20), Vector2(20, n), Color("#a7b8cc"), 1.0))
 	add_child(_grip)
 	_fit.call_deferred()
+
+func _process(_delta: float) -> void:
+	if not visible or cpp_session==null or cpp_session.bridge==null or panel==null or content_edit==null: return
+	var frame: Dictionary = cpp_session.bridge.read_frame()
+	if not frame.ok or frame.value.epoch==_display_epoch: return
+	_display_epoch = frame.value.epoch
+	if content_edit.sync_values():
+		panel.values = content_edit.values.duplicate(true)
+		panel._refresh_rows()
+		panel._changed()
 
 func _exit_tree() -> void:
 	if _placed: _remember()

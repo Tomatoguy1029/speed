@@ -10,6 +10,7 @@ extends EditorPlugin
 const Timeline := preload("res://addons/spawn_timeline/timeline.gd")
 const TypeChecks := preload("res://addons/spawn_timeline/type_checks.gd")
 const FormationPaths := preload("res://tools/editor/formation_uid_paths.gd")
+const Request := preload("res://addons/stage_launcher/launch_request.gd")
 const TITLE := "出現タイムライン"
 const MENU_LABEL := "出現タイムライン・編成"
 
@@ -109,8 +110,31 @@ func _has_main_screen() -> bool:
 func _build() -> bool:
 	FormationPaths.sync()
 	var error: Error = load("res://addons/content_build/builder.gd").build_all()
+	if error == OK: error = prepare_timeline_request()
 	if error != OK: push_error("実行用データの生成に失敗: %s" % error_string(error))
 	return error == OK
+
+## 編集の保存と生成は分ける。起動直前には保存済みSourceだけを読み直す。
+static func prepare_timeline_request(output := "res://.content") -> Error:
+	var pending := Request.pending_timeline()
+	if pending.is_empty(): return OK
+	var error := Request.set_timeline_content({})
+	if error != OK: return error
+	if not pending.stage is int or pending.stage <= 0 or not (pending.time is float or pending.time is int) or not is_finite(float(pending.time)) or pending.time < 0 or not pending.source is String or not ResourceLoader.exists(pending.source): return ERR_INVALID_DATA
+	var source := ResourceLoader.load(pending.source,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
+	if source == null or source.index != pending.stage: return ERR_INVALID_DATA
+	var config := ResourceLoader.load("res://data/config.tres","",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as GameConfig
+	var path := output.path_join("run/stage_%d.json" % source.index)
+	# 新しい索引が完成しないかぎり、前回の生成結果を起動へ渡さない。
+	if FileAccess.file_exists(path):
+		error = DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+		if error != OK: return error
+	error = load("res://addons/content_build/builder.gd").build_cpp_stage(source,config,output)
+	if error != OK: return error
+	if not FileAccess.file_exists(path): return ERR_CANT_CREATE
+	var index: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not index is Dictionary or not index.get("input_sha256",null) is String: return ERR_INVALID_DATA
+	return Request.set_timeline_content({"index":path,"signature":index.input_sha256})
 
 func _on_property_edited(_property: String) -> void:
 	_queue_phase_save()

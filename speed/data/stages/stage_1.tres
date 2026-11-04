@@ -293,7 +293,7 @@ display_name = "新しい時間帯"
 [sub_resource type="Resource" id="Curve_biter"]
 script = ExtResource("curve")
 type = &"biter"
-points = PackedVector2Array(0, 18, 14, 100, 29, 175, 45, 110, 58, 230, 68, 110, 87, 247, 90, 85, 107, 147, 120, 85, 133, 280, 143, 140, 161, 324, 166, 77, 188, 170, 195, 101, 200, 383, 218, 160, 230, 330, 240, 85, 263, 190, 270, 105, 278, 387, 293, 180, 312, 328, 315, 81, 323, 190, 339, 182, 345, 85, 350, 407, 368, 200, 387, 440, 391, 137, 415, 161, 420, 220, 428, 408, 451, 220, 476, 428, 480, 90, 490, 0, 600.9, 0, 601, 402)
+points = PackedVector2Array(0, 18, 14, 100, 29, 175, 45, 110, 58, 230, 68, 110, 87, 247, 90, 85, 107, 147, 120, 85, 133, 280, 143, 140, 161, 324, 166, 77, 188, 170, 195, 101, 200, 383, 218, 160, 230, 330, 240, 85, 263, 190, 270, 105, 283, 275, 293, 180, 312, 275, 315, 81, 327, 107, 336, 132, 345, 85, 352, 275, 368, 76, 384, 321, 391, 137, 415, 161, 420, 220, 428, 408, 451, 220, 476, 428, 480, 90, 490, 0, 600.9, 0, 601, 402)
 
 [sub_resource type="Resource" id="Curve_bomber"]
 script = ExtResource("curve")
@@ -318,8 +318,8 @@ phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource(
 enemies = Array[StringName]([&"biter", &"bomber", &"splitter", &"splitling", &"pulser", &"shield", &"pump", &"marlin", &"triangle", &"triangle_star"])
 enemy_tuning = {
 "biter": {
-"params.bullet_dmg": 4.0,
-"params.bite_telegraph": 0.4
+"params.bite_telegraph": 0.4,
+"params.bullet_dmg": 4.0
 },
 "bomber": {
 "params.blast_dmg": 14.0
@@ -329,7 +329,7 @@ enemy_tuning = {
 "params.fire_interval": 3.6
 },
 "pulser": {
-"params.bullet_dmg": 12.0
+"params.bullet_dmg": 6.0
 },
 "pump": {
 "hp": 60.0,

@@ -13,21 +13,27 @@ var current_id := -1
 
 ## 通常のゲームのランを作る。ステージとモードは GameManager の選択から読む。
 ## 資源の読み込みを開始して返す。呼び出し側が木へ入れると描画の準備を進める。
-func create_run() -> RunSession:
+func create_run(overrides := {}) -> RunSession:
 	var before := Time.get_ticks_usec()
-	var options := {"stage_index": GameManager.run_stage, "endless": GameManager.run_endless,
-		"stage": ContentManager.runtime_stage(GameManager.run_stage), "profile": ProfileManager.for_run(false)}
-	if OS.is_debug_build():
-		options.start_time = GameManager.run_start_time
-		options.start_source = GameManager.run_start_source
+	var prepared := GameManager.run_start_content.duplicate(true)
+	var start_time := GameManager.run_start_time
+	var source := GameManager.run_start_source
+	var timeline := OS.is_debug_build() and source == "timeline"
+	if not timeline:
+		var path := "res://.content/run/stage_%d.json" % GameManager.run_stage
+		var index = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
+		prepared = {"index":path,"signature":index.get("input_sha256","")} if index is Dictionary else {}
 	GameManager.run_start_time = 0.0
 	GameManager.run_start_source = "stage_start"
-	var session := _register(RunSession.new(), options)
-	session.loading_timings["stage_and_profile_ms"] = (Time.get_ticks_usec() - before) / 1000.0
+	GameManager.run_start_content = {}
+	var options := {"runtime":"cpp","cpp_index":prepared.get("index",""),"cpp_signature":prepared.get("signature",""),
+		"cpp_profile":ProfileManager.for_cpp(false),"seed":randi(),"endless":GameManager.run_endless,"cpp_source":source,
+		"cpp_start":{"equipment":[],"lab_mode":false}}
+	if OS.is_debug_build() and overrides.get("seed") is int: options.seed = overrides.seed
+	if timeline: options.cpp_start.scenario = {"kind":"timeline","params":{"time":start_time}}
+	var session := _register(RunSession.new(),options)
+	session.loading_timings["stage_and_profile_ms"] = (Time.get_ticks_usec()-before)/1000.0
 	current_id = session.id
-	session.sim.finished.connect(GameManager.finish_run)
-	session.sim.aborted.connect(GameManager.abort_run)
-	# 暗転中にもI/Oを進める。描画準備は木に入ってから行う。
 	session.start_loading(options)
 	return session
 
@@ -49,7 +55,7 @@ func session(id: int) -> RunSession:
 func command(id: int, name: StringName, args := {}) -> void:
 	var s: RunSession = _sessions.get(id)
 	if s != null:
-		s.sim.command(name, args)
+		if s.bridge != null: s.bridge.command(String(name),args)
 
 ## RunSession が木から出るときに呼ぶ。
 func unregister(s: RunSession) -> void:
@@ -59,9 +65,14 @@ func unregister(s: RunSession) -> void:
 		current_id = -1
 
 func _register(s: RunSession, options: Dictionary) -> RunSession:
-	s.sim.options = options
 	s.id = _next_id
 	_next_id += 1
 	_sessions[s.id] = s
 	session_created.emit(s)
 	return s
+
+## 手動で作ったSessionも同じ単調なランIDへ登録する。
+func ensure_registered(s: RunSession) -> bool:
+	if s.id>0: return _sessions.get(s.id)==s
+	if _next_id<=0 or _next_id==9223372036854775807: return false
+	return _register(s,{"runtime":"cpp"})!=null

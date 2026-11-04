@@ -37,8 +37,8 @@ behavior = &"dolphin"
 ranged = true
 params = {
 "aim_turn": 2.0,
-"bullet_dmg": 14.0,
-"enemy_dmg": 40.0,
+"bullet_dmg": 8.0,
+"enemy_dmg": 10.0,
 "fire_interval": 3.4,
 "keep": 520.0,
 "telegraph": 1.0,

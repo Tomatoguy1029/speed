@@ -1,5 +1,5 @@
 [gd_scene format=3]
-[ext_resource type="Script" path="res://scripts/bosses/monoceros_boss.gd" id="actor"]
+[ext_resource type="Script" path="res://scripts/data_types/boss_scene_source.gd" id="actor"]
 [ext_resource type="AnimationLibrary" path="res://scenes/bosses/monoceros_boss_timeline.tres" id="timeline"]
 [ext_resource type="PackedScene" path="res://scenes/bosses/monoceros_presentation.tscn" id="visual"]
 [node name="MonocerosBoss" type="Node2D"]

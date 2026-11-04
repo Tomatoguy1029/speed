@@ -1,0 +1,693 @@
+{
+  "records": [
+    {
+      "name": "BudgetPhase",
+      "section": 16,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "budget",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "PopulationPhase",
+      "section": 84,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "external_id",
+          "type": "string"
+        },
+        {
+          "name": "start",
+          "type": "f64"
+        },
+        {
+          "name": "pop_from",
+          "type": "f64"
+        },
+        {
+          "name": "pop_to",
+          "type": "f64"
+        },
+        {
+          "name": "rate",
+          "type": "f64"
+        },
+        {
+          "name": "xp_bonus",
+          "type": "f64"
+        },
+        {
+          "name": "surge_interval",
+          "type": "f64"
+        },
+        {
+          "name": "surge_pop",
+          "type": "f64"
+        },
+        {
+          "name": "surge_ranged",
+          "type": "f64"
+        },
+        {
+          "name": "surge_elite",
+          "type": "f64"
+        },
+        {
+          "name": "wave_interval",
+          "type": "f64"
+        },
+        {
+          "name": "attack_budget",
+          "type": "u32"
+        },
+        {
+          "name": "wave_type",
+          "type": "u32"
+        }
+      ]
+    },
+    {
+      "name": "PopulationMix",
+      "section": 85,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "phase",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationPhase"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "weight",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationCurve",
+      "section": 86,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "PopulationPoint",
+      "section": 87,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "curve",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationCurve"
+        },
+        {
+          "name": "time",
+          "type": "f64"
+        },
+        {
+          "name": "value",
+          "type": "f64"
+        },
+        {
+          "name": "slope",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationWindow",
+      "section": 88,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "start",
+          "type": "f64"
+        },
+        {
+          "name": "end",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationType",
+      "section": 89,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "rank",
+          "type": "f64"
+        },
+        {
+          "name": "maximum",
+          "type": "f64"
+        },
+        {
+          "name": "ranged",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "FormationEntry",
+      "section": 180,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "formation",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationDefinition"
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "FormationLayout",
+      "section": 181,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "formation",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationDefinition"
+        },
+        {
+          "name": "weight",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "value",
+          "type": "f64"
+        },
+        {
+          "name": "managed",
+          "type": "i64",
+          "min": -1,
+          "max": 1
+        }
+      ]
+    },
+    {
+      "name": "FormationType",
+      "section": 182,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationLayout"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "FormationMarker",
+      "section": 183,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "layout",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationLayout"
+        },
+        {
+          "name": "entry",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationEntry"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationClip",
+      "section": 184,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "start",
+          "type": "f64"
+        },
+        {
+          "name": "end",
+          "type": "f64"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "groups",
+          "type": "u32"
+        },
+        {
+          "name": "priority",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "PopulationClipType",
+      "section": 185,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "clip",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationClip"
+        },
+        {
+          "name": "enemy",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        }
+      ]
+    },
+    {
+      "name": "PopulationClipFormation",
+      "section": 186,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "clip",
+          "type": "u32",
+          "min": 1,
+          "ref": "PopulationClip"
+        },
+        {
+          "name": "formation",
+          "type": "u32",
+          "min": 1,
+          "ref": "FormationDefinition"
+        }
+      ]
+    },
+    {
+      "name": "DeathChainDefinition",
+      "section": 187,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1,
+          "ref": "EnemyRecord"
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "damage",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "EncounterDefinition",
+      "section": 188,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "active",
+          "type": "bool"
+        },
+        {
+          "name": "interval",
+          "type": "f64",
+          "min": 0
+        }
+      ]
+    },
+    {
+      "name": "EncounterPattern",
+      "section": 189,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "attempts",
+          "type": "u32",
+          "min": 1,
+          "max": 32
+        },
+        {
+          "name": "min_fodder",
+          "type": "u32"
+        },
+        {
+          "name": "margin",
+          "type": "f64"
+        },
+        {
+          "name": "window",
+          "type": "f64"
+        },
+        {
+          "name": "draw_seconds",
+          "type": "f64"
+        },
+        {
+          "name": "exit_clearance",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "scale_min",
+          "type": "f64"
+        },
+        {
+          "name": "scale_max",
+          "type": "f64"
+        },
+        {
+          "name": "min_spacing",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "EncounterPoint",
+      "section": 190,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "pattern",
+          "type": "u32",
+          "min": 1,
+          "ref": "EncounterPattern"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "EncounterRegion",
+      "section": 191,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "pattern",
+          "type": "u32",
+          "min": 1,
+          "ref": "EncounterPattern"
+        },
+        {
+          "name": "enemy",
+          "type": "u32"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "angle",
+          "type": "f64"
+        },
+        {
+          "name": "jitter",
+          "type": "f64"
+        },
+        {
+          "name": "min_count",
+          "type": "u32",
+          "max": 100
+        },
+        {
+          "name": "max_count",
+          "type": "u32",
+          "max": 100
+        },
+        {
+          "name": "fodder",
+          "type": "bool"
+        },
+        {
+          "name": "elite",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "EncounterPhase",
+      "section": 192,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    }
+  ],
+  "enums": {
+    "AttackCategory": [
+      {
+        "name": "Aimed",
+        "value": "aimed"
+      },
+      {
+        "name": "Homing",
+        "value": "homing"
+      },
+      {
+        "name": "Dash",
+        "value": "dash"
+      },
+      {
+        "name": "Beam",
+        "value": "beam"
+      },
+      {
+        "name": "Zone",
+        "value": "zone"
+      },
+      {
+        "name": "Wave",
+        "value": "wave"
+      },
+      {
+        "name": "Residue",
+        "value": "residue"
+      }
+    ],
+    "SpawnOrigin": [
+      {
+        "name": "Normal",
+        "value": "normal"
+      },
+      {
+        "name": "Refill",
+        "value": "refill"
+      },
+      {
+        "name": "Summon",
+        "value": "summon"
+      },
+      {
+        "name": "Split",
+        "value": "split"
+      },
+      {
+        "name": "BossPart",
+        "value": "boss_part"
+      },
+      {
+        "name": "HeroLandmark",
+        "value": "hero_landmark"
+      },
+      {
+        "name": "DevPlacement",
+        "value": "dev_placement"
+      }
+    ],
+    "SpawnRole": [
+      {
+        "name": "Regular",
+        "value": "regular"
+      },
+      {
+        "name": "Terrain",
+        "value": "terrain"
+      },
+      {
+        "name": "BossBody",
+        "value": "boss_body"
+      },
+      {
+        "name": "BossPart",
+        "value": "boss_part"
+      }
+    ]
+  }
+}

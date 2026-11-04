@@ -1,0 +1,18 @@
+{
+  "godot_cpp": {
+    "url": "https://github.com/godotengine/godot-cpp.git",
+    "commit": "e103d348c4b2d8df7b819126d855e19381cb9a87",
+    "api": "4.7",
+    "api_sha256": "53d37f85be32b6d10fb2266ca51f6ef0c3a55728acdb7c8301b1458a93c00943"
+  },
+  "scons": "4.11.1",
+  "precision": "single",
+  "enabled_classes": [
+    "RefCounted",
+    "RandomNumberGenerator",
+    "OS",
+    "HashingContext"
+  ],
+  "engine": "4.7.2",
+  "export_templates": "4.7.2.stable"
+}

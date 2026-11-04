@@ -7,7 +7,7 @@ metadata/values = {"flight_scale": 1.0, "effect_tint": Color(1, 1, 1, 1)}
 metadata/inputs = {
     "res://tools/art/bake_pump_shell.py": "d78b400ad3ba8b1daadd634ca51d46f9dd822a2d76a2ebcc538666fa50bc79bc",
     "res://shaders/pump_shell.gdshader": "7f9af1301281051f9220776fe00ce4893c822f4d46ebd1f3c34627b2bb24176c",
-    "res://scripts/render/attacks/shell.gd": "687081042cae9d84516d12435c0ef825642105f4d857f601091e60fa4d37ad7d"
+    "res://scripts/render/attacks/shell.gd": "5cb1deeb7219f9a6c39819d5846f05c3354c223e1ece6ca3c796ff3a097ec6eb"
 }
 metadata/saved_profiles = {
     "res://scenes/attacks/shell.tscn": "376eb2449cc071f7bc35a95c7d7ba2ee7c1318ec0cea88482967764c200f9720"

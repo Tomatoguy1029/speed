@@ -16,10 +16,6 @@ func _apply_effect_settings() -> void:
 
 const TEXTURE := preload("res://assets/fx/light_arrow.svg")
 
-func draw_shot(c: CanvasItem, pr: ProjectileSystem, i: int, pos: Vector2) -> bool:
-	draw_arrow(c, pos, pr.hostile_vel[i].angle(), pr.hostile_r[i] * flight_scale, false, state.world_time, 1.0, effect_tint, pr.hostile_length[i] * flight_scale, _style)
-	return true
-
 static func draw_arrow(c: CanvasItem, pos: Vector2, angle: float, radius: float,
 		cosmic: bool, world_time: float, opacity := 1.0, effect_color := Color.WHITE, length := 0.0, style: Dictionary = {}) -> void:
 	var scale := radius / 12.0
@@ -40,3 +36,16 @@ static func draw_arrow(c: CanvasItem, pos: Vector2, angle: float, radius: float,
 			var a := (0.55 + sin(world_time * 6.0 + n * 2.0) * 0.35) * opacity
 			c.draw_rect(Rect2(p - Vector2.ONE, Vector2.ONE * 2.0), Color(0.87, 0.94, 1.0, a) * effect_color)
 	c.draw_set_transform(Vector2.ZERO)
+
+## C++が確定した矢の姿だけを描く。
+var _cpp_arrow: Dictionary = {}
+func apply_frame(row: Dictionary) -> void:
+	_cpp_arrow = row
+	queue_redraw()
+func _draw() -> void:
+	if _cpp_arrow.is_empty():
+		super()
+		return
+	var row := _cpp_arrow
+	draw_arrow(self,row.points[0],row.angle,row.widths[0],row.cosmic,row.world_time,1.0,row.colors[0],row.length,row)
+	if row.get("petrified_radius",0.0)>0.0: draw_circle(row.points[0],row.petrified_radius,Color(0.62,0.6,0.58,0.9))

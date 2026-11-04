@@ -38,7 +38,7 @@ DATE = re.compile(r"\d{4}-\d{1,2}-\d{1,2}|\d{4}年\d{1,2}月(\d{1,2}日)?|\d{1,2
 NAMES = re.compile(r"Tomatoguy|ShueMaker|keporusu|wakida|shumak", re.IGNORECASE)
 LINK = re.compile(r"\]\(([^)\s]+)\)")
 # 列で持つデータのコードと、その列の一覧を載せた設計書の節（表の1列目に列名をコードの書き方で書く）
-COLUMN_TABLES = [("speed/scripts/data_types/enemy_table.gd", "docs/architecture.md", "### 6.2 敵の表の列")]
+COLUMN_TABLES = []
 VAR = re.compile(r"^var (\w+)")
 TABLE_ROW = re.compile(r"^\|\s*`(\w+)`\s*\|")
 CODE_SPAN = re.compile(r"`[^`]*`")

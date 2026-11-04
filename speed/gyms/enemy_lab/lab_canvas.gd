@@ -1,6 +1,7 @@
 ## 本番のランの表示枠に重ねる、実験場の編集用の層。
 ## 敵・弾・地形・機体は本番の描画が描く。ここでは選択・射程・ID・線・配置の目印だけを描く。
 extends Control
+const HazardKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.HazardKind
 const UI := preload("res://gyms/enemy_lab/lab_ui.gd")
 
 signal picked(row: int)
@@ -108,7 +109,7 @@ func _place(point: Vector2) -> void:
 		if field != null:
 			session.perform("field", {"kind": String(field.kind), "pos": [point.x, point.y], "radius": field.radius})
 		return
-	var kind := "boss" if ContentManager.bosses.has(StringName(spawn_type)) else "spawn"
+	var kind = "boss" if ContentManager.bosses.has(StringName(spawn_type)) else "spawn"
 	session.perform(kind, {"type": spawn_type, "pos": [point.x, point.y], "count": spawn_count})
 	selection.clear()
 	if session.selected >= 0: selection.append(session.run.enemies.table.id[session.selected])
@@ -201,10 +202,10 @@ func _gui_input(event: InputEvent) -> void:
 						finish_route()
 					_stroke_pressed = false
 				if _range_drag and session.selected >= 0:
-					var t: EnemyTable = session.run.enemies.table
+					var t: Dictionary = session.run.enemies.table
 					var row: int = session.selected
-					var delta := world(event.position) - t.pos[row]
-					var key := range_parameter(session.definition_for_row(row))
+					var delta = world(event.position) - t.pos[row]
+					var key = range_parameter(session.definition_for_row(row))
 					if not key.is_empty(): session.perform("edit_range", {"id": t.id[row], "key": key, "length": delta.length(), "angle": delta.angle()})
 				_range_drag = false
 				if _dragging and _drag_id >= 0:
@@ -226,7 +227,7 @@ func _gui_input(event: InputEvent) -> void:
 				return
 			if route_tool == 1 and not route.is_empty():
 				_remember_route()
-				var point := _nearest_route_point(event.position)
+				var point = _nearest_route_point(event.position)
 				route.remove_at(point if point >= 0 else route.size() - 1)
 				result.clear()
 				route_edited.emit()
@@ -270,14 +271,14 @@ func _gui_input(event: InputEvent) -> void:
 			for id in selection:
 				var row: int = session.row_for_id(id)
 				if row >= 0:
-					var t: EnemyTable = session.run.enemies.table
+					var t: Dictionary = session.run.enemies.table
 					session.perform("move", {"id": id, "pos": [t.pos[row].x, t.pos[row].y], "angle": t.facing[row] + deg_to_rad(-15 if event.keycode == KEY_Q else 15)})
 		elif event.keycode == KEY_D and event.ctrl_pressed:
-			var t: EnemyTable = session.run.enemies.table
+			var t: Dictionary = session.run.enemies.table
 			for id in selection.duplicate():
 				var row: int = session.row_for_id(id)
 				if row >= 0:
-					var point := t.pos[row] + Vector2(60, 60)
+					var point = t.pos[row] + Vector2(60, 60)
 					session.perform("boss" if t.is_boss[row] else "spawn", {"type": String(t.type[row]), "pos": [point.x, point.y], "elite": t.elite[row] != 0, "angle": t.facing[row]})
 		elif event.keycode == KEY_ESCAPE:
 			if _freehand:
@@ -309,9 +310,9 @@ func _pick(pos: Vector2, cycle := false) -> int:
 func _draw() -> void:
 	if session == null or not is_instance_valid(session.run):
 		return
-	var run: RunSimulation = session.run
+	var run = session.run
 	if run.enemies.count() == 0 and route.is_empty() and mode != 3:
-		var message := tr("lab.ui.empty_field")
+		var message = tr("lab.ui.empty_field")
 		var font := get_theme_default_font()
 		var width := font.get_string_size(message, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 		var at := size * 0.5 + Vector2(0, 64)
@@ -319,17 +320,17 @@ func _draw() -> void:
 		draw_string(font, at - Vector2(width / 2, 0), message, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, UI.MUTED)
 	for entry in session.schedule:
 		if entry.get("enabled", true):
-			var point := screen(session.vector(entry.get("pos", [0, 0])))
+			var point = screen(session.vector(entry.get("pos", [0, 0])))
 			draw_arc(point, maxf(8, float(entry.get("radius", 0)) * zoom), 0, TAU, 32, Color("#9d8ccf"), 1)
 			draw_string(ThemeDB.fallback_font, point + Vector2(8, 8), "%s ×%d / %.1fs" % [String(entry.get("type", "")), int(entry.get("count", 1)), float(entry.get("interval", 1))], HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color("#c0b0e2"))
 	_draw_projectiles(run.projectiles)
 	_draw_boss_ranges(run)
-	var t := run.enemies.table
+	var t = run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.dead[i]:
 			continue
 		var pos := screen(t.pos[i])
-		var radius := maxf(3, t.r[i] * zoom)
+		var radius = maxf(3, t.r[i] * zoom)
 		if not Rect2(Vector2.ZERO, size).grow(radius + 200).has_point(pos):
 			continue
 		var selected: bool = session.selected == i or selection.has(t.id[i])
@@ -339,7 +340,7 @@ func _draw() -> void:
 			var length := float(def.params.get(key, 0))
 			if length > 0:
 				draw_arc(pos, length * zoom, 0, TAU, 64, Color(0.98, 0.65, 0.3, 0.35), 1.5)
-				var end := pos + Vector2.from_angle(t.facing[i]) * length * zoom
+				var end = pos + Vector2.from_angle(t.facing[i]) * length * zoom
 				draw_line(pos, end, Color(0.98, 0.65, 0.3, 0.5), 2)
 				draw_circle(end, 6, Color.ORANGE, false, 2)
 		var reason: String = run.projectiles.director.reasons.get(str(t.id[i]), "")
@@ -351,7 +352,7 @@ func _draw() -> void:
 			draw_circle(pos, t.r[i] * zoom, Color(0.98, 0.65, 0.3, 0.08))
 			draw_arc(pos, t.r[i] * zoom, 0, TAU, 96, Color("#f9ae58"), 1.5)
 			draw_arc(pos, radius + 9, 0, TAU, 32, Color("#71e4e0"), 2)
-			var width := radius * 2
+			var width: float = radius * 2
 			draw_rect(Rect2(pos + Vector2(-radius, -radius - 18), Vector2(width, 4)), Color("#354052"))
 			draw_rect(Rect2(pos + Vector2(-radius, -radius - 18), Vector2(width * t.hp[i] / maxf(1, t.max_hp[i]), 4)), Color("#88d8a0"))
 		if show_ids or selected:
@@ -365,7 +366,7 @@ func _draw() -> void:
 	if candidate.has("route"):
 		_draw_route(candidate.route, Color("#d4b1ff"), 2)
 		for blocker in candidate.get("validation", {}).get("blockers", []):
-			var point := screen(session.vector(blocker.pos))
+			var point = screen(session.vector(blocker.pos))
 			draw_line(point - Vector2(6, 6), point + Vector2(6, 6), Color.SALMON, 2)
 			draw_line(point - Vector2(-6, 6), point + Vector2(-6, 6), Color.SALMON, 2)
 		for command in candidate.get("commands", []):
@@ -373,7 +374,7 @@ func _draw() -> void:
 	if mode == 4:
 		var anchor: Vector2 = session.vector(pattern.get("anchor", [0, 0]))
 		for region in pattern.get("regions", []):
-			var point := screen(anchor + session.vector(region.pos))
+			var point = screen(anchor + session.vector(region.pos))
 			var color := Color("#87d4af") if region.get("role") == "fodder" else Color("#e5aa7b")
 			draw_string(ThemeDB.fallback_font, point + Vector2(8, -8), "%s %d–%d" % [region.type, int(region.get("min_count", 1)), int(region.get("max_count", 1))], HORIZONTAL_ALIGNMENT_LEFT, -1, 12, color)
 			draw_circle(point, maxf(5, float(region.jitter) * zoom), Color(color, 0.08))
@@ -381,7 +382,7 @@ func _draw() -> void:
 			draw_line(point - Vector2(6, 0), point + Vector2(6, 0), color, 2)
 			draw_line(point - Vector2(0, 6), point + Vector2(0, 6), color, 2)
 	for blocker in result.get("blockers", []):
-		var point := screen(session.vector(blocker.pos))
+		var point = screen(session.vector(blocker.pos))
 		draw_line(point - Vector2(8, 8), point + Vector2(8, 8), Color.SALMON, 3)
 		draw_line(point - Vector2(-8, 8), point + Vector2(-8, 8), Color.SALMON, 3)
 	for event in result.get("events", []):
@@ -411,7 +412,7 @@ func _draw_route(points: PackedVector2Array, color: Color, width: float, edit_po
 			draw_string(ThemeDB.fallback_font, pts[i] + Vector2(7, -7), number, HORIZONTAL_ALIGNMENT_LEFT, -1, 13, color)
 
 ## 本番の画面に出さないボスの攻撃範囲（lab_ranges() を持つボス）を重ねる。選択中のボスは構えていない間の範囲も描く。
-func _draw_boss_ranges(run: RunSimulation) -> void:
+func _draw_boss_ranges(run) -> void:
 	if not show_ranges:
 		return
 	for actor in run.bosses.actors:
@@ -421,9 +422,9 @@ func _draw_boss_ranges(run: RunSimulation) -> void:
 		for shape: Dictionary in actor.lab_ranges(selected):
 			var color := Color("#ff6b7a") if shape.active else Color("#e6b969")
 			var pos := screen(shape.center)
-			var radius := float(shape.radius) * zoom
+			var radius = float(shape.radius) * zoom
 			if shape.get("fan", false):
-				var angle := float(shape.angle)
+				var angle = float(shape.angle)
 				var half := float(shape.half_angle)
 				var points := PackedVector2Array([pos])
 				for j in 25: points.append(pos + Vector2.from_angle(angle - half + half * 2.0 * j / 24.0) * radius)
@@ -434,7 +435,7 @@ func _draw_boss_ranges(run: RunSimulation) -> void:
 			draw_circle(pos, radius, Color(color, 0.1 if shape.active else 0.05))
 			draw_arc(pos, radius, 0, TAU, 48, color, 2)
 
-func _draw_projectiles(p: ProjectileSystem) -> void:
+func _draw_projectiles(p) -> void:
 	if show_ranges and p.director != null:
 		for i in p.hazard_alive.size():
 			if p.hazard_alive[i]: _source_line(p, int(p.lab_hazard_group.get(i, 0)), p.hazard_pos[i])
@@ -446,33 +447,33 @@ func _draw_projectiles(p: ProjectileSystem) -> void:
 	for i in p.hazard_alive.size():
 		if not p.hazard_alive[i]:
 			continue
-		var charging := p.hazard_t[i] < p.hazard_delay[i]
+		var charging = p.hazard_t[i] < p.hazard_delay[i]
 		var color := Color("#e6b969") if charging else Color("#ff6b7a")
 		var pos := screen(p.hazard_pos[i])
-		var kind := p.hazard_kind[i]
-		if kind == ProjectileSystem.HazardKind.BEAM and p.hazard_arc[i] > 0.0:
+		var kind = p.hazard_kind[i]
+		if kind == HazardKind.Beam and p.hazard_arc[i] > 0.0:
 			# 先へ行くほど広がるビーム（みずがめ座）は、範囲の輪郭を描く
 			var u := Vector2.from_angle(p.hazard_angle[i])
 			var v := Vector2(-u.y, u.x)
-			var w0 := p.flood_half(i, 0.0) * zoom
-			var w1 := p.flood_half(i, p.hazard_len[i]) * zoom
-			var tip := pos + u * p.hazard_len[i] * zoom
+			var w0 = p.flood_half(i, 0.0) * zoom
+			var w1 = p.flood_half(i, p.hazard_len[i]) * zoom
+			var tip = pos + u * p.hazard_len[i] * zoom
 			var outline := PackedVector2Array([pos + v * w0, tip + v * w1, tip - v * w1, pos - v * w0, pos + v * w0])
 			draw_colored_polygon(outline, Color(color, 0.06 if charging else 0.1))
 			draw_polyline(outline, color, 1.5, true)
-		elif kind == ProjectileSystem.HazardKind.BEAM or kind == ProjectileSystem.HazardKind.WALL:
-			var end := pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
+		elif kind == HazardKind.Beam or kind == HazardKind.Wall:
+			var end = pos + Vector2.from_angle(p.hazard_angle[i]) * p.hazard_len[i] * zoom
 			draw_line(pos, end, Color(color, 0.18 if charging else 0.55), maxf(2, p.hazard_width[i] * zoom), true)
 			draw_line(pos, end, color, 1.5, true)
-		elif kind == ProjectileSystem.HazardKind.ZONE:
+		elif kind == HazardKind.Zone:
 			draw_circle(pos, p.hazard_len[i] * zoom, Color(color, 0.13))
 			draw_arc(pos, p.hazard_len[i] * zoom, 0, TAU, 48, color, 2)
 		else:
-			var radius := p.hazard_len[i] if charging else p.wave_radius(i)
+			var radius = p.hazard_len[i] if charging else p.wave_radius(i)
 			var pts := PackedVector2Array()
 			for k in 97:
-				var angle := p.hazard_angle[i] - p.hazard_arc[i] + 2 * p.hazard_arc[i] * k / 96.0
-				var in_gap := p.hazard_gap_w[i] > 0 and absf(angle_difference(angle, p.hazard_gap[i])) < p.hazard_gap_w[i]
+				var angle = p.hazard_angle[i] - p.hazard_arc[i] + 2 * p.hazard_arc[i] * k / 96.0
+				var in_gap = p.hazard_gap_w[i] > 0 and absf(angle_difference(angle, p.hazard_gap[i])) < p.hazard_gap_w[i]
 				if in_gap:
 					if pts.size() > 1:
 						draw_polyline(pts, color, maxf(2, p.hazard_width[i] * zoom), true)
@@ -482,11 +483,11 @@ func _draw_projectiles(p: ProjectileSystem) -> void:
 			if pts.size() > 1:
 				draw_polyline(pts, color, maxf(2, p.hazard_width[i] * zoom), true)
 
-func _source_line(p: ProjectileSystem, token: int, at: Vector2) -> void:
+func _source_line(p, token: int, at: Vector2) -> void:
 	if token == 0 or not p.director.groups.has(token): return
 	var group: Dictionary = p.director.groups[token]
 	var row: int = session.row_for_id(int(group.id))
-	var from := screen(session.run.enemies.table.pos[row] if row >= 0 else group.get("pos", at))
+	var from = screen(session.run.enemies.table.pos[row] if row >= 0 else group.get("pos", at))
 	var to := screen(at)
 	if row >= 0:
 		draw_line(from, to, Color(0.94, 0.69, 0.4, 0.3), 1)

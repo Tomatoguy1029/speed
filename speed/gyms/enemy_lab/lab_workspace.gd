@@ -193,6 +193,10 @@ func _palette(parent: Node) -> void:
 	lab._left.add_child(box)
 	var title: Label = lab._label(box, tr("lab.ui.enemies"))
 	title.add_theme_font_size_override("font_size", 16)
+	lab._stage = OptionButton.new()
+	for n in range(1, ContentManager.stage_count() + 1): lab._stage.add_item(tr("lab.message_c83172920b") % n, n)
+	box.add_child(lab._stage)
+	UI.button(box, tr("lab.message_dfa32d64eb"), lab._reset, "plus")
 	lab._filter = LineEdit.new()
 	lab._filter.placeholder_text = tr("lab.ui.search")
 	lab._filter.right_icon = UI.icon("search")
@@ -238,7 +242,7 @@ func _toolbar(parent: Node) -> void:
 	var bar := HFlowContainer.new()
 	parent.add_child(bar)
 	for item in [[0, "lab.ui.select", "pointer"], [1, "lab.ui.place", "plus"], [2, "lab.ui.route", "pencil"], [3, "lab.ui.try", ""], [5, "lab.ui.range", "ruler"]]:
-		var button := UI.button(bar, tr(item[1]), lab._set_mode.bind(item[0]), item[2])
+		var button = UI.button(bar, tr(item[1]), lab._set_mode.bind(item[0]), item[2])
 		button.toggle_mode = true
 		tools[item[0]] = button
 	_route_tool = OptionButton.new()
@@ -353,10 +357,7 @@ func _settings(parent: Node) -> void:
 	settings.hide()
 
 func environment(parent: Node) -> void:
-	var box := UI.fold(parent, tr("lab.ui.field"), true)
-	lab._stage = OptionButton.new()
-	for n in range(1, ContentManager.stage_count() + 1): lab._stage.add_item(tr("lab.message_c83172920b") % n, n)
-	box.add_child(lab._stage)
+	var box = UI.fold(parent, tr("lab.ui.field"), true)
 	var seed_row := HBoxContainer.new()
 	box.add_child(seed_row)
 	lab._label(seed_row, "Seed")
@@ -364,13 +365,13 @@ func environment(parent: Node) -> void:
 	lab._seed.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	lab._empty = _check(box, "lab.message_528e1c7048", true)
 	lab._auto = _check(box, "lab.message_bb051fda3b")
-	var field_options := UI.fold(box, tr("lab.ui.field_objects"))
+	var field_options = UI.fold(box, tr("lab.ui.field_objects"))
 	lab._terrain = _check(field_options, "lab.terrain")
 	lab._rocks = _check(field_options, "lab.rocks")
 	lab._gimmicks = _check(field_options, "lab.gimmicks")
 	lab._empty.toggled.connect(func(on): lab._terrain.button_pressed = not on; lab._rocks.button_pressed = not on; lab._gimmicks.button_pressed = not on)
 	UI.button(box, tr("lab.message_dfa32d64eb"), func(): await lab._reset(); close_settings(), "plus")
-	var advanced := UI.fold(box, tr("lab.ui.data"))
+	var advanced = UI.fold(box, tr("lab.ui.data"))
 	UI.button(advanced, tr("lab.reload_data"), lab._reload_data)
 
 func _check(parent: Node, key: String, on := false) -> CheckButton:
@@ -574,7 +575,7 @@ func sync() -> void:
 	if _last_mode != lab.canvas.mode:
 		_last_mode = lab.canvas.mode
 		for mode in tools: tools[mode].set_pressed_no_signal(mode == _last_mode)
-		var hints := {0: "lab.ui.select_hint", 1: "lab.ui.place_hint", 2: "lab.ui.route_hint", 3: "lab.ui.try_hint", 4: "lab.message_277d733b3c", 5: "lab.ui.range_hint"}
+		var hints = {0: "lab.ui.select_hint", 1: "lab.ui.place_hint", 2: "lab.ui.route_hint", 3: "lab.ui.try_hint", 4: "lab.message_277d733b3c", 5: "lab.ui.range_hint"}
 		_mode_hint.text = tr(hints.get(_last_mode, "lab.ui.select_hint"))
 		_mode_hint.tooltip_text = _mode_hint.text
 		for id in palette_buttons: palette_buttons[id].set_pressed_no_signal(id == lab.canvas.spawn_type and _last_mode == 1)

@@ -15,10 +15,33 @@ var pushes: Array[Dictionary] = []
 var impacts: Array[Dictionary] = []
 var tracks: Dictionary = {}
 var sparks := PixelSparks.new()
-
-func setup(render: RunPresentation, owner_behavior) -> void:
-	super(render, owner_behavior)
-	blue_exhaust = true
+var _frame := {}
+var _ship := {}
+var _frame_seen := {}
+var _pending_targets := {}
+func setup_frame(parent: Node2D, pixel: float) -> void:
+	_painter = PixelPainter.new()
+	_painter.setup_painter(pixel)
+	parent.add_child(_painter)
+	_rings = PixelShapes.new()
+	_rings.setup(pixel,PixelShapes.Shape.RING)
+	parent.add_child(_rings)
+func sync_frame(values: Dictionary, ship: Dictionary, dt: float) -> void:
+	_frame = values
+	_ship = ship
+	_pending_targets.clear()
+	for hit: Dictionary in values.pending:
+		if not _pending_targets.has(hit.id): _pending_targets[hit.id] = hit.pos
+	var alive := {}
+	for value: Dictionary in values.visuals:
+		alive[value.id] = true
+		if _frame_seen.has(value.id): continue
+		on_event({"type":&"sonic_impact" if value.impact else &"sonic_push","pos":value.pos,"dir":value.dir,"dead":value.dead,"row":-1,"id":value.target})
+		if value.impact: impacts[-1].age = value.age-dt
+		else: pushes[-1].age = value.age-dt
+	_frame_seen = alive
+func _target(row: int, id: int):
+	return _pending_targets.get(id)
 
 func dispose() -> void:
 	if is_instance_valid(_rings): _rings.queue_free()
@@ -32,15 +55,8 @@ func on_event(ev: Dictionary) -> void:
 			sparks.add(ev.pos, 10 if ev.dead else 5, ev.dir.angle(), 1.3, 50.0, 130.0, 0.26,
 				[Color.WHITE, Color("#cfe4ff"), Color("#ff7a6b"), Color("#ffd9cc")])
 
-func tick(_dt: float) -> void:
-	var dt := world_dt()
-	var p := painter()
-	if _rings == null:
-		_rings = PixelShapes.new()
-		_rings.setup(p.px, PixelShapes.Shape.RING)
-		_rings.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-		_rings.modulate = RenderPipeline.plain_color(rm._layers.fx)
-		rm._layers.fx.add_child(_rings)
+func frame_tick(dt: float) -> void:
+	var p: PixelPainter = _painter
 	_rings.begin()
 	p.begin()
 	if active:
@@ -54,10 +70,12 @@ func tick(_dt: float) -> void:
 ## 音の輪：半径 R と R−1 の2重。寿命とともに薄れ、縁が機首に届くところでふわっと消える（機体を追い越さない）。
 ## 輪は GPU でまとめて描く。
 func _draw_rings(r: PixelShapes) -> void:
-	var speed: float = behavior.wave_speed()
-	var life: float = behavior.wave_life()
-	var nose: Vector2 = state.ship_pos + state.ship_heading * float(behavior.p("nose")) * r.px
-	for f in behavior.frames:
+	var speed: float = _frame.wave_speed
+	var life: float = _frame.life
+	var ship_pos: Vector2 = _ship.ship_pos
+	var heading: Vector2 = _ship.ship_heading
+	var nose: Vector2 = ship_pos+heading*float(_frame.nose)*r.px
+	for f in (_frame.frames):
 		var radius := speed * float(f.age) / r.px
 		if radius < 1.0: continue
 		var gap: float = nose.distance_to(f.pos) / r.px - radius
@@ -67,19 +85,22 @@ func _draw_rings(r: PixelShapes) -> void:
 
 ## 機体の後ろのマッハ円錐の蒸気と、機首の白い山形。一定距離ごとの衝撃の瞬間は蒸気が濃くなる。
 func _draw_ship(p: PixelPainter, dt: float) -> void:
-	var speed: float = behavior.speed / p.px
-	var high: bool = (state.tracing or state.glide) and behavior.fast()
+	var speed: float = float(_frame.speed)/p.px
+	var high: bool = (_ship.tracing or _ship.glide) and speed>_frame.min_speed
+	var ship_pos: Vector2 = _ship.ship_pos
+	var heading: Vector2 = _ship.ship_heading
+	var pulse: float = _frame.pulse
 	# 蒸気は細い円錐が見える速さ（円錐の半角が35度以下）の間だけ出す。遅いと円錐が横へ開くので出さない
-	var ring_speed: float = behavior.wave_speed() / p.px
+	var ring_speed: float = float(_frame.wave_speed)/p.px
 	var cone_now := asin(minf(0.99, ring_speed / maxf(speed, ring_speed + 1.0)))
 	var supersonic := high and cone_now <= deg_to_rad(35.0)
 	if supersonic: _cone = cone_now
 	_vapor += ((1.0 if supersonic else 0.0) - _vapor) * minf(1.0, dt * 6.0)
 	_boom_age += dt
-	if behavior.pulse > _last_pulse: _boom_age = 0.0
-	_last_pulse = behavior.pulse
+	if pulse > _last_pulse: _boom_age = 0.0
+	_last_pulse = pulse
 	var level := _vapor * (0.28 + 0.35 * exp(-_boom_age * 6.0))
-	var u := state.ship_heading
+	var u := heading
 	var n := u.orthogonal()
 	if level > 0.02:
 		var cone := _cone
@@ -88,30 +109,31 @@ func _draw_ship(p: PixelPainter, dt: float) -> void:
 			var back := 4.0 + k * 20.0
 			var half := back * tan(cone) * (0.35 + 0.65 * float((i * 53) % 10) / 10.0)
 			var side := half if i % 2 else -half
-			p.dot(state.ship_pos - u * back * p.px + n * side * p.px, Color(C_VAPOR, level * (1.0 - k * 0.6)))
+			p.dot(ship_pos - u * back * p.px + n * side * p.px, Color(C_VAPOR, level * (1.0 - k * 0.6)))
 	if high:
 		for i in 4:
-			p.dot(state.ship_pos + u * (9 - i) * p.px + n * i * p.px, Color.WHITE)
-			p.dot(state.ship_pos + u * (9 - i) * p.px - n * i * p.px, Color.WHITE)
+			p.dot(ship_pos + u * (9 - i) * p.px + n * i * p.px, Color.WHITE)
+			p.dot(ship_pos + u * (9 - i) * p.px - n * i * p.px, Color.WHITE)
 
 ## 押された敵：白い衝撃の弧（0.07秒）と、滑っている間の短い筋。威力の瞬間の白い円と輪。
 func _draw_enemies(p: PixelPainter, dt: float) -> void:
-	var t: EnemyTable = behavior.ctx.enemies.table
 	for push in pushes:
 		push.age += dt
 		var q: float = push.age / 0.07
-		if q >= 1.0 or not behavior.ctx.enemies.is_same(push.row, push.id): continue
+		var target = _target(push.row,push.id)
+		if q>=1.0 or target==null: continue
 		var u: Vector2 = push.dir
-		var center: Vector2 = t.pos[push.row] - u * 5.0 * p.px
+		var center: Vector2 = target-u*5.0*p.px
 		for k in range(-3, 4):
 			var bend := absf(k) * 0.6
 			p.dot(center + u.orthogonal() * k * p.px + u * bend * p.px, Color.WHITE if q < 0.5 else Color("#cfe4ff"))
 	pushes = pushes.filter(func(x): return x.age < 0.07)
 	var live := {}
-	for hit in behavior.pending:
-		if not behavior.ctx.enemies.is_same(hit.row, hit.id) or t.dead[hit.row] != 0: continue
+	for hit in (_frame.pending):
+		var target = _target(hit.get("row",-1),hit.id)
+		if target==null: continue
 		var points: Array = tracks.get(hit.id, [])
-		if dt > 0.0: points.append(t.pos[hit.row])
+		if dt > 0.0: points.append(target)
 		if points.size() > 10: points.pop_front()
 		live[hit.id] = points
 		var speed: float = hit.velocity.length() / p.px

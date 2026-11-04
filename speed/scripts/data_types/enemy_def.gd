@@ -92,7 +92,7 @@ const PARAMS_DOCS := {
 	"bite_reach": ["噛みつく距離", "体の縁からこの距離まで来た機体に噛みつく。", "単位（距離）"],
 	"bite_telegraph": ["噛みつきの予告", "光って構えてから噛みつくまでの時間。", "世界秒"],
 	"bite_radius": ["噛みつきの範囲", "噛みついたときに当たる、体の前の範囲の半径。", "単位（距離）"],
-	"bite_rest": ["噛みついたあとの休み", "噛みついてから、次に構えられるまでの時間。", "世界秒"],
+	"bite_rest": ["噛みついたあとの休み", "噛みついた位置と向きを保って休み、追跡を再開するまでの時間。", "世界秒"],
 	"aim_turn": ["構えの間に向き直る速さ", "構えている間、機体の方へ向きを変える速さ。撃つ向きはこの向き。", "ラジアン/秒"],
 	"enemy_dmg": ["敵へのダメージ", "波動の先頭が通り過ぎた敵に与えるダメージ。", "HP"],
 	"stand_off": ["回り込む距離", "機体と縦か横にそろう位置のうち、機体からこの距離だけ離れた所へ回り込む。", "単位（距離）"],
@@ -352,3 +352,12 @@ func knockback_scale(cfg: GameConfig) -> float:
 	if rank <= cfg.rank_knockback.size():
 		return cfg.rank_knockback[rank - 1]
 	return 0.0
+
+## 制作時と出現前で同じ固定報酬を解決する。
+func resolve_xp_reward() -> Dictionary:
+	if not xp_reward_counts.is_empty() and xp_reward_counts.size() != 3: return {}
+	if resolved_xp_reward.is_empty() or resolved_xp_reward.rank != rank or resolved_xp_reward.override != xp_reward_counts:
+		var counts := default_xp_reward_counts(rank) if xp_reward_counts.is_empty() else xp_reward_counts.duplicate()
+		for kind in counts.size(): counts[kind] = maxi(0, counts[kind])
+		resolved_xp_reward = {"rank":rank,"counts":counts,"gold_eligible":rank>=3 and rank<=10 and counts[1]>0,"override":xp_reward_counts.duplicate()}
+	return resolved_xp_reward
