@@ -43,8 +43,6 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
-	if event.get("type",&"")==&"canis_cue" and event.get("cue","")=="blaze_explode" and is_instance_valid(_burst_overlay):
-		_burst_overlay.start(event.position,float(event.radius),float(event.world_time)-float(event.get("age",0.0)))
 	if event.get("type",&"")==&"canis_cue" and event.get("cue","")=="landing":
 		_land_clock = float(event.world_time)
 		_land_facing = float(event.angle)
@@ -156,7 +154,7 @@ func _exit_tree() -> void:
 
 func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
-	if is_instance_valid(_burst_overlay): _burst_overlay.apply_clock(float(state.clock))
+	if is_instance_valid(_burst_overlay): _burst_overlay.apply_frame(state.get("blaze_bursts",[]),float(state.clock))
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	HOUND_BURN.draw(canvas,_trails,float(state.clock))
 	if not _nova.is_empty():

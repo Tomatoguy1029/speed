@@ -12,7 +12,8 @@
       {"name":"order_wait","type":"f64","min":0},
       {"name":"hound_warn","type":"f64","min":0},
       {"name":"has_hound_speed","type":"bool"},
-      {"name":"hound_speed","type":"f64","min":0}
+      {"name":"hound_speed","type":"f64","min":0},
+      {"name":"burst_duration","type":"f64","min":0}
     ]
   }],
   "enums": {}

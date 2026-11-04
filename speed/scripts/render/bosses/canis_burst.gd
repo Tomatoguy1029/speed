@@ -8,13 +8,13 @@ const BURSTS := preload("res://scripts/render/fx/blast_bursts.gd")
 const BODY_MESH := preload("res://scripts/render/fx/fire_bursts.gd")
 const FX := preload("res://data/visuals/fx_reference.tres")
 var _params := {}
-var _items: Array[Dictionary] = []
+var _items: Dictionary = {}
 
 func _ready() -> void:
 	_params = FX.for_id("O-blaze")
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
-func start(at: Vector2, radius: float, started: float) -> void:
+func _start(id: int, at: Vector2, radius: float, started: float) -> void:
 	if _params.is_empty(): _params = FX.for_id("O-blaze")
 	var root := Node2D.new()
 	root.position = at
@@ -42,17 +42,22 @@ func start(at: Vector2, radius: float, started: float) -> void:
 		surface.material = mat
 		root.add_child(surface)
 		materials.append(mat)
-	_items.append({"node":root,"materials":materials,"started":started})
+	_items[id] = {"node":root,"materials":materials,"started":started}
 
-func apply_clock(clock: float) -> void:
+func apply_frame(rows: Array, clock: float) -> void:
 	var duration := float(SETTINGS.get_meta("duration"))
 	var fps := float(SETTINGS.get_meta("fps"))
-	for item: Dictionary in _items:
+	var live := {}
+	for row: Dictionary in rows:
+		var id := int(row.id)
+		live[id] = true
+		if not _items.has(id): _start(id,row.position,float(row.radius),float(row.started))
+		var item: Dictionary = _items[id]
 		var elapsed := (clock-float(item.started))/float(_params.timing)
-		if elapsed>=duration:
-			item.node.queue_free()
-			continue
-		item.node.visible = elapsed>=0.0
+		item.node.visible = elapsed>=0.0 and elapsed<duration
 		var shader_age := floorf(maxf(0.0,elapsed)*fps)/fps/duration
 		for mat: ShaderMaterial in item.materials: mat.set_shader_parameter("age",shader_age)
-	_items = _items.filter(func(item): return (clock-float(item.started))/float(_params.timing)<duration)
+	for id in _items.keys():
+		if live.has(id): continue
+		_items[id].node.queue_free()
+		_items.erase(id)

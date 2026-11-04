@@ -2,16 +2,19 @@
 @tool
 extends RefCounted
 
+const BURST := "res://data/visuals/canis_burst.tres"
 const SETTINGS := "res://data/visuals/fx_reference.tres"
 const ROARING := ["command","stream","howl","bay","relay","hunt","hunt_pounce","nova"]
 const SPEED := ["command","stream","howl","bay","relay","hunt","hunt_pounce","blaze"]
 
 static func input_paths() -> PackedStringArray:
-	return PackedStringArray([SETTINGS])
+	return PackedStringArray([SETTINGS,BURST])
 
 static func apply(data: Dictionary) -> Error:
 	var settings := ResourceLoader.load(SETTINGS,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as FxReferenceSettings
 	if settings==null or not settings.valid(): return ERR_INVALID_DATA
+	var burst := ResourceLoader.load(BURST,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+	if burst==null or float(burst.get_meta("duration",0.0))<=0.0: return ERR_INVALID_DATA
 	var boss_ids := {}
 	for boss: Dictionary in data.get("BossDefinition",[]):
 		if int(boss.kind)==2: boss_ids[int(boss.id)] = true
@@ -34,7 +37,8 @@ static func apply(data: Dictionary) -> Error:
 			"roar_time":float(values.roarTime) if roaring else 0.0,"timing":float(values.timing),
 			"order_wait":float(values.orderWait) if roaring and name!="nova" else 0.0,
 			"hound_warn":float(values.houndWarn) if roaring and name!="nova" else 0.0,
-			"has_hound_speed":speed,"hound_speed":float(values.houndAttackSpeed) if speed else 0.0})
+			"has_hound_speed":speed,"hound_speed":float(values.houndAttackSpeed) if speed else 0.0,
+			"burst_duration":float(burst.get_meta("duration")) if name=="blaze" else 0.0})
 	# 号令だけは共通の段階表が発射を進めるため、予兆と咆哮の確定時計へ組み替える。
 	for config: Dictionary in rows:
 		if config.external_id!="O-command": continue
