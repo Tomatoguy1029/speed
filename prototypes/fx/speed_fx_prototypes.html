@@ -7494,6 +7494,15 @@ function hAt(n, t) { // 過去の頭の位置（残像・通り道に使う）
 
 // ---------- 試作の姿勢（見た目だけ）
 // 予兆でためて止まり（静）、発動で一気に動く（動）。型ごとにため方と発動後の動きを変える。
+// 横薙ぎの見た目の頭（判定の円はそのまま）：ゆっくり→一気に→行き過ぎて戻る緩急、真ん中で外へ突き出す踏み込み、振る先を向く頭
+function hSweepVis(S, n, rel, R) {
+  const r = S.r, T = hTiming(S), base = hBase(S, n), live = R?.P?.alive ?? 1, f = clamp(rel / T.active), after = Math.max(0, rel - T.active);
+  const fe = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2, on = smooth(0, 0.06, rel) * (1 - smooth(T.active + 0.2, T.active + 0.45, rel));
+  const over = after > 0 ? Math.sin(Math.min(1, after / 0.1) * Math.PI) * Math.exp(-after / 0.16) : 0, swing = Math.sin(Math.PI * fe);
+  const real = n.sweep + r.sweep_arc * (f - 0.5), a = real + ((n.sweep + r.sweep_arc * (fe - 0.5) + r.sweep_arc * 0.13 * over) - real) * on * live;
+  const reach = r.sweep_reach + (70 * swing - 18 * (1 - swing)) * on * live;
+  return { pos: add(base, mul(fromA(a), reach)), face: a + (0.5 * swing + 0.25 * over) * on * live };
+}
 function hPose(S, n, R) {
   const T = hTiming(S), t = S.age, type = hTech(S).type;
   const out = { coil: 0, freeze: 0, rel: -1, head: n.pos, angle: n.angle, sx: 1, sy: 1, T, type };
@@ -7518,12 +7527,13 @@ function hPose(S, n, R) {
       out.angle = n.angle + sign * 0.16 * Math.exp(-since / 0.06) * Math.sin(Math.min(1, since / 0.03) * Math.PI * 0.5) * (rel < T.active + S.r.blade_interval ? 1 : 0);
     }
   }
+  if (S.tech === 'bite_sweep' && rel >= 0 && rel < T.active + 0.5) { const v = hSweepVis(S, n, rel, R); out.head = v.pos; out.angle = v.face; }
   if (out.freeze > 0 && rel < 0) out.head = add(out.head, mul(orth(fw), Math.sin(S.t * 95) * 1.6 * out.freeze));
   return out;
 }
 function hVisualNeck(S, n, pose, R) {
   const pts = n.points; if (n !== S.actor || S.age < 0) return pts;
-  const N = pts.length - 1, root = pts[0], tip = pts[N], dir = norm(sub(tip, root)), side = orth(dir), type = pose.type, A = (type === 'sweep' ? 30 : type === 'lunge' ? 36 : 18) * R.P.coil;
+  const dHead = sub(pose.head, n.pos), N = pts.length - 1, root = pts[0], tip = pts[N], dir = norm(sub(tip, root)), side = orth(dir), type = pose.type, A = (type === 'sweep' ? 30 : type === 'lunge' ? 36 : 18) * R.P.coil;
   return pts.map((p, i) => {
     const u = i / N; let o = 0;
     // ため：伸ばす技はS字、振る技は振りかぶる側へ弓なり、吐く技は少し引いた弓なり
@@ -7537,7 +7547,7 @@ function hVisualNeck(S, n, pose, R) {
       const after = pose.rel - (type === 'lunge' ? pose.T.active : 0), s = 1 - u, amp = type === 'lunge' ? 13 : type === 'spit' ? 10 : type === 'sweep' ? 6 : 4;
       if (after > 0) { const front = after * 9; if (s < front) o += Math.sin((front - s) * 9) * amp * Math.exp(-after / 0.22) * (1 - s * 0.5) * R.P.snap; }
     }
-    return i === N ? pose.head : add(p, mul(side, o));
+    return i === N ? pose.head : add(add(p, mul(side, o)), mul(dHead, u * u));
   });
 }
 
@@ -7625,17 +7635,17 @@ function hDust(S, R, at, t, seed, dirA, power) { // 土ぼこり：ふくらみ�
 }
 function hSweepTrail(S, R, n, pose) { // 薙ぎ払い：頭の通った弧に、先が白く後ろへ冷えて細る三日月の帯。後ろから虫食いで消える
   if (S.tech !== 'bite_sweep' || pose.rel < 0) return;
-  const T = pose.T, r = S.r, base = hBase(S, n), pal = FX.ramp(R.P.color), w = r.sweep_arc / T.active;
-  const cur = Math.min(pose.rel, T.active), aHead = n.sweep + r.sweep_arc * (cur / T.active - 0.5), aStart = n.sweep - r.sweep_arc * 0.5, maxAge = 0.34 * R.P.timing, after = Math.max(0, pose.rel - T.active);
-  // 筋の束：真ん中（頭の通り道）の筋ほど長く残り、外の筋ほど短い → 先が太く後ろが細る三日月。光が主で、面で塗りつぶさない
-  const Rr = r.sweep_reach * WL, half = r.bite_radius * 0.55 * WL * R.P.size, C = toL(base), stepA = 0.5 / Math.max(1, Rr);
+  const T = pose.T, r = S.r, base = hBase(S, n), pal = FX.ramp(R.P.color);
+  const maxAge = 0.34 * R.P.timing, half = r.bite_radius * 0.55 * WL * R.P.size, dt = 1 / 300, endT = T.active;
+  // 筋の束：頭の通った道に沿って、真ん中の筋ほど長く残り、外の筋ほど短い → 先が太く後ろが細る三日月。光が主で、面で塗りつぶさない
+  const at = (q) => toL(hSweepVis(S, n, q, R).pos);
   for (let o = -half; o <= half; o += 0.75) {
     const e = Math.abs(o) / half, lane = Math.round(o / 0.75), life = maxAge * (1 - e ** 1.6) * (0.5 + 0.5 * hash(lane * 3.7 + 1)); if (life <= 0.01) continue;
-    for (let a = aHead; a >= aStart; a -= stepA) {
-      const age = (aHead - a) / w + after; if (age > life) break;
-      const k = age / life, x = C.x + Math.cos(a) * (Rr + o), y = C.y + Math.sin(a) * (Rr + o);
-      if (k > 0.55 && hash(lane * 11 + Math.floor(a * Rr / 1.5) * 5) > (1 - k) * 2.2) continue;
-      const lv = k < 0.12 && e < 0.35 ? 4 : k < 0.4 ? 3 : 2, al = (1 - k) * (1 - e * 0.7);
+    for (let age = Math.max(0, pose.rel - endT); age <= life; age += dt) {
+      const q = pose.rel - age; if (q < 0) break; const A = at(q), B = at(Math.max(0, q - dt)), tg = norm(sub(A, B)), nr = orth(tg), k = age / life, x = A.x + nr.x * o, y = A.y + nr.y * o;
+      if (k > 0.55 && hash(lane * 11 + Math.floor(q * 300) * 5) > (1 - k) * 2.2) continue;
+      const speed = dist(A, B) / dt / WL, lv = k < 0.12 && e < 0.35 ? 4 : k < 0.4 ? 3 : 2, al = (1 - k) * (1 - e * 0.7) * smooth(200, 900, speed); // 遅い所（振り始め・振り終わり）では帯を出さない
+      if (al < 0.03) continue;
       if (al > 0.6 && e < 0.25) R.front.px(x, y, pal[lv]); else if (al * (1 - e) > 0.18) R.front.dot(x, y, pal[Math.max(1, lv - 1)], al * (1 - e) * 0.9);
       R.front.light(x, y, pal[2], al * (1 - e) * 0.1 * R.P.intensity);
     }
@@ -7842,7 +7852,7 @@ const H_STATUS = {
 };
 const H_DESC = {
   bite_thrust: '予兆：首をS字にためて頭を引き、目が赤く強まり、最後は震えて止まる → 一気に伸びて頭の形の光と両脇の空気の筋、目の光が通り道に残る → 上下の牙の鉤が口先へ寄り、前へ長い閃光と欠片・土ぼこり → 衝撃の波が首を根元へ抜ける',
-  bite_sweep: '予兆：振りかぶる側へ首を弓なりにため、目が赤く強まって止まる → 頭の通った弧に、先が白く後ろへ冷えて細る三日月の帯（判定の幅）と外へ削られる小石 → 振り切って止まり、帯は後ろから崩れて消える',
+  bite_sweep: '予兆：振りかぶる側へ首を弓なりにため、目が赤く強まって止まる → ゆっくり振り出し、真ん中で一気に速くなって頭が外へ突き出し、振る先を向いて噛みにいく。三日月の帯（先が白く後ろへ冷えて細る）と外へ削られる小石 → 振り切って少し行き過ぎて戻り、帯は後ろから崩れて消える。緩急と踏み込みは見た目だけで、判定は現行の円のまま',
   wind_band: '予兆：前から空気の筋が口へ吸い込まれ、頭がふくらんで止まる → 口から帯の幅いっぱいへ空気の筋の束が流れ、圧の山が前へ走り、先で外へ巻いて散る。砂粒が運ばれる → 止むと根元から離れて流れ去る',
   wind_blades: '予兆：口のまわりで空気が渦を巻いて縮む → 0.18秒ごとに首を振り抜いて、押し固めた空気の三日月を3枚。外の縁が白く内側へ冷え、後ろへ短い筋 → 寿命の終わりに両端から欠けて消える',
   rubble_lump: '予兆：首の瓦礫が口へ送られ、口先で塊になる。頭を大きく引いて止まる → 頭を突き出して吐き、土煙と砂利。岩は回りながら飛んで砂ぼこりの尾を引く',
@@ -7854,6 +7864,7 @@ const H_DESC = {
 };
 const H_REFS = ['cpp/bosses/hydra/body.cpp（chain・待機の狙い）', 'cpp/bosses/hydra/ の各技（bite_thrust・bite_sweep・wind_band・wind_blades・rubble_lump・beam_fixed・beam_bolt・thunder_drop）', 'data/bosses/hydra.tres・hydra_moves/*.tres', 'scripts/render/attacks/hydra_shape.gd（現行表示の近似）', 'pixelFX の作り方を下敷き（impacts/hit-spark・melee/sword-slash・わしの稲妻 zigzag・voltInk）'];
 const H_PARAMS = [
+  { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'coil', label: 'ための首の曲がり', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'snap', label: '発動の勢い（反動・衝撃）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'dust', label: '小石・土ぼこりの量', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
