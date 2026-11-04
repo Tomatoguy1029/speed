@@ -620,9 +620,15 @@
           "min": 0,
           "config": "trace_radius",
           "runtime": "trace_radius"
+        },
+        {
+          "name": "fx_boss_ram_hitstop",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.boss_ram_hitstop"
         }
       ],
-      "version": 9
+      "version": 10
     },
     {
       "name": "StringEntry",
@@ -2162,6 +2168,10 @@
       {
         "name": "LabSpawn",
         "value": "lab_spawn"
+      },
+      {
+        "name": "BossRamContact",
+        "value": "boss_ram_contact"
       }
     ],
     "ResultKind": [
@@ -3220,6 +3230,16 @@
       "outcome",
       "reason",
       "row"
+    ],
+    "boss_ram_contact": [
+      "id",
+      "serial",
+      "kind",
+      "pos",
+      "direction",
+      "remaining",
+      "target_position",
+      "target_radius"
     ]
   },
   "includes": [
