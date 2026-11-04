@@ -1,6 +1,8 @@
 ## 戦闘の参照を持たず、生成済みパーツへ本体の値だけを反映する。
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
+const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
 @export var pixel_size := 3.0
 @export var sirius_color := Color("#e8f6ff")
 @export var sirius_halo_color := Color("#9fe8ff")
@@ -12,10 +14,18 @@ var pulse := 0.0
 var _pulse_until := -1.0
 var _clock := -1.0
 var gait := 0.0
+var _walk_phase := 0.0
 var flames: Node2D
+var _part_origins := {}
+var _land_clock := -1.0
+var _land_facing := 0.0
+var _land_feet: Array = []
+var _reference_canvas
 @onready var parts: Node2D = $Parts
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self,"boss/body/canis_major")
+	for name: String in ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg","Body","Head","Tail"]:
+		_part_origins[name] = (parts.get_node(name) as Node2D).position
 	z_index = 1
 func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 	flames = preload("res://scripts/render/bosses/canis_flames.gd").new()
@@ -24,6 +34,11 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
+	if event.get("type",&"")==&"canis_cue" and event.get("cue","")=="landing":
+		_land_clock = float(event.world_time)
+		_land_facing = float(event.angle)
+		if not state.is_empty(): _land_feet = POUNCE_MOTION.landing_feet(parts,_part_origins,event.position,_land_facing,float(state.radius)/100.0)
+		if not state.is_empty(): apply_frame(state,technique)
 	if event.get("type",&"")==&"combat_damage":
 		hit = 0.18
 		queue_redraw()
@@ -35,13 +50,19 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	var dt: float = maxf(0.0,float(body.clock)-_clock) if _clock>=0.0 else 0.0
 	if _clock>float(body.clock):
 		gait = 0.0
+		_walk_phase = 0.0
 		_pulse_until = -1.0
+		_land_clock = -1.0
+		_land_feet.clear()
 	if not state.is_empty() and int(body.phase)>int(state.phase): _pulse_until = float(body.clock)+0.35
 	if not state.is_empty() and (body.get("calling",false)!=state.get("calling",false) or body.get("barking",false) and not state.get("barking",false)): _pulse_until = float(body.clock)+0.35
 	pulse = maxf(0.0,_pulse_until-float(body.clock))
 	if flames!=null: flames.apply_frame(body.get("flames",[]),float(body.clock),body.get("burning",[]),{"position":body.position+Vector2.from_angle(float(body.facing))*float(body.radius)*0.84,"profile":attack.get("flame_profile",5),"active":attack.get("technique","")=="blaze" and int(attack.get("stage",5))==0})
 	_track_command(body,attack,dt)
 	_track_nova(body)
+	if not state.is_empty() and dt>0.0:
+		var previous_position: Vector2 = state.position
+		_walk_phase += previous_position.distance_to(body.position)/maxf(float(body.radius)*0.95,0.001)*TAU
 	state = body
 	technique = attack
 	_clock = float(body.clock)
@@ -56,12 +77,49 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	parts.scale = Vector2(k*(1.0+crouch*0.15),k*stretch)
 	var moving: bool = body.velocity.length()>5.0
 	var legs := ["RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg"]
-	for i in legs.size(): parts.get_node(legs[i]).rotation = sin(gait+(0.0 if i==0 or i==3 else PI))*(0.16 if moving else 0.015)
+	for name: String in _part_origins:
+		var part := parts.get_node(name) as Node2D
+		part.position = _part_origins[name]
+		part.scale = Vector2.ONE
+	parts.get_node("Body").rotation = 0.0
+	for i in legs.size(): parts.get_node(legs[i]).rotation = 0.0
 	parts.get_node("Tail").rotation = sin(gait*0.4)*0.07
 	parts.get_node("Head").rotation = -0.45*smoothstep(0.0,0.65,float(body.charge)) if attack.get("technique","")=="howl" and int(attack.get("stage",5))==0 else 0.0
+	if moving:
+		# canisPose の歩行は時間ではなく移動距離で足を一周させる。
+		var offsets := [0.0,0.5,0.25,0.75]
+		for i in legs.size():
+			var part := parts.get_node(legs[i]) as Node2D
+			var step_phase := fposmod(_walk_phase/TAU+offsets[i],1.0)
+			var stance := step_phase<0.72
+			var stroke := 1.0-2.0*step_phase/0.72 if stance else -1.0+2.0*smoothstep(0.72,1.0,step_phase)
+			var lift := 0.0 if stance else sin((step_phase-0.72)/0.28*PI)
+			part.position = _part_origins[legs[i]]+Vector2(lift*3.0*(1.0 if i%2!=0 else -1.0),stroke*11.0)
+			part.rotation = stroke*0.26
+			part.scale = Vector2(1.0,1.0-lift*0.18)
+		parts.get_node("Tail").rotation += sin(_walk_phase)*0.12
+		parts.get_node("Body").rotation = sin(_walk_phase)*0.05
+		parts.get_node("Body").position = Vector2(sin(_walk_phase)*1.5,absf(sin(_walk_phase))*2.0)
+		parts.get_node("Head").rotation -= sin(_walk_phase)*0.07
+	var motion: Dictionary = attack.get("pounce_motion",{})
+	var land_age := float(body.clock)-_land_clock if _land_clock>=0.0 else -1.0
+	if not motion.is_empty() and not motion.get("done",false):
+		parts.scale = Vector2.ONE*k
+		var flying := bool(motion.jumping)
+		POUNCE_MOTION.apply(parts,_part_origins,"strike" if flying else "load",float(motion.stage_time),float(motion.active_time if flying else motion.warn_time))
+	elif land_age>=0.0 and land_age<0.5:
+		parts.scale = Vector2.ONE*k
+		POUNCE_MOTION.apply(parts,_part_origins,"catch",land_age,0.0)
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
 	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(attack.get("glow",body.charge)) if int(attack.get("stage",5)) in [0,1] else float(body.charge),pulse)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
+
+func set_reference_canvas(canvas) -> void:
+	_reference_canvas = canvas
+
+func draw_reference(canvas, _real_dt: float) -> void:
+	if canvas!=_reference_canvas or _land_clock<0.0 or state.is_empty(): return
+	LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 
 ## 描画専用の短い履歴。戦闘の猟犬位置へ書き戻さない。
 var _trails: Dictionary = {}
