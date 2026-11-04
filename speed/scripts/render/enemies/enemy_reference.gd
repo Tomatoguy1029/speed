@@ -89,8 +89,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_soldier.render(frame.soldier_fx, frame.soldier_bolts, canvas, world_time)
 	if frame.has("cepheus_fx") and frame.has("cepheus_actors"):
 		_cepheus.render(frame.cepheus_actors, frame.cepheus_fx, canvas, world_time)
-	if frame.has("corona_selected"):
-		_corona.render(frame.corona, frame.corona_selected, canvas, world_time)
+	if frame.has("corona_selected") and frame.has("corona_thrown"):
+		_corona.render(frame.corona, frame.corona_selected, frame.corona_thrown, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -110,7 +110,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var aquarius := frame.has("aquarius_jets")
 	var soldier := frame.has("soldier_fx") and frame.has("soldier_bolts")
 	var cepheus := frame.has("cepheus_fx") and frame.has("cepheus_actors")
-	var corona := frame.has("corona_selected")
+	var corona := frame.has("corona_selected") and frame.has("corona_thrown")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
@@ -122,7 +122,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 		var members: PackedFloat64Array = frame.get("corona_members", PackedFloat64Array())
 		var kept := PackedFloat64Array()
 		for index in range(0, members.size(), 10):
-			if members[index+3] > 0.0 or members[index+6] <= 0.0: kept.append_array(members.slice(index,index+10))
+			if members[index+3] <= 0.0 and members[index+6] <= 0.0: kept.append_array(members.slice(index,index+10))
 		result.corona_members = kept
 	if beamer or lynx or bite or cross or crab or dolphin or telescope or reticle or aquarius or soldier:
 		var batches: Array = []
