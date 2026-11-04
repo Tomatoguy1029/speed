@@ -2,6 +2,7 @@
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
+const EMBERS := preload("res://scripts/render/bosses/canis_embers.gd")
 const FIRE_PIXELS := preload("res://scripts/render/bosses/canis_fire_pixels.gd")
 const HOUND_BURN := preload("res://scripts/render/bosses/canis_hound_burn.gd")
 const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
@@ -158,6 +159,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if is_instance_valid(_burst_overlay): _burst_overlay.apply_frame(state.get("blaze_bursts",[]),float(state.clock))
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	HOUND_BURN.draw(canvas,_trails,float(state.clock))
+	EMBERS.draw(canvas,state.get("fire_visual",[]),float(state.clock),get_viewport_rect().size.y/225.0)
 	FIRE_PIXELS.draw(canvas,state.get("fire_visual",[]))
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
