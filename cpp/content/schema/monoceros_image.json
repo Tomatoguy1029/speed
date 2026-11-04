@@ -258,6 +258,57 @@
           "type": "f64"
         }
       ]
+    },
+    {
+      "name": "BossImageFeedback",
+      "section": 415,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "duration",
+          "type": "f64"
+        },
+        {
+          "name": "max_white",
+          "type": "f64"
+        },
+        {
+          "name": "max_offset",
+          "type": "f64"
+        },
+        {
+          "name": "max_angle",
+          "type": "f64"
+        },
+        {
+          "name": "phase_rate",
+          "type": "f64"
+        },
+        {
+          "name": "seed_modulo",
+          "type": "u32"
+        },
+        {
+          "name": "seed_rate",
+          "type": "f64"
+        },
+        {
+          "name": "y_rate",
+          "type": "f64"
+        },
+        {
+          "name": "angle_rate",
+          "type": "f64"
+        },
+        {
+          "name": "offset_scale",
+          "type": "f64"
+        }
+      ]
     }
   ],
   "enums": {}

@@ -7,6 +7,7 @@ const BOSS := "res://data/bosses/monoceros.tres"
 const EFFECT := "res://data/visuals/effect_settings.tres"
 const MASKS := "res://assets/effects/boss_contact/monoceros_masks.tres"
 const HORN := "res://assets/pixel/monoceros/horn/horn.tres"
+const FEEDBACK := preload("res://scripts/bosses/boss_hit_feedback.gd")
 const MOVES := ["", "charge", "kick", "sweep", "lance", "return_charge", "horn_wave", "horn_dance", "sword_flash"]
 const FEET := ["FrontLeftLeg", "FrontRightLeg", "RearLeftLeg", "RearRightLeg"]
 const TUNING := {"body_follow":"body_follow_seconds", "neck_follow":"neck_follow_seconds", "head_follow":"head_follow_seconds",
@@ -16,7 +17,7 @@ const TUNING := {"body_follow":"body_follow_seconds", "neck_follow":"neck_follow
 static func input_paths() -> Array[String]:
 	var paths: Array[String] = [SCENE, PARTS, GAIT, BOSS, EFFECT, MASKS, HORN,
 		"res://scripts/bosses/monoceros_parts.gd", "res://scripts/render/bosses/monoceros.gd",
-		"res://scripts/render/visual_effect_settings.gd"]
+		"res://scripts/render/visual_effect_settings.gd", "res://scripts/bosses/boss_hit_feedback.gd"]
 	var masks: Resource = load(MASKS)
 	for path in masks.get_meta("inputs", {}): paths.append(path)
 	return paths
@@ -108,5 +109,8 @@ static func apply(data: Dictionary) -> Error:
 			var field: String = TUNING[key]
 			row[key] = float(overrides.get(field,body.get(field,root.get(field))))
 		data.MonocerosImageTuning.append(row)
+	data.BossImageFeedback = [{"id":1,"duration":FEEDBACK.DURATION,"max_white":FEEDBACK.MAX_WHITE,"max_offset":FEEDBACK.MAX_OFFSET,
+		"max_angle":FEEDBACK.MAX_ANGLE,"phase_rate":FEEDBACK.PHASE_RATE,"seed_modulo":FEEDBACK.SEED_MODULO,"seed_rate":FEEDBACK.SEED_RATE,
+		"y_rate":FEEDBACK.Y_RATE,"angle_rate":FEEDBACK.ANGLE_RATE,"offset_scale":FEEDBACK.OFFSET_SCALE}]
 	root.free()
 	return OK
