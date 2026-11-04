@@ -1,0 +1,310 @@
+{
+  "records": [
+    {
+      "name": "BossImageMaskRecord",
+      "section": 356,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "width",
+          "type": "u32"
+        },
+        {
+          "name": "height",
+          "type": "u32"
+        },
+        {
+          "name": "alpha_bits_hex",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusImageNode",
+      "section": 357,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "parent",
+          "type": "u32"
+        },
+        {
+          "name": "path",
+          "type": "string"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "scale_x",
+          "type": "f64"
+        },
+        {
+          "name": "scale_y",
+          "type": "f64"
+        },
+        {
+          "name": "skew",
+          "type": "f64"
+        },
+        {
+          "name": "visible",
+          "type": "bool"
+        },
+        {
+          "name": "pivot",
+          "type": "bool"
+        },
+        {
+          "name": "pivot_x",
+          "type": "f64"
+        },
+        {
+          "name": "pivot_y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusImageSprite",
+      "section": 358,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "node",
+          "type": "u32"
+        },
+        {
+          "name": "mask",
+          "type": "u32"
+        },
+        {
+          "name": "region_x",
+          "type": "u32"
+        },
+        {
+          "name": "region_y",
+          "type": "u32"
+        },
+        {
+          "name": "region_w",
+          "type": "u32"
+        },
+        {
+          "name": "region_h",
+          "type": "u32"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "scale_x",
+          "type": "f64"
+        },
+        {
+          "name": "scale_y",
+          "type": "f64"
+        },
+        {
+          "name": "skew",
+          "type": "f64"
+        },
+        {
+          "name": "offset_x",
+          "type": "f64"
+        },
+        {
+          "name": "offset_y",
+          "type": "f64"
+        },
+        {
+          "name": "centered",
+          "type": "bool"
+        },
+        {
+          "name": "flip_h",
+          "type": "bool"
+        },
+        {
+          "name": "flip_v",
+          "type": "bool"
+        },
+        {
+          "name": "visible",
+          "type": "bool"
+        },
+        {
+          "name": "bow",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusImageBow",
+      "section": 359,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "region_x",
+          "type": "u32"
+        },
+        {
+          "name": "region_y",
+          "type": "u32"
+        },
+        {
+          "name": "region_w",
+          "type": "u32"
+        },
+        {
+          "name": "region_h",
+          "type": "u32"
+        },
+        {
+          "name": "grip_x",
+          "type": "f64"
+        },
+        {
+          "name": "grip_y",
+          "type": "f64"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusImageClip",
+      "section": 360,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "name",
+          "type": "string"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusImageKey",
+      "section": 361,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "clip",
+          "type": "u32"
+        },
+        {
+          "name": "duration",
+          "type": "f64"
+        },
+        {
+          "name": "interpolate",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "CentaurusImagePose",
+      "section": 362,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "key",
+          "type": "u32"
+        },
+        {
+          "name": "node",
+          "type": "u32"
+        },
+        {
+          "name": "x",
+          "type": "f64"
+        },
+        {
+          "name": "y",
+          "type": "f64"
+        },
+        {
+          "name": "rotation",
+          "type": "f64"
+        },
+        {
+          "name": "scale_x",
+          "type": "f64"
+        },
+        {
+          "name": "scale_y",
+          "type": "f64"
+        },
+        {
+          "name": "skew",
+          "type": "f64"
+        },
+        {
+          "name": "visible",
+          "type": "bool"
+        },
+        {
+          "name": "bow",
+          "type": "i64"
+        },
+        {
+          "name": "pivot_origin",
+          "type": "bool"
+        },
+        {
+          "name": "pivot_x",
+          "type": "f64"
+        },
+        {
+          "name": "pivot_y",
+          "type": "f64"
+        }
+      ]
+    }
+  ],
+  "enums": {}
+}

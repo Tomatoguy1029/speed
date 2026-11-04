@@ -3,6 +3,8 @@
 namespace speed {class CanisStream {public:
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static double attack_length(const RunRuntime &,EnemyHandle,uint32_t);
+    static double order_start(const ContentBundle &,uint32_t,double);
+    static double hound_warning(const ContentBundle &,uint32_t,double);
     static void start(RunRuntime &,TechniqueState &,CanisStreamState &,uint32_t);
     static bool advance(RunRuntime &,TechniqueState &,CanisStreamState &,double,bool manual_retained=false);
     static void begin(RunRuntime &,TechniqueState &);

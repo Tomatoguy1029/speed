@@ -1,4 +1,5 @@
 #include "kick.h"
+#include "../flow/phase_controller.h"
 #include "strike_shape.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
@@ -25,7 +26,14 @@ void MonocerosKick::command(RunRuntime &r,TechniqueState &t,TechniqueCommand com
         MonocerosKick::command(r,t,TechniqueCommand::LockAim);
         if (e.pos.distance_to(t.aim)>reach(r,t) || std::abs(angle_difference(t.direction.angle()-e.facing-godot::Math::PI))>boss(r,t).kick_trigger_arc) recovery(r,t);
         else t.stage=TechniqueStage::Active;
-    } else if (command==TechniqueCommand::EndStrike && t.stage==TechniqueStage::Active) recovery(r,t);
+    } else if (command==TechniqueCommand::EndStrike && t.stage==TechniqueStage::Active) {
+        if (auto *body=PhaseController::find(r,t.actor)) {
+            MonocerosBreathVisual visual;visual.position=t.direction*rule(r,t).reach;visual.direction=t.direction.angle();
+            visual.started=body->clock;visual.lifetime=r.content->config.fx_monoceros_kick_life;visual.spread=0.9;visual.reach=120;visual.seed=39;visual.attached=true;
+            body->monoceros_breaths.push_back(visual);
+        }
+        recovery(r,t);
+    }
 }
 godot::PackedVector2Array MonocerosKick::horn(const RunRuntime &r,const TechniqueState &t,bool) {
     const auto &e=r.state.enemies[t.actor.slot];godot::PackedVector2Array points;points.push_back(e.pos+t.direction*e.radius*0.65);points.push_back(e.pos+t.direction*rule(r,t).reach);return points;

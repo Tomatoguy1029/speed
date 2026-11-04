@@ -16,7 +16,8 @@ struct CoronaMember {EnemyHandle owner;uint32_t definition=0,slot=0;uint64_t ser
 struct CoronaMemberRef {EnemyHandle target;uint64_t serial=0;};
 struct PumpState {std::vector<uint32_t> contents;double bud_t=0;};
 struct CrabState {int32_t buds=1;AttackHandle sweep;};
-struct AquilaState {Vector2 anchor;double bud_t=0;};
+struct AquilaTrace {Vector2 pos;double time=0;};
+struct AquilaState {Vector2 anchor;double bud_t=0;uint32_t drop_count=0;std::vector<AquilaTrace> trace;};
 struct PhoenixState {Vector2 anchor;};
 struct PendingEnemySpawn {uint32_t definition=0;Vector2 position,velocity;double facing=0,hit_cd=0,guard=0,knock=0,priority=0;SpawnOrigin origin=SpawnOrigin::Split;EnemyHandle picaro_owner;};
 struct CrowState {};
@@ -31,7 +32,7 @@ struct RulerState {int32_t side=0;AttackHandle beam;};
 struct CepheusState {uint32_t tier=0;Vector2 anchor;double volley=0;};
 struct SoldierFormation {Vector2 anchor;double spacing=0,row_near=0,row_far=0,fan_radius=0,fan_step=0;uint32_t tier=1;};
 struct SoldierState {EnemyHandle king;int64_t king_id=0;uint32_t slot=0;SoldierFormation formation;};
-struct LynxState {int32_t buds=0;};
+struct LynxState {int32_t buds=0,last_side=1;double last_fire=-1;};
 struct MarlinState {godot::Vector2 anchor;};
 struct SniperState {std::vector<float> rays;};
 struct Enemy {

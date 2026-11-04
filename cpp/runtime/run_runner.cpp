@@ -7,6 +7,9 @@
 #include "dev_commands.h"
 #include "../output/frame_builder.h"
 #include "../bosses/draco/finale.h"
+#include "../bosses/canis_major/nova.h"
+#include "../bosses/canis_major/fire_visual.h"
+#include "../systems/boss_image.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "../behaviors/enemies/corona_vortex.h"
@@ -28,6 +31,8 @@
 #include "../behaviors/traits/vortex.h"
 #include "../systems/progression.h"
 #include "../systems/field.h"
+#include "../systems/boss_ram.h"
+#include "../systems/boss_contact.h"
 #include "../systems/enemy_system.h"
 #include "../systems/encounters.h"
 #include "../systems/pickup_system.h"
@@ -56,6 +61,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     auto &state=core.runtime.state;auto &control=state.control;
     auto timed=[&](const char *name,auto &&action) {MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,name);return action();};
     using Phase=godot::RunState::Phase;
+    BossRamSystem::cancel_invalid(core.runtime);
     // UIの入口判定を通過するまで、入力も時計も消費しない。
     if (control.ui_overlay || (control.ui_reward && state.phase!=Phase::Finishing)) return true;
     if (state.phase==Phase::LevelUp) {ProgressionSystem::poll(core);return true;}
@@ -84,8 +90,11 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.controls_locked) state.ship.vel=godot::Vector2();
     camera(core,0,size);
     state.sim_time+=dt;
+    BossImageSystem::refresh(core.runtime);
     if (!timed("draw_input",[&]{return core.handle_draw_input(input,int64_t(std::round(state.sim_time*1000)),control.camera_zoom);})) return false;
-    if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);return true;}
+    if (state.control.boss_ram.pending && state.draw.tracing) core.end_trace(false);
+    if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);BossRamSystem::advance(core.runtime,dt);return true;}
+    if (state.control.boss_ram.pending) BossRamSystem::advance(core.runtime,dt);
     if (!state.draw.tracing && state.dash_stop>0) state.dash_stop=std::max(0.0,state.dash_stop-dt*state.combat_config.kill_hitstop_regen);
     if (!timed("draw",[&]{return core.step_draw(dt);})) return false;
     if (core.check_run_end()) return true;
@@ -113,11 +122,14 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
             timed("field.gravity",[&]{FieldSystem::step_gravity(core.runtime,wd);});
             if (!timed("enemies",[&]{return core.advance_enemies(wd);})) return false;
             if (!timed("avoidance",[&]{return core.avoid_strong(wd);})) return false;
+            BossImageSystem::refresh(core.runtime);
         }
         if (core.check_run_end()) return true;
         if (!timed("enemy_grid",[&]{return core.rebuild_enemy_grid(state.frame_grid_cell);})) return false;
     }
+    if (state.boss_contact_interrupt_trace) {state.boss_contact_interrupt_trace=false;if (state.draw.tracing) core.end_trace(false);}
     if (!timed("ship",[&]{return core.step_ship_input(dt,world_dt,input);})) return false;
+    BossContactSystem::clear_landings(core.runtime);
     BossFinish::record_approach(core.runtime);
     if (control.lab_enemy_ai || !control.lab_mode) {
         if (input.hero_press) HeroesSystem::activate(core.runtime);
@@ -184,6 +196,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     state.ship_pos=state.ship.pos;
     if ((control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
+    BossImageSystem::refresh(core.runtime);
+    if (world_step && state.phase==Phase::Play)
+        for (auto &body:state.bosses.bodies) {CanisNova::field_tick(core.runtime,body);CanisFireVisualSystem::tick(core.runtime,body);}
     if (!core.check_run_end()) {
         if (state.loadout.ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);

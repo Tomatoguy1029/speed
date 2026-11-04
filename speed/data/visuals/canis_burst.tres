@@ -1,0 +1,33 @@
+[gd_resource type="Resource" format=3]
+
+[resource]
+metadata/reference_radius = 100.0
+metadata/reference_pixel_size = 2.366
+metadata/radius_scale = 0.6
+metadata/reference_reach = 3.2991459179412574
+metadata/seed = 4.0
+metadata/duration = 0.8
+metadata/fps = 30.0
+metadata/settings = {
+"cinder_count": 30.0,
+"cinder_seconds": 0.5000000074506,
+"cool_speed": 1.20000001788144,
+"flash_seconds": 0.0999999977648,
+"grow_seconds": 0.29999999515706,
+"hole_size": 0.40000000596048,
+"ring_alpha": 0.0,
+"smoke_alpha": 0.60000000894072,
+"smoke_count": 8.0,
+"smoke_seconds": 0.60000000894072,
+"spark_count": 20.0,
+"spark_seconds": 0.5000000074506,
+"spark_speed": 1.0000000149012,
+"start_size": 0.10000000149012,
+"c0": Color(1, 1, 1, 1),
+"c1": Color(0.847058823529, 0.945098039216, 1, 1),
+"c2": Color(0.435294117647, 0.721568627451, 0.949019607843, 1),
+"c3": Color(0.164705882353, 0.4, 0.76862745098, 1),
+"smoke_dark": Color(0.0901960784314, 0.141176470588, 0.2, 1),
+"smoke_mid": Color(0.207843137255, 0.278431372549, 0.356862745098, 1),
+"smoke_light": Color(0.380392156863, 0.454901960784, 0.545098039216, 1)
+}

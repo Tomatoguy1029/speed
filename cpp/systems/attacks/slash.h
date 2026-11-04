@@ -6,6 +6,8 @@ struct SlashParams {
     double angle=0,speed=0,size=0,range=0,damage=0,side=1;
     EnemyHandle owner;
     BudgetToken budget;
+    uint32_t lynx_definition=0;
+    godot::Vector2 paw_offset;
 };
 class SlashSystem {
 public:

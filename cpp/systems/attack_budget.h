@@ -8,6 +8,7 @@ struct BudgetRequest {
     std::vector<AttackCategory> categories;
     EnemyHandle source;
     double duration=0,priority=0,cost=1;
+    bool reuse_residual=false;
 };
 class AttackBudgetSystem {
     RunRuntime &run;

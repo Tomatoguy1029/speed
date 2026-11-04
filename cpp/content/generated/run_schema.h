@@ -98,6 +98,12 @@ struct RunConfig {
     double pickup_repair_fraction{};
     double pickup_life{};
     double trace_radius{};
+    double fx_boss_ram_hitstop{};
+    double fx_monoceros_sweep_timing{};
+    double fx_monoceros_slash_life{};
+    double fx_monoceros_kick_life{};
+    double fx_monoceros_lance_timing{};
+    double fx_boss_touch_damage{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -275,6 +281,18 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.pickup_life < 0) return false;
     if (!input.read_f64(out.trace_radius)) return false;
     if (out.trace_radius < 0) return false;
+    if (!input.read_f64(out.fx_boss_ram_hitstop)) return false;
+    if (out.fx_boss_ram_hitstop < 0) return false;
+    if (!input.read_f64(out.fx_monoceros_sweep_timing)) return false;
+    if (out.fx_monoceros_sweep_timing < 0) return false;
+    if (!input.read_f64(out.fx_monoceros_slash_life)) return false;
+    if (out.fx_monoceros_slash_life < 0) return false;
+    if (!input.read_f64(out.fx_monoceros_kick_life)) return false;
+    if (out.fx_monoceros_kick_life < 0) return false;
+    if (!input.read_f64(out.fx_monoceros_lance_timing)) return false;
+    if (out.fx_monoceros_lance_timing < 0) return false;
+    if (!input.read_f64(out.fx_boss_touch_damage)) return false;
+    if (out.fx_boss_touch_damage < 0) return false;
     return true;
 }
 struct StringEntry {
@@ -2064,6 +2082,14 @@ struct LynxDefinition {
     double slash_size{};
     double slash_range{};
     double damage{};
+    double fx_span{};
+    double fx_max_size{};
+    double fx_start{};
+    double fx_grow{};
+    double fx_cut{};
+    double fx_space0{};
+    double fx_space1{};
+    double fx_gap{};
 };
 inline bool read(BinaryReader &input, LynxDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2082,6 +2108,22 @@ inline bool read(BinaryReader &input, LynxDefinition &out) {
     if (out.slash_range < 0) return false;
     if (!input.read_f64(out.damage)) return false;
     if (out.damage < 0) return false;
+    if (!input.read_f64(out.fx_span)) return false;
+    if (out.fx_span < 0) return false;
+    if (!input.read_f64(out.fx_max_size)) return false;
+    if (out.fx_max_size < 0) return false;
+    if (!input.read_f64(out.fx_start)) return false;
+    if (out.fx_start < 0) return false;
+    if (!input.read_f64(out.fx_grow)) return false;
+    if (out.fx_grow < 0.001) return false;
+    if (!input.read_f64(out.fx_cut)) return false;
+    if (out.fx_cut < 0.001) return false;
+    if (!input.read_f64(out.fx_space0)) return false;
+    if (out.fx_space0 < 0) return false;
+    if (!input.read_f64(out.fx_space1)) return false;
+    if (out.fx_space1 < 0) return false;
+    if (!input.read_f64(out.fx_gap)) return false;
+    if (out.fx_gap < 0) return false;
     return true;
 }
 struct SoldierDefinition {
@@ -2205,6 +2247,7 @@ struct AquariusDefinition {
     double admission_duration{};
     double half_width{};
     uint32_t beams{};
+    double fx_size{};
 };
 inline bool read(BinaryReader &input, AquariusDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2231,6 +2274,8 @@ inline bool read(BinaryReader &input, AquariusDefinition &out) {
     if (out.half_width < 0) return false;
     if (!input.read_u32(out.beams)) return false;
     if (out.beams < 1) return false;
+    if (!input.read_f64(out.fx_size)) return false;
+    if (out.fx_size < 0) return false;
     return true;
 }
 struct CrossEnemyDefinition {
@@ -2436,6 +2481,8 @@ struct CrabDefinition {
     double turn_angle{};
     double damage{};
     double admission_duration{};
+    double fx_reach_r{};
+    double fx_hit_r{};
 };
 inline bool read(BinaryReader &input, CrabDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2454,6 +2501,10 @@ inline bool read(BinaryReader &input, CrabDefinition &out) {
     if (out.damage < 0) return false;
     if (!input.read_f64(out.admission_duration)) return false;
     if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.fx_reach_r)) return false;
+    if (out.fx_reach_r < 0) return false;
+    if (!input.read_f64(out.fx_hit_r)) return false;
+    if (out.fx_hit_r < 0) return false;
     return true;
 }
 struct CrowDefinition {
@@ -2684,6 +2735,7 @@ struct RulerDefinition {
     double beam_start_gap{};
     double damage{};
     double admission_duration{};
+    double fx_muzzle{};
 };
 inline bool read(BinaryReader &input, RulerDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -2716,6 +2768,8 @@ inline bool read(BinaryReader &input, RulerDefinition &out) {
     if (out.damage < 0) return false;
     if (!input.read_f64(out.admission_duration)) return false;
     if (out.admission_duration < 0) return false;
+    if (!input.read_f64(out.fx_muzzle)) return false;
+    if (out.fx_muzzle < 0) return false;
     return true;
 }
 struct TriangleDefinition {
@@ -5160,6 +5214,479 @@ inline bool read(BinaryReader &input, CentaurusComboDefinition &out) {
     if (out.gap < 0) return false;
     return true;
 }
+struct CentaurusReferenceFxDefinition {
+    uint32_t id{};
+    double release_life{};
+    double landing_life{};
+    double stomp_life{};
+};
+inline bool read(BinaryReader &input, CentaurusReferenceFxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.release_life)) return false;
+    if (out.release_life < 0) return false;
+    if (!input.read_f64(out.landing_life)) return false;
+    if (out.landing_life < 0) return false;
+    if (!input.read_f64(out.stomp_life)) return false;
+    if (out.stomp_life < 0) return false;
+    return true;
+}
+struct BossImageMaskRecord {
+    uint32_t id{};
+    uint32_t width{};
+    uint32_t height{};
+    std::string alpha_bits_hex{};
+};
+inline bool read(BinaryReader &input, BossImageMaskRecord &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.width)) return false;
+    if (!input.read_u32(out.height)) return false;
+    if (!input.read_string(out.alpha_bits_hex)) return false;
+    return true;
+}
+struct CentaurusImageNode {
+    uint32_t id{};
+    uint32_t parent{};
+    std::string path{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    bool visible{};
+    bool pivot{};
+    double pivot_x{};
+    double pivot_y{};
+};
+inline bool read(BinaryReader &input, CentaurusImageNode &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.parent)) return false;
+    if (!input.read_string(out.path)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_bool(out.pivot)) return false;
+    if (!input.read_f64(out.pivot_x)) return false;
+    if (!input.read_f64(out.pivot_y)) return false;
+    return true;
+}
+struct CentaurusImageSprite {
+    uint32_t id{};
+    uint32_t node{};
+    uint32_t mask{};
+    uint32_t region_x{};
+    uint32_t region_y{};
+    uint32_t region_w{};
+    uint32_t region_h{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    double offset_x{};
+    double offset_y{};
+    bool centered{};
+    bool flip_h{};
+    bool flip_v{};
+    bool visible{};
+    bool bow{};
+};
+inline bool read(BinaryReader &input, CentaurusImageSprite &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_u32(out.mask)) return false;
+    if (!input.read_u32(out.region_x)) return false;
+    if (!input.read_u32(out.region_y)) return false;
+    if (!input.read_u32(out.region_w)) return false;
+    if (!input.read_u32(out.region_h)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    if (!input.read_bool(out.centered)) return false;
+    if (!input.read_bool(out.flip_h)) return false;
+    if (!input.read_bool(out.flip_v)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_bool(out.bow)) return false;
+    return true;
+}
+struct CentaurusImageBow {
+    uint32_t id{};
+    uint32_t region_x{};
+    uint32_t region_y{};
+    uint32_t region_w{};
+    uint32_t region_h{};
+    double grip_x{};
+    double grip_y{};
+};
+inline bool read(BinaryReader &input, CentaurusImageBow &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.region_x)) return false;
+    if (!input.read_u32(out.region_y)) return false;
+    if (!input.read_u32(out.region_w)) return false;
+    if (!input.read_u32(out.region_h)) return false;
+    if (!input.read_f64(out.grip_x)) return false;
+    if (!input.read_f64(out.grip_y)) return false;
+    return true;
+}
+struct CentaurusImageClip {
+    uint32_t id{};
+    std::string name{};
+};
+inline bool read(BinaryReader &input, CentaurusImageClip &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.name)) return false;
+    return true;
+}
+struct CentaurusImageKey {
+    uint32_t id{};
+    uint32_t clip{};
+    double duration{};
+    bool interpolate{};
+};
+inline bool read(BinaryReader &input, CentaurusImageKey &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.clip)) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_bool(out.interpolate)) return false;
+    return true;
+}
+struct CentaurusImagePose {
+    uint32_t id{};
+    uint32_t key{};
+    uint32_t node{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    bool visible{};
+    int64_t bow{};
+    bool pivot_origin{};
+    double pivot_x{};
+    double pivot_y{};
+};
+inline bool read(BinaryReader &input, CentaurusImagePose &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.key)) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_i64(out.bow)) return false;
+    if (!input.read_bool(out.pivot_origin)) return false;
+    if (!input.read_f64(out.pivot_x)) return false;
+    if (!input.read_f64(out.pivot_y)) return false;
+    return true;
+}
+struct CanisImagePartDefinition {
+    uint32_t id{};
+    std::string name{};
+    uint32_t mask{};
+    double x{};
+    double y{};
+    double sprite_x{};
+    double sprite_y{};
+    uint32_t width{};
+    uint32_t height{};
+    bool flip_h{};
+    bool visible{};
+};
+inline bool read(BinaryReader &input, CanisImagePartDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.name)) return false;
+    if (!input.read_u32(out.mask)) return false;
+    if (out.mask < 1) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.sprite_x)) return false;
+    if (!input.read_f64(out.sprite_y)) return false;
+    if (!input.read_u32(out.width)) return false;
+    if (out.width < 1) return false;
+    if (!input.read_u32(out.height)) return false;
+    if (out.height < 1) return false;
+    if (!input.read_bool(out.flip_h)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    return true;
+}
+struct CanisRoarDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    std::string external_id{};
+    bool has_roar{};
+    uint32_t level{};
+    double roar_time{};
+    double timing{};
+    double order_wait{};
+    double hound_warn{};
+    bool has_hound_speed{};
+    double hound_speed{};
+    double burst_duration{};
+};
+inline bool read(BinaryReader &input, CanisRoarDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (out.technique < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_bool(out.has_roar)) return false;
+    if (!input.read_u32(out.level)) return false;
+    if (out.level > 3) return false;
+    if (!input.read_f64(out.roar_time)) return false;
+    if (out.roar_time < 0) return false;
+    if (!input.read_f64(out.timing)) return false;
+    if (out.timing < 0) return false;
+    if (!input.read_f64(out.order_wait)) return false;
+    if (out.order_wait < 0) return false;
+    if (!input.read_f64(out.hound_warn)) return false;
+    if (out.hound_warn < 0) return false;
+    if (!input.read_bool(out.has_hound_speed)) return false;
+    if (!input.read_f64(out.hound_speed)) return false;
+    if (out.hound_speed < 0) return false;
+    if (!input.read_f64(out.burst_duration)) return false;
+    if (out.burst_duration < 0) return false;
+    return true;
+}
+struct CanisFireFxDefinition {
+    uint32_t id{};
+    uint32_t technique{};
+    std::string external_id{};
+    double size{};
+    double intensity{};
+    double timing{};
+    double jet_length{};
+    double jet_width{};
+    double jet_spikes{};
+    double ember_delay{};
+    bool has_hound_jet{};
+    double hound_jet_length{};
+    double hound_jet_width{};
+    bool has_hound_speed{};
+    double hound_speed{};
+};
+inline bool read(BinaryReader &input, CanisFireFxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.technique)) return false;
+    if (out.technique < 1) return false;
+    if (!input.read_string(out.external_id)) return false;
+    if (!input.read_f64(out.size)) return false;
+    if (out.size < 0) return false;
+    if (!input.read_f64(out.intensity)) return false;
+    if (out.intensity < 0) return false;
+    if (!input.read_f64(out.timing)) return false;
+    if (out.timing < 0) return false;
+    if (!input.read_f64(out.jet_length)) return false;
+    if (out.jet_length < 0) return false;
+    if (!input.read_f64(out.jet_width)) return false;
+    if (out.jet_width < 0) return false;
+    if (!input.read_f64(out.jet_spikes)) return false;
+    if (out.jet_spikes < 0) return false;
+    if (!input.read_f64(out.ember_delay)) return false;
+    if (out.ember_delay < 0) return false;
+    if (!input.read_bool(out.has_hound_jet)) return false;
+    if (!input.read_f64(out.hound_jet_length)) return false;
+    if (out.hound_jet_length < 0) return false;
+    if (!input.read_f64(out.hound_jet_width)) return false;
+    if (out.hound_jet_width < 0) return false;
+    if (!input.read_bool(out.has_hound_speed)) return false;
+    if (!input.read_f64(out.hound_speed)) return false;
+    if (out.hound_speed < 0) return false;
+    return true;
+}
+struct MonocerosImageNode {
+    uint32_t id{};
+    uint32_t parent{};
+    std::string path{};
+    double x{};
+    double y{};
+    double rotation{};
+    double scale_x{};
+    double scale_y{};
+    double skew{};
+    bool visible{};
+    bool editable{};
+    double offset_x{};
+    double offset_y{};
+};
+inline bool read(BinaryReader &input, MonocerosImageNode &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.parent)) return false;
+    if (!input.read_string(out.path)) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    if (!input.read_f64(out.rotation)) return false;
+    if (!input.read_f64(out.scale_x)) return false;
+    if (!input.read_f64(out.scale_y)) return false;
+    if (!input.read_f64(out.skew)) return false;
+    if (!input.read_bool(out.visible)) return false;
+    if (!input.read_bool(out.editable)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    return true;
+}
+struct MonocerosImageSprite {
+    uint32_t id{};
+    uint32_t node{};
+    uint32_t mask{};
+    uint32_t region_x{};
+    uint32_t region_y{};
+    uint32_t region_w{};
+    uint32_t region_h{};
+    double offset_x{};
+    double offset_y{};
+    bool centered{};
+    bool flip_h{};
+    bool flip_v{};
+    uint32_t hframes{};
+    uint32_t vframes{};
+    uint32_t frame{};
+    int64_t gait_slot{};
+    bool gait_armor{};
+    bool horn{};
+};
+inline bool read(BinaryReader &input, MonocerosImageSprite &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.node)) return false;
+    if (!input.read_u32(out.mask)) return false;
+    if (!input.read_u32(out.region_x)) return false;
+    if (!input.read_u32(out.region_y)) return false;
+    if (!input.read_u32(out.region_w)) return false;
+    if (!input.read_u32(out.region_h)) return false;
+    if (!input.read_f64(out.offset_x)) return false;
+    if (!input.read_f64(out.offset_y)) return false;
+    if (!input.read_bool(out.centered)) return false;
+    if (!input.read_bool(out.flip_h)) return false;
+    if (!input.read_bool(out.flip_v)) return false;
+    if (!input.read_u32(out.hframes)) return false;
+    if (!input.read_u32(out.vframes)) return false;
+    if (!input.read_u32(out.frame)) return false;
+    if (!input.read_i64(out.gait_slot)) return false;
+    if (!input.read_bool(out.gait_armor)) return false;
+    if (!input.read_bool(out.horn)) return false;
+    return true;
+}
+struct MonocerosImageGait {
+    uint32_t id{};
+    double duration{};
+    uint32_t base_mask{};
+    uint32_t base_x{};
+    uint32_t base_y{};
+    uint32_t base_w{};
+    uint32_t base_h{};
+    uint32_t armor_mask{};
+    uint32_t armor_x{};
+    uint32_t armor_y{};
+    uint32_t armor_w{};
+    uint32_t armor_h{};
+};
+inline bool read(BinaryReader &input, MonocerosImageGait &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_u32(out.base_mask)) return false;
+    if (!input.read_u32(out.base_x)) return false;
+    if (!input.read_u32(out.base_y)) return false;
+    if (!input.read_u32(out.base_w)) return false;
+    if (!input.read_u32(out.base_h)) return false;
+    if (!input.read_u32(out.armor_mask)) return false;
+    if (!input.read_u32(out.armor_x)) return false;
+    if (!input.read_u32(out.armor_y)) return false;
+    if (!input.read_u32(out.armor_w)) return false;
+    if (!input.read_u32(out.armor_h)) return false;
+    return true;
+}
+struct MonocerosImageHorn {
+    uint32_t id{};
+    double duration{};
+    double core_length{};
+};
+inline bool read(BinaryReader &input, MonocerosImageHorn &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_f64(out.core_length)) return false;
+    return true;
+}
+struct MonocerosImageTuning {
+    uint32_t id{};
+    std::string move{};
+    double body_follow{};
+    double neck_follow{};
+    double head_follow{};
+    double tail_follow{};
+    double flame_follow{};
+    double body_lag{};
+    double head_turn{};
+    double tail_turn{};
+};
+inline bool read(BinaryReader &input, MonocerosImageTuning &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_string(out.move)) return false;
+    if (!input.read_f64(out.body_follow)) return false;
+    if (!input.read_f64(out.neck_follow)) return false;
+    if (!input.read_f64(out.head_follow)) return false;
+    if (!input.read_f64(out.tail_follow)) return false;
+    if (!input.read_f64(out.flame_follow)) return false;
+    if (!input.read_f64(out.body_lag)) return false;
+    if (!input.read_f64(out.head_turn)) return false;
+    if (!input.read_f64(out.tail_turn)) return false;
+    return true;
+}
+struct BossImageFeedback {
+    uint32_t id{};
+    double duration{};
+    double max_white{};
+    double max_offset{};
+    double max_angle{};
+    double phase_rate{};
+    uint32_t seed_modulo{};
+    double seed_rate{};
+    double y_rate{};
+    double angle_rate{};
+    double offset_scale{};
+};
+inline bool read(BinaryReader &input, BossImageFeedback &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.duration)) return false;
+    if (!input.read_f64(out.max_white)) return false;
+    if (!input.read_f64(out.max_offset)) return false;
+    if (!input.read_f64(out.max_angle)) return false;
+    if (!input.read_f64(out.phase_rate)) return false;
+    if (!input.read_u32(out.seed_modulo)) return false;
+    if (!input.read_f64(out.seed_rate)) return false;
+    if (!input.read_f64(out.y_rate)) return false;
+    if (!input.read_f64(out.angle_rate)) return false;
+    if (!input.read_f64(out.offset_scale)) return false;
+    return true;
+}
 struct CanisBodyDefinition {
     uint32_t id{};
     uint32_t boss{};
@@ -5763,6 +6290,51 @@ inline bool read(BinaryReader &input, CanisRelayDefinition &out) {
     if (out.final_lock < 0) return false;
     if (!input.read_f64(out.final_turn)) return false;
     if (out.final_turn < 0) return false;
+    return true;
+}
+struct CanisNovaHullPoint {
+    uint32_t id{};
+    double x{};
+    double y{};
+};
+inline bool read(BinaryReader &input, CanisNovaHullPoint &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_f64(out.x)) return false;
+    if (!input.read_f64(out.y)) return false;
+    return true;
+}
+struct CanisNovaFxDefinition {
+    uint32_t id{};
+    uint32_t source_width{};
+    uint32_t source_height{};
+    double gather_time{};
+    double hound_delay{};
+    double flash_delay{};
+    uint32_t roar_level{};
+    double roar_time{};
+    double timing{};
+};
+inline bool read(BinaryReader &input, CanisNovaFxDefinition &out) {
+    if (!input.read_u32(out.id)) return false;
+    if (out.id < 1) return false;
+    if (!input.read_u32(out.source_width)) return false;
+    if (out.source_width < 1) return false;
+    if (!input.read_u32(out.source_height)) return false;
+    if (out.source_height < 1) return false;
+    if (!input.read_f64(out.gather_time)) return false;
+    if (out.gather_time < 0) return false;
+    if (!input.read_f64(out.hound_delay)) return false;
+    if (out.hound_delay < 0) return false;
+    if (!input.read_f64(out.flash_delay)) return false;
+    if (out.flash_delay < 0) return false;
+    if (!input.read_u32(out.roar_level)) return false;
+    if (out.roar_level < 1) return false;
+    if (out.roar_level > 3) return false;
+    if (!input.read_f64(out.roar_time)) return false;
+    if (out.roar_time < 0) return false;
+    if (!input.read_f64(out.timing)) return false;
+    if (out.timing < 0) return false;
     return true;
 }
 struct CanisSiriusFlameDefinition {
@@ -7468,6 +8040,23 @@ struct ContentRecords {
     std::vector<CentaurusShowerDefinition> CentaurusShowerDefinition_rows;
     std::vector<CentaurusSailDefinition> CentaurusSailDefinition_rows;
     std::vector<CentaurusComboDefinition> CentaurusComboDefinition_rows;
+    std::vector<CentaurusReferenceFxDefinition> CentaurusReferenceFxDefinition_rows;
+    std::vector<BossImageMaskRecord> BossImageMaskRecord_rows;
+    std::vector<CentaurusImageNode> CentaurusImageNode_rows;
+    std::vector<CentaurusImageSprite> CentaurusImageSprite_rows;
+    std::vector<CentaurusImageBow> CentaurusImageBow_rows;
+    std::vector<CentaurusImageClip> CentaurusImageClip_rows;
+    std::vector<CentaurusImageKey> CentaurusImageKey_rows;
+    std::vector<CentaurusImagePose> CentaurusImagePose_rows;
+    std::vector<CanisImagePartDefinition> CanisImagePartDefinition_rows;
+    std::vector<CanisRoarDefinition> CanisRoarDefinition_rows;
+    std::vector<CanisFireFxDefinition> CanisFireFxDefinition_rows;
+    std::vector<MonocerosImageNode> MonocerosImageNode_rows;
+    std::vector<MonocerosImageSprite> MonocerosImageSprite_rows;
+    std::vector<MonocerosImageGait> MonocerosImageGait_rows;
+    std::vector<MonocerosImageHorn> MonocerosImageHorn_rows;
+    std::vector<MonocerosImageTuning> MonocerosImageTuning_rows;
+    std::vector<BossImageFeedback> BossImageFeedback_rows;
     std::vector<CanisBodyDefinition> CanisBodyDefinition_rows;
     std::vector<CanisFlameDefinition> CanisFlameDefinition_rows;
     std::vector<CanisCommandDefinition> CanisCommandDefinition_rows;
@@ -7481,6 +8070,8 @@ struct ContentRecords {
     std::vector<CanisHuntPounceDefinition> CanisHuntPounceDefinition_rows;
     std::vector<CanisNovaDefinition> CanisNovaDefinition_rows;
     std::vector<CanisRelayDefinition> CanisRelayDefinition_rows;
+    std::vector<CanisNovaHullPoint> CanisNovaHullPoint_rows;
+    std::vector<CanisNovaFxDefinition> CanisNovaFxDefinition_rows;
     std::vector<CanisSiriusFlameDefinition> CanisSiriusFlameDefinition_rows;
     std::vector<HydraBodyDefinition> HydraBodyDefinition_rows;
     std::vector<HydraRegrowDefinition> HydraRegrowDefinition_rows;
@@ -7531,8 +8122,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 10) return false;
-        if (count > input.remaining()/680) return false;
+        if (version != 16) return false;
+        if (count > input.remaining()/728) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -7991,7 +8582,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 69: {
         if (version != 1) return false;
-        if (count > input.remaining()/60) return false;
+        if (count > input.remaining()/124) return false;
         for (uint32_t i=0; i<count; ++i) { LynxDefinition row; if (!read(input,row)) return false; out.LynxDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8021,7 +8612,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 104: {
         if (version != 1) return false;
-        if (count > input.remaining()/88) return false;
+        if (count > input.remaining()/96) return false;
         for (uint32_t i=0; i<count; ++i) { AquariusDefinition row; if (!read(input,row)) return false; out.AquariusDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8063,7 +8654,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 130: {
         if (version != 1) return false;
-        if (count > input.remaining()/60) return false;
+        if (count > input.remaining()/76) return false;
         for (uint32_t i=0; i<count; ++i) { CrabDefinition row; if (!read(input,row)) return false; out.CrabDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8105,7 +8696,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 113: {
         if (version != 1) return false;
-        if (count > input.remaining()/116) return false;
+        if (count > input.remaining()/124) return false;
         for (uint32_t i=0; i<count; ++i) { RulerDefinition row; if (!read(input,row)) return false; out.RulerDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -8541,6 +9132,108 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { CentaurusComboDefinition row; if (!read(input,row)) return false; out.CentaurusComboDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
+    case 451: {
+        if (version != 1) return false;
+        if (count > input.remaining()/28) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusReferenceFxDefinition row; if (!read(input,row)) return false; out.CentaurusReferenceFxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 356: {
+        if (version != 1) return false;
+        if (count > input.remaining()/16) return false;
+        for (uint32_t i=0; i<count; ++i) { BossImageMaskRecord row; if (!read(input,row)) return false; out.BossImageMaskRecord_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 357: {
+        if (version != 1) return false;
+        if (count > input.remaining()/78) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageNode row; if (!read(input,row)) return false; out.CentaurusImageNode_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 358: {
+        if (version != 1) return false;
+        if (count > input.remaining()/97) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageSprite row; if (!read(input,row)) return false; out.CentaurusImageSprite_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 359: {
+        if (version != 1) return false;
+        if (count > input.remaining()/36) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageBow row; if (!read(input,row)) return false; out.CentaurusImageBow_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 360: {
+        if (version != 1) return false;
+        if (count > input.remaining()/8) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageClip row; if (!read(input,row)) return false; out.CentaurusImageClip_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 361: {
+        if (version != 1) return false;
+        if (count > input.remaining()/17) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImageKey row; if (!read(input,row)) return false; out.CentaurusImageKey_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 362: {
+        if (version != 1) return false;
+        if (count > input.remaining()/86) return false;
+        for (uint32_t i=0; i<count; ++i) { CentaurusImagePose row; if (!read(input,row)) return false; out.CentaurusImagePose_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 363: {
+        if (version != 1) return false;
+        if (count > input.remaining()/54) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisImagePartDefinition row; if (!read(input,row)) return false; out.CanisImagePartDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 364: {
+        if (version != 1) return false;
+        if (count > input.remaining()/66) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisRoarDefinition row; if (!read(input,row)) return false; out.CanisRoarDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 365: {
+        if (version != 1) return false;
+        if (count > input.remaining()/94) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisFireFxDefinition row; if (!read(input,row)) return false; out.CanisFireFxDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 410: {
+        if (version != 1) return false;
+        if (count > input.remaining()/78) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageNode row; if (!read(input,row)) return false; out.MonocerosImageNode_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 411: {
+        if (version != 1) return false;
+        if (count > input.remaining()/69) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageSprite row; if (!read(input,row)) return false; out.MonocerosImageSprite_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 412: {
+        if (version != 1) return false;
+        if (count > input.remaining()/52) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageGait row; if (!read(input,row)) return false; out.MonocerosImageGait_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 413: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageHorn row; if (!read(input,row)) return false; out.MonocerosImageHorn_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 414: {
+        if (version != 1) return false;
+        if (count > input.remaining()/72) return false;
+        for (uint32_t i=0; i<count; ++i) { MonocerosImageTuning row; if (!read(input,row)) return false; out.MonocerosImageTuning_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 415: {
+        if (version != 1) return false;
+        if (count > input.remaining()/80) return false;
+        for (uint32_t i=0; i<count; ++i) { BossImageFeedback row; if (!read(input,row)) return false; out.BossImageFeedback_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
     case 340: {
         if (version != 1) return false;
         if (count > input.remaining()/164) return false;
@@ -8617,6 +9310,18 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/60) return false;
         for (uint32_t i=0; i<count; ++i) { CanisRelayDefinition row; if (!read(input,row)) return false; out.CanisRelayDefinition_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 354: {
+        if (version != 1) return false;
+        if (count > input.remaining()/20) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisNovaHullPoint row; if (!read(input,row)) return false; out.CanisNovaHullPoint_rows.push_back(std::move(row)); }
+        return input.remaining()==0;
+    }
+    case 355: {
+        if (version != 1) return false;
+        if (count > input.remaining()/56) return false;
+        for (uint32_t i=0; i<count; ++i) { CanisNovaFxDefinition row; if (!read(input,row)) return false; out.CanisNovaFxDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 353: {
@@ -9235,6 +9940,40 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusSailDefinition_rows) if (!CentaurusSailDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CentaurusComboDefinition_ids;
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!CentaurusComboDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusReferenceFxDefinition_ids;
+    for (const auto &row:data.CentaurusReferenceFxDefinition_rows) if (!CentaurusReferenceFxDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossImageMaskRecord_ids;
+    for (const auto &row:data.BossImageMaskRecord_rows) if (!BossImageMaskRecord_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageNode_ids;
+    for (const auto &row:data.CentaurusImageNode_rows) if (!CentaurusImageNode_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageSprite_ids;
+    for (const auto &row:data.CentaurusImageSprite_rows) if (!CentaurusImageSprite_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageBow_ids;
+    for (const auto &row:data.CentaurusImageBow_rows) if (!CentaurusImageBow_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageClip_ids;
+    for (const auto &row:data.CentaurusImageClip_rows) if (!CentaurusImageClip_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImageKey_ids;
+    for (const auto &row:data.CentaurusImageKey_rows) if (!CentaurusImageKey_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CentaurusImagePose_ids;
+    for (const auto &row:data.CentaurusImagePose_rows) if (!CentaurusImagePose_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisImagePartDefinition_ids;
+    for (const auto &row:data.CanisImagePartDefinition_rows) if (!CanisImagePartDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisRoarDefinition_ids;
+    for (const auto &row:data.CanisRoarDefinition_rows) if (!CanisRoarDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisFireFxDefinition_ids;
+    for (const auto &row:data.CanisFireFxDefinition_rows) if (!CanisFireFxDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageNode_ids;
+    for (const auto &row:data.MonocerosImageNode_rows) if (!MonocerosImageNode_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageSprite_ids;
+    for (const auto &row:data.MonocerosImageSprite_rows) if (!MonocerosImageSprite_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageGait_ids;
+    for (const auto &row:data.MonocerosImageGait_rows) if (!MonocerosImageGait_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageHorn_ids;
+    for (const auto &row:data.MonocerosImageHorn_rows) if (!MonocerosImageHorn_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> MonocerosImageTuning_ids;
+    for (const auto &row:data.MonocerosImageTuning_rows) if (!MonocerosImageTuning_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> BossImageFeedback_ids;
+    for (const auto &row:data.BossImageFeedback_rows) if (!BossImageFeedback_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisBodyDefinition_ids;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!CanisBodyDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisFlameDefinition_ids;
@@ -9261,6 +10000,10 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CanisNovaDefinition_rows) if (!CanisNovaDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisRelayDefinition_ids;
     for (const auto &row:data.CanisRelayDefinition_rows) if (!CanisRelayDefinition_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisNovaHullPoint_ids;
+    for (const auto &row:data.CanisNovaHullPoint_rows) if (!CanisNovaHullPoint_ids.insert(row.id).second) return false;
+    std::unordered_set<uint32_t> CanisNovaFxDefinition_ids;
+    for (const auto &row:data.CanisNovaFxDefinition_rows) if (!CanisNovaFxDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> CanisSiriusFlameDefinition_ids;
     for (const auto &row:data.CanisSiriusFlameDefinition_rows) if (!CanisSiriusFlameDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraBodyDefinition_ids;
@@ -9529,6 +10272,8 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.first)) return false;
     for (const auto &row:data.CentaurusComboDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.second)) return false;
+    for (const auto &row:data.CanisRoarDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
+    for (const auto &row:data.CanisFireFxDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
     for (const auto &row:data.CanisBodyDefinition_rows) if (!EnemyRecord_ids.count(row.hound)) return false;
     for (const auto &row:data.CanisFlameDefinition_rows) if (!BossDefinition_ids.count(row.boss)) return false;
@@ -9705,6 +10450,8 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.pickup_config.repair_fraction=config.pickup_repair_fraction;
     state.pickup_config.pickup_life=config.pickup_life;
     state.trace_radius=config.trace_radius;
+    state.control.boss_ram_hitstop=config.fx_boss_ram_hitstop;
+    state.control.boss_touch_damage=config.fx_boss_touch_damage;
 }
 inline godot::Dictionary config_snapshot(const RunConfig &config) {
     godot::Dictionary out;
@@ -9800,6 +10547,12 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["pickup_repair_fraction"]=config.pickup_repair_fraction;
     out["pickup_life"]=config.pickup_life;
     out["trace_radius"]=config.trace_radius;
+    out["fx_boss_ram_hitstop"]=config.fx_boss_ram_hitstop;
+    out["fx_monoceros_sweep_timing"]=config.fx_monoceros_sweep_timing;
+    out["fx_monoceros_slash_life"]=config.fx_monoceros_slash_life;
+    out["fx_monoceros_kick_life"]=config.fx_monoceros_kick_life;
+    out["fx_monoceros_lance_timing"]=config.fx_monoceros_lance_timing;
+    out["fx_boss_touch_damage"]=config.fx_boss_touch_damage;
     return out;
 }
 inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {
@@ -9847,5 +10600,5 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=227;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=246;
 }

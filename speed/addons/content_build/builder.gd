@@ -20,6 +20,17 @@ static func signature() -> String:
 	files.append("res://tools/art/bake_elite_death.py")
 	files.append("res://tools/art/elite_contacts.py")
 	files.append("res://tools/art/bake_elite_crackle.py")
+	for name in ["bake_phoenix_fx", "bake_centaurus_contact_masks", "bake_canis_fx"]: files.append("res://tools/art/"+name+".py")
+	files.append_array(preload("res://tools/content/build_canis_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_boss_image_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_image_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_monoceros_image_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_roar_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_fire_fx.gd").input_paths())
+	files.append("res://tools/art/bake_canis_hound_edges.py")
+	for name in ["bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
+	files.append("res://tools/art/bake_canis_contact_masks.py")
+	files.append("res://tools/art/bake_monoceros_contact_masks.py")
 	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
 		if not path in files and FileAccess.file_exists(path): files.append(path)
 	return _file_signature(files)
@@ -132,7 +143,7 @@ static func _build_units(force: bool, output: String) -> Error:
 	last_build_report = cache.report
 	var files := PackedStringArray()
 	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
-	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
+	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle","bake_phoenix_fx","bake_centaurus_contact_masks","bake_canis_fx","bake_canis_contact_masks","bake_monoceros_contact_masks","bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
 	# 全編集元を内容で照合し、変更も出力欠落もなければResourceの読込前に返す。
 	var all_inputs := files.duplicate()
 	var boss_inputs := PackedStringArray()

@@ -4,6 +4,7 @@
 #include "../../systems/enemy_system.h"
 #include "../../systems/group_system.h"
 #include "../../systems/attack_budget.h"
+#include "../../systems/attack_system.h"
 #include "../../systems/combat_resolver.h"
 #include "../../systems/attacks/bolt.h"
 #include "../../output/frame_builder.h"
@@ -23,7 +24,7 @@ void SoldierBehavior::start_mutiny(RunRuntime &r,EnemyHandle h,double seconds) {
 AttackHandle SoldierBehavior::fire(RunRuntime &r,EnemyHandle h,BudgetToken token) {
     auto &s=r.state;if (!s.enemy_handles.contains(h)) return {};const auto &e=s.enemies[h.slot];
     if (e.dead || e.mode!=EnemyMode::Move || !std::holds_alternative<SoldierState>(e.behavior_state)) return {};
-    const auto &p=r.content->soldiers[r.content->definitions[e.definition].soldier_definition-1];BoltParams shot;shot.position=e.pos+godot::Vector2::from_angle(e.facing)*e.radius;shot.angle=e.facing;shot.speed=p.bolt_speed;shot.damage=p.damage;shot.budget=token;return BoltSystem::emit(r,shot);
+    const auto &p=r.content->soldiers[r.content->definitions[e.definition].soldier_definition-1];BoltParams shot;shot.position=e.pos+godot::Vector2::from_angle(e.facing)*e.radius;shot.angle=e.facing;shot.speed=p.bolt_speed;shot.damage=p.damage;shot.budget=token;const auto handle=BoltSystem::emit(r,shot);if (const auto *record=AttackSystem::get(s,handle)) s.hostiles[record->row].bolt.reference_soldier=true;return handle;
 }
 void SoldierBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     auto &s=r.state;auto &e=s.enemies[row];const auto &d=r.content->definitions[e.definition];const auto &p=r.content->soldiers[d.soldier_definition-1];const auto self=s.enemy_handles.at(row);

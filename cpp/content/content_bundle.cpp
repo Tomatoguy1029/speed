@@ -47,6 +47,37 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         records.RunConfig_rows[0].aim_lag<=0 || records.RunConfig_rows[0].aim_speed<=0 ||
         records.DefinitionIndex_rows.size()!=records.EnemyRecord_rows.size()) return {};
     auto bundle=std::make_shared<ContentBundle>();
+    for (const auto &row:records.BossImageMaskRecord_rows) {
+        if (row.id!=bundle->boss_image_masks.size()+1 || row.width==0 || row.height==0 || row.width>16384 || row.height>16384) return {};
+        const uint64_t size=(uint64_t(row.width)*row.height+7)/8;
+        if (row.alpha_bits_hex.size()!=size*2) return {};
+        BossImageMask mask;mask.id=row.id;mask.width=row.width;mask.height=row.height;mask.bits.reserve(size);
+        const auto nibble=[](char c)->int {if (c>='0' && c<='9') return c-'0';if (c>='a' && c<='f') return c-'a'+10;return -1;};
+        for (size_t i=0;i<row.alpha_bits_hex.size();i+=2) {
+            const int a=nibble(row.alpha_bits_hex[i]),b=nibble(row.alpha_bits_hex[i+1]);if (a<0 || b<0) return {};
+            mask.bits.push_back(uint8_t(a*16+b));
+        }
+        bundle->boss_image_masks.push_back(std::move(mask));
+    }
+    bundle->centaurus_image_pose.nodes=records.CentaurusImageNode_rows;
+    bundle->centaurus_image_pose.sprites=records.CentaurusImageSprite_rows;
+    bundle->centaurus_image_pose.bows=records.CentaurusImageBow_rows;
+    bundle->centaurus_image_pose.clips=records.CentaurusImageClip_rows;
+    bundle->centaurus_image_pose.keys=records.CentaurusImageKey_rows;
+    bundle->centaurus_image_pose.poses=records.CentaurusImagePose_rows;
+    bundle->monoceros_image_pose.nodes=records.MonocerosImageNode_rows;
+    bundle->monoceros_image_pose.sprites=records.MonocerosImageSprite_rows;
+    bundle->monoceros_image_pose.gait=records.MonocerosImageGait_rows;
+    bundle->monoceros_image_pose.horns=records.MonocerosImageHorn_rows;
+    bundle->monoceros_image_pose.tuning=records.MonocerosImageTuning_rows;
+    if (records.BossImageFeedback_rows.size()!=1) return {};
+    bundle->boss_image_feedback=records.BossImageFeedback_rows.front();
+    if (records.CentaurusReferenceFxDefinition_rows.size()!=1) return {};
+    bundle->centaurus_fx=records.CentaurusReferenceFxDefinition_rows.front();
+    if (bundle->boss_image_feedback.duration<=0 || bundle->boss_image_feedback.seed_modulo==0) return {};
+    bundle->canis_image_parts=records.CanisImagePartDefinition_rows;
+    bundle->canis_roars=records.CanisRoarDefinition_rows;
+    bundle->canis_fire_fx=records.CanisFireFxDefinition_rows;
     std::copy(bytes.ptr()+24,bytes.ptr()+56,bundle->input_sha256.begin());
     std::copy(bytes.ptr()+56,bytes.ptr()+88,bundle->payload_sha256.begin());
     bundle->config=records.RunConfig_rows[0];
@@ -169,6 +200,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->canis_sirius=records.CanisSiriusDefinition_rows;
     bundle->canis_bays=records.CanisBayDefinition_rows;
     bundle->canis_blazes=records.CanisBlazeDefinition_rows;bundle->canis_streams=records.CanisStreamDefinition_rows;bundle->canis_hunts=records.CanisHuntDefinition_rows;bundle->canis_hunt_pounces=records.CanisHuntPounceDefinition_rows;bundle->canis_novas=records.CanisNovaDefinition_rows;bundle->canis_relays=records.CanisRelayDefinition_rows;bundle->canis_sirius_flames=records.CanisSiriusFlameDefinition_rows;
+    bundle->canis_nova_hull=records.CanisNovaHullPoint_rows;bundle->canis_nova_fx=records.CanisNovaFxDefinition_rows;
     bundle->canis_flames=records.CanisFlameDefinition_rows;
     for (size_t i=0;i<bundle->canis_flames.size();++i) {const auto &p=bundle->canis_flames[i];if (p.id!=i+1 || records.BossDefinition_rows[p.boss-1].kind!=2 || p.particle_life<=0 || p.duration<=0) return {};}
     bundle->boss_bodies=records.BossBodyDefinition_rows;
@@ -286,7 +318,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         }
         if (p.kind==40) {
             const auto v=std::find_if(bundle->canis_commands.begin(),bundle->canis_commands.end(),[&](const auto &v){return v.technique==p.id;});
-            if (v==bundle->canis_commands.end() || bundle->bosses[p.boss-1].kind!=2 || v->lunge_time<=0 || p.active!=v->lunge_time+0.05 || stages.size()!=2 || stages[0].command!=1 || stages[0].at!=p.warn || stages[1].command!=2 || stages[1].at!=p.warn+v->lunge_time+0.05) return {};continue;
+            const auto fx=std::find_if(records.CanisRoarDefinition_rows.begin(),records.CanisRoarDefinition_rows.end(),[&](const auto &row){return row.technique==p.id;});
+            double start=p.warn;
+            if (fx!=records.CanisRoarDefinition_rows.end()) {
+                constexpr double lives[]={0,.24,.36,.52};
+                if (!fx->has_roar || fx->level<1 || fx->level>3) return {};
+                start=p.warn-std::min(p.warn*.65,.32)+lives[fx->level]*fx->roar_time*fx->timing+fx->order_wait+fx->hound_warn;
+            }
+            if (v==bundle->canis_commands.end() || bundle->bosses[p.boss-1].kind!=2 || v->lunge_time<=0 || p.active!=v->lunge_time+0.05 || stages.size()!=2 || stages[0].command!=1 || stages[0].at!=start || stages[1].command!=2 || stages[1].at!=start+v->lunge_time+0.05) return {};continue;
         }
         if (p.kind==14) {
             const auto shower=std::find_if(bundle->centaurus_showers.begin(),bundle->centaurus_showers.end(),[&](const auto &v){return v.technique==p.id;});
@@ -346,6 +385,10 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=0;i<bundle->canis_sirius_flames.size();++i) if (bundle->canis_sirius_flames[i].id!=i+1 || bundle->boss_techniques[bundle->canis_sirius_flames[i].technique-1].kind!=51) return {};
     for (size_t i=0;i<bundle->canis_relays.size();++i) if (bundle->canis_relays[i].id!=i+1 || bundle->boss_techniques[bundle->canis_relays[i].technique-1].kind!=50) return {};
     for (size_t i=0;i<bundle->canis_novas.size();++i) if (bundle->canis_novas[i].id!=i+1 || bundle->boss_techniques[bundle->canis_novas[i].technique-1].kind!=49) return {};
+    if (!bundle->canis_novas.empty()) {
+        if (bundle->canis_nova_fx.size()!=1 || bundle->canis_nova_fx[0].id!=1 || bundle->canis_nova_hull.size()<3) return {};
+        for (size_t i=0;i<bundle->canis_nova_hull.size();++i) if (bundle->canis_nova_hull[i].id!=i+1) return {};
+    } else if (!bundle->canis_nova_fx.empty() || !bundle->canis_nova_hull.empty()) return {};
     for (size_t i=0;i<bundle->canis_hunt_pounces.size();++i) if (bundle->canis_hunt_pounces[i].id!=i+1 || bundle->boss_techniques[bundle->canis_hunt_pounces[i].technique-1].kind!=48) return {};
     for (size_t i=0;i<bundle->canis_hunts.size();++i) if (bundle->canis_hunts[i].id!=i+1 || bundle->boss_techniques[bundle->canis_hunts[i].technique-1].kind!=47) return {};
     for (size_t i=0;i<bundle->canis_streams.size();++i) if (bundle->canis_streams[i].id!=i+1 || bundle->boss_techniques[bundle->canis_streams[i].technique-1].kind!=46) return {};
@@ -735,8 +778,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (dolphin!=bundle->dolphins.end()) return {};
         const auto item_lynx=std::find_if(bundle->lynxes.begin(),bundle->lynxes.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==19) {
-            if (item_lynx==bundle->lynxes.end() || row.fire_interval<=0 || item_lynx->warn<=0) return {};
-            for (double value:{item_lynx->accel,item_lynx->keep,item_lynx->warn,item_lynx->slash_speed,item_lynx->slash_size,item_lynx->slash_range,item_lynx->damage}) if (!std::isfinite(float(value))) return {};
+            if (item_lynx==bundle->lynxes.end() || row.fire_interval<=0 || item_lynx->warn<=0 || item_lynx->fx_start<=0 || item_lynx->fx_max_size<=0) return {};
+            for (double value:{item_lynx->accel,item_lynx->keep,item_lynx->warn,item_lynx->slash_speed,item_lynx->slash_size,item_lynx->slash_range,item_lynx->damage,item_lynx->fx_span,item_lynx->fx_max_size,item_lynx->fx_start,item_lynx->fx_grow,item_lynx->fx_cut,item_lynx->fx_space0,item_lynx->fx_space1,item_lynx->fx_gap}) if (!std::isfinite(float(value))) return {};
             definition.lynx_definition=uint32_t(item_lynx-bundle->lynxes.begin()+1);definition.accel=item_lynx->accel;
         } else if (item_lynx!=bundle->lynxes.end()) return {};
         const auto triangle=std::find_if(bundle->triangles.begin(),bundle->triangles.end(),[&](const auto &p){return p.id==row.id;});
@@ -748,7 +791,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         const auto ruler=std::find_if(bundle->rulers.begin(),bundle->rulers.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==33) {
             if (ruler==bundle->rulers.end() || ruler->warn<=0) return {};
-            for (double value:{ruler->accel,ruler->keep,ruler->split_delay,ruler->half_gap,ruler->emit_back,ruler->deploy_speed,ruler->deploy_time,ruler->warn,ruler->beam_len,ruler->beam_width,ruler->beam_time,ruler->beam_start_gap,ruler->damage,ruler->admission_duration}) if (!std::isfinite(float(value))) return {};
+            for (double value:{ruler->accel,ruler->keep,ruler->split_delay,ruler->half_gap,ruler->emit_back,ruler->deploy_speed,ruler->deploy_time,ruler->warn,ruler->beam_len,ruler->beam_width,ruler->beam_time,ruler->beam_start_gap,ruler->damage,ruler->admission_duration,ruler->fx_muzzle}) if (!std::isfinite(float(value))) return {};
             definition.ruler_definition=uint32_t(ruler-bundle->rulers.begin()+1);definition.accel=ruler->accel;
         } else if (ruler!=bundle->rulers.end()) return {};
         const auto king=std::find_if(bundle->cepheus.begin(),bundle->cepheus.end(),[&](const auto &p){return p.id==row.id;});
@@ -789,8 +832,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (pump!=bundle->pumps.end()) return {};
         const auto crab=std::find_if(bundle->crabs.begin(),bundle->crabs.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==34) {
-            if (crab==bundle->crabs.end()) return {};
-            for (double value:{crab->approach,crab->reach,crab->telegraph,crab->open_time,crab->turn_angle,crab->damage,crab->admission_duration}) if (!std::isfinite(float(value))) return {};
+            if (crab==bundle->crabs.end() || crab->fx_hit_r<=0) return {};
+            for (double value:{crab->approach,crab->reach,crab->telegraph,crab->open_time,crab->turn_angle,crab->damage,crab->admission_duration,crab->fx_reach_r,crab->fx_hit_r}) if (!std::isfinite(float(value))) return {};
             definition.crab_definition=uint32_t(crab-bundle->crabs.begin()+1);
         } else if (crab!=bundle->crabs.end()) return {};
         const auto aquila=std::find_if(bundle->aquilas.begin(),bundle->aquilas.end(),[&](const auto &p){return p.id==row.id;});
@@ -819,8 +862,8 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (cross!=bundle->cross_enemies.end()) return {};
         const auto aquarius=std::find_if(bundle->aquarius.begin(),bundle->aquarius.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==24) {
-            if (aquarius==bundle->aquarius.end() || aquarius->telegraph<=0) return {};
-            for (double value:{aquarius->accel,aquarius->approach,aquarius->telegraph,aquarius->beam_time,aquarius->beam_length,aquarius->half_width,aquarius->spread,aquarius->rest,aquarius->damage,aquarius->admission_duration}) if (!std::isfinite(float(value))) return {};
+            if (aquarius==bundle->aquarius.end() || aquarius->telegraph<=0 || aquarius->fx_size<=0) return {};
+            for (double value:{aquarius->accel,aquarius->approach,aquarius->telegraph,aquarius->beam_time,aquarius->beam_length,aquarius->half_width,aquarius->spread,aquarius->rest,aquarius->damage,aquarius->admission_duration,aquarius->fx_size}) if (!std::isfinite(float(value))) return {};
             definition.aquarius_definition=uint32_t(aquarius-bundle->aquarius.begin()+1);definition.accel=aquarius->accel;
         } else if (aquarius!=bundle->aquarius.end()) return {};
         const auto crow=std::find_if(bundle->crows.begin(),bundle->crows.end(),[&](const auto &p){return p.id==row.id;});

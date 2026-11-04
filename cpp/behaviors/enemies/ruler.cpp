@@ -10,8 +10,10 @@
 #include <cmath>
 namespace speed {
 godot::Vector2 RulerBehavior::beam_origin(const RunRuntime &r,uint32_t row) {
-    const auto &e=r.state.enemies[row];const auto &p=r.content->rulers[r.content->definitions[e.definition].ruler_definition-1];
-    return e.pos+godot::Vector2::from_angle(e.facing)*(e.radius+p.beam_width*0.5+p.beam_start_gap);
+    const auto &e=r.state.enemies[row];const auto &d=r.content->definitions[e.definition];const auto &p=r.content->rulers[d.ruler_definition-1];
+    const auto direction=godot::Vector2::from_angle(e.facing),normal=godot::Vector2(-direction.y,direction.x);
+    const double scale=2.0*e.radius*d.sprite_scale/58.0,side=std::get<RulerState>(e.behavior_state).side;
+    return e.pos+direction*(27.5*scale+p.fx_muzzle)+normal*(side*10.5*scale);
 }
 void RulerBehavior::after_tick(RunRuntime &r) {
     // AI can be skipped while pushed, held or offscreen. Keep the live wall on

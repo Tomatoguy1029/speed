@@ -739,6 +739,46 @@
           "name": "damage",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "fx_span",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_max_size",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_start",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_grow",
+          "type": "f64",
+          "min": 0.001
+        },
+        {
+          "name": "fx_cut",
+          "type": "f64",
+          "min": 0.001
+        },
+        {
+          "name": "fx_space0",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_space1",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_gap",
+          "type": "f64",
+          "min": 0
         }
       ]
     },
@@ -984,6 +1024,11 @@
           "name": "beams",
           "type": "u32",
           "min": 1
+        },
+        {
+          "name": "fx_size",
+          "type": "f64",
+          "min": 0
         }
       ]
     },
@@ -1348,6 +1393,16 @@
         },
         {
           "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_reach_r",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_hit_r",
           "type": "f64",
           "min": 0
         }
@@ -1781,6 +1836,11 @@
         },
         {
           "name": "admission_duration",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "fx_muzzle",
           "type": "f64",
           "min": 0
         }

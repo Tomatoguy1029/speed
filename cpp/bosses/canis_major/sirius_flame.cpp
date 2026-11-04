@@ -1,4 +1,5 @@
 #include "sirius_flame.h"
+#include "fire_visual.h"
 #include "flames.h"
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
@@ -14,7 +15,7 @@ void CanisSiriusFlame::step(RunRuntime &r,TechniqueState &t,double dt) {
     auto &v=std::get<CanisSiriusFlameState>(t.detail);const auto &base=r.content->boss_techniques[t.definition-1];const auto &p=rule(*r.content,t.definition);auto *b=PhaseController::find(r,t.actor);if (!b) {t.stage=TechniqueStage::Failed;return;}auto &e=r.state.enemies[t.actor.slot];
     if (t.stage==TechniqueStage::Recovery) {e.vel={};t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     v.age+=dt;
-    if (!v.started) {if (base.track_during_warn) CanisTechnique::face(r,t,r.state.enemy_aim,r.content->bosses[base.boss-1].turn,dt);e.vel={};v.emit_left+=dt*18;while (v.emit_left>=1) {v.emit_left-=1;CanisFlames::warning_particle(r,*b,p.flame,t.definition);}if (v.age<base.warn) return;v.started=true;v.age=0;v.emit_left=0;t.stage=TechniqueStage::Active;CanisTechnique::cue(r,t,"flame_start");}
+    if (!v.started) {if (base.track_during_warn) CanisTechnique::face(r,t,r.state.enemy_aim,r.content->bosses[base.boss-1].turn,dt);e.vel={};v.emit_left+=dt*18;while (v.emit_left>=1) {v.emit_left-=1;CanisFlames::warning_particle(r,*b,p.flame,t.definition);}if (v.age<base.warn) return;v.started=true;v.age=0;v.emit_left=0;t.stage=TechniqueStage::Active;CanisFireVisualSystem::begin_continuous(r,*b,t,base.active);CanisTechnique::cue(r,t,"flame_start");}
     CanisTechnique::face(r,t,r.state.ship_pos,p.turn,dt);if (e.pos.distance_to(r.state.ship_pos)>p.advance_until) {const auto from=e.pos,step=godot::Vector2::from_angle(e.facing)*p.advance*dt;e.pos+=step;e.vel=step/std::max(dt,0.001);FieldSystem::collide_enemy(r,t.actor.slot,from,dt);}else e.vel={};
     v.emit_left+=dt*p.emit_rate;while (v.emit_left>=1) {v.emit_left-=1;CanisFlames::begin(r,*b,p.flame,{},0,t.definition);}if (v.age>=base.active) {t.stage=TechniqueStage::Recovery;t.remaining=base.recover;t.locked=false;e.vel={};CanisTechnique::cue(r,t,"recovery_started");}
 }

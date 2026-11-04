@@ -1,6 +1,7 @@
 #include "phase_controller.h"
 #include "../monoceros/body.h"
 #include "../centaurus/body.h"
+#include "../centaurus/reference_fx.h"
 #include "../centaurus/finish.h"
 #include "../canis_major/body.h"
 #include "../hydra/body.h"
@@ -92,6 +93,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
         if (b.mode==BossMode::Defeated || b.mode==BossMode::Cancelled) continue;
         if (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead) {cancel(r,b.actor);continue;}
         const auto &p=r.content->boss_bodies[b.definition-1];const auto &definition=r.content->bosses[p.boss-1];b.clock+=dt;if (definition.kind==4) {DracoPicaro::tick(r,b);if (!b.draco.intro.active) DracoRifts::tick_closing(r,b,dt);}auto &e=s.enemies[b.actor.slot];if (definition.kind==2) b.canis.turn_motion=0;
+        b.monoceros_slashes.erase(std::remove_if(b.monoceros_slashes.begin(),b.monoceros_slashes.end(),[&](const auto &slash){return b.clock-slash.started>r.content->config.fx_monoceros_slash_life;}),b.monoceros_slashes.end());
         if (definition.kind==3 && b.mode!=BossMode::Final) {e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);HydraBody::step(r,b,dt);continue;}
         if (definition.kind==1) CentaurusBody::pre_step(r,b,dt);
         e.flash=std::max(0.0,e.flash-dt);e.hit_cd=std::max(0.0,e.hit_cd-dt);bool suspend=true;
@@ -130,7 +132,22 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
         if (!HydraBody::validate(s,c,b)) return false;
         if (!DracoBody::validate(s,c,b)) return false;
         if (!CanisMajorBody::validate(s,c,b)) return false;
-        for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width}) if (!std::isfinite(value) || value<0) return false;
+        for (double value:{b.clock,b.initial_wait,b.entrance_elapsed,b.phase_remaining,b.final_elapsed,b.final_charge,b.final_width,b.hit_feedback_until}) if (!std::isfinite(value) || value<0) return false;
+        for (const auto &slash:b.monoceros_slashes) if (!slash.from.is_finite() || !slash.to.is_finite() || !std::isfinite(slash.width) || slash.width<0 || !std::isfinite(slash.started) || slash.started<0 || slash.started>b.clock) return false;
+        for (const auto &v:b.monoceros_breaths) if (!v.position.is_finite() || !std::isfinite(v.direction) || !std::isfinite(v.started) || v.started<0 || v.started>b.clock || !std::isfinite(v.lifetime) || v.lifetime<=0 || !std::isfinite(v.spread) || v.spread<0 || !std::isfinite(v.reach) || v.reach<0 || !v.seed || v.preset>1) return false;
+        for (const auto &v:b.monoceros_shatters) if (!v.position.is_finite() || !std::isfinite(v.started) || v.started<0 || v.started>b.clock || !std::isfinite(v.lifetime) || v.lifetime<=0) return false;
+        for (const auto &v:b.monoceros_burns) if (!v.position.is_finite() || !std::isfinite(v.started) || v.started<0 || v.started>b.clock) return false;
+        const auto &mp=b.monoceros_pose;
+        for (double value:{mp.last_body_clock,mp.body,mp.neck,mp.head,mp.tail,mp.flame,mp.gait,mp.feedback_white,mp.feedback_angle}) if (!std::isfinite(value)) return false;
+        if (mp.last_body_clock<0 || mp.last_body_clock>b.clock || mp.gait<0 || mp.feedback_white<0 || !mp.feedback_offset.is_finite()) return false;
+        for (const auto &node:mp.nodes) if (!node.node || node.node>c.monoceros_image_pose.nodes.size() || !node.transform.columns[0].is_finite() || !node.transform.columns[1].is_finite() || !node.transform.columns[2].is_finite()) return false;
+        for (const auto &visual:b.monoceros_sweeps) {
+            if (visual.technique_id<=0 || !std::isfinite(visual.started) || !std::isfinite(visual.last_clock) || visual.started<0 || visual.started>visual.last_clock || visual.last_clock>b.clock || !std::isfinite(visual.start_angle) || !std::isfinite(visual.last_angle) || !std::isfinite(visual.arc) || visual.arc<=0 || !std::isfinite(visual.duration) || visual.duration<=0 || (visual.side!=1 && visual.side!=-1)) return false;
+            double previous=-1;
+            for (const auto &point:visual.points) {if (!point.center.is_finite() || !point.tip.is_finite() || !std::isfinite(point.progress) || point.progress<0 || point.progress>1 || !std::isfinite(point.time) || point.time<previous || point.time>visual.last_clock-visual.started+0.000001) return false;previous=point.time;}
+            for (const auto &m:visual.motes) if (!m.position.is_finite() || !m.velocity.is_finite() || !std::isfinite(m.life) || !std::isfinite(m.maximum) || m.maximum<=0 || m.life<=0 || m.life>m.maximum || (m.color!=3 && m.color!=4)) return false;
+        }
+        for (const auto &part:b.image_parts) if (part.part==0 || part.mask==0 || part.mask>c.boss_image_masks.size() || part.region.size.x<=0 || part.region.size.y<=0 || !part.pixel_to_world.columns[0].is_finite() || !part.pixel_to_world.columns[1].is_finite() || !part.pixel_to_world.columns[2].is_finite()) return false;
         if (!CentaurusBody::validate(s,c,b)) return false;
         if (!std::isfinite(b.final_started) || (b.mode<BossMode::Defeated && (!s.enemy_handles.contains(b.actor) || s.enemies[b.actor.slot].dead))) return false;
     }return true;
@@ -138,6 +155,25 @@ bool PhaseController::validate(const godot::RunState &s,const ContentBundle &c) 
 godot::Array PhaseController::snapshot(const RunRuntime &r) {
     godot::Array out;for (const auto &b:r.state.bosses.bodies) {godot::Dictionary p;p["id"]=b.id;p["definition"]=b.definition;p["actor"]=r.state.enemy_handles.entity_id(b.actor);p["mode"]=int(b.mode);p["phase"]=b.phase;p["pending"]=b.phase_pending;p["clock"]=b.clock;p["initial_wait"]=b.initial_wait;p["phase_remaining"]=b.phase_remaining;p["final_elapsed"]=b.final_elapsed;p["final_landed"]=b.final_landed;p["final_to"]=b.final_to;p["final_width"]=b.final_width;p["final_warning"]=b.final_elapsed<b.final_charge-r.content->boss_bodies[b.definition-1].final_widen_time;p["final_clock"]=r.state.time;p["final_alpha"]=r.state.phase==godot::RunState::Phase::Play?1.0:r.state.phase==godot::RunState::Phase::Dying?std::max(0.0,1.0-r.state.sequence_t/std::max(0.01,r.state.death_freeze)):0.0;p["boss_spawned"]=r.state.world.boss_spawned;p["boss_dead"]=r.state.boss_dead;
         const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);if (definition.kind==4) DracoBody::snapshot(r,b,p);if (definition.kind==3) HydraBody::snapshot(r,b,p);if (definition.kind==2) {CanisMajorBody::snapshot(r,b,p);p["flames"]=CanisFlames::snapshot(r,b);p["lunges"]=CanisHoundLunge::snapshot(r,b);}p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
+        godot::Array image_parts;for (const auto &part:b.image_parts) {godot::Dictionary v;v["part"]=part.part;v["region"]=part.region;v["pixel_to_world"]=part.pixel_to_world;v["visible"]=part.visible;image_parts.push_back(v);}p["image_parts"]=image_parts;
+        if (definition.kind==1) p["reference_fx"]=CentaurusReferenceFx::snapshot(b);
+        godot::Array sword_slashes;for (const auto &slash:b.monoceros_slashes) {godot::Dictionary v;v["from"]=slash.from;v["to"]=slash.to;v["width"]=slash.width;v["started"]=slash.started;v["seed"]=slash.seed;sword_slashes.push_back(v);}p["sword_slashes"]=sword_slashes;
+        godot::Array sweep_visuals;for (const auto &visual:b.monoceros_sweeps) {
+            godot::Dictionary item;item["started"]=visual.started;item["duration"]=visual.duration;godot::Array points,motes;
+            for (const auto &point:visual.points) {godot::Dictionary v;v["center"]=point.center;v["tip"]=point.tip;v["v"]=point.progress;v["t"]=point.time;points.push_back(v);}
+            for (const auto &m:visual.motes) {godot::Dictionary v;v["position"]=m.position;v["velocity"]=m.velocity;v["life"]=m.life;v["maximum"]=m.maximum;v["color"]=m.color;motes.push_back(v);}
+            item["points"]=points;item["motes"]=motes;sweep_visuals.push_back(item);
+        }p["sweep_visuals"]=sweep_visuals;
+        godot::Array breaths;for (const auto &breath:b.monoceros_breaths) {
+            godot::Dictionary v;v["position"]=breath.attached && r.state.enemy_handles.contains(b.actor)?r.state.enemies[b.actor.slot].pos+breath.position:breath.position;
+            v["direction"]=breath.preset==1 && r.state.enemy_handles.contains(b.actor)?r.state.enemies[b.actor.slot].facing+std::acos(-1.0):breath.direction;v["started"]=breath.started;v["seed"]=breath.seed;v["spread"]=breath.spread;v["reach"]=breath.reach;v["preset"]=breath.preset;breaths.push_back(v);
+        }p["monoceros_breaths"]=breaths;
+        godot::Array shatters;for (const auto &shatter:b.monoceros_shatters) {godot::Dictionary v;v["position"]=shatter.position;v["started"]=shatter.started;shatters.push_back(v);}p["monoceros_shatters"]=shatters;
+        godot::Array burns;for (const auto &burn:b.monoceros_burns) {godot::Dictionary v;v["position"]=burn.position;v["started"]=burn.started;burns.push_back(v);}p["monoceros_burns"]=burns;
+        if (definition.kind==0) {
+            godot::Array nodes;for (const auto &node:b.monoceros_pose.nodes) {godot::Dictionary v;v["node"]=node.node;v["transform"]=node.transform;v["visible"]=node.visible;nodes.push_back(v);}p["image_node_poses"]=nodes;
+            godot::Dictionary feedback;feedback["white"]=b.monoceros_pose.feedback_white;feedback["angle"]=b.monoceros_pose.feedback_angle;feedback["offset"]=b.monoceros_pose.feedback_offset;p["image_feedback"]=feedback;
+        }
         godot::Array participants;for (const auto &part:b.participants) {godot::Dictionary v;v["id"]=part.id;v["health_target"]=same_handle(part.actor,part.health_target)?part.id:r.state.enemy_handles.entity_id(part.health_target);v["is_body"]=part.is_body;v["active"]=part.active;participants.push_back(v);}p["participants"]=participants;
         if (definition.kind==1) {const auto &v=b.centaurus;p["guard_point"]=v.guard_point;p["has_guard_point"]=v.has_guard_point;p["guard_scan"]=v.guard_scan;p["guard_refill"]=v.guard_refill;p["path_hold"]=v.path_hold;p["turn_motion"]=v.turn_motion;p["leaping"]=v.leaping;p["leap_elapsed"]=v.leap_elapsed;p["leap_progress"]=std::clamp(v.leap_elapsed/std::max(0.001,std::find_if(r.content->centaurus_bodies.begin(),r.content->centaurus_bodies.end(),[&](const auto &entry){return entry.body==b.definition;})->leap_time),0.0,1.0);p["leap_from"]=v.leap_from;p["leap_to"]=v.leap_to;p["leap_ready_at"]=v.leap_ready_at;p["retreat_ready_at"]=v.retreat_ready_at;p["cooldowns"]=int64_t(v.cooldowns.size());godot::Array guards;for (const auto &g:v.guards) {godot::Dictionary q;q["id"]=r.state.enemy_handles.entity_id(g.actor);q["scale"]=g.scale;q["phase"]=g.phase;guards.push_back(q);}p["guards"]=guards;}
         if (r.state.enemy_handles.contains(b.actor)) {const auto &e=r.state.enemies[b.actor.slot];p["velocity"]=e.vel;p["flash"]=e.flash;p["horn_length"]=e.radius*(definition.horn_length_ratio+(definition.horn_length_ratio_p2-definition.horn_length_ratio)*double(p["phase_progress"]));p["position"]=e.pos;p["facing"]=e.facing;p["radius"]=e.radius;p["hp"]=e.hp;p["max_hp"]=e.max_hp;p["charge"]=e.charge;p["horn_waves"]=MonocerosHornWave::waves(r,b.actor);godot::PackedVector2Array slash;if (b.has_slash) {slash.push_back(b.slash_from);slash.push_back(b.slash_to);}p["last_slash"]=slash;}out.push_back(p);

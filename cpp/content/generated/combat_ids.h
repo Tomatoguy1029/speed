@@ -205,7 +205,7 @@ inline bool parse_symbol(std::string_view value, VisualRole &out) {
     if (value=="boss_finish") {out=VisualRole::BossFinish;return true;}
     return false;
 }
-enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,CriticalLance=68,CriticalLanceHit=69,RockBreak=70,RunUpHit=71,EndHole=72,HoleCapture=73,HoleRecover=74,AquariusAim=75,BomberExplode=76,SummonMark=77,CepheusSummon=78,RulerSplit=79,BossSpawn=80,BossPhase=81,BossDefeated=82,BossCancelled=83,FinalStrike=84,Swallow=85,SpaceQuake=86,SonicPush=87,SonicImpact=88,ContactBolt=89,LanceLaunch=90,SonicBoom=91,LanceShatter=92,ChainShock=93,WaveRelease=94,AnchorCapture=95,AnchorFire=96,BipolarCharge=97,RouteOpportunity=98,EncounterDeferred=99,SlashRelease=100,EscortDeploy=101,EscortSlash=102,EnemyTuningChanged=103,EnemyTuningSaved=104,BossFinish=105,BossExplode=106,ClearBanner=107,SlashMark=108,FlashSlash=109,MonocerosSlashRelease=110,HeroDiscovered=111,HeroLink=112,HeroFreed=113,HeroPower=114,HeroPowerEnd=115,Landmark=116,TwinFirst=117,CentaurusCue=118,CanisIgniteArrived=119,CanisCue=120,HydraCue=121,DracoRoar=122,BossAction=123,DracoCue=124,BossDecision=125,BossEffect=126,LabSpawn=127,Count};
+enum class EventType : uint32_t {AttackStart=0,AttackEnd=1,AttackRetired=2,AttackVisualEnd=3,Bonus=4,BlockImpact=5,Bounce=6,ClipGroupEnd=7,ClipGroup=8,CombatDamage=9,CombatPlayerDamage=10,CriticalHit=11,DebrisTrail=12,DrawStart=13,Duplicate=14,EnemyRetire=15,GameOver=16,GaugeFull=17,Hit=18,HullScatter=19,Hurt=20,Kill=21,Launch=22,LevelBonus=23,Levelup=24,Phase=25,Pickup=26,Reroll=27,ShieldBlock=28,ShieldExpired=29,ShieldReflect=30,ShieldStolen=31,ShipDeath=32,ShipExplode=33,ShotHit=34,StrongSpawn=35,Text=36,TimeLimitReached=37,TraceEnd=38,Upgrade=39,Wave=40,WeaponFire=41,Offer=42,Choice=43,Loadout=44,RunFinished=45,Crash=46,Ring=47,Shoot=48,EnemyLaserCharge=49,EnemyLaserFire=50,EnemyLaserCancel=51,CrystalDrop=52,CrystalGoldRoll=53,GemBurst=54,CrystalAbsorb=55,CrystalAbsorber=56,CrystalTransfer=57,CrystalLost=58,CrystalCollect=59,BarrierHit=60,BarrierRestore=61,TelescopeCharge=62,TelescopeFire=63,Explode=64,FullBurstReady=65,FloodEnd=66,Beam=67,CriticalLance=68,CriticalLanceHit=69,RockBreak=70,RunUpHit=71,EndHole=72,HoleCapture=73,HoleRecover=74,AquariusAim=75,BomberExplode=76,SummonMark=77,CepheusSummon=78,RulerSplit=79,BossSpawn=80,BossPhase=81,BossDefeated=82,BossCancelled=83,FinalStrike=84,Swallow=85,SpaceQuake=86,SonicPush=87,SonicImpact=88,ContactBolt=89,LanceLaunch=90,SonicBoom=91,LanceShatter=92,ChainShock=93,WaveRelease=94,AnchorCapture=95,AnchorFire=96,BipolarCharge=97,RouteOpportunity=98,EncounterDeferred=99,SlashRelease=100,EscortDeploy=101,EscortSlash=102,EnemyTuningChanged=103,EnemyTuningSaved=104,BossFinish=105,BossExplode=106,ClearBanner=107,SlashMark=108,FlashSlash=109,MonocerosSlashRelease=110,HeroDiscovered=111,HeroLink=112,HeroFreed=113,HeroPower=114,HeroPowerEnd=115,Landmark=116,TwinFirst=117,CentaurusCue=118,CanisIgniteArrived=119,CanisCue=120,HydraCue=121,DracoRoar=122,BossAction=123,DracoCue=124,BossDecision=125,BossEffect=126,LabSpawn=127,BossRamContact=128,BiteCue=129,Count};
 inline const char *symbol_name(EventType value) {
     switch(value) {
     case EventType::AttackStart: return "attack_start";
@@ -336,6 +336,8 @@ inline const char *symbol_name(EventType value) {
     case EventType::BossDecision: return "boss_decision";
     case EventType::BossEffect: return "boss_effect";
     case EventType::LabSpawn: return "lab_spawn";
+    case EventType::BossRamContact: return "boss_ram_contact";
+    case EventType::BiteCue: return "biter_cue";
     default: return "";
     }
 }
@@ -468,6 +470,8 @@ inline bool parse_symbol(std::string_view value, EventType &out) {
     if (value=="boss_decision") {out=EventType::BossDecision;return true;}
     if (value=="boss_effect") {out=EventType::BossEffect;return true;}
     if (value=="lab_spawn") {out=EventType::LabSpawn;return true;}
+    if (value=="boss_ram_contact") {out=EventType::BossRamContact;return true;}
+    if (value=="biter_cue") {out=EventType::BiteCue;return true;}
     return false;
 }
 enum class ResultKind : uint32_t {Clear=0,Death=1,Abort=2,Count};
@@ -1041,7 +1045,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::TelescopeFire: return field=="pos" || field=="angle" || field=="length" || field=="width";
     case EventType::Explode: return field=="pos" || field=="radius" || field=="cause" || field=="color" || field=="life";
     case EventType::FullBurstReady: return field=="pos";
-    case EventType::FloodEnd: return field=="id" || field=="row" || field=="pos" || field=="angle" || field=="length" || field=="width" || field=="spread" || field=="age" || field=="tail" || field=="collapse" || field=="margin";
+    case EventType::FloodEnd: return field=="reference_aquarius" || field=="index" || field=="id" || field=="row" || field=="pos" || field=="angle" || field=="length" || field=="width" || field=="spread" || field=="age" || field=="tail" || field=="collapse" || field=="margin";
     case EventType::Beam: return field=="from" || field=="to" || field=="width" || field=="life" || field=="color" || field=="visual_key" || field=="width_scale";
     case EventType::CriticalLance: return field=="from" || field=="to" || field=="width";
     case EventType::CriticalLanceHit: return field=="pos" || field=="radius" || field=="direction";
@@ -1103,6 +1107,8 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::BossDecision: return field=="action_id" || field=="body_id" || field=="action" || field=="boss" || field=="observed_start" || field=="origin" || field=="decision_id" || field=="ship_position" || field=="ship_velocity" || field=="aim" || field=="direction" || field=="phase" || field=="pass" || field=="stage" || field=="body_position" || field=="facing" || field=="distance" || field=="row" || field=="section" || field=="flow_clock" || field=="request" || field=="stamina" || field=="maximum_stamina" || field=="stamina_reserved" || field=="cap" || field=="section_spent" || field=="section_budget" || field=="remaining_budget" || field=="history" || field=="candidates" || field=="selection" || field=="selected" || field=="reason";
     case EventType::BossEffect: return field=="action_id" || field=="body_id" || field=="action" || field=="boss" || field=="observed_start" || field=="origin" || field=="decision_id" || field=="ship_position" || field=="ship_velocity" || field=="aim" || field=="direction" || field=="phase" || field=="pass" || field=="stage" || field=="body_position" || field=="facing" || field=="distance" || field=="effect_id" || field=="step" || field=="spawn_position" || field=="position" || field=="checks" || field=="contacts" || field=="applied" || field=="observation_scope" || field=="outcome" || field=="reason" || field=="row";
     case EventType::LabSpawn: return field=="pos" || field=="enemy_type";
+    case EventType::BossRamContact: return field=="id" || field=="serial" || field=="kind" || field=="pos" || field=="direction" || field=="remaining" || field=="target_position" || field=="target_radius";
+    case EventType::BiteCue: return field=="id" || field=="pos" || field=="angle" || field=="radius" || field=="sprite_radius" || field=="cue";
     default: return false;
     }
 }

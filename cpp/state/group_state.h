@@ -5,11 +5,13 @@
 namespace speed {
 struct HoundSteering {
     double arrive=0,decel=0,face_turn=0,turn_slow=0,turn_fast=0,turn_switch=0,max_speed=0,accel=0;
+    double speed_rate=1;
 };
 struct HoundOrder {
     bool follow=false,steer=false,quiet=false,warning=false,quiet_velocity_set=false;
+    bool canis_howl_rest=false;
     godot::Vector2 follow_goal,steer_goal,face_point,quiet_velocity;
-    double follow_until=0,follow_scale=1,steer_until=0,quiet_until=0,warning_until=0,heading=0,speed=0;
+    double follow_until=0,follow_scale=1,steer_until=0,quiet_until=0,warning_until=0,warning_started=0,heading=0,speed=0;
     HoundSteering steering;
 };
 struct GroupMember {EnemyHandle actor;HoundOrder order;};
@@ -19,7 +21,7 @@ struct Group {
     EnemyHandle leader;Vector2 target;SoldierFormation formation;
     OrderedValues<int64_t,GroupMember> members;
 };
-struct CepheusMark {Vector2 pos,king;godot::Color color;double age=0,life=0;};
+struct CepheusMark {Vector2 pos,king;godot::Color color;double age=0,life=0;int64_t visual_owner=0,visual_tick=0;uint32_t visual_slot=0,visual_id=0;double visual_angle=0,visual_radius=0,visual_sprite_radius=0;};
 struct DefenderPost {EnemyHandle actor,target;godot::Vector2 position;};
 struct GroupState {
     OrderedValues<int64_t,Group> groups;

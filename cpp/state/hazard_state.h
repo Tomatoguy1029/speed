@@ -8,8 +8,8 @@
 namespace speed {
 enum class CircleHazardKind { Bite, Blast };
 struct CircleHazard {float radius=0;CircleHazardKind kind=CircleHazardKind::Bite;};
-struct BeamHazard {float angle=0,length=0,half_width=0,arc=0;uint32_t definition=0,style=0;int64_t flood_group=0;};
-struct WallHazard {float angle=0,length=0,half_width=0;uint32_t definition=0,style=0;bool blocking=false;};
+struct BeamHazard {float angle=0,length=0,half_width=0,arc=0;uint32_t definition=0,style=0;int64_t flood_group=0;uint32_t flood_index=0;bool flood_reference=false;};
+struct WallHazard {float angle=0,length=0,half_width=0;uint32_t definition=0,style=0;bool blocking=false;int64_t trail_visual_owner=0;int8_t trail_visual_side=0;};
 struct WaveHazard {
     float angle=0,arc=0,radius=0,start_radius=0,speed=0,half_width=0,gap=0,gap_arc=0;
     double enemy_damage=0;
@@ -18,6 +18,7 @@ struct WaveHazard {
 };
 struct MonocerosWaveHazard {
     double radius=0,maximum=0,speed=0,angle=0,half_angle=0,width=0;
+    double reference_time=0,visual_age=0;
 };
 struct CanisFlameHazard {
     enum class Kind : uint8_t { Jet,Particle,Trail,Transfer };
@@ -45,6 +46,7 @@ struct HazardState {
     godot::Color color;
     AttackHandle attack;
     uint32_t zone_definition=0;
+    uint32_t aquila_seed=0;
     double enemy_damage=0;
     bool alive=true,hit=false;
     std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard,CanisFlameHazard,CanisHoundLungeHazard,HydraShapeHazard> shape=CircleHazard{};

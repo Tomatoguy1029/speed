@@ -9,4 +9,4 @@ base = ExtResource("2")
 armor = ExtResource("3")
 normal = ExtResource("4")
 angle = 1.5707964
-size_from_collision = true
+size_from_collision = false

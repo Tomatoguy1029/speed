@@ -1,5 +1,6 @@
 #include "lance.h"
 #include "strike_shape.h"
+#include "../flow/phase_controller.h"
 #include "../../systems/field.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
@@ -35,12 +36,12 @@ void MonocerosLance::step(RunRuntime &r,TechniqueState &t,double dt) {
     case Stage::Run: {
         v.form=1;const auto from=e.pos,step=t.direction*std::min(p.speed*dt,std::max(0.0,p.distance-v.traveled));const auto hit=FieldSystem::first_body_hit(r,from,from+step,e.radius);e.pos=hit?from.lerp(from+step,hit->t):from+step;e.vel=step/dt;MonocerosStrike::damage(r,t,prior,horn(r,t),p.width);
         if (hit) {v.speed=p.speed;enter(v,Stage::Stop);break;}
-        v.traveled+=step.length();v.boom_time+=dt;while (v.boom_time>=std::max(p.boom_interval,0.001)) {v.boom_time-=std::max(p.boom_interval,0.001);cue(r,t,"sonic_boom");}
+        v.traveled+=step.length();v.boom_time+=dt;while (v.boom_time>=std::max(p.boom_interval,0.001)) {v.boom_time-=std::max(p.boom_interval,0.001);if (auto *body=PhaseController::find(r,t.actor)) {MonocerosBreathVisual visual;visual.position=e.pos+t.direction*p.boom_ahead;visual.started=body->clock;visual.lifetime=0.7*r.content->config.fx_monoceros_lance_timing;visual.spread=0.7;visual.reach=200;visual.seed=83;visual.preset=1;body->monoceros_breaths.push_back(visual);}cue(r,t,"sonic_boom");}
         if (v.traveled>=p.distance) {v.speed=p.speed;enter(v,Stage::Stop);}break;
     }
     case Stage::Stop:
         v.speed*=std::exp(-p.stop_decay*dt);move(r,t,t.direction*v.speed*dt,dt);
-        if (!v.shattered && v.elapsed>=p.shatter_time) {cue(r,t,"lance_shatter");v.shattered=true;v.form=0;v.glow=0;}
+        if (!v.shattered && v.elapsed>=p.shatter_time) {if (auto *body=PhaseController::find(r,t.actor)) body->monoceros_shatters.push_back({e.pos+godot::Vector2::from_angle(e.facing)*length(r,t),body->clock,0.84*r.content->config.fx_monoceros_lance_timing});cue(r,t,"lance_shatter");v.shattered=true;v.form=0;v.glow=0;}
         if (v.elapsed>=p.stop_time) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;e.vel={};}break;
     }
 }

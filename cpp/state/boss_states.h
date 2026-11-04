@@ -1,7 +1,14 @@
 #pragma once
 #include "entity_store.h"
 #include "combat_types.h"
+#include "../bosses/centaurus/image_pose_state.h"
+#include "../bosses/centaurus/reference_fx_state.h"
+#include "../bosses/canis_major/image_pose_state.h"
+#include "../bosses/monoceros/image_pose_state.h"
+#include "../bosses/monoceros/sweep_visual_state.h"
+#include "../bosses/canis_major/fire_visual_state.h"
 #include "../content/generated/combat_ids.h"
+#include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <string>
@@ -50,6 +57,7 @@ struct MonocerosDanceState {
     double elapsed=0,angle=0,glow=0,run_speed=0,travel=0,traveled=0,heading=0,speed=0;
     uint32_t completed=0;
 };
+struct MonocerosSlashVisual {godot::Vector2 from,to;double width=0,started=0;uint32_t seed=0;};
 struct MonocerosSwordState {
     enum class Stage : uint8_t { Aim,Swing,Gap,Return };
     Stage stage=Stage::Aim;
@@ -67,14 +75,27 @@ struct CanisBlazeChosen {EnemyHandle actor;double at=0;bool sent=false,lit=false
 struct CanisBlazeState {std::vector<CanisBlazeChosen> chosen;double age=0;};
 struct CanisSequenceItem {EnemyHandle actor;double mark=0,launch=0;bool marked=false,launched=false;};
 struct CanisHowlState {bool formed=false;double last_launch=0;std::vector<CanisSequenceItem> sequence;};
-struct CanisCommandState {std::vector<EnemyHandle> warned;};
+struct CanisCommandState {std::vector<EnemyHandle> warned;bool warning_started=false;};
 struct CanisStreamState {uint32_t definition=0;bool sent=false;double started=0,last_launch=0;std::vector<CanisSequenceItem> sequence;};
 struct CanisFlameAimState {double age=0;bool fired=false,done=false;};
 struct CanisHuntState {CanisStreamState stream;CanisFlameAimState aim;bool aiming=false,combo_pending=true;};
 struct CanisHuntPounceState {CanisStreamState stream;CanisPounceState jump;bool jumping=false,combo_pending=true;};
 struct CanisNovaPair {EnemyHandle actor;uint32_t group=0;double angle=0,side=1;bool stationed=false;};
 struct CanisNovaShadow {double angle=0,half=0,near=0;};
-struct CanisNovaState {double started=0;std::vector<CanisNovaPair> pairs;std::vector<CanisNovaShadow> shadows;std::vector<bool> ring_hit;bool flashed=false,released=false;};
+struct CanisNovaState {
+    double started=0;
+    std::vector<CanisNovaPair> pairs;
+    std::vector<CanisNovaShadow> shadows;
+    std::vector<bool> ring_hit;
+    bool flashed=false,released=false;
+    // 判定と表示が同じワールド位置で参照する、24fps単位の遮光場。
+    std::vector<uint8_t> field_alpha;
+    godot::Vector2 field_origin;
+    double field_cell=0;
+    int64_t field_frame=-1;
+    uint32_t field_width=0,field_height=0;
+    uint64_t field_revision=0;
+};
 struct CanisRelayItem {EnemyHandle actor;double at=0,angle=0;godot::Vector2 from;bool marked=false,fired=false,released=false;};
 struct CanisRelayState {CanisFlameAimState aim;double started=0,last_fire=0,tint_until=0;std::vector<CanisRelayItem> items;bool ordered=false,aiming=false,cancelled=false;};
 struct DracoBiteState {godot::Vector2 origin,retracted,strike;std::vector<godot::Vector2> base,landed;};
@@ -157,6 +178,8 @@ struct ParticipantState {
 };
 struct CentaurusGuardState {EnemyHandle actor;double scale=1,phase=0;};
 struct CentaurusBodyState {
+    CentaurusReferenceFxState reference_fx;
+    CentaurusImagePoseClock image_pose;
     std::vector<CentaurusGuardState> guards;
     std::unordered_map<uint32_t,double> cooldowns;
     godot::Vector2 guard_point,leap_from,leap_to;
@@ -167,9 +190,16 @@ struct CentaurusBodyState {
 struct CanisHoundRef {EnemyHandle actor;double base_hp=0;godot::Color color;};
 struct CanisRingMember {EnemyHandle actor;double angle=0;};
 struct CanisBurningHound {EnemyHandle actor;int64_t observation_id=0,effect_id=0;godot::Vector2 observation_pos;uint32_t definition=0,technique=0;double base_hp=0,age=0,blink_age=-1;godot::Color color;};
+struct CanisBlazeBurst {godot::Vector2 position;double radius=0,started=0;int64_t id=0;uint32_t technique=0;};
 struct CanisBodyState {
+    CanisImagePoseClock image_pose;
+    CanisFireVisualState fire_visual;
+    int64_t roar_last_technique=0,roar_serial=0;
+    uint32_t roar_definition=0;
+    double roar_started=-1;
     TechniqueHandle nova;
     std::vector<CanisBurningHound> burning;
+    std::vector<CanisBlazeBurst> bursts;
     std::vector<CanisRingMember> ring;
     godot::Vector2 ring_center;
     double ring_started=-1,ring_tick_at=0;
@@ -275,11 +305,19 @@ struct HydraNeckState {
 struct DracoCloneUnit {TechniqueState inner;HydraNeckState neck;std::vector<EnemyHandle> parts;std::vector<godot::Vector2> points;godot::Vector2 origin;uint32_t index=0;bool entry_hit=false;};
 struct HydraBodyState {std::unordered_map<int64_t,AttackHandle> final_beams;double major_cd=0,combo_left=0,major_padding_left=0;std::unordered_map<uint32_t,double> major_until;HydraSquadState squad;DamageRequest bearer_death;HydraNeckState bearer;double separation_left=0;bool separation_pending=false,separated=false,attack_field_advance=false;double growth_left=0,chance_left=0,recovery_left=0;std::unordered_map<int64_t,uint32_t> dash_kills;std::vector<HydraNeckState> necks;};
 struct BossBodyState {
+    double hit_feedback_until=0;
+    std::vector<BossImagePart> image_parts;
     int64_t final_observation_id=0;
     HydraBodyState hydra;
     DracoBodyState draco;
     CanisBodyState canis;
     CentaurusBodyState centaurus;
+    MonocerosImagePoseClock monoceros_pose;
+    std::vector<MonocerosBreathVisual> monoceros_breaths;
+    std::vector<MonocerosShatterVisual> monoceros_shatters;
+    std::vector<MonocerosBurnVisual> monoceros_burns;
+    std::vector<MonocerosSweepVisual> monoceros_sweeps;
+    std::vector<MonocerosSlashVisual> monoceros_slashes;
     std::vector<ParticipantState> participants;
     int64_t id=0;
     uint32_t definition=0,phase=1;

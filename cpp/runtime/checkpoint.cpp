@@ -53,6 +53,10 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         !std::isfinite(state.time) || !std::isfinite(state.world_time) || !std::isfinite(state.sim_time) ||
         !std::isfinite(state.grid.cell) || state.grid.cell<=0 || state.enemies.size()>=UINT32_MAX ||
         state.behavior_kinds.size()!=state.behavior_rows.size()) return false;
+    const auto &ram=state.control.boss_ram;
+    if (!std::isfinite(state.control.boss_ram_hitstop) || state.control.boss_ram_hitstop<0 || state.control.next_boss_ram_serial<1 ||
+        !std::isfinite(ram.remaining) || ram.remaining<0 || !std::isfinite(ram.started_at) || !std::isfinite(ram.released_at) || ram.started_at< -1 || ram.released_at< -1 || !ram.entry.is_finite() || !ram.exit.is_finite() || !ram.direction.is_finite()) return false;
+    if (ram.pending && (!ram.target.generation || ram.target_id<=0 || ram.serial<=0 || ram.serial>=state.control.next_boss_ram_serial)) return false;
     if (!std::isfinite(state.control.boss_at) || state.control.boss_at<-1 || !std::isfinite(state.control.world_real_accum) || !std::isfinite(state.control.world_dt_accum) ||
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
@@ -143,11 +147,11 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Soldier)!=(soldier!=nullptr)) return false;
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;
         const auto *lynx=std::get_if<LynxState>(&enemy.behavior_state);
-        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr)) return false;
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr) || (lynx && (!std::isfinite(lynx->last_fire) || (lynx->last_side!=1 && lynx->last_side!=-1)))) return false;
         const auto *corona=std::get_if<CoronaState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Corona)!=(corona!=nullptr)) return false;
         if (corona) {if (!std::isfinite(corona->wait) || !std::isfinite(corona->capture_t) || !corona->center.is_finite()) return false;uint32_t count=0;for (const auto &bucket:corona->types) {if (bucket.definition>=content.definitions.size() || bucket.items.empty()) return false;for (uint32_t slot=0;slot<bucket.items.size();++slot) {const auto h=bucket.items[slot];if (!state.enemy_handles.contains(h)) return false;const auto &member=state.enemies[h.slot].corona;if (!member || member->thrown || member->slot!=slot || member->definition!=bucket.definition || !same_handle(member->owner,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;++count;}}if (count!=corona->count) return false;}
-        if (enemy.corona) {const auto &c=*enemy.corona;if (!enemy.held || !c.serial || c.serial>state.corona_serial || !state.enemy_handles.contains(c.owner) || !std::holds_alternative<CoronaState>(state.enemies[c.owner.slot].behavior_state) || c.definition!=enemy.definition || !c.from.is_finite() || !c.ship_from.is_finite()) return false;for (double x:{c.angle,c.radius,c.life,c.release_fraction,c.damage,c.effect}) if (!std::isfinite(x)) return false;if (c.radius<0 || c.release_fraction<0 || c.release_fraction>1 || c.damage<0 || c.effect<0 || c.attack_token<0) return false;}
+        if (enemy.corona) {const auto &c=*enemy.corona;if (!enemy.held || !c.serial || c.serial>state.corona_serial || c.definition!=enemy.definition || !c.from.is_finite() || !c.ship_from.is_finite()) return false;if (state.enemy_handles.contains(c.owner)) {if (!std::holds_alternative<CoronaState>(state.enemies[c.owner.slot].behavior_state)) return false;} else if (!c.thrown || c.slot>=content.definitions.size() || content.definitions[c.slot].kind!=EnemyDefinition::Kind::Corona) return false;for (double x:{c.angle,c.radius,c.life,c.release_fraction,c.damage,c.effect}) if (!std::isfinite(x)) return false;if (c.radius<0 || c.release_fraction<0 || c.release_fraction>1 || c.damage<0 || c.effect<0 || c.attack_token<0) return false;}
         const auto *pump=std::get_if<PumpState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Pump)!=(pump!=nullptr)) return false;
         if (pump) {if (!std::isfinite(pump->bud_t) || pump->contents.size()>content.pumps[content.definitions[enemy.definition].pump_definition-1].store_max) return false;for (auto id:pump->contents) if (!id || id>content.definitions.size()) return false;}
@@ -156,6 +160,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (crab) if (const auto *record=AttackSystem::get(state,crab->sweep)) if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;
         const auto *aquila=std::get_if<AquilaState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Aquila)!=(aquila!=nullptr) || (aquila && (!aquila->anchor.is_finite() || !std::isfinite(aquila->bud_t)))) return false;
+        if (aquila) for (const auto &point:aquila->trace) if (!point.pos.is_finite() || !std::isfinite(point.time)) return false;
         const auto *phoenix=std::get_if<PhoenixState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Phoenix)!=(phoenix!=nullptr) || (phoenix && !phoenix->anchor.is_finite())) return false;
         const auto *marlin=std::get_if<MarlinState>(&enemy.behavior_state);
@@ -196,7 +201,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (shot.kind==int64_t(HostileKind::Slash)) {
             if (shot.slash.definition!=1 || content.slashes.empty() || (shot.slash.side!=1 && shot.slash.side!=-1) ||
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.radius) || shot.radius<=0 ||
-                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
+                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0 ||
+                shot.slash.lynx_definition>content.lynxes.size() || !std::isfinite(shot.slash.initial_life) || shot.slash.initial_life<0 || !std::isfinite(shot.slash.age) || shot.slash.age<0 || !shot.slash.paw_offset.is_finite()) return false;
         } else if (shot.slash.definition) return false;
         if (shot.kind==int64_t(HostileKind::Bolt)) {
             if (!shot.bolt.definition || shot.bolt.definition>content.bolts.size() || !shot.pos.is_finite() || !shot.vel.is_finite() ||
@@ -230,11 +236,12 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
         if (const auto *wall=std::get_if<WallHazard>(&hazard.shape)) {
+            if (wall->trail_visual_owner<0 || (wall->trail_visual_owner==0 && wall->trail_visual_side!=0) || (wall->trail_visual_owner>0 && wall->trail_visual_side!=1 && wall->trail_visual_side!=-1)) return false;
             if (!wall->definition || wall->definition>content.walls.size() || wall->style>=uint32_t(WallStyle::Count) ||
                 !std::isfinite(wall->angle) || !std::isfinite(wall->length) || wall->length<0 || !std::isfinite(wall->half_width) || wall->half_width<0) return false;
         }
         if (const auto *wave=std::get_if<MonocerosWaveHazard>(&hazard.shape)) {
-            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width}) if (!std::isfinite(value) || value<0) return false;
+            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width,wave->reference_time,wave->visual_age}) if (!std::isfinite(value) || value<0) return false;
             if (!std::isfinite(wave->angle)) return false;
         }
         if (const auto *wave=std::get_if<WaveHazard>(&hazard.shape)) {

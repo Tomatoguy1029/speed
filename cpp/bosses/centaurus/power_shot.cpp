@@ -1,4 +1,5 @@
 #include "power_shot.h"
+#include "../flow/phase_controller.h"
 #include "../../systems/attacks/light_arrow.h"
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
@@ -43,6 +44,7 @@ bool CentaurusPower::validate(const TechniqueState &t,const ContentBundle &c) {c
 godot::Dictionary CentaurusPower::snapshot(const RunRuntime &r,const TechniqueState &t) {
     const auto &p=rule(*r.content,t);const auto &v=std::get<CentaurusPowerState>(t.detail);godot::Dictionary out;out["alerting"]=v.alerting;out["released"]=v.released;out["locked_origin"]=v.origin;out["locked_angle"]=v.angle;out["travel"]=p.travel;
     if (r.state.enemy_handles.contains(t.actor)) {out["aim_origin"]=v.alerting?v.origin:mouth(r,t);out["aim_angle"]=v.alerting?v.angle:double(r.state.enemies[t.actor.slot].facing);}
+    if (const auto *body=PhaseController::find(r,t.actor)) out["alert_age"]=body->clock-t.started_at-(r.content->boss_techniques[t.definition-1].warn-p.alert);
     out["ship_position"]=r.state.ship_pos;out["ship_radius"]=r.state.ship_config.ship_radius;
     godot::PackedFloat64Array offsets;for (uint32_t k=0;k<p.count;++k) offsets.push_back((double(k)-double(p.count-1)*0.5)*p.spread);out["offsets"]=offsets;return out;
 }

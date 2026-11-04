@@ -26,6 +26,7 @@ void BoltSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const auto direction=shot.vel.normalized()*definition.flight_scale;
     const Color tint(definition.tint_r,definition.tint_g,definition.tint_b,definition.tint_a);
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    if (shot.bolt.reference_soldier) shape["reference_soldier_bolt"]=true;
     shape["behind_parent"]=shot.stone>0;
     PackedVector2Array points;PackedInt32Array offsets;PackedFloat32Array widths;PackedColorArray colors;offsets.push_back(0);
     const double back[]={34,30,24},front[]={6,4,2},width[]={14,6,2.5};
@@ -37,6 +38,7 @@ void BoltSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;out.push_back(shape);
     if (shot.stone>0) {
         Dictionary stone=shape.duplicate();stone["kind"]=int32_t(RenderShapeKind::Circle);
+        stone.erase("reference_soldier_bolt");
         PackedVector2Array p;p.push_back(shot.pos);PackedInt32Array o;o.push_back(0);o.push_back(1);PackedFloat32Array r;r.push_back(shot.radius*1.3);PackedColorArray c;c.push_back(Color(0.62,0.6,0.58,0.9));
         stone["points"]=p;stone["offsets"]=o;stone["widths"]=r;stone["colors"]=c;out.push_back(stone);
     }

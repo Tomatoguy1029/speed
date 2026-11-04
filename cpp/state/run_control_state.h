@@ -3,6 +3,7 @@
 #include <vector>
 #include <string>
 #include "../runtime/input_frame.h"
+#include "entity_store.h"
 #include <godot_cpp/variant/string_name.hpp>
 namespace speed {
 struct RunControlState {
@@ -17,6 +18,17 @@ struct RunControlState {
     bool lab_mode=false;
     bool lab_enemy_ai=true;
     double boss_at=-1;
+    // G10の停止と出口移動を値として保持し、復帰後も一度だけ適用する。
+    double boss_ram_hitstop=0;
+    double boss_touch_damage=0;
+    struct BossRam {
+        bool pending=false;
+        EnemyHandle target;
+        int64_t target_id=0,serial=0;
+        godot::Vector2 entry,exit,direction;
+        double remaining=0,started_at=-1,released_at=-1;
+    } boss_ram;
+    int64_t next_boss_ram_serial=1;
     bool draco_finish_done=false;
     std::vector<std::string> final_modules;
     bool ui_overlay=false, ui_reward=false, time_limit_reached=false;

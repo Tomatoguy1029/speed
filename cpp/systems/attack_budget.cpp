@@ -73,7 +73,14 @@ bool AttackBudgetSystem::request(const BudgetRequest &request) {
     const double until=budget.now+std::max(0.05,request.duration);if (!std::isfinite(until)) return false;
     if (const auto *token=budget.owners.getptr(owner)) {
         auto &group=budget.groups[*token];
-        if (const auto *member=group.members.getptr(id)) return !member->closed;
+        if (auto *member=group.members.getptr(id)) {
+            if (!member->closed) return true;
+            // 既存の枠に残る同じ敵の斬撃を保ちながら、次の攻撃を始める。
+            if (!request.reuse_residual || !group.residuals || guard_active() ||
+                (budget.enabled && (budget.budget<=0 || greater(used_cost(),budget.budget)))) return false;
+            member->actor=request.source;member->until=until;member->begun=false;member->closed=false;
+            group.until=std::max(group.until,until);return true;
+        }
         if (!state.world.attack_formation_mode) return false;
         if (budget.enabled && (budget.budget<=0 || greater(used_cost(),budget.budget))) return false;
         group.members.insert(id,{request.source,until,false,false});group.until=std::max(group.until,until);return true;

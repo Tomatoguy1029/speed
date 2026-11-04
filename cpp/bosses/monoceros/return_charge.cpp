@@ -15,7 +15,7 @@ void launch(RunRuntime &r,TechniqueState &t) {
     auto &e=r.state.enemies[t.actor.slot];const auto &p=rule(r,t);const auto &b=boss(r,t);auto &v=std::get<MonocerosReturnState>(t.detail);
     const double distance=std::max(b.near_clearance,std::min(double(e.pos.distance_to(t.aim)),p.distance));
     if (FieldSystem::first_body_hit(r,e.pos,e.pos+t.direction*distance,e.radius)) {t.stage=TechniqueStage::Failed;t.reposition=b.reposition_time;const auto side=(t.aim-e.pos).normalized().orthogonal();t.reposition_direction=FieldSystem::body_gap(r,e.pos+side*220.0,e.radius)>=FieldSystem::body_gap(r,e.pos-side*220.0,e.radius)?side:-side;e.vel={};return;}
-    t.direction=godot::Vector2::from_angle(e.facing);v.travel=std::min(p.distance,double(e.pos.distance_to(r.state.ship_pos))+p.overshoot);v.traveled=0;v.angle=e.facing;v.glow=0;t.hit=false;t.stage=TechniqueStage::Active;enter(v,MonocerosReturnState::Stage::Run);
+    t.direction=godot::Vector2::from_angle(e.facing);v.travel=std::min(p.distance,double(e.pos.distance_to(r.state.ship_pos))+p.overshoot);v.traveled=0;v.angle=e.facing;v.glow=1;t.hit=false;t.stage=TechniqueStage::Active;enter(v,MonocerosReturnState::Stage::Run);
 }
 }
 bool MonocerosReturn::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {if (!r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead || !definition || definition>r.content->boss_techniques.size()) return false;TechniqueState t;t.actor=actor;t.definition=definition;const auto &b=boss(r,t);return r.state.enemies[actor.slot].pos.distance_to(r.state.ship_pos)<=rule(r,t).distance+r.state.enemies[actor.slot].radius*(rule(r,t).phase>=2?b.horn_length_ratio_p2:b.horn_length_ratio);}
@@ -29,11 +29,11 @@ void MonocerosReturn::step(RunRuntime &r,TechniqueState &t,double dt) {
     case Stage::Aim:
         MonocerosCharge::step(r,t,dt);if (!t.locked && v.elapsed>=p.warn-b.lock_lead) MonocerosCharge::command(r,t,TechniqueCommand::LockAim);v.angle=e.facing;v.glow=std::clamp(v.elapsed/std::max(p.warn,0.001),0.0,1.0);if (v.elapsed>=p.warn) launch(r,t);break;
     case Stage::Run: {
-        const auto step=t.direction*std::min(p.distance/std::max(p.active,0.001)*dt,std::max(0.0,v.travel-v.traveled));if (!MonocerosCharge::advance(r,t,dt,prior,step)) return;v.traveled+=step.length();
+        v.glow=1;const auto step=t.direction*std::min(p.distance/std::max(p.active,0.001)*dt,std::max(0.0,v.travel-v.traveled));if (!MonocerosCharge::advance(r,t,dt,prior,step)) return;v.traveled+=step.length();
         if (v.traveled>=v.travel) {if (++v.completed>=p.passes) finish(r,t);else {t.locked=false;enter(v,Stage::Brake);}}break;
     }
     case Stage::Brake: {
-        const double k=std::clamp(v.elapsed/std::max(p.brake_time,0.001),0.0,1.0),speed=p.distance/std::max(p.active,0.001)*p.brake_speed_ratio*(1.0-k);const auto from=e.pos;e.pos+=t.direction*speed*dt;e.vel=t.direction*speed;FieldSystem::collide_enemy(r,t.actor.slot,from,dt);v.angle=e.facing;
+        v.glow=0;const double k=std::clamp(v.elapsed/std::max(p.brake_time,0.001),0.0,1.0),speed=p.distance/std::max(p.active,0.001)*p.brake_speed_ratio*(1.0-k);const auto from=e.pos;e.pos+=t.direction*speed*dt;e.vel=t.direction*speed;FieldSystem::collide_enemy(r,t.actor.slot,from,dt);v.angle=e.facing;
         if (v.elapsed>=p.brake_time) {v.from_angle=e.facing;v.turn_delta=angle_difference((r.state.ship_pos-e.pos).angle()-v.from_angle);enter(v,Stage::Turn);}break;
     }
     case Stage::Turn: {

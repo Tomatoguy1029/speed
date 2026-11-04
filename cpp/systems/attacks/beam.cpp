@@ -41,6 +41,10 @@ void BeamSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const double zoom=std::max(0.01,run.state.control.camera_zoom);const bool charging=hazard.time<hazard.delay;
     if (!charging && !view.grow(beam->length).has_point(hazard.pos)) return;
     Dictionary shape;shape["kind"]=int32_t(charging?RenderShapeKind::Circle:RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    const auto source=record->spec.owner.source_definition;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Beamer) shape["reference_beamer"]=true;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Cross) shape["reference_cross"]=true;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Sniper && beam->style==uint32_t(BeamStyle::Telescope)) shape["reference_telescope"]=true;
     if (charging && beam->style==uint32_t(BeamStyle::Guide) && view.grow(beam->length).has_point(hazard.pos)) {
         const double k=std::clamp(double(hazard.time)/std::max(0.001,double(hazard.delay)),0.0,1.0);
         Dictionary guide=shape.duplicate();guide["kind"]=int32_t(RenderShapeKind::Polyline);guide["behind_parent"]=true;

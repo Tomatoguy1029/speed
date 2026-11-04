@@ -1,5 +1,6 @@
 #include "../api/run_core.h"
 #include "field.h"
+#include "boss_contact_feedback.h"
 #include "geometry.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
@@ -128,6 +129,7 @@ Dictionary SpeedRunCore::ship_snapshot() const {
     Dictionary out;
     if (!runtime.state.ship_ready || runtime.state.closed) return out;
     out["ship_pos"] = runtime.state.ship.pos; out["ship_vel"] = runtime.state.ship.vel; out["ship_heading"] = runtime.state.ship.heading;
+    out["ship_contact_white"] = speed::boss_contact_white(runtime);
     out["ship_hp"] = runtime.state.ship.hp; out["ship_hurt"] = runtime.state.ship.hurt; out["ship_invuln"] = runtime.state.ship.invuln;
     out["ship_shield_flash"] = runtime.state.ship.shield_flash; out["ship_shield_t"] = runtime.state.ship.shield_t; out["ship_shield_max"] = runtime.state.ship.shield_max;
     out["ship_boost_t"] = runtime.state.ship.boost_t; out["ship_fade_t"] = runtime.state.ship.fade_t;

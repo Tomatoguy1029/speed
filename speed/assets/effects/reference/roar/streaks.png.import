@@ -1,0 +1,13 @@
+[remap]
+importer="texture"
+type="CompressedTexture2D"
+path="res://.godot/imported/streaks.png-379b24f9f2fca379f4106798bd450d09.ctex"
+
+[deps]
+source_file="res://assets/effects/reference/roar/streaks.png"
+dest_files=["res://.godot/imported/streaks.png-379b24f9f2fca379f4106798bd450d09.ctex"]
+
+[params]
+compress/mode=0
+mipmaps/generate=false
+process/fix_alpha_border=false

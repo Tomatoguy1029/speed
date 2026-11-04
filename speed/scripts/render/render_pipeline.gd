@@ -17,6 +17,7 @@ var _world: Node2D
 var _camera: Camera2D
 var _glow_viewport: SubViewport
 var _glow_camera: Camera2D
+var _screen_copy: BackBufferCopy
 var _shock: ColorRect
 var _ripple: ColorRect
 ## 震空の歪み：pos（世界）、radius（世界）、age、cell（世界の1ドット）
@@ -95,6 +96,10 @@ func _setup_bloom_pass(glow_layers: Array) -> void:
 func _setup_shockwave() -> void:
 	var layer := CanvasLayer.new()
 	layer.layer = _overlay_layer
+	_screen_copy = BackBufferCopy.new()
+	_screen_copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	_screen_copy.hide()
+	layer.add_child(_screen_copy)
 	_shock = ColorRect.new()
 	_shock.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_shock.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -152,6 +157,7 @@ func step(dt: float, view_center: Vector2, zoom: float) -> void:
 		_glow_camera.zoom = _camera.zoom * 0.5
 	_update_waves(dt, view_center, zoom)
 	_update_ripples(dt, view_center, zoom)
+	_screen_copy.visible = _shock.visible or _ripple.visible
 	if sparks.available():
 		sparks.step(dt, view_center, zoom)
 
