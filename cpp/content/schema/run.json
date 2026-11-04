@@ -643,13 +643,18 @@
           "min": 0
         },
         {
+          "name": "fx_monoceros_lance_timing",
+          "type": "f64",
+          "min": 0
+        },
+        {
           "name": "fx_boss_touch_damage",
           "type": "f64",
           "min": 0,
           "runtime": "control.boss_touch_damage"
         }
       ],
-      "version": 14
+      "version": 15
     },
     {
       "name": "StringEntry",
