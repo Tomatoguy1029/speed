@@ -14,6 +14,9 @@ func setup_frame(parent: Node2D, ship_parent: Node2D, texture: Texture2D, factor
 			for i in range(0,value.segments.size(),2):
 				lightning.draw(node,value.segments[i],value.segments[i+1],2.0*EFFECT_SETTINGS.number("weapon/contactArc","pixel_scale",1.0)/maxf(_zoom,0.01),int(value.id)*7919+i*313+shape*101,alpha,EFFECT_SETTINGS.tinted("weapon/contactArc",Color("#ffcf3a")),Color("#fff8d6")))
 	_probe = Sprite2D.new()
+	var white := ShaderMaterial.new()
+	white.shader = preload("res://shaders/ship_contact_white.gdshader")
+	_probe.material = white
 	_probe.texture = texture
 	_probe.offset = Vector2(0,texture.get_height()*0.5-30.0) if texture!=null else Vector2.ZERO
 	_probe.scale = Vector2.ONE*factor
@@ -26,6 +29,7 @@ func frame_tick(data: Dictionary, ship: Dictionary, zoom: float, visible: bool) 
 	_probe.position = ship.ship_pos
 	_probe.rotation = ship.ship_heading.angle()+PI/2.0
 	_probe.visible = visible
+	_probe.material.set_shader_parameter("strength",1.0 if ship.get("ship_contact_white",false) else 0.0)
 	_probe.modulate = Color("#ff6b5a") if ship.ship_hurt>0.0 else Color.WHITE
 func dispose() -> void:
 	if is_instance_valid(_probe): _probe.queue_free()

@@ -162,6 +162,7 @@ var _shield_transfers: Array[Dictionary] = []
 var _shield_holder: Node2D
 var _shield_transfer_canvas: DrawLayer
 var _shield_layer := 2
+var _ship_white_material: ShaderMaterial
 var _ship_visible := true
 var _ship_visual_position := Vector2.INF
 var _zoom := 1.0
@@ -185,6 +186,8 @@ var elite_crackle: Node2D
 var _mark_clock := 0.0
 
 func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_scale: float) -> void:
+	_ship_white_material = ShaderMaterial.new()
+	_ship_white_material.shader = preload("res://shaders/ship_contact_white.gdshader")
 	metrics_record = perf.open(&"metrics")
 	_scope = scope
 	_pixel = 1.82*character_scale
@@ -222,18 +225,21 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_layer(2).add_child(_hero_aura)
 
 	_barrier_armor = Sprite2D.new()
+	_barrier_armor.material = _ship_white_material
 	_barrier_armor.texture = _scope.resources.get("res://assets/pixel/airship_armor.png")
 	_barrier_armor.offset = Vector2(0.0,_barrier_armor.texture.get_height()*0.5-30.0) if _barrier_armor.texture!=null else Vector2.ZERO
 	_barrier_armor.scale = Vector2.ONE*character_scale
 	_barrier_armor.hide()
 	_layer(18).add_child(_barrier_armor)
 	_mines_overlay = Sprite2D.new()
+	_mines_overlay.material = _ship_white_material
 	_mines_overlay.texture = _scope.resources.get("res://assets/pixel/airship_mine.png")
 	_mines_overlay.offset = Vector2(0.0,_mines_overlay.texture.get_height()*0.5-30.0) if _mines_overlay.texture!=null else Vector2.ZERO
 	_mines_overlay.scale = Vector2.ONE*character_scale
 	_mines_overlay.hide()
 	_layer(18).add_child(_mines_overlay)
 	_rear_canvas = DrawLayer.new()
+	_rear_canvas.material = _ship_white_material
 	_layer(18).add_child(_rear_canvas)
 	_rear_canvas.draw_fn = func(canvas: CanvasItem):
 		if _rear_frame.is_empty() or not _rear_frame.rear.ready or not _ship_visible: return
@@ -1049,6 +1055,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			var sprite := Sprite2D.new()
 			sprite.texture = _scope.resources.get(visuals[row.part_key].path)
 			sprite.offset = Vector2(0.0,sprite.texture.get_height()*0.5-30.0)
+			sprite.material = _ship_white_material
 			_layer(17 if visuals[row.part_key].role==5 else 18).add_child(sprite)
 			parts[key] = sprite
 		var sprite: Sprite2D = parts[key]
@@ -1057,6 +1064,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			_ship_visible = row.visible
 		sprite.transform = row.transform
 		sprite.visible = row.visible
+		_ship_white_material.set_shader_parameter("strength",1.0 if row.visual_state & 4 else 0.0)
 		sprite.modulate = Color("#ff6b5a") if row.visual_state & 1 else Color.WHITE
 		if row.visual_state & 2: sprite.modulate.a = 0.5
 	submit_us = Time.get_ticks_usec()-begin
