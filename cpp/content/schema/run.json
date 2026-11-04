@@ -2178,6 +2178,10 @@
       {
         "name": "BossRamContact",
         "value": "boss_ram_contact"
+      },
+      {
+        "name": "BiteCue",
+        "value": "biter_cue"
       }
     ],
     "ResultKind": [
@@ -3246,6 +3250,14 @@
       "remaining",
       "target_position",
       "target_radius"
+    ],
+    "biter_cue": [
+      "id",
+      "pos",
+      "angle",
+      "radius",
+      "sprite_radius",
+      "cue"
     ]
   },
   "includes": [
