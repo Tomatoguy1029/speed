@@ -50,6 +50,12 @@ func set_overlay_layer(value: int) -> void:
 	for child in get_children():
 		if child is CanvasLayer: child.layer += offset
 
+## 画面効果の層を足す。offset は画面効果の基準の層からの順番（衝撃波0・火花1・光のにじみ2）。
+## 外観の追加で基準の層が移ると、ほかの画面効果と一緒に移る。
+func add_screen_layer(layer: CanvasLayer, offset: int) -> void:
+	layer.layer = _overlay_layer + offset
+	add_child(layer)
+
 func _setup_hdr_glow(glow_layers: Array) -> void:
 	get_viewport().use_hdr_2d = true
 	var env := Environment.new()

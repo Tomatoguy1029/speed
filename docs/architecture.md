@@ -540,6 +540,8 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 - 画面外の演出は描画だけ省き、位置・寿命の更新は続ける（カメラが動けば同じ状態が見える）。
 - 画面の拡大縮小は、表示を伸ばす方式（`canvas_items`）と、縦横比に合わせて広げる設定（`expand`）を使う。カメラのズームは画面の短い辺を基準に計算する（仕様書 15）。
 
+ワープホールは `scripts/render/fx/warp_hole_visual.gd` が値型フレームの位置・半径・消える時刻と世界時刻から開閉と点滅を求め、1枚の四角形を `warp_hole.gdshader` で描く。ボーナスステージは `scripts/render/fx/bonus_stage_visual.gd` がUIの `bonus_remaining` の変化から、潜る演出・閃光・背景・画面効果を表示側だけで動かす。背景は地色の範囲へ `bonus_background.gdshader` を重ね、画面効果は `RenderPipeline.add_screen_layer()` で光のにじみの層と同じ順番へ置いた全画面の `bonus_screen.gdshader` が描く。トンネルの模様は `warp_tunnel.gdshaderinc` を共有する。どれもRunFrameViewとRunPresentationのpreloadから出撃前の準備へ含める。
+
 ## 11. 保存
 
 - `user://` に保存する。中身は仕様書 14 のとおり（ストーリーの進み具合、伝説のモジュール、ハイスコア、図鑑の獲得状況を含む）。
@@ -740,7 +742,7 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 
 ### 15.2 背景の配置
 
-画面全体の地色は `StageDef.background_color` に保存し、制作時にRunResourcesへ引き継ぐ。通常時の描画はその色、ボーナス中は専用色を使う。背景エディターは地色を配置と同じ履歴・未保存判定で扱う。星は `background_star_field.gd` と `background_stars.gdshader` を本番とプレビューで共有する。メッシュと固定乱数の星データを表示開始時にGPUへ送り、表示中心・範囲・倍率だけを更新する。プレビューは開始地点からの座標を本番のカメラ座標へ変換し、地色・星・背景素材・ガイドの順に描く。星の表示切替は編集画面内で保持する。
+画面全体の地色は `StageDef.background_color` に保存し、制作時にRunResourcesへ引き継ぐ。通常時の描画はその色を使い、ボーナス中は地色の範囲へ専用の背景を重ねる（[10.2](#102-層資源画面効果)）。背景エディターは地色を配置と同じ履歴・未保存判定で扱う。星は `background_star_field.gd` と `background_stars.gdshader` を本番とプレビューで共有する。メッシュと固定乱数の星データを表示開始時にGPUへ送り、表示中心・範囲・倍率だけを更新する。プレビューは開始地点からの座標を本番のカメラ座標へ変換し、地色・星・背景素材・ガイドの順に描く。星の表示切替は編集画面内で保持する。
 
 ステージの背景は `StageDef.backgrounds` の `BackgroundPlacement` 配列へ保存する。画像・開始地点からの位置・倍率・回転・色と明るさ・移動倍率 `parallax` を持ち、配列の後ろほど手前へ描く。`tint` のRGBを色、Aを明るさとして保存し、`display_tint()` がRGBへ明るさを掛けて描画用のAを1に保つ。元画像のアルファは画像の穴・輪郭に使う。`position_at()` が開始地点からのカメラ移動量に応じた表示位置を計算し、本番と背景エディターの視差プレビューで共有する。実行用の `texture_path` と `used_rect` は生成時に解決し、`bounds()` は生成済み範囲を返す。`RunPresentation` と開発用の `gyms/background_lab/` が同じ原点と寸法で描く。背景エディターは保存時にステージを読み直して地色と背景配列を書き換え、外部変更はファイルのハッシュで検出する。実行用の依存資源にも背景画像を含める。
 
