@@ -190,19 +190,19 @@ function dSpiralBegin(S) {
 function dSpiralWindup(S, dt) {
   const sp = S.spiral; dSpiralCamera(S, dt); const half = V(W / Z / cam.zoom / 2, H / Z / cam.zoom / 2);
   if (sp.phase === 'exit') { sp.depart += dt; const angle = sp.exitAngle + angDiff(-Math.PI / 2, sp.exitAngle) * smooth(0, 0.55, sp.depart), speed = Math.max((DP.body_length + half.y * 2 + DP.body_width * 2) / clamp(S.r.exit_duration, 0.6, 3), 1100); dSetFollow(S, add(S.B.pos, mul(fromA(angle), speed * dt))); S.elapsed = Math.min(S.elapsed, S.r.warn - 1.01);
-    if (dOffscreen(S)) { sp.phase = 'entry'; sp.center = { ...S.ship.pos }; const margin = S.B.r + DP.body_width + 100; sp.outside = V(Math.max(sp.center.x + sp.horizontal + margin, cam.x + half.x + margin), Math.min(sp.center.y - sp.extent - margin, cam.y - half.y - margin)); sp.control = add(sp.center, V(sp.horizontal * 0.52, -sp.extent)); sp.inside = add(sp.center, V(0, -sp.extent)); S.trail = Array.from({ length: DCOUNT + 1 }, (_, i) => add(sp.outside, V(S.r.spiral_length * i / DCOUNT, 0))); S.points = S.trail; S.B.pos = sp.outside; S.elapsed = S.r.warn - 1; } return;
+    if (dOffscreen(S)) { sp.phase = 'entry'; sp.center = { ...S.ship.pos }; const margin = S.B.r + DP.body_width + 100; sp.outside = V(Math.min(sp.center.x - sp.horizontal - margin, cam.x - half.x - margin), Math.max(sp.center.y + sp.extent + margin, cam.y + half.y + margin)); sp.control = add(sp.center, V(-sp.horizontal * 0.52, sp.extent)); sp.inside = add(sp.center, V(0, sp.extent)); S.trail = Array.from({ length: DCOUNT + 1 }, (_, i) => add(sp.outside, V(-S.r.spiral_length * i / DCOUNT, 0))); S.points = S.trail; S.B.pos = sp.outside; S.elapsed = S.r.warn - 1; } return;
   }
   const shift0 = mul(sub(S.ship.pos, sp.center), 1 - Math.exp(-1.4 * dt)), shift = len(shift0) > 350 * dt ? mul(norm(shift0), 350 * dt) : shift0; sp.center = add(sp.center, shift); for (const key of ['outside', 'control', 'inside']) sp[key] = add(sp[key], shift); S.trail = S.trail.map(p => add(p, shift));
   const k = clamp(S.elapsed - (S.r.warn - 1)), head = lerpV(lerpV(sp.outside, sp.control, k), lerpV(sp.control, sp.inside, k), k); dSetFollow(S, head, S.r.spiral_length);
 }
 // 渦：中心へ行くほど半径が小さくなる螺旋（外周→内周を2周で一定に縮め、隣の周回との間に逃げ道を残す）。中心は巻き始めの自機の位置で固定し、ずらさない。
 function dSpiralHead(S, turns) {
-  const sp = S.spiral, angle = -Math.PI / 2 - turns * TAU, radius = lerp(sp.extent, sp.extent * sp.inner, turns / 2);
+  const sp = S.spiral, angle = Math.PI / 2 - turns * TAU, radius = lerp(sp.extent, sp.extent * sp.inner, turns / 2);
   return add(sp.center, V(Math.cos(angle) * radius, Math.sin(angle) * radius));
 }
-// 直進：頭が真下へ抜け、残りの胴は紐を結ぶように、引かれた分だけ渦ごと中心へ締まっていく
+// 直進：頭が真上へ抜け、残りの胴は紐を結ぶように、引かれた分だけ渦ごと中心へ締まっていく
 function dSpiralPull(S, pulled) {
-  const sp = S.spiral, L = S.r.spiral_length, d = V(0, 1), coil = sp.coilPoints, total = pathLength(coil), tight = smooth(0, L * 0.7, pulled);
+  const sp = S.spiral, L = S.r.spiral_length, d = V(0, -1), coil = sp.coilPoints, total = pathLength(coil), tight = smooth(0, L * 0.7, pulled);
   S.points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const s = i / DCOUNT * L; if (s <= pulled) return add(sp.pullFrom, mul(d, pulled - s));
     const rest = s - pulled, at = pathAt(coil, Math.min(total, rest)).pos, k = lerp(1, 1 - 0.8 * tight, smooth(0, 260, rest)); return add(sp.center, mul(sub(at, sp.center), k)); });
   dRound(S.points, Math.round(pulled / L * DCOUNT), 6, 14);
@@ -220,9 +220,9 @@ function dSpiralActive(S, dt) {
   if (t < shrinkAt) {
     let turns = t < sp.first ? t / sp.first : 1 + (t - sp.first) / sp.second; turns = clamp(turns, 0, 2);
     let head = dSpiralHead(S, turns);
-    // 巻き終わり：真上で左へ曲げて頭を下（中心）へ向ける。曲げた分だけ最後の4分の1周で右へ寄せて、真下の直進が中心を通るようにする
-    const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(-sp.bendRadius * Math.sin(bend) + sp.bendRadius * smooth(1.75, 2, turns), sp.bendRadius * (1 - Math.cos(bend))));
-    dSetFollow(S, head, S.r.spiral_length); if (t > sp.first + sp.second) { S.points = S.points.map(q => ({ ...q })); dRound(S.points, 4, 4, 10); } if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, sp.extent * 2))]];
+    // 巻き終わり：自機の真下で曲げて頭を上（y の負の向き）へ向ける。曲げた分だけ最後の4分の1周で寄せて、真上への直進が中心を通るようにする
+    const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(sp.bendRadius * Math.sin(bend) - sp.bendRadius * smooth(1.75, 2, turns), -sp.bendRadius * (1 - Math.cos(bend))));
+    dSetFollow(S, head, S.r.spiral_length); if (t > sp.first + sp.second) { S.points = S.points.map(q => ({ ...q })); dRound(S.points, 4, 4, 10); } if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, -sp.extent * 2))]];
     return;
   }
   if (!sp.coilPoints) { sp.coilPoints = S.points.map(p => ({ ...p })); sp.pullFrom = { ...S.points[0] }; }
