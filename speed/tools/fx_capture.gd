@@ -47,8 +47,9 @@ func _ready() -> void:
 	viewport.size = SIZE
 	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(viewport)
+	var capture_profile: Dictionary = spec.get("profile",ProfileManager.for_cpp(true,{}))
 	session = RunManager.create_session(viewport,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,
-		"seed":int(spec.seed),"hud":false,"cpp_start":{"lab_mode":true},"cpp_profile":ProfileManager.for_cpp(true,{})},true)
+		"seed":int(spec.seed),"hud":false,"cpp_start":{"lab_mode":true},"cpp_profile":capture_profile},true)
 	session.remove_from_group("recordable_runs")
 	session.auto_step = false
 	while is_instance_valid(session) and session.bridge==null and session.cpp_error==OK:
@@ -101,7 +102,7 @@ func _ready() -> void:
 		"index":index_path,"index_input_sha256":index.input_sha256,"camera":spec.camera,"build_identity":spec.build_identity,
 		"library_sha256":FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib"),
 		"dependencies_sha256":FileAccess.get_sha256(root.path_join("cpp/dependencies.json")),"engine":Engine.get_version_info(),
-		"frames":images,"observations":observations}
+		"frames":images,"observations":observations,"profile":capture_profile}
 	var file := FileAccess.open(output.path_join("frames.json"),FileAccess.WRITE)
 	if file==null:
 		_fail("撮影条件を保存できません")
