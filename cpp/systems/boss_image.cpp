@@ -1,5 +1,7 @@
 #include "boss_image.h"
 #include "../runtime/run_runtime.h"
+#include "../bosses/centaurus/image_pose_system.h"
+#include "../bosses/canis_major/image_pose.h"
 #include <cmath>
 namespace speed {
 namespace {
@@ -22,6 +24,18 @@ bool solid(const ContentBundle &content,const BossBodyState &body,godot::Vector2
     }
     return false;
 }
+}
+void BossImageSystem::refresh(RunRuntime &r) {
+    for (auto &body:r.state.bosses.bodies) {
+        if (!body.definition || body.definition>r.content->boss_bodies.size()) continue;
+        const auto boss=r.content->boss_bodies[body.definition-1].boss;
+        if (!boss || boss>r.content->bosses.size()) continue;
+        switch (r.content->bosses[boss-1].kind) {
+        case 1:CentaurusImagePoseSystem::refresh(r,body);break;
+        case 2:CanisImagePose::update(r,body);break;
+        default:break;
+        }
+    }
 }
 bool BossImageSystem::available(const RunRuntime &r,EnemyHandle actor) {
     const auto *body=body_for(r,actor);return body && !body->image_parts.empty();

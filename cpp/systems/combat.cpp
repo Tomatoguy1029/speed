@@ -11,7 +11,6 @@
 #include "combat_resolver.h"
 #include "boss_ram.h"
 #include "boss_image.h"
-#include "../bosses/centaurus/image_pose_system.h"
 #include "../output/event_builder.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
@@ -89,7 +88,7 @@ void SpeedRunCore::kill_enemy(size_t row,bool crit,StringName cause,Vector2 dire
 bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.combat_ready || !from.is_finite() || !std::isfinite(radius) || radius < 0) return false;
     if (speed::WallSystem::bounce_ship(runtime,from)) return true;
-    for (auto &body:runtime.state.bosses.bodies) speed::CentaurusImagePoseSystem::refresh(runtime,body);
+    speed::BossImageSystem::refresh(runtime);
     if (speed::BossContactSystem::resolve(runtime,from,runtime.state.ship.pos,runtime.state.ship_config.ship_radius)) return true;
     const auto &c = runtime.state.combat_config;
     const Vector2 to = runtime.state.ship.pos;
