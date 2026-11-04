@@ -185,7 +185,7 @@ function dClones(S, dt) {
 }
 function dSpiralBegin(S) {
   const r = S.r, width = DP.body_width, half = V(W / Z / 2 / 0.82, H / Z / 2 / 0.82), broad = Math.max(half.x, half.y) * clamp(r.radius_factor, 0.5, 1.5), clearance = S.B.r + width * 0.5 + DATA.config.ship_radius * 2 + 40, extent = Math.max(width * 4, broad, width * 3 + clearance), smallest = Math.min(1, clearance / extent), largest = Math.max(smallest, 1 - width * 3 / extent), inner = clamp(r.inner_radius_factor / r.radius_factor, smallest, largest), shrink = clamp(r.shrink_time, 0.3, Math.max(0.3, r.active * 0.5)), coil = clamp(r.coil_time, 0.5, Math.min(3, Math.max(0.5, r.active - shrink - 0.8))), pause = clamp(r.pause, 0.8, Math.min(3, Math.max(0.8, r.active - shrink - coil - 0.15))), headClearance = S.B.r + DATA.config.ship_radius + 60, headOffset = clamp(r.head_offset, headClearance, Math.max(headClearance, extent * (1 + inner) * 0.5 * 0.8));
-  S.spiral = { center: { ...S.ship.pos }, extent, horizontal: extent, inner, shrink, coil, pause, first: coil * 0.35, second: coil * 0.45, bendTime: coil * 0.2, bendRadius: Math.min(headOffset, extent * 0.34), headOffset, phase: 'exit', depart: 0, exitAngle: angOf(sub(S.points[0], S.points[1])) }; cam.zoom = 1;
+  S.spiral = { center: { ...S.ship.pos }, extent, horizontal: extent, inner, shrink, coil, pause, first: coil * 0.35, second: coil * 0.45, bendTime: coil * 0.2, bendRadius: Math.max(40, extent * inner * 0.35), headOffset, phase: 'exit', depart: 0, exitAngle: angOf(sub(S.points[0], S.points[1])) }; cam.zoom = 1;
 }
 function dSpiralWindup(S, dt) {
   const sp = S.spiral; dSpiralCamera(S, dt); const half = V(W / Z / cam.zoom / 2, H / Z / cam.zoom / 2);
@@ -195,14 +195,32 @@ function dSpiralWindup(S, dt) {
   const shift0 = mul(sub(S.ship.pos, sp.center), 1 - Math.exp(-1.4 * dt)), shift = len(shift0) > 350 * dt ? mul(norm(shift0), 350 * dt) : shift0; sp.center = add(sp.center, shift); for (const key of ['outside', 'control', 'inside']) sp[key] = add(sp[key], shift); S.trail = S.trail.map(p => add(p, shift));
   const k = clamp(S.elapsed - (S.r.warn - 1)), head = lerpV(lerpV(sp.outside, sp.control, k), lerpV(sp.control, sp.inside, k), k); dSetFollow(S, head, S.r.spiral_length);
 }
+// 渦：中心へ行くほど半径が小さくなる螺旋（外周→内周を2周で一定に縮め、隣の周回との間に逃げ道を残す）。中心は巻き始めの自機の位置で固定し、ずらさない。
+function dSpiralHead(S, turns) {
+  const sp = S.spiral, angle = -Math.PI / 2 - turns * TAU, radius = lerp(sp.extent, sp.extent * sp.inner, turns / 2);
+  return add(sp.center, V(Math.cos(angle) * radius, Math.sin(angle) * radius));
+}
+// 直進：頭が真下へ抜け、残りの胴は紐を結ぶように、引かれた分だけ渦ごと中心へ締まっていく
+function dSpiralPull(S, pulled) {
+  const sp = S.spiral, L = S.r.spiral_length, d = V(0, 1), coil = sp.coilPoints, total = pathLength(coil), tight = smooth(0, L * 0.7, pulled);
+  S.points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const s = i / DCOUNT * L; if (s <= pulled) return add(sp.pullFrom, mul(d, pulled - s));
+    const rest = s - pulled, at = pathAt(coil, Math.min(total, rest)).pos, k = lerp(1, 1 - 0.8 * tight, smooth(0, 260, rest)); return add(sp.center, mul(sub(at, sp.center), k)); });
+  S.trail = S.points; S.B.pos = S.points[0]; S.B.facing = Math.PI / 2;
+}
 function dSpiralActive(S, dt) {
   const sp = S.spiral, t = S.elapsed, shrinkAt = sp.coil + sp.pause; dSpiralCamera(S, dt);
-  if (!sp.correction) { sp.held = { ...S.ship.pos }; sp.correction = sub(add(sp.held, V(sp.bendRadius, -sp.headOffset - sp.bendRadius)), add(sp.center, V(0, -sp.extent * sp.inner))); }
+  if (!sp.held) sp.held = { ...S.ship.pos };
   if (t < sp.coil) S.ship.pos = { ...sp.held };
-  let turns = t < sp.first ? t / sp.first : 1 + (t - sp.first) / sp.second; turns = clamp(turns, 0, 2); const shrink = clamp((t - shrinkAt) / sp.shrink), angle = -Math.PI / 2 - turns * TAU, radiusScale = lerp(1, sp.inner, turns * 0.5), bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2;
-  let head = add(add(sp.center, V(Math.cos(angle) * sp.horizontal * radiusScale, Math.sin(angle) * sp.extent * radiusScale)), mul(sp.correction, smooth(1, 2, turns))); head = add(head, V(-sp.bendRadius * Math.sin(bend), sp.bendRadius * (1 - Math.cos(bend))));
-  const exitDistance = sp.extent * 2 + S.r.spiral_length, extra = Math.max(0, t - shrinkAt - sp.shrink) * exitDistance / sp.shrink; head.y += shrink * exitDistance + extra;
-  dSetFollow(S, head, S.r.spiral_length); if (t >= sp.coil && t < shrinkAt) S.tell = [[S.B.pos, add(S.B.pos, V(0, sp.extent * 2))]];
+  if (t < shrinkAt) {
+    let turns = t < sp.first ? t / sp.first : 1 + (t - sp.first) / sp.second; turns = clamp(turns, 0, 2);
+    let head = dSpiralHead(S, turns);
+    // 巻き終わり：真上で左へ曲げて頭を下（中心）へ向ける。曲げた分だけ最後の4分の1周で右へ寄せて、真下の直進が中心を通るようにする
+    const bend = clamp((t - sp.first - sp.second) / sp.bendTime) * Math.PI / 2; head = add(head, V(-sp.bendRadius * Math.sin(bend) + sp.bendRadius * smooth(1.75, 2, turns), sp.bendRadius * (1 - Math.cos(bend))));
+    dSetFollow(S, head, S.r.spiral_length); if (t >= sp.coil) S.tell = [[S.B.pos, add(S.B.pos, V(0, sp.extent * 2))]];
+    return;
+  }
+  if (!sp.coilPoints) { sp.coilPoints = S.points.map(p => ({ ...p })); sp.pullFrom = { ...S.points[0] }; }
+  dSpiralPull(S, (t - shrinkAt) * (sp.extent * 2 + S.r.spiral_length) / sp.shrink);
 }
 function dSpiralCamera(S, dt) { cam.zoom = lerp(cam.zoom, 0.82, 1 - Math.exp(-3 * dt)); cam.x = lerp(cam.x, S.ship.pos.x, 1 - Math.exp(-5 * dt)); cam.y = lerp(cam.y, S.ship.pos.y, 1 - Math.exp(-5 * dt)); }
 function dEnd(S) {
@@ -217,7 +235,7 @@ function dRecover(S) {
   else if (id === 'leap') S.B.pos = sub(S.settled, mul(S.direction, 60 * smooth(0, 1, k)));
   else if (id === 'breath') { S.B.facing = lerp(S.axis + r.sweep, S.axis, smooth(0, 1, k)); dBlend(S, S.landedPoints, dNeutral(S.B.pos, S.axis, S.t), k); }
   else if (id === 'inhale') S.override = dNeutral(S.B.pos, S.B.facing, S.t);
-  else if (id === 'spiral') { const speed = (S.spiral.extent * 2 + r.spiral_length) / S.spiral.shrink; dSetFollow(S, add(S.settled, V(0, speed * S.elapsed)), r.spiral_length); }
+  else if (id === 'spiral') { const sp = S.spiral, speed = (sp.extent * 2 + r.spiral_length) / sp.shrink; if (sp.coilPoints) dSpiralPull(S, (S.r.active - sp.coil - sp.pause + S.elapsed) * speed); }
 }
 function dStep(S, dt) {
   S.age += dt; if (S.age < 0) return;
