@@ -2,6 +2,7 @@
 #include "body.h"
 #include "hound_lunge.h"
 #include "sequence.h"
+#include "stream.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/group_system.h"
@@ -27,7 +28,7 @@ void form(RunRuntime &r,TechniqueState &t,BossBodyState &b) {
         for (uint32_t slot=0;slot<total;++slot) {if (empty.count(slot)) continue;const double angle=offset+godot::Math::TAU*slot/total;auto best=pool.end();double closest=INFINITY;for (auto it=pool.begin();it!=pool.end();++it) {const double gap=std::abs(angle_difference((r.state.enemies[it->slot].pos-b.canis.ring_center).angle()-angle));if (gap<closest) {closest=gap;best=it;}}if (best!=pool.end()) {b.canis.ring.push_back({*best,angle});pool.erase(best);}else if (summoned<p.summon_max) {EnemySpawn spawn;spawn.position=b.canis.ring_center+godot::Vector2::from_angle(angle)*(p.ring_radius+p.spawn_out);spawn.has_hound_pack=true;spawn.hound_pack=-r.state.enemy_handles.entity_id(b.actor);spawn.has_facing=true;spawn.facing=angle+godot::Math::PI;const auto id=EnemySystem::spawn(r,CanisMajorBody::rule(r,b).hound-1,spawn);if (id>=0) {b.canis.ring.push_back({r.state.enemy_handles.at(r.state.rows_by_id.at(id)),angle});++summoned;}}}
     }
     auto rows=b.canis.ring;std::sort(rows.begin(),rows.end(),[](const auto &a,const auto &b){return a.angle<b.angle;});if (r.state.control.rng.randi_range(0,1).value()==1) std::reverse(rows.begin(),rows.end());if (!rows.empty()) {const auto first=r.state.control.rng.randi_range(0,rows.size()-1).value();std::rotate(rows.begin(),rows.begin()+first,rows.end());}
-    const double start=b.clock+p.follow_time;v.last_launch=start+std::max(0,int(rows.size())-1)*p.seq_interval+p.seq_warn;for (size_t i=0;i<rows.size();++i) v.sequence.push_back({rows[i].actor,start+i*p.seq_interval,start+i*p.seq_interval+p.seq_warn,false,false});
+    const double start=b.clock+p.follow_time,warning=CanisStream::hound_warning(*r.content,t.definition,p.seq_warn);v.last_launch=start+std::max(0,int(rows.size())-1)*p.seq_interval+warning;for (size_t i=0;i<rows.size();++i) v.sequence.push_back({rows[i].actor,start+i*p.seq_interval,start+i*p.seq_interval+warning,false,false});
 }
 }
 bool CanisHowl::in_ring(const BossBodyState &b,EnemyHandle actor) {return std::any_of(b.canis.ring.begin(),b.canis.ring.end(),[&](const auto &v){return same_handle(v.actor,actor);});}
@@ -35,9 +36,9 @@ bool CanisHowl::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition)
 void CanisHowl::begin(RunRuntime &r,TechniqueState &t) {t.detail=CanisHowlState{};t.started_at=PhaseController::find(r,t.actor)->clock;t.previous_ship=r.state.ship_pos;r.state.enemies[t.actor.slot].vel={};cue(r,t,"telegraph");}
 void CanisHowl::step(RunRuntime &r,TechniqueState &t,double dt) {
     const auto &base=r.content->boss_techniques[t.definition-1];const auto &p=rule(*r.content,t.definition);auto &v=std::get<CanisHowlState>(t.detail);auto *b=PhaseController::find(r,t.actor);if (!b) {t.stage=TechniqueStage::Failed;return;}r.state.enemies[t.actor.slot].vel={};if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
-    if (!v.formed) {auto &e=r.state.enemies[t.actor.slot];if (!TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) e.facing+=std::clamp(angle_difference((r.state.enemy_aim-e.pos).angle()-e.facing),-r.content->bosses[base.boss-1].turn*dt,r.content->bosses[base.boss-1].turn*dt);if (b->clock-t.started_at<base.warn) return;v.formed=true;t.stage=TechniqueStage::Active;form(r,t,*b);}
+    if (!v.formed) {auto &e=r.state.enemies[t.actor.slot];if (!TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) e.facing+=std::clamp(angle_difference((r.state.enemy_aim-e.pos).angle()-e.facing),-r.content->bosses[base.boss-1].turn*dt,r.content->bosses[base.boss-1].turn*dt);if (b->clock-t.started_at<CanisStream::order_start(*r.content,t.definition,base.warn)) return;v.formed=true;t.stage=TechniqueStage::Active;form(r,t,*b);}
     CanisSequence::tick(r,t,*b,v.sequence,p.lunge_speed,p.lunge_time,base.damage,"howl");
-    CanisHoundLunge::step(r,*b,t.id);if (b->clock>=v.last_launch+p.tail) {cancel(r,t);t.stage=TechniqueStage::Recovery;t.remaining=base.recover;t.locked=false;cue(r,t,"recovery_started");}
+    CanisHoundLunge::step(r,*b,t.id);if (b->clock>=v.last_launch+p.tail) {for (const auto &item:v.sequence) if (!item.launched) GroupSystem::release_order(r.state,item.actor);v.sequence.clear();end_ring(r,*b);t.stage=TechniqueStage::Recovery;t.remaining=base.recover;t.locked=false;cue(r,t,"recovery_started");}
 }
 void CanisHowl::cancel(RunRuntime &r,TechniqueState &t) {auto &v=std::get<CanisHowlState>(t.detail);for (const auto &item:v.sequence) GroupSystem::release_order(r.state,item.actor);v.sequence.clear();if (auto *b=PhaseController::find(r,t.actor)) {CanisHoundLunge::end_action(r,*b,t.id,true);end_ring(r,*b);}}
 double CanisHowl::radius(const RunRuntime &r,const BossBodyState &b) {if (b.canis.ring_started<0) return -1;const auto &p=rule(*r.content,b.canis.ring_definition);const double progress=std::clamp((b.clock-b.canis.ring_started-p.gather_time)/std::max(p.close_time,0.001),0.0,1.0);return p.ring_radius+(p.ring_close-p.ring_radius)*progress;}

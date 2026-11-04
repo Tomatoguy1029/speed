@@ -11,7 +11,7 @@ namespace {const CanisStreamDefinition &rule(const ContentBundle &c,uint32_t def
 double CanisStream::order_start(const ContentBundle &c,uint32_t technique,double warn) {
     const auto *fx=CanisRoar::settings(c,technique);if (!fx) return warn;
     const double lives[]={0,.24,.36,.52};
-    return warn-std::min(warn*.65,.32)+lives[fx->level]*fx->roar_time*fx->timing+fx->order_wait;
+    return warn-std::min(warn*.65,fx->external_id=="O-howl"?.55:.32)+lives[fx->level]*fx->roar_time*fx->timing+fx->order_wait;
 }
 double CanisStream::hound_warning(const ContentBundle &c,uint32_t technique,double fallback) {const auto *fx=CanisRoar::settings(c,technique);return fx?fx->hound_warn:fallback;}
 bool CanisStream::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {const auto *b=PhaseController::find(r,actor);return b && !b->canis.barking && !b->canis.calling && b->canis.led.size()>=rule(*r.content,definition).min_hounds;}
