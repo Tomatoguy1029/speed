@@ -260,13 +260,9 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     }
     auto &pickups=state.pickups;
     if (live_crystals!=pickups.live_gems || (state.pickup_config.fixed_rewards && live_crystals>state.pickup_config.gem_max)) return false;
-    // 行番号は索引。保持した集約先のIDから再構築する。
-    pickups.gem_absorber=-1;
-    for (size_t row=0;row<pickups.gems.size();++row) {
-        const auto &gem=pickups.gems[row];
-        if (gem.alive && gem.kind==2 && gem.id==pickups.gem_absorber_id) {pickups.gem_absorber=int64_t(row);break;}
-    }
-    if (pickups.gem_absorber<0) pickups.gem_absorber_id=0;
+    // Preserve values/IDs in old checkpoints, but retire the absorber designation.
+    pickups.gem_absorber=-1;pickups.gem_absorber_id=0;
+    pickups.rebuild_gem_index();
     for (const auto &pending:state.pending_enemies) if (!pending.definition || pending.definition>content.definitions.size() || !pending.position.is_finite() || !pending.velocity.is_finite() || !std::isfinite(pending.facing) || !std::isfinite(pending.hit_cd) || pending.hit_cd<0 || !std::isfinite(pending.guard) || pending.guard<0 || !std::isfinite(pending.knock) || pending.knock<0 || !std::isfinite(pending.priority)) return false;
     if (state.loadout.comet_weapon && (state.loadout.comet_weapon>content.equipment.size() || !content.equipment[state.loadout.comet_weapon-1].comet_only || state.loadout.candidates.empty())) return false;
     for (auto weapon:state.loadout.pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;

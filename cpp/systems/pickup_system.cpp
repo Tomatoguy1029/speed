@@ -9,23 +9,7 @@
 namespace speed {
 namespace {
 void drop_gem(RunRuntime &run,godot::Vector2 position,double value) {
-    if (run.state.pickups.live_gems > run.state.pickup_config.gem_max) {
-        while (run.state.pickups.gem_queue_head < run.state.pickups.gem_queue.size()) {
-            const auto entry = run.state.pickups.gem_queue[run.state.pickups.gem_queue_head++];
-            auto &old = run.state.pickups.gems[entry.first];
-            if (old.alive && old.order == entry.second) {
-                value += old.value;
-                old.alive = false;
-                run.state.pickups.free_gems.push_back(entry.first);
-                --run.state.pickups.live_gems;
-                break;
-            }
-        }
-        if (run.state.pickups.gem_queue_head >= 1024 && run.state.pickups.gem_queue_head * 2 >= run.state.pickups.gem_queue.size()) {
-            run.state.pickups.gem_queue.erase(run.state.pickups.gem_queue.begin(), run.state.pickups.gem_queue.begin() + run.state.pickups.gem_queue_head);
-            run.state.pickups.gem_queue_head = 0;
-        }
-    }
+    if (!PickupSystem::reserve(run,1)) return;
     const double angle = run.state.control.rng.randf() * (2.0 * godot::Math::PI);
     const godot::Vector2 at = position + godot::Vector2::from_angle(angle) * 8.0;
     size_t row = run.state.pickups.gems.size();
@@ -33,8 +17,9 @@ void drop_gem(RunRuntime &run,godot::Vector2 position,double value) {
     else { row = run.state.pickups.free_gems.back(); run.state.pickups.free_gems.pop_back(); }
     run.state.pickups.gems[row] = {at, value, run.state.pickups.next_ground_order, true, false};
     run.state.pickups.gems[row].id=run.state.pickups.next_id++;
-    run.state.pickups.gem_queue.push_back({row, run.state.pickups.next_ground_order++});
+    ++run.state.pickups.next_ground_order;
     ++run.state.pickups.live_gems;
+    run.state.pickups.index_gem(row);
 }
 
 void drop_legacy(RunRuntime &run,const Corpse &enemy) {
@@ -68,32 +53,13 @@ void drop_legacy(RunRuntime &run,const Corpse &enemy) {
 
 uint64_t place_crystal(RunRuntime &run,godot::Vector2 pos,CrystalState crystal,bool new_supply,int64_t carrier_id=-1) {
     auto &state=run.state;auto &pickups=state.pickups;
-    if (pickups.live_gems<state.pickup_config.gem_max && pickups.next_ground_order==UINT64_MAX) {run.frame_workspace.invalid=true;return 0;}
-    const auto id=crystal.id;const double value=crystal.value;
-    // 満杯では新しい位置も乱数も作らず、最古の大結晶（なければ最古の結晶）へ加算する。
-    if (state.pickups.live_gems>=state.pickup_config.gem_max && state.pickups.live_gems>0) {
-        int64_t target=state.pickups.gem_absorber;
-        if (target<0 || size_t(target)>=state.pickups.gems.size() || !state.pickups.gems[target].alive || state.pickups.gems[target].id!=state.pickups.gem_absorber_id || state.pickups.gems[target].kind!=2) {
-            int64_t oldest=-1,high=-1;
-            for (size_t i=0;i<state.pickups.gems.size();++i) if (state.pickups.gems[i].alive) {
-                if (oldest<0 || state.pickups.gems[i].order<state.pickups.gems[oldest].order) oldest=int64_t(i);
-                if (state.pickups.gems[i].kind==2 && (high<0 || state.pickups.gems[i].order<state.pickups.gems[high].order)) high=int64_t(i);
-            }
-            target=high>=0?high:oldest;
-            const uint8_t before_kind=state.pickups.gems[target].kind;
-            state.pickups.gems[target].kind=2;state.pickups.gem_absorber=target;state.pickups.gem_absorber_id=state.pickups.gems[target].id;
-            EventBuilder::crystal_absorber_selected(run,state.pickups.gems[target],before_kind);
-        }
-        auto &receiver=state.pickups.gems[target];const double before=receiver.value;receiver.value+=value;
-        crystal.pos=pos;
-        EventBuilder::crystal_absorbed(run,crystal,receiver,before,new_supply,carrier_id);
-        return id;
-    }
+    if (pickups.next_ground_order==UINT64_MAX || pickups.live_gems>=state.pickup_config.gem_max) {run.frame_workspace.invalid=true;return 0;}
+    const auto id=crystal.id;
     const auto at=pos+godot::Vector2::from_angle(state.control.rng.randf()*2.0*godot::Math::PI)*8.0;
     size_t row=state.pickups.gems.size();
     if (state.pickups.free_gems.empty()) state.pickups.gems.emplace_back();else {row=state.pickups.free_gems.back();state.pickups.free_gems.pop_back();}
     crystal.pos=at;crystal.order=state.pickups.next_ground_order++;crystal.alive=true;crystal.pulled=false;
-    state.pickups.gems[row]=crystal;++state.pickups.live_gems;
+    state.pickups.gems[row]=crystal;++state.pickups.live_gems;state.pickups.index_gem(row);
     EventBuilder::crystal_drop(run,state.pickups.gems[row],new_supply,carrier_id);
     return id;
 }
@@ -106,8 +72,22 @@ uint64_t drop_crystal(RunRuntime &run,godot::Vector2 pos,uint8_t kind,const Crys
 }
 
 }
+bool PickupSystem::reserve(RunRuntime &run,size_t count) {
+    auto &s=run.state;auto &p=s.pickups;
+    if (count>size_t(s.pickup_config.gem_max)) {run.frame_workspace.invalid=true;return false;}
+    const int64_t needed=p.live_gems+int64_t(count)-s.pickup_config.gem_max;
+    if (needed<=0) return true;
+    const godot::Rect2 view(s.view_center-s.view_half,s.view_half*2);
+    const auto rows=p.eviction_rows(size_t(needed),view,s.ship.pos);
+    for (int64_t i=0;i<needed;++i) {
+        if (s.pickup_config.fixed_rewards) EventBuilder::crystal_lost(run,p.gems[rows[i]],-1,CargoLoss::Capacity);
+        release_crystal(run,rows[i],CrystalRemoval::Lost);
+    }
+    return true;
+}
 uint64_t PickupSystem::supply(RunRuntime &run,godot::Vector2 pos,uint8_t kind) {
     if (kind>2 || !pos.is_finite()) return 0;
+    if (!reserve(run,1)) return 0;
     return drop_crystal(run,pos,kind,{CrystalSource::Direct,0,-1,run.state.time,run.state.world_time});
 }
 bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval reason) {
@@ -118,6 +98,7 @@ bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval rea
         auto &total=reason==CrystalRemoval::Collected?p.collected[gem.kind]:p.lost[gem.kind];++total.count;total.base_xp+=gem.value;
     }
     if (p.gem_absorber_id==gem.id) {EventBuilder::crystal_absorber_released(run,gem.id,reason);p.gem_absorber=-1;p.gem_absorber_id=0;}
+    p.unindex_gem(row);
     p.gems[row].alive=false;p.free_gems.push_back(row);--p.live_gems;return true;
 }
 double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<size_t> &rows,CrystalCollectMethod method) {
@@ -169,9 +150,10 @@ bool PickupSystem::carry(RunRuntime &run,EnemyHandle owner,size_t row) {
     found->crystals.push_back(crystal);const bool was_absorber=p.gem_absorber_id==crystal.id;
     release_crystal(run,row,CrystalRemoval::Stored);EventBuilder::crystal_transferred(run,crystal,id,was_absorber);return true;
 }
-void PickupSystem::redrop(RunRuntime &run,const Corpse &enemy) {
+void PickupSystem::redrop(RunRuntime &run,const Corpse &enemy,bool reserved) {
     auto &cargo=run.state.pickups.cargo;const auto found=std::find_if(cargo.begin(),cargo.end(),[&](const auto &entry){return entry.enemy_id==enemy.id;});
     if (found==cargo.end()) return;
+    if (!reserved && !reserve(run,found->crystals.size())) return;
     auto crystals=std::move(found->crystals);cargo.erase(found);
     for (size_t k=0;k<crystals.size();++k) {
         auto &crystal=crystals[k];crystal.velocity={};crystal.wait=0;
@@ -203,6 +185,14 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     EventBuilder::flush_combat(run);
     CrystalOrigin origin{CrystalSource::Enemy,enemy.definition,enemy.id,state.time,state.world_time};
     const uint64_t reward_count=uint64_t(definition.xp_rewards[0])+definition.xp_rewards[1]+definition.xp_rewards[2];
+    bool gold=false;
+    if (definition.gold_eligible) {
+        ++state.pickups.gold_rolls;gold=state.control.rng.randf()<state.pickup_config.strong_gold_chance;
+        if (gold) ++state.pickups.gold_won;
+        EventBuilder::crystal_gold_roll(run,enemy,gold);
+    }
+    size_t carried=0;for (const auto &cargo:state.pickups.cargo) if (cargo.enemy_id==enemy.id) carried=cargo.crystals.size();
+    if (!reserve(run,reward_count+size_t(gold)+carried)) return;
     uint64_t index=0;
     for (uint8_t kind=0;kind<3;++kind) for (uint32_t i=0;i<definition.xp_rewards[kind];++i,++index) {
         if (definition.reward_scattered) {
@@ -211,13 +201,8 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
         } else drop_crystal(run,enemy.pos,kind,origin);
     }
     if (definition.reward_burst && reward_count) EventBuilder::crystal_burst(run,enemy);
-    if (definition.gold_eligible) {
-        ++state.pickups.gold_rolls;const bool won=state.control.rng.randf()<state.pickup_config.strong_gold_chance;
-        if (won) ++state.pickups.gold_won;
-        EventBuilder::crystal_gold_roll(run,enemy,won);
-        if (won) {origin.source=CrystalSource::StrongGold;drop_crystal(run,enemy.pos,2,origin);}
-    }
-    redrop(run,enemy);
+    if (gold) {origin.source=CrystalSource::StrongGold;drop_crystal(run,enemy.pos,2,origin);}
+    redrop(run,enemy,true);
     const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor && !run.content->rock_fields.empty();
     const double chance=meteor?run.content->rock_fields.front().meteor_coin_chance:0.03;
     const int64_t count=enemy.elite?3+state.control.rng.randi_range(0,3).value():(state.control.rng.randf()<chance?(meteor?1+state.control.rng.randi_range(0,2).value():1):0);

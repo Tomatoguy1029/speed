@@ -414,7 +414,7 @@ void SpeedRunCore::close() {
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.hazards.clear(); runtime.state.free_hazards.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
-    runtime.state.pickups.gems.clear(); runtime.state.pickups.coins.clear();runtime.state.pickups.capsules.clear(); runtime.state.pickups.free_gems.clear(); runtime.state.pickups.free_coins.clear(); runtime.state.pickups.gem_queue.clear(); runtime.state.collections.clear();
+    runtime.state.pickups.gem_cells.clear();runtime.state.pickups.moving_gems.clear();runtime.state.pickups.gems.clear(); runtime.state.pickups.coins.clear();runtime.state.pickups.capsules.clear(); runtime.state.pickups.free_gems.clear(); runtime.state.pickups.free_coins.clear(); runtime.state.pickups.gem_queue.clear(); runtime.state.collections.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {

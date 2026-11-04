@@ -490,6 +490,13 @@
           "runtime": "pickup_config.gem_max"
         },
         {
+          "name": "gem_draw_max",
+          "type": "i64",
+          "min": 1,
+          "config": "gem_draw_max",
+          "runtime": "pickup_config.gem_draw_max"
+        },
+        {
           "name": "strong_gold_chance",
           "type": "f64",
           "min": 0,
@@ -622,7 +629,7 @@
           "runtime": "trace_radius"
         }
       ],
-      "version": 9
+      "version": 10
     },
     {
       "name": "StringEntry",
