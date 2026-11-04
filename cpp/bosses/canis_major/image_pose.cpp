@@ -86,8 +86,8 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
             const double age=b.canis.roar_last_technique==t->id?b.clock-b.canis.roar_started:-1;
             const double inhale=age>=0?0:std::clamp((t->stage==TechniqueStage::Windup?e.charge:0.0)*2.0,0.0,1.0);
             const double push=age>=0?smooth(0,.035,age)*(1-smooth(.09,.24,age)):0;
-            c.nodes[6].rotation=-.045*inhale;c.nodes[6].position={0,42-inhale*9+push*13};c.nodes[6].scale={1+push*.035,1+push*.09};
-            c.nodes[5].position={0,-inhale*4-push*3};c.nodes[5].rotation=0;c.nodes[5].scale={1+inhale*.025-push*.02,1-inhale*.055+push*.04};
+            c.nodes[6].rotation=-.045*inhale;c.nodes[6].position={0,float(42-inhale*9+push*13)};c.nodes[6].scale={float(1+push*.035),float(1+push*.09)};
+            c.nodes[5].position={0,float(-inhale*4-push*3)};c.nodes[5].rotation=0;c.nodes[5].scale={float(1+inhale*.025-push*.02),float(1-inhale*.055+push*.04)};
         }
     }
     if (p && !p->done) {
