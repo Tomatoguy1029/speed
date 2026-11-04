@@ -19,10 +19,18 @@ uniform float age;
 uniform float level;
 uniform vec4 tint : source_color;
 uniform bool first_band;
+uniform bool linear_target = true;
+vec3 to_srgb(vec3 c) {
+	return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));
+}
+vec3 to_linear(vec3 c) {
+	return mix(c/12.92,pow(max((c+0.055)/1.055,vec3(0.0)),vec3(2.4)),step(vec3(0.04045),c));
+}
 
 vec4 sample_snapshot(vec2 point) {
 	if (point.x<0.0 || point.y<0.0 || point.x>=viewport_size.x || point.y>=viewport_size.y) return vec4(0.0);
-	return texture(snapshot,point/viewport_size);
+	vec4 value=texture(snapshot,point/viewport_size);
+	return vec4(linear_target?to_srgb(value.rgb):value.rgb,value.a);
 }
 vec4 over(vec4 under, vec4 top, float opacity) {
 	float alpha=top.a*opacity;
@@ -56,13 +64,14 @@ void fragment() {
 	if (displacement>0.0 && band_radius>1.0) {
 		vec4 band=sample_snapshot(center+delta/(1.0+displacement));
 		float alpha=0.1*(0.5+0.5*level/3.0);
-		if (first_band) band=vec4(min(vec3(1.0),band.rgb+tint.rgb*alpha),band.a);
-		else band=vec4(tint.rgb,alpha);
+		vec3 hue=linear_target?to_srgb(tint.rgb):tint.rgb;
+		if (first_band) band=vec4(min(vec3(1.0),band.rgb+hue*alpha),band.a);
+		else band=vec4(hue,alpha);
 		float mask=ramp(radius,max(0.0,band_radius-band_width),band_radius-band_width*0.3)*(1.0-ramp(radius,band_radius,band_radius+band_width*0.35));
 		float size=(band_radius+band_width)*2.4;
 		mask*=texture_mask(streaks,delta,seed*1.7,size);
 		mask*=texture_mask(lumps,delta,seed*4.0+age*0.8,size);
 		result=over(result,band,mask*min(1.0,strength*envelope*1.4));
 	}
-	COLOR=result;
+	COLOR=vec4(linear_target?to_linear(result.rgb):result.rgb,result.a);
 }

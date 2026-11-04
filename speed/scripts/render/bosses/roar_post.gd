@@ -45,7 +45,7 @@ func apply_frame(bodies: Array, size: Vector2, camera: Vector2, zoom: float) -> 
 		var shake := Vector2.ZERO
 		if shake_amount>0.3: shake = Vector2(sin(age*91.0+float(roar.seed)),cos(age*73.0+float(roar.seed)))*shake_amount
 		_image.size = size
-		var values := {"viewport_size":size,"center":center,"shake":shake,"clear_radius":clear,"outer_radius":outer,
+		var values := {"linear_target":get_viewport().use_hdr_2d,"viewport_size":size,"center":center,"shake":shake,"clear_radius":clear,"outer_radius":outer,
 			"zoom_amount":float(LEVELS[level].blur)*float(params.roarBlur)*envelope*2.2,"strength":strength,"envelope":envelope,
 			"band_radius":lerpf(clear,outer,1.0-pow(1.0-clampf(u*1.4,0.0,1.0),2.0)),"band_width":unit*0.45,
 			"displacement":0.035*(0.6+0.4*level/3.0)*float(params.roarLines),"seed":float(roar.seed),"age":age,"level":float(level),

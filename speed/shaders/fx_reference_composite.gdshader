@@ -7,6 +7,7 @@ uniform sampler2D color_pixels : filter_nearest, repeat_disable;
 uniform sampler2D light_pixels : filter_nearest, repeat_disable;
 uniform bool linear_target = true;
 uniform bool has_light = false;
+uniform float opacity = 1.0;
 vec3 to_srgb(vec3 c) {
 	return mix(c*12.92,1.055*pow(max(c,vec3(0.0)),vec3(1.0/2.4))-0.055,step(vec3(0.0031308),c));
 }
@@ -16,7 +17,8 @@ vec3 to_linear(vec3 c) {
 void fragment() {
 	vec4 under=texture(snapshot,SCREEN_UV);
 	vec4 color=texture(color_pixels,UV);
-	vec3 light=texture(light_pixels,UV).rgb;
+	color.a*=opacity;
+	vec3 light=has_light?texture(light_pixels,UV).rgb:vec3(0.0);
 	if (color.a<=0.0 && all(equal(light,vec3(0.0)))) {
 		// FXがない画素のHDR輝度を保つ。lighterの黒面はalphaだけを満たす。
 		COLOR=vec4(under.rgb,has_light?1.0:under.a);
