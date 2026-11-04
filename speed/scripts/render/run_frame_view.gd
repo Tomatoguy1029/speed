@@ -267,8 +267,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_phoenix_visual.setup_frame(marlin_parent)
 	_pulser_parent = marlin_parent
 	_reference_layer = preload("res://scripts/render/fx/fx_reference_layer.gd").new()
-	_reference_layer.setup(marlin_parent)
-	_enemy_reference.setup(marlin_parent, _scope, visuals)
+	_reference_layer.setup(marlin_parent, self)
+	_enemy_reference.setup(marlin_parent, _scope, visuals, _reference_layer.shadows)
 	_pulser_visual = preload("res://scripts/render/enemies/pulser.gd").new()
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)

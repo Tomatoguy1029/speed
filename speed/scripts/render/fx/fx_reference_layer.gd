@@ -13,20 +13,22 @@ var _size := Vector2.ZERO
 var _center := Vector2.ZERO
 var _zoom := 1.0
 
-func setup(parent: Node2D) -> void:
+func setup(parent: Node2D, back_parent: Node2D) -> void:
 	_parent = parent
 	shadows = Node2D.new()
 	shadows.z_index = -2
-	parent.add_child(shadows)
+	back_parent.add_child(shadows)
 	overlay = Node2D.new()
 	overlay.z_index = 9
 	parent.add_child(overlay)
 	for i in 2:
+		# CanvasLayerをまたいでz_indexは比較されない。背面は本体と同じワールドへ置く。
+		var target: Node2D = back_parent if i == 0 else parent
 		var depth := -1 if i==0 else 10
 		var copy := BackBufferCopy.new()
 		copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
 		copy.z_index = depth
-		parent.add_child(copy)
+		target.add_child(copy)
 		_copies.append(copy)
 		var sprite := Sprite2D.new()
 		sprite.centered = false
@@ -35,7 +37,7 @@ func setup(parent: Node2D) -> void:
 		var material := ShaderMaterial.new()
 		material.shader = COMPOSITE
 		sprite.material = material
-		parent.add_child(sprite)
+		target.add_child(sprite)
 		_sprites.append(sprite)
 		_lights.append(null)
 

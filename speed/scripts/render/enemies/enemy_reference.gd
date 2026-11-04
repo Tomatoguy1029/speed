@@ -43,12 +43,12 @@ var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
 var _ghost_copies: Array[BackBufferCopy] = []
 
-## parent はカメラ変換が適用されるワールド層。影は論理画素の背面より奥に置く。
-func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> void:
+## parent は前面の表示層。鳳凰の影は本体より奥にある専用の親へ置く。
+func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary, shadow_parent: Node2D) -> void:
 	_parent = parent
 	_scope = scope
 	_visuals = visuals
-	_phoenix.setup_shadow(parent)
+	_phoenix.setup_shadow(shadow_parent)
 	_telescope.setup(parent)
 	_aquarius.setup(parent, scope)
 	_cepheus.setup(parent, scope, visuals)
