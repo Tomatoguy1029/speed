@@ -121,6 +121,9 @@ func _present(camera: Dictionary, frame: int, images: Array) -> bool:
 		return false
 	var center: Vector2 = render.view_override.center
 	render._present_cpp(0.0 if frame==0 else 1.0/60.0)
+	if not render.frame_view.visible:
+		_fail("本番描画がフレームを受理できません: tick="+str(frame*2))
+		return false
 	images.append({"file":"%06d.png" % frame,"tick":frame*2,"seconds":frame/60.0,"world_time":state.value.ui.world_time,"camera_center":[center.x,center.y]})
 	if observe_contacts:
 		var ship: Dictionary = state.value.ui.ship
