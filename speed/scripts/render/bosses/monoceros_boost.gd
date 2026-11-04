@@ -6,6 +6,8 @@ var _length := -1.0
 var _width := 0.0
 var _run_at := -1.0
 var _last_clock := -1.0
+var _glow_view: SubViewport
+var _reference_glow: ShaderMaterial
 
 func _ready() -> void:
 	manual = true
@@ -15,8 +17,20 @@ func _ready() -> void:
 	_shape_material.set_shader_parameter("deformation", 0.35)
 	_shape_material.set_shader_parameter("threshold", 0.32)
 	_shape_material.set_shader_parameter("edge_softness", 0.04)
-	_glow_material.set_shader_parameter("radius", 2.0)
-	_glow_material.set_shader_parameter("strength", 0.16)
+	# 発光も先に論理画素へ焼き、その結果をNearestで拡大する。
+	_glow_view = _viewport("MonocerosGlow")
+	var glow_source := Sprite2D.new()
+	glow_source.centered = false
+	glow_source.texture = color_view.get_texture()
+	glow_source.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	_reference_glow = ShaderMaterial.new()
+	_reference_glow.shader = preload("res://shaders/monoceros_boost_glow.gdshader")
+	glow_source.material = _reference_glow
+	_glow_view.add_child(glow_source)
+	glow.texture = _glow_view.get_texture()
+	var additive := CanvasItemMaterial.new()
+	additive.blend_mode = CanvasItemMaterial.BLEND_MODE_ADD
+	glow.material = additive
 	body.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	glow.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 
@@ -80,6 +94,7 @@ func _draw_density(clock: float, radius: float, world_scale: float, params: Dict
 	if density_view.size != size:
 		density_view.size = size
 		color_view.size = size
+		_glow_view.size = size
 	var origin := Vector2(size.x*0.5,size.y-40.0)
 	for sprite: Sprite2D in [body,glow]:
 		sprite.position = Vector2(size)*0.5-origin
@@ -89,7 +104,7 @@ func _draw_density(clock: float, radius: float, world_scale: float, params: Dict
 	_shape_material.set_shader_parameter("outer_color", Color(params.tailOuterColor))
 	_shape_material.set_shader_parameter("inner_color", Color(params.tailJetColor))
 	_shape_material.set_shader_parameter("core_color", Color(params.tailCoreColor))
-	_glow_material.set_shader_parameter("field_size", Vector2(size))
+	_reference_glow.set_shader_parameter("field_size", Vector2(size))
 	_batch.begin()
 	for sample in samples:
 		var channel := Color(1,0,0,1) if sample.z == 0.0 else (Color(0,1,0,1) if sample.z == 1.0 else Color(0,0,1,1))
@@ -97,3 +112,4 @@ func _draw_density(clock: float, radius: float, world_scale: float, params: Dict
 	_batch.end()
 	density_view.render_target_update_mode = SubViewport.UPDATE_ONCE
 	color_view.render_target_update_mode = SubViewport.UPDATE_ONCE
+	_glow_view.render_target_update_mode = SubViewport.UPDATE_ONCE
