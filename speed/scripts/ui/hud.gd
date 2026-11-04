@@ -104,7 +104,7 @@ var _experience_fill: AtlasTexture
 var _pause_box: VBoxContainer
 var _draw_button: Button
 var _banner := ""
-var _banner_color := Color.WHITE
+var _banner_cleared := false
 var _banner_t := 0.0
 var _warning_t := 0.0
 var _hero_notice_t := 0.0
@@ -210,6 +210,8 @@ func _notification(what: int) -> void:
 		bridge.command("pause",{"paused":true})
 
 func _process(delta: float) -> void:
+	if not _banner.is_empty():
+		_banner_t += delta
 	_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
 	_warning_t = maxf(0.0,_warning_t-delta)
 	_update_speed_indicator(delta)
@@ -581,7 +583,8 @@ func _lap_filled(before: float, after: float, capacity: float) -> bool:
 func _draw_banner() -> void:
 	if _banner == "":
 		return
-	draw_string(_font, Vector2(0, size.y / 2.0), _banner, HORIZONTAL_ALIGNMENT_CENTER, size.x, 72, _banner_color)
+	var duration := ContentManager.base.boss_finish_clear_time if _banner_cleared else ContentManager.base.death_game_over_time
+	preload("res://scripts/ui/result_banner.gd").draw(self, _font, _banner, _banner_t / maxf(duration, 0.001), _banner_cleared)
 
 func _exit_tree() -> void:
 	if bridge!=null: bridge.unsubscribe("hud")
@@ -929,10 +932,12 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_rewards.enqueue_ult(reward)
 		if event.type=="game_over":
 			_banner = tr("hud.game_over")
-			_banner_color = Color("#ff6b5a")
+			_banner_cleared = false
+			_banner_t = 0.0
 		elif event.type=="clear_banner":
 			_banner = tr("hud.clear")
-			_banner_color = Color("#ffe46b")
+			_banner_cleared = true
+			_banner_t = 0.0
 	return true
 
 ## 地図は自機を原点にして、世界の方角と縮尺を保つ。
