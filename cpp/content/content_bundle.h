@@ -18,6 +18,7 @@ struct ContentBundle {
     MonocerosImagePoseData monoceros_image_pose;
     BossImageFeedback boss_image_feedback;
     std::vector<CanisImagePartDefinition> canis_image_parts;
+    std::vector<CanisRoarDefinition> canis_roars;
     std::vector<DracoFinaleDefinition> draco_finales;
     std::vector<DracoFlowGateDefinition> draco_flow_gates;
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};

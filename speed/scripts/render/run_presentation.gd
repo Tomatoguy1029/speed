@@ -23,6 +23,7 @@ var cpp_scope: ContentResourceScope
 var frame_view: Node2D
 var cpp_background: Node2D
 var pipeline: RenderPipeline
+var _roar_post: CanvasLayer
 var _camera: Camera2D
 var cam_center := Vector2.ZERO
 var cam_zoom := 1.0
@@ -158,6 +159,8 @@ func _ready_cpp() -> void:
 	var layer_count: int = cpp_resources.visuals.size()-3
 	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],layer_count)
 	frame_view.pipeline = pipeline
+	_roar_post = preload("res://scripts/render/bosses/roar_post.gd").new()
+	add_child(_roar_post)
 	sync_canvas_layers()
 
 ## 外観の追加後も画面効果とHUDを全ての敵より手前に保つ。
@@ -166,6 +169,7 @@ func sync_canvas_layers() -> void:
 	for entry: Dictionary in cpp_resources.visuals:
 		overlay_layer = maxi(overlay_layer,int(entry.id)-3)
 	if pipeline!=null: pipeline.set_overlay_layer(overlay_layer)
+	if _roar_post!=null: _roar_post.layer = overlay_layer+2
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	if hud!=null: hud.layer = maxi(hud.layer,overlay_layer+3)
 	preload("res://scripts/ui/canvas_order.gd").world_changed(self,hud.layer if hud!=null else overlay_layer+3)
@@ -196,6 +200,7 @@ func _present_cpp(delta: float) -> void:
 	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
 	frame_view.update_reference_effects(frame,delta)
+	if _roar_post!=null: _roar_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center,cam_zoom)
 	shake=maxf(shake,frame_view.ruler_shake)
 	frame_view.ruler_shake=0.0
 	if frame_view.finish_shake>0.0:
