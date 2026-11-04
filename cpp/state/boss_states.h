@@ -312,6 +312,7 @@ struct BossBodyState {
     CanisBodyState canis;
     CentaurusBodyState centaurus;
     MonocerosImagePoseClock monoceros_pose;
+    std::vector<MonocerosBreathVisual> monoceros_breaths;
     std::vector<MonocerosSweepVisual> monoceros_sweeps;
     std::vector<MonocerosSlashVisual> monoceros_slashes;
     std::vector<ParticipantState> participants;
