@@ -8,6 +8,7 @@
 #include "../output/frame_builder.h"
 #include "../bosses/draco/finale.h"
 #include "../bosses/canis_major/nova.h"
+#include "../bosses/canis_major/fire_visual.h"
 #include "../systems/boss_image.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
@@ -197,7 +198,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     camera(core,dt,size);
     BossImageSystem::refresh(core.runtime);
     if (world_step && state.phase==Phase::Play)
-        for (auto &body:state.bosses.bodies) CanisNova::field_tick(core.runtime,body);
+        for (auto &body:state.bosses.bodies) {CanisNova::field_tick(core.runtime,body);CanisFireVisualSystem::tick(core.runtime,body);}
     if (!core.check_run_end()) {
         if (state.loadout.ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);

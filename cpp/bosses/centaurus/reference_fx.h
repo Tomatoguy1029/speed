@@ -1,5 +1,6 @@
 #pragma once
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 namespace speed {
 class RunRuntime;
 struct BossBodyState;
