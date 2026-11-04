@@ -6,7 +6,7 @@
 #include <vector>
 
 namespace speed {
-struct RunRuntime;
+class RunRuntime;
 struct BossBodyState;
 
 class CanisImagePose {

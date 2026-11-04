@@ -48,7 +48,7 @@ func _enter_tree() -> void:
 	_dialog.custom_action.connect(_on_dialog_action)
 	EditorInterface.get_base_control().add_child(_dialog)
 	GATE.on_blocked = _on_blocked
-	refresh()
+	refresh.call_deferred()
 
 func _exit_tree() -> void:
 	if not is_instance_valid(_bar): return
