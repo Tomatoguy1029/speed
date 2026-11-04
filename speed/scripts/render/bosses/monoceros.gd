@@ -46,10 +46,13 @@ var _reference_id := "I-charge"
 var _horn_visual := 0.0
 var _horn_overlay: Sprite2D
 var _armor_overlay: Sprite2D
+var _image_nodes: Array[Node2D] = []
+var _image_sprites: Array[Sprite2D] = []
 @onready var parts: PartsVisual = $Parts
 @onready var horn: Sprite2D = $Parts/Head/Lower/Horn
 
 func _ready() -> void:
+	_collect_image_nodes(self)
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 	z_index = 8
 	_reference_boost = REFERENCE_BOOST.new()
@@ -58,6 +61,14 @@ func _ready() -> void:
 	_horn_overlay = _make_light_overlay(horn)
 	_armor_overlay = _make_light_overlay(parts.get_node("Head/Lower/Sprite/head_gold_armor") as Sprite2D)
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
+
+## 生成時と同じ深さ優先順を、演出用子Spriteの追加前に記録する。
+func _collect_image_nodes(parent: Node) -> void:
+	for child in parent.get_children():
+		if child is Node2D:
+			_image_nodes.append(child)
+			if child is Sprite2D: _image_sprites.append(child)
+		_collect_image_nodes(child)
 
 func _make_light_overlay(source: Sprite2D) -> Sprite2D:
 	var light := Sprite2D.new()
@@ -140,7 +151,8 @@ func _sync_parts(dt: float) -> void:
 	# 胴体中心を固定して見た目だけ遅らせる。移動・判定・予告線は役者の方向を使う。
 	parts.rotation = -PI * 0.5 + angle_difference(float(state.facing), _body_facing)
 	var reaction := {"white":0.0,"angle":0.0,"offset":Vector2.ZERO}
-	if hit_feedback!=null: reaction = hit_feedback.sample(int(state.actor))
+	if state.has("image_feedback"): reaction = state.image_feedback
+	elif hit_feedback!=null: reaction = hit_feedback.sample(int(state.actor))
 	material.set_shader_parameter("boss_hit_white",reaction.white)
 	parts.rotation += reaction.angle
 	parts.position = -Vector2(0, -37).rotated(parts.rotation) * k + reaction.offset
@@ -164,6 +176,33 @@ func _sync_parts(dt: float) -> void:
 	_kick_pose()
 	_charge_pose()
 	_sync_horn(dt, k)
+	_apply_image_pose(state.get("image_node_poses",[]),state.get("image_parts",[]),reaction)
+
+## 本番が画像境界に使った全関節を、そのまま表示とFXの基点にも使う。
+func _apply_image_pose(node_poses: Array, sprites: Array, reaction: Dictionary) -> void:
+	if node_poses.is_empty(): return
+	for entry: Dictionary in node_poses:
+		var index := int(entry.node)-1
+		if index < 0 or index >= _image_nodes.size(): continue
+		_image_nodes[index].global_transform = entry.transform
+		_image_nodes[index].visible = bool(entry.visible)
+	for entry: Dictionary in sprites:
+		var index := int(entry.part)-1
+		if index < 0 or index >= _image_sprites.size(): continue
+		var sprite := _image_sprites[index]
+		var region := Rect2(entry.region)
+		if sprite == horn:
+			var frame_width := horn.texture.get_width()/float(horn.hframes)
+			horn.frame = clampi(floori(region.position.x/frame_width),0,horn.hframes-1)
+			_horn_overlay.frame = horn.frame
+		elif sprite.get_parent().name == &"Sprite" and sprite.get_parent().get_parent().name == &"Foot":
+			var animation := &"armor" if sprite.name == &"Armor" else &"run"
+			for frame in parts.gait.get_frame_count(animation):
+				var texture := parts.gait.get_frame_texture(animation,frame)
+				if texture is AtlasTexture and texture.region == region:
+					sprite.texture = texture
+					break
+	_tail_facing = (parts.get_node("TailBooster") as Node2D).global_rotation + PI*0.5 - float(reaction.angle)
 
 ## 突進の構えと発進は本体と足の見た目だけを動かす。
 func _charge_pose() -> void:

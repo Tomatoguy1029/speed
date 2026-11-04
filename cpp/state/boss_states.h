@@ -3,6 +3,7 @@
 #include "combat_types.h"
 #include "../bosses/centaurus/image_pose_state.h"
 #include "../bosses/canis_major/image_pose_state.h"
+#include "../bosses/monoceros/image_pose_state.h"
 #include "../content/generated/combat_ids.h"
 #include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
@@ -300,6 +301,7 @@ struct BossBodyState {
     DracoBodyState draco;
     CanisBodyState canis;
     CentaurusBodyState centaurus;
+    MonocerosImagePoseClock monoceros_pose;
     std::vector<MonocerosSlashVisual> monoceros_slashes;
     std::vector<ParticipantState> participants;
     int64_t id=0;
