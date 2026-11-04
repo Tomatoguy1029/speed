@@ -46,13 +46,19 @@ func apply_frame(rows: Array, clock: float, burning: Array = [], mouth: Dictiona
 	var seen := {}
 	var clouds := {}
 	var replacement := {}
-	for jet: Dictionary in fire_visual: replacement[int(jet.id)] = true
+	var continuous := {}
+	var replacement_trails := {}
+	for jet: Dictionary in fire_visual:
+		replacement[int(jet.id)] = true
+		if int(jet.get("trail_id",0))!=0: replacement_trails[int(jet.trail_id)] = true
+		if jet.get("continuous",false): continuous[int(jet.technique)] = true
 	for row: Dictionary in rows:
 		if row.kind==1:
-			if replacement.has(int(row.get("jet_id",0))): continue
+			if replacement.has(int(row.get("jet_id",0))) or row.get("harmful",false) and continuous.has(int(row.get("technique",0))): continue
 			if not clouds.has(row.profile): clouds[row.profile] = []
 			clouds[row.profile].append(row)
 		elif row.kind==2 and row.length>0.0:
+			if replacement_trails.has(int(row.id)): continue
 			var key := "焼け跡:%d" % row.id
 			seen[key] = true
 			var samples := []
