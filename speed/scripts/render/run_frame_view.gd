@@ -1476,7 +1476,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				_layer(11).add_child(_critical_lances)
 			if event.type==&"critical_lance": _critical_lances.fire(event)
 			preload("res://scripts/render/equipment/critBeam.gd").frame_event(_lance_flashes,_lance_hits,event,_pixel)
-		if event.type==&"flood_end":
+		if event.type==&"flood_end" and not event.get("reference_aquarius",false):
 			var tail: Dictionary = preload("res://scripts/render/attacks/flood.gd").frame_create(_scope)
 			_layer(11).add_child(tail.node)
 			if pipeline!=null and not pipeline.rich: tail.node.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
