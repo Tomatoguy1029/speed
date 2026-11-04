@@ -69,6 +69,7 @@ void ZoneSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const auto source=record->spec.owner.source_definition;
     if (d.style==uint32_t(ZoneStyle::Bite) && source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Defender) shape["reference_bite"]=true;
     if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Crab) shape["reference_crab"]=true;
+    if (h.aquila_seed) shape["reference_aquila"]=true;
     PackedVector2Array points;points.push_back(h.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(radius);PackedColorArray colors;colors.push_back(h.color);
     shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;shape["time"]=double(h.time);shape["delay"]=double(h.delay);shape["active"]=double(h.duration);shape["zone_style"]=d.style;
     shape["tint"]=Color(d.tint_r,d.tint_g,d.tint_b,d.tint_a);shape["glow_opacity"]=d.glow_opacity;shape["ring_opacity"]=d.ring_opacity;shape["ring_width"]=d.ring_width;shape["arm_count"]=int32_t(d.arm_count);shape["lightning_reach"]=d.lightning_reach;shape["lightning_width"]=d.lightning_width;out.push_back(shape);

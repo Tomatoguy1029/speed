@@ -45,6 +45,7 @@ struct HazardState {
     godot::Color color;
     AttackHandle attack;
     uint32_t zone_definition=0;
+    uint32_t aquila_seed=0;
     double enemy_damage=0;
     bool alive=true,hit=false;
     std::variant<CircleHazard,BeamHazard,WaveHazard,WallHazard,MonocerosWaveHazard,CanisFlameHazard,CanisHoundLungeHazard,HydraShapeHazard> shape=CircleHazard{};

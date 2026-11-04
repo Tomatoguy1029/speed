@@ -2,6 +2,7 @@
 #include "../../systems/enemy_motion.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_budget.h"
+#include "../../systems/attack_system.h"
 #include "../../systems/field.h"
 #include "../../systems/attacks/zone.h"
 #include <algorithm>
@@ -42,9 +43,14 @@ void AquilaBehavior::before_move(RunRuntime &r,EnemyHandle self,double dt) {
     const auto dir=godot::Vector2::from_angle(e.facing);const double remaining=std::max(0.0,double((v.anchor-e.pos).dot(dir))),travel=std::min(remaining,p.dash_speed*std::min(dt,e.timer));e.vel=dir*(travel/dt);
     const double elapsed=travel/p.dash_speed;double next=v.bud_t;
     const auto owner=AttackBudgetSystem::owner(s,e.id,e.attack_group);
-    const auto drop=[&](godot::Vector2 at) {ZoneParams zone;zone.position=at;zone.radius=p.blast_radius;zone.delay=p.blast_delay;zone.damage=p.damage;zone.style=ZoneStyle::Aquila;zone.color=godot::Color::html("e1f7ff");zone.owner=self;if (e.attack_managed) zone.budget.value=AttackBudgetSystem::token(s,owner);ZoneSystem::emit(r,zone);};
+    const auto drop=[&](godot::Vector2 at) {ZoneParams zone;zone.position=at;zone.radius=p.blast_radius;zone.delay=p.blast_delay;zone.damage=p.damage;zone.style=ZoneStyle::Aquila;zone.color=godot::Color::html("e1f7ff");zone.owner=self;if (e.attack_managed) zone.budget.value=AttackBudgetSystem::token(s,owner);const auto handle=ZoneSystem::emit(r,zone);if (const auto *record=AttackSystem::get(s,handle)) s.hazards[record->row].aquila_seed=v.drop_count++*31u+7u;};
     while (next<=elapsed+0.00001) {drop(e.pos+dir*p.dash_speed*next);next+=p.drop_step;}
     v.bud_t=next-elapsed;e.timer-=dt;
     if (e.timer<=0 || remaining<=travel+0.001) {if (p.drop_step-v.bud_t>p.drop_step*0.25) drop(e.pos+dir*travel);e.mode=EnemyMode::Recover;e.timer=p.recover;}
+}
+void AquilaBehavior::after_move(RunRuntime &r,EnemyHandle self) {
+    auto &s=r.state;if (!s.enemy_handles.contains(self) || s.enemies[self.slot].dead) return;
+    const auto &e=s.enemies[self.slot];auto &trace=std::get<AquilaState>(s.enemies[self.slot].behavior_state).trace;
+    trace.push_back({e.pos,s.world_time});trace.erase(std::remove_if(trace.begin(),trace.end(),[&](const auto &p){return s.world_time-p.time>0.5;}),trace.end());
 }
 }

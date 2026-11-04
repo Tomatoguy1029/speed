@@ -160,6 +160,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (crab) if (const auto *record=AttackSystem::get(state,crab->sweep)) if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;
         const auto *aquila=std::get_if<AquilaState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Aquila)!=(aquila!=nullptr) || (aquila && (!aquila->anchor.is_finite() || !std::isfinite(aquila->bud_t)))) return false;
+        if (aquila) for (const auto &point:aquila->trace) if (!point.pos.is_finite() || !std::isfinite(point.time)) return false;
         const auto *phoenix=std::get_if<PhoenixState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Phoenix)!=(phoenix!=nullptr) || (phoenix && !phoenix->anchor.is_finite())) return false;
         const auto *marlin=std::get_if<MarlinState>(&enemy.behavior_state);
