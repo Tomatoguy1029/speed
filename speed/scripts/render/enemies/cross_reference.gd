@@ -18,7 +18,7 @@ func render(actors: Array, beams: Array, events: Array, canvas, world_time: floa
 		for q in range(4):
 			var end: Vector2 = canvas.to_logical(actor.pos + Vector2.from_angle(q * PI / 2.0) * float(actor.length) * (0.25 + 0.75 * charge))
 			FX.warn_rail(canvas.back, origin, end, {"color": color, "k": charge, "time": world_time, "seed": q + 1, "intensity": intensity})
-		FX.gather(canvas.front, origin, float(actor.radius) * 2.4 * float(_settings.size) * canvas.world_scale, charge * intensity, color, world_time, 18, 3)
+		FX.gather(canvas.back, origin, float(actor.radius) * 2.4 * float(_settings.size) * canvas.world_scale, charge * intensity, color, world_time, 18, 3)
 	var present := {}
 	for row: Dictionary in beams:
 		var id := int(row.order)
@@ -31,8 +31,8 @@ func render(actors: Array, beams: Array, events: Array, canvas, world_time: floa
 		var origin: Vector2 = canvas.to_logical(row.pos)
 		var end: Vector2 = canvas.to_logical(row.pos + Vector2.from_angle(float(row.angle)) * float(row.length))
 		var q := posmod(roundi(float(row.angle) / (PI / 2.0)), 4)
-		FX.beam(canvas.front, origin, end, {"color": color, "w": float(row.half_width) * canvas.world_scale, "time": world_time + q, "alpha": alpha, "source": false})
-		if q == 0: FX.flare(canvas.front, origin, 16.0 * float(_settings.size) * canvas.world_scale, color, world_time, alpha, 4)
+		FX.beam(canvas.back, origin, end, {"color": color, "w": float(row.half_width) * canvas.world_scale, "time": world_time + q, "alpha": alpha, "source": false})
+		if q == 0: FX.flare(canvas.back, origin, 16.0 * float(_settings.size) * canvas.world_scale, color, world_time, alpha, 4)
 	for event: Dictionary in events:
 		if event.get("type") != &"attack_retired": continue
 		var id := int(event.id)
