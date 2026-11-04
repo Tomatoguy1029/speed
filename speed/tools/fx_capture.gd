@@ -54,6 +54,10 @@ func _ready() -> void:
 	if not is_instance_valid(session) or session.bridge==null:
 		_fail("本番ランの開始に失敗しました")
 		return
+	var recording: Dictionary = session.bridge.read_recording(true)
+	if not recording.ok or recording.value.get("identity",{}).get("implementation_sha256","")!=spec.build_identity.source_sha256:
+		_fail("ロード済みC++と撮影用ソースのハッシュが一致しません")
+		return
 	session.bridge.unsubscribe("audio")
 	session.bridge.unsubscribe("laser_audio")
 	var router := session.cpp_input_source.get_object() as InputRouter
