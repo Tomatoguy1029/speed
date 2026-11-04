@@ -88,6 +88,8 @@ var _boss_final_beams := {}
 var _boss_body_displays := {}
 var _reference_layer: RefCounted
 var _reference_render_frame: Dictionary = {}
+var _reference_events: Array = []
+var _ram_reference := preload("res://scripts/render/fx/boss_ram_reference.gd").new()
 var _boss_technique_visual: Node2D
 var _boss_lance_visual: Node2D
 var _boss_wave_visual: Node2D
@@ -1001,6 +1003,9 @@ func apply_frame(frame: Dictionary) -> bool:
 			EFFECT_SETTINGS.apply_body(display,["monoceros","centaurus","canis_major","hydra","draco"][body.kind],move)
 			display.set_meta("visual_move",move)
 			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
+		if display.has_method("set_reference_hit"):
+			var ram: Dictionary = frame.get("boss_ram",{})
+			display.set_reference_hit(_ram_reference.white(ram) if int(ram.get("id",0))==int(body.id) else 0.0)
 		if display.has_method("set_reference_canvas"):
 			display.set_reference_canvas(_reference_layer.canvas)
 		display.apply_frame(body,attack,entry.get("appearance",{}))
@@ -1163,6 +1168,7 @@ func receive_frame(frame: Dictionary) -> bool:
 			boss_hit_feedback.pulse(int(payload.target_id))
 		payload["type"] = event.type
 		_queued_events.append(payload)
+		_reference_events.append(payload)
 	return true
 
 func update_reference_effects(_frame: Dictionary, real_dt: float) -> void:
@@ -1170,7 +1176,11 @@ func update_reference_effects(_frame: Dictionary, real_dt: float) -> void:
 	for display: Node2D in _boss_body_displays.values():
 		if display.visible and display.has_method("draw_reference"):
 			display.draw_reference(_reference_layer.canvas, 0.0 if authoring_paused else real_dt)
+	var ram: Dictionary = _reference_render_frame.get("boss_ram",{})
+	var ram_body: Node2D = _boss_body_displays.get(int(ram.get("id",0)))
+	_ram_reference.render(ram,ram_body,_reference_layer.canvas,int(_reference_render_frame.get("epoch",0)))
 	_reference_layer.end_frame()
+	_reference_events.clear()
 
 func update_effects(frame: Dictionary, dt: float) -> void:
 	if authoring_clock >= 0.0:

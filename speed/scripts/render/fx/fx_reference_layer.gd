@@ -41,4 +41,4 @@ func end_frame() -> void:
 		else:
 			(sprite.texture as ImageTexture).update(image)
 		sprite.position = _center - _size / (2.0 * _zoom)
-		sprite.scale = _size / Vector2(image.get_size()) / _zoom
+		sprite.scale = Vector2.ONE * (_size.y / 225.0) / _zoom
