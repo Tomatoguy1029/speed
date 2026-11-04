@@ -2,6 +2,7 @@
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
+const HOUND_BURN := preload("res://scripts/render/bosses/canis_hound_burn.gd")
 const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
 const NOVA_DISPLAY := preload("res://scripts/render/bosses/canis_nova.gd")
 const BURST_DISPLAY := preload("res://scripts/render/bosses/canis_burst.gd")
@@ -64,6 +65,7 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 		_pulse_until = -1.0
 		_land_clock = -1.0
 		_land_feet.clear()
+		_trails.clear()
 	if not state.is_empty() and int(body.phase)>int(state.phase): _pulse_until = float(body.clock)+0.35
 	if not state.is_empty() and (body.get("calling",false)!=state.get("calling",false) or body.get("barking",false) and not state.get("barking",false)): _pulse_until = float(body.clock)+0.35
 	pulse = maxf(0.0,_pulse_until-float(body.clock))
@@ -156,33 +158,36 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
 	if is_instance_valid(_burst_overlay): _burst_overlay.apply_clock(float(state.clock))
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
+	HOUND_BURN.draw(canvas,_trails,float(state.clock))
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
 		NOVA_DISPLAY.draw_flare(canvas,_nova,_nova_params)
 	if is_instance_valid(_nova_overlay):
 		_nova_overlay.update_overlay(_nova,_nova_params,float(state.facing),canvas.world_scale*get_viewport_rect().size.y/225.0)
 
-## 描画専用の短い履歴。戦闘の猟犬位置へ書き戻さない。
+## 飛びかかりは技の回復後も各猟犬の寿命まで続く。履歴は表示だけが持つ。
 var _trails: Dictionary = {}
-var _lunge_layer: Node2D
-func _track_command(body: Dictionary, attack: Dictionary, dt: float) -> void:
-	if _lunge_layer==null:
-		_lunge_layer = Node2D.new()
-		_lunge_layer.top_level = true
-		_lunge_layer.draw.connect(_draw_command_lunges)
-		add_child(_lunge_layer)
+func _track_command(body: Dictionary, _attack: Dictionary, dt: float) -> void:
 	var live := {}
-	if attack.get("technique","") in ["command","bay"] and int(attack.get("stage",5)) in [0,1]:
-		for lunge: Dictionary in body.get("lunges",[]):
-			live[lunge.actor] = true
-			var trail: Dictionary = _trails.get(lunge.actor,{"points":PackedVector2Array(),"radius":lunge.radius})
-			if dt>0.0 or trail.points.is_empty():
-				trail.points.append(lunge.position)
-				if trail.points.size()>6: trail.points = trail.points.slice(trail.points.size()-6)
-			_trails[lunge.actor] = trail
+	var indices := {}
+	var led: Array = body.get("led",[])
+	for i in led.size(): indices[int(led[i].id)] = i
+	for lunge: Dictionary in body.get("lunges",[]):
+		var id := int(lunge.actor)
+		live[id] = true
+		var trail: Dictionary = _trails.get(id,{"points":PackedVector2Array(),"index":indices.get(id,0)})
+		trail.position = lunge.position
+		trail.radius = lunge.radius
+		trail.sprite_radius = lunge.get("sprite_radius",lunge.radius)
+		trail.sprite_angle = lunge.get("sprite_angle",0.0)
+		trail.facing = (lunge.velocity as Vector2).angle()
+		trail.until = lunge.until
+		if dt>0.0 or trail.points.is_empty():
+			trail.points.append(lunge.position)
+			if trail.points.size()>14: trail.points = trail.points.slice(trail.points.size()-14)
+		_trails[id] = trail
 	for id in _trails.keys():
-		if not live.has(id): _trails.erase(id)
-	_lunge_layer.queue_redraw()
+		if not live.has(id) and float(body.clock)>=float(_trails[id].until)+0.4: _trails.erase(id)
 	queue_redraw()
 func _draw() -> void:
 	for warning: Dictionary in technique.get("warnings",[]):
@@ -213,20 +218,6 @@ func _draw() -> void:
 		var grow := fmod(float(state.clock)*2.5+ring*0.5,1.0)
 		draw_arc(Vector2(84.0,0.0),20.0+grow*90.0,0.0,TAU,32,Color(Color("#f2b567"),1.0-grow),pixel_size)
 	draw_set_transform(Vector2.ZERO)
-func _draw_command_lunges() -> void:
-	for id in _trails:
-		var trail: Dictionary = _trails[id]
-		var points: PackedVector2Array = trail.points
-		var radius: float = trail.radius
-		for j in range(1,points.size()):
-			var f := float(j)/float(points.size()-1)
-			_lunge_layer.draw_line(points[j-1],points[j],Color(Color("#ff667d"),0.15+0.55*f),radius*(0.4+0.9*f),true)
-		var at: Vector2 = points[points.size()-1]
-		var flicker := 0.75+0.25*sin(float(state.clock)*40.0+float(id))
-		_lunge_layer.draw_circle(at,radius*1.9,Color(Color("#ff667d"),0.22*flicker))
-		_lunge_layer.draw_circle(at,radius*1.3,Color(Color("#f2b567"),0.35*flicker))
-		_lunge_layer.draw_arc(at,radius*1.3,0.0,TAU,20,Color(Color("#e8f6ff"),0.8*flicker),2.1,true)
-
 ## 閃光の遮蔽場は戦闘側から受け取り、描画側で再計算しない。
 const SIRIUS_COLOR := Color("#cfefff")
 var _nova := {}

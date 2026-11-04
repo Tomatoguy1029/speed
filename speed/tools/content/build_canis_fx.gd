@@ -4,14 +4,24 @@ extends RefCounted
 
 const HULL_PATH := "res://data/visuals/canis_nova_hull.tres"
 const EMISSION_PATH := "res://data/visuals/canis_nova_emission.tres"
+const EDGES_PATH := "res://data/visuals/canis_hound_edges.tres"
 const SETTINGS_PATH := "res://data/visuals/fx_reference.tres"
 
 static func input_paths() -> PackedStringArray:
-	return PackedStringArray([HULL_PATH,EMISSION_PATH,SETTINGS_PATH,"res://data/visuals/looks/hound.tres",
+	return PackedStringArray([HULL_PATH,EMISSION_PATH,EDGES_PATH,SETTINGS_PATH,"res://tools/art/bake_canis_hound_edges.py","res://data/visuals/looks/hound.tres",
 		"res://assets/pixel/hound/base.png","res://assets/pixel/hound/base.png.import",
 		"res://assets/pixel/hound/armor.png","res://assets/pixel/hound/armor.png.import","res://tools/art/bake_canis_fx.py"])
 
 static func apply(data: Dictionary) -> Error:
+	if not data.get("CanisBodyDefinition",[]).is_empty():
+		var edges := ResourceLoader.load(EDGES_PATH,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
+		if edges==null or edges.get_meta("version",0)!=1: return ERR_INVALID_DATA
+		for path: String in edges.get_meta("inputs",{}):
+			if FileAccess.get_sha256(path)!=edges.get_meta("inputs",{})[path]:
+				push_error("猟犬の炎の輪郭画像の入力が変わりました: "+path)
+				return ERR_INVALID_DATA
+		var points = edges.get_meta("points",PackedVector2Array())
+		if not points is PackedVector2Array or points.is_empty(): return ERR_INVALID_DATA
 	if data.get("CanisNovaDefinition",[]).is_empty(): return OK
 	var baked := ResourceLoader.load(HULL_PATH,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 	if baked==null or baked.get_meta("bake_version",0)!=1:
