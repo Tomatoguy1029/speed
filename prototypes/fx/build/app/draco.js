@@ -1,4 +1,7 @@
 // ===== りゅう：現行の背骨・装甲・四肢と13技を独立再生 =====
+// りゅうの作り直しまでの仮：旧うみへびの技の帯を借りていた所。記録だけして描かない。
+function hEffect(S, kind, points, width, delay, life) { const e = { kind, points, width, delay, life, t: S.t }; (S.effects ||= []).push(e); return e; }
+function hDrawEffect() {}
 const DRACO = BOSSES.draco, DP = DRACO.def.params, DCOUNT = DP.body_segments;
 const dTaper = t => lerp(1, 0.23, clamp((t - 0.55) / 0.45) ** 1.35);
 function dNeutral(head, angle, time, length = DP.body_length) {
