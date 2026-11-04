@@ -17,8 +17,10 @@ var _fire: Array[Color] = []
 var _spark: Array[Color] = []
 var _flame: Array = []
 var smoke_color := Color("#3a2230")
+var _base_color := Color("#ff6a3a")
 
 func configure(color: Color) -> void:
+	_base_color = color
 	_fire.clear()
 	_spark.clear()
 	_flame.clear()
@@ -29,6 +31,15 @@ func configure(color: Color) -> void:
 	for pair in FLAME_RAMP:
 		_flame.append([_tint(Color(pair[0]), color), _tint(Color(pair[1]), color)])
 	smoke_color = _tint(Color("#3a2230"), color)
+
+func fire_colors() -> Array[Color]:
+	return _fire
+
+func spark_colors() -> Array[Color]:
+	return _spark
+
+func colorize(color: Color) -> Color:
+	return _tint(color, _base_color)
 
 func draw_back(painter, simulation, clock: float, burst_age: float, timing: float, pixel_size: float) -> void:
 	if simulation.scorch_size > 0:
