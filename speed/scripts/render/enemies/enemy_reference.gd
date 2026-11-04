@@ -10,6 +10,7 @@ const CRAB := preload("res://scripts/render/enemies/crab_reference.gd")
 const RULER := preload("res://scripts/render/enemies/ruler_reference.gd")
 const DOLPHIN := preload("res://scripts/render/enemies/dolphin_reference.gd")
 const AURIGA := preload("res://scripts/render/enemies/auriga_reference.gd")
+const TELESCOPE := preload("res://scripts/render/enemies/telescope_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -23,6 +24,7 @@ var _crab = CRAB.new()
 var _ruler = RULER.new()
 var _dolphin = DOLPHIN.new()
 var _auriga = AURIGA.new()
+var _telescope = TELESCOPE.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -63,6 +65,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_dolphin.render(frame.dolphin_actors, frame.dolphin_waves, normalized, canvas, world_time)
 	if frame.has("auriga_trails"):
 		_auriga.render(frame.auriga_trails, canvas, world_time)
+	if frame.has("telescope_beams"):
+		_telescope.render(frame.telescope_beams, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -77,6 +81,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var ruler := frame.has("ruler_fx")
 	var dolphin := frame.has("dolphin_actors") and frame.has("dolphin_waves")
 	var auriga := frame.has("auriga_trails")
+	var telescope := frame.has("telescope_beams")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
@@ -102,7 +107,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 				row["gunner"] = kept
 			batches.append(row)
 		result.batches = batches
-	if phoenix or beamer or lynx or bite or cross or crab or ruler or dolphin or auriga:
+	if phoenix or beamer or lynx or bite or cross or crab or ruler or dolphin or auriga or telescope:
 		var shapes: Array = []
 		for row: Dictionary in frame.get("shapes", []):
 			if phoenix and int(row.get("zone_style", -1)) == 5:
@@ -122,6 +127,8 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if dolphin and bool(row.get("reference_dolphin", false)):
 				continue
 			if auriga and bool(row.get("reference_auriga", false)):
+				continue
+			if telescope and bool(row.get("reference_telescope", false)):
 				continue
 			shapes.append(row)
 		result.shapes = shapes

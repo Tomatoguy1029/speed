@@ -323,7 +323,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto *circle=std::get_if<CircleHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);if (!circle || !record) continue;
         Dictionary impact;impact["order"]=record->id;impact["owner_id"]=record->spec.owner.source_id;impact["pos"]=h.pos;impact["radius"]=double(circle->radius);impact["age"]=std::max(0.0,double(h.time-h.delay));phoenix_impacts.push_back(impact);
     }
-    Array beamer_fx;
+    Array beamer_fx,telescope_beams;
     for (const auto &h:state.hazards) {
         const auto *wave=std::get_if<WaveHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
         if (!h.alive || !wave || !record || wave->style!=uint32_t(WaveStyle::Ripple)) continue;
@@ -336,6 +336,9 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto source=record->spec.owner.source_definition;
         if (!source || source>run.content->definitions.size()) continue;
         const auto kind=run.content->definitions[source-1].kind;
+        if (kind==EnemyDefinition::Kind::Sniper && beam->style==uint32_t(BeamStyle::Telescope)) {
+            Dictionary fx;fx["order"]=record->id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);telescope_beams.push_back(fx);continue;
+        }
         if (kind==EnemyDefinition::Kind::Cross && beam->style==uint32_t(BeamStyle::Plain)) {
             Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);cross_beams.push_back(fx);continue;
         }
@@ -403,7 +406,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
-    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;out["auriga_trails"]=auriga_trails;
+    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;out["auriga_trails"]=auriga_trails;out["telescope_beams"]=telescope_beams;
     out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
