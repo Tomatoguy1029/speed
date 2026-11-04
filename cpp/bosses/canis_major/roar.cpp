@@ -5,7 +5,7 @@
 
 namespace speed {
 namespace {
-const CanisRoarDefinition *settings(const ContentBundle &content,uint32_t technique) {
+const CanisRoarDefinition *find_settings(const ContentBundle &content,uint32_t technique) {
     const auto found=std::find_if(content.canis_roars.begin(),content.canis_roars.end(),[&](const auto &x){return x.technique==technique;});
     return found==content.canis_roars.end()?nullptr:&*found;
 }
@@ -22,10 +22,11 @@ double warning(const ContentBundle &content,const TechniqueState &t) {
     return technique.warn;
 }
 }
+const CanisRoarDefinition *CanisRoar::settings(const ContentBundle &content,uint32_t technique) { return find_settings(content,technique); }
 void CanisRoar::update(RunRuntime &r,BossBodyState &body) {
     for (const auto &t:r.state.bosses.techniques) {
         if (!same_handle(t.actor,body.actor) || t.stage>=TechniqueStage::Finished || body.canis.roar_last_technique==t.id) continue;
-        const auto *p=settings(*r.content,t.definition);if (!p || !p->has_roar) continue;
+        const auto *p=find_settings(*r.content,t.definition);if (!p || !p->has_roar) continue;
         const auto &id=r.content->boss_techniques[t.definition-1].external_id;
         const double warn=warning(*r.content,t);
         const double cue=id=="nova"?.4:warn-std::min(warn*.65,id=="howl"?.55:.32);

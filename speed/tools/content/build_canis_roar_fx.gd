@@ -35,5 +35,25 @@ static func apply(data: Dictionary) -> Error:
 			"order_wait":float(values.orderWait) if roaring and name!="nova" else 0.0,
 			"hound_warn":float(values.houndWarn) if roaring and name!="nova" else 0.0,
 			"has_hound_speed":speed,"hound_speed":float(values.houndAttackSpeed) if speed else 0.0})
+	# 号令だけは共通の段階表が発射を進めるため、予兆と咆哮の確定時計へ組み替える。
+	for config: Dictionary in rows:
+		if config.external_id!="O-command": continue
+		var technique: Dictionary = {}
+		for item: Dictionary in data.get("BossTechniqueDefinition",[]):
+			if int(item.id)==int(config.technique): technique = item; break
+		var detail: Dictionary = {}
+		for item: Dictionary in data.get("CanisCommandDefinition",[]):
+			if int(item.technique)==int(config.technique): detail = item; break
+		if technique.is_empty() or detail.is_empty(): return ERR_INVALID_DATA
+		var warn := float(technique.warn)
+		var cue := warn-minf(warn*0.65,0.32)
+		var lives := [0.0,0.24,0.36,0.52]
+		var start := cue+float(lives[int(config.level)])*float(config.roar_time)*float(config.timing)+float(config.order_wait)+float(config.hound_warn)
+		var stages := 0
+		for stage: Dictionary in data.get("BossTechniqueStage",[]):
+			if int(stage.technique)!=int(config.technique): continue
+			if int(stage.command)==1: stage.at = start; stages += 1
+			elif int(stage.command)==2: stage.at = start+float(detail.lunge_time)+0.05; stages += 1
+		if stages!=2: return ERR_INVALID_DATA
 	data["CanisRoarDefinition"] = rows
 	return OK

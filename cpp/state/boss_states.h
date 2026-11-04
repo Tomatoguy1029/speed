@@ -73,7 +73,7 @@ struct CanisBlazeChosen {EnemyHandle actor;double at=0;bool sent=false,lit=false
 struct CanisBlazeState {std::vector<CanisBlazeChosen> chosen;double age=0;};
 struct CanisSequenceItem {EnemyHandle actor;double mark=0,launch=0;bool marked=false,launched=false;};
 struct CanisHowlState {bool formed=false;double last_launch=0;std::vector<CanisSequenceItem> sequence;};
-struct CanisCommandState {std::vector<EnemyHandle> warned;};
+struct CanisCommandState {std::vector<EnemyHandle> warned;bool warning_started=false;};
 struct CanisStreamState {uint32_t definition=0;bool sent=false;double started=0,last_launch=0;std::vector<CanisSequenceItem> sequence;};
 struct CanisFlameAimState {double age=0;bool fired=false,done=false;};
 struct CanisHuntState {CanisStreamState stream;CanisFlameAimState aim;bool aiming=false,combo_pending=true;};
