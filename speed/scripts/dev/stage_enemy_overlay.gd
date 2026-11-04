@@ -71,7 +71,6 @@ func _ensure_contents() -> void:
 			content_edit = null
 			return
 		panel.definition_source = func(id): return content_edit.definitions[StringName(id)] if content_edit.definitions.has(StringName(id)) else PANEL.IO.definition(id)
-		panel.generate_saved = content_edit.generate_saved
 		panel.bind_run(content_edit.source,content_edit.config,content_edit.values)
 	box.add_child(panel)
 	panel.tuning_changed.connect(func(values):
@@ -79,10 +78,10 @@ func _ensure_contents() -> void:
 			var applied: Dictionary = content_edit.apply(values)
 			if not applied.ok: panel._status.text = applied.message
 )
-	panel.generated.connect(func(_stage):
+	panel.saved.connect(func(_stage):
 		if cpp_session!=null:
 			var notified: Dictionary = content_edit.notify_saved(panel.stage_path)
-			if not notified.ok: panel._status.text = "保存・生成済み / 通知失敗: "+notified.message)
+			if not notified.ok: panel._status.text = "保存済み / 通知失敗: "+notified.message)
 	_grip = Control.new()
 	_grip.top_level = true
 	_grip.size = Vector2(22, 22)

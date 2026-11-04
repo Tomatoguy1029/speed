@@ -197,7 +197,13 @@ func lab_appearance_operations(lab) -> void:
 	var local: Vector2 = rect.position+(Vector2(pixel%int(armor.data.width),pixel/int(armor.data.width))+Vector2.ONE*0.5)*rect.size/armor.source.get_size()
 	var presentation: RunPresentation = controls._render()
 	var previous_scope := presentation.cpp_scope
+	var builder = load("res://tools/content/build_run_content.gd")
+	var builds: int = builder.preparation_build_count
+	var index_path: String = lab.session._output.path_join("stage_%d.json" % lab.session._source.index)
+	var index_hash := FileAccess.get_sha256(index_path)
 	ui_click_point(armor.get_global_transform_with_canvas()*local)
+	check(builder.preparation_build_count==builds and FileAccess.get_sha256(index_path)==index_hash,"装甲を塗っても戦闘データの生成・書込を行わない")
+	var painted: Dictionary = lab.session.run.enemies.def_of(&"biter").armor_colors.duplicate(true)
 	if not display_only: check(lab.session.run.enemies.def_of(&"biter").armor_colors!=colors,"装甲片の実クリックでその片だけ塗り替える")
 	if not display_only: check(presentation.cpp_scope!=previous_scope,"塗り替えた表示資源を現在のランへ渡す")
 	await get_tree().process_frame
@@ -212,6 +218,15 @@ func lab_appearance_operations(lab) -> void:
 		check(material.get_shader_parameter("paint_tex")==look.painted_armors[entry.paint],"実クリックで塗った色を描画中の材質へ反映する")
 	ui_key(KEY_Z,true)
 	if not display_only: check(lab.session.run.enemies.def_of(&"biter").armor_colors==colors,"装甲の塗り替えを実キー操作で取り消す")
+	await lab.session.redo_edit()
+	check(lab.session.run.enemies.def_of(&"biter").armor_colors==painted,"やり直しで未保存の配色を復元する")
+	await lab.session.reset({"overrides":{"biter":{"armor_colors":painted}}})
+	var restored: RunPresentation = lab.session.scene.view.get_node("RunPresentation")
+	for entry: Dictionary in lab.session.scene.cpp_resources.visuals:
+		if entry.role!=6: continue
+		var look: EnemyLook = restored.cpp_scope.resources[entry.path]
+		check(look.painted_armors.has(entry.paint),"未保存の配色を含むリセットでも描画前に塗装画像が揃う")
+
 
 func ui_key(code: Key, ctrl := false, shift := false) -> void:
 	for down in [true,false]:

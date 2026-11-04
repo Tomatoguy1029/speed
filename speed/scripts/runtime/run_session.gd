@@ -173,6 +173,8 @@ func _poll_cpp_loading() -> void:
 		return
 	if not resources.is_ready(): return
 	if _warm_started_us==0:
+		var prepare_visuals: Callable = _pending_cpp.options.get("cpp_prepare_visuals",Callable())
+		if _pending_cpp.with_view and prepare_visuals.is_valid(): prepare_visuals.call(resources,cpp_resources)
 		_warm_started_us = Time.get_ticks_usec()
 		loading_timings["resource_wait_ms"] = (_warm_started_us-_load_started_us)/1000.0
 	if not resources.warmup_complete:

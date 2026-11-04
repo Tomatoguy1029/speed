@@ -28,7 +28,6 @@ var _baseline_stage: StageDef
 var _baseline_definitions := {}
 var _seek_view_mode := SubViewport.UPDATE_ALWAYS
 const BUILDER := preload("res://tools/content/build_run_content.gd")
-const LOADER := preload("res://scripts/runtime/run_content_loader.gd")
 const PROJECTION := preload("res://scripts/runtime/run_read_model.gd")
 var baseline: Dictionary = {}
 var spec: Dictionary = {}
@@ -171,7 +170,7 @@ func _rebuild() -> void:
 		return
 	var index_path := _output.path_join("stage_%d.json" % _source.index)
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
-	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_start":{"lab_mode":true},"cpp_profile":ProfileManager.for_cpp(true,spec.get("meta",{})),"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
+	scene = RunManager.create_session(viewport if viewport!=null else self,{"runtime":"cpp","cpp_index":index_path,"cpp_signature":index.input_sha256,"seed":int(spec.get("seed",932)),"hud":true,"cpp_start":{"lab_mode":true},"cpp_prepare_visuals":_prepare_visuals,"cpp_profile":ProfileManager.for_cpp(true,spec.get("meta",{})),"cpp_edit_source":{"stage":_source,"config":_config,"definitions":_definitions}},viewport!=null)
 	scene.remove_from_group("recordable_runs")
 	scene.auto_step = false
 	while is_instance_valid(scene) and scene.bridge==null and scene.cpp_error==OK: await get_tree().process_frame
@@ -396,10 +395,9 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			if source.is_empty(): return {"ok":false,"message":"配置の形式が不正です"}
 			var next_sources := _formation_sources.duplicate(true)
 			next_sources.append(source)
-			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources,_boss_definitions,null,_boss_programs)
+			var bundle := {}
+			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources,_boss_definitions,null,_boss_programs,PackedStringArray(),false,bundle)
 			if built!=OK: return {"ok":false,"message":"配置の定義を生成できません"}
-			var bundle := _read_generated()
-			if bundle.is_empty(): return {"ok":false,"message":"配置の生成物を読み込めません"}
 			var result: Dictionary = bridge.replace_scenario("formation",{"layout":int(args.get("layout",0)),"entry":int(args.get("entry",0))},bundle.bytes)
 			if result.ok: _formation_sources = next_sources
 			return result
@@ -489,10 +487,9 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			for id in args.ids:
 				if not ContentManager.phases.has(StringName(id)): return {"ok":false,"message":"時間帯の定義がありません"}
 				next.phases.append(ContentManager.phases[StringName(id)].duplicate(true))
-			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources,_boss_definitions,null,_boss_programs)
+			var bundle := {}
+			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources,_boss_definitions,null,_boss_programs,PackedStringArray(),false,bundle)
 			if built!=OK: return {"ok":false,"message":"時間帯の定義を生成できません"}
-			var bundle := _read_generated()
-			if bundle.is_empty(): return {"ok":false,"message":"時間帯の生成物を読み込めません"}
 			var result: Dictionary = bridge.replace_scenario("phase_set",{},bundle.bytes)
 			if result.ok:
 				_source = next
@@ -506,11 +503,6 @@ func _apply_meta(levels: Dictionary) -> Dictionary:
 	var packed := PackedInt32Array()
 	for id in PROJECTION.META_IDS: packed.append(clampi(int(levels.get(id,0)),0,100))
 	return bridge.command("dev_edit",{"kind":"meta","payload":{"levels":packed,"profile":ProfileManager.for_cpp(true,levels)}})
-
-func _read_generated() -> Dictionary:
-	var path := _output.path_join("stage_%d.json" % _source.index)
-	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	return LOADER.read_bundle(path,index.input_sha256)
 
 ## 次の技再生にだけ使う値を、本番と同じ変換・版検査で取り替える。
 func set_boss_program(id: String, program: Dictionary) -> Dictionary:
@@ -534,6 +526,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	elif kind in ["boss_parameter","boss_appearance","boss_program"]:
 		if kind=="boss_parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL]): return {"ok":false}
 		if not bosses.has(type): return {"ok":false,"message":"このボスの編集はまだ移行していません"}
+		bosses[type] = bosses[type].duplicate(true)
 		var definition: BossDef = bosses[type]
 		if kind=="boss_program": pass
 		elif kind=="boss_appearance":
@@ -548,6 +541,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	else:
 		if kind=="parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL] or (args.value is float and not is_finite(args.value))): return {"ok":false}
 		if not next.has(type): return {"ok":false}
+		next[type] = next[type].duplicate(true)
 		var definition: EnemyDef = next[type]
 		if kind=="armor_paint":
 			if not ARMOR_PAINT.valid_palettes(args.get("colors")): return {"ok":false}
@@ -563,12 +557,22 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		elif key in ["hp","toughness","armor","speed","radius","accel","turn","xp","weak_arc","attack_weight","hitstop_multiplier"]:
 			definition.set(key,clampi(int(args.value),-1,1) if key=="toughness" else maxf(0.01 if key in ["hp","radius"] else 0.0,float(args.value)))
 		else: return {"ok":false}
-	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses,scene.cpp_resources,_boss_programs)
+	if kind=="armor_paint":
+		# 塗装は表示専用。戦闘バイナリを生成せず、対象の外観だけを差し替える。
+		var resources = scene.cpp_resources.duplicate(true)
+		for entry: Dictionary in resources.visuals:
+			if entry.role!=6 or entry.id!=_source.resources.enemy_ids.find(String(type))+6: continue
+			var look: EnemyLook = load(entry.path)
+			entry.paint = look.colors_key(next[type].armor_colors)
+			entry.hull_preview = look.preview_key(next[type].armor_colors)
+			if entry.get("ruler",false): entry.lower_paint = look.split_other.colors_key(next[type].armor_colors) if look.split_other!=null else ""
+		_definitions = next
+		run.enemies.data.definitions = next
+		_replace_visuals(resources, type)
+		return {"ok":true}
+	var bundle := {}
+	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses,scene.cpp_resources,_boss_programs,PackedStringArray(),false,bundle)
 	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
-	var path := _output.path_join("stage_%d.json" % _source.index)
-	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	var bundle: Dictionary = LOADER.read_bundle(path,index.input_sha256)
-	if bundle.is_empty(): return {"ok":false,"message":"編集の定義を読み込めません"}
 	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "boss_parameter" if kind in ["boss_parameter","boss_appearance","boss_program"] else "parameter")
 	if result.ok:
 		_definitions = next
@@ -577,32 +581,62 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		_config = config
 		run.cfg = config
 		run.enemies.data.definitions = next
-		# 外観は表示側だけが所有し、当たりに効く値は上の定義置換で適用する。
-		scene.cpp_resources = bundle.resources
-		if scene.view!=null:
-			var presentation: RunPresentation = scene.view.get_node("RunPresentation")
-			var scope := ContentResourceScope.new()
-			scope.resources = presentation.cpp_scope.resources.duplicate()
-			scope.warmup_complete = true
-			var palettes := {}
-			for entry: Dictionary in bundle.resources.visuals:
-				if entry.role!=6: continue
-				var enemy_index: int = entry.id-6
-				if enemy_index<0 or enemy_index>=_source.resources.enemy_ids.size(): continue
-				var id := StringName(_source.resources.enemy_ids[enemy_index])
-				if not next.has(id): continue
-				if not palettes.has(entry.path): palettes[entry.path] = []
-				palettes[entry.path].append(next[id].armor_colors)
-			for visual_path in palettes:
-				var look: EnemyLook = scope.resources[visual_path]
-				var colors: Array[Dictionary] = []
-				colors.assign(palettes[visual_path])
-				scope.provide(visual_path,ARMOR_PAINT.prepare_look(load(look.source_path),colors))
-			presentation.cpp_resources = bundle.resources
-			presentation.cpp_scope = scope
-			presentation.frame_view.replace_lab_visuals(scope,bundle.resources.visuals)
-			presentation.sync_canvas_layers()
+		_replace_visuals(bundle.resources)
 	return result
+
+## 既存のScopeを複製して、巻き戻し用Sessionの画像を変更しない。
+## 同じ外観の全配色を用意し、敵を切り替えても未保存の塗装を保持する。
+func _replace_visuals(resources: Resource, painted_type := &"") -> void:
+	scene.cpp_resources = resources
+	if scene.view==null: return
+	var presentation: RunPresentation = scene.view.get_node("RunPresentation")
+	var scope := ContentResourceScope.new()
+	scope.resources = presentation.cpp_scope.resources.duplicate()
+	scope.warmup_complete = true
+	if painted_type!=&"": _prepare_visuals(scope,resources)
+	presentation.cpp_resources = resources
+	presentation.cpp_scope = scope
+	presentation.frame_view.replace_lab_visuals(scope,resources.visuals)
+	presentation.sync_canvas_layers()
+
+## 開始・リセットでも、生成済み外観にない配色だけを描画開始前に補う。
+func _prepare_visuals(scope: ContentResourceScope, resources: Resource) -> void:
+	var palettes := {}
+	for entry: Dictionary in resources.visuals:
+		if entry.role!=6: continue
+		var index: int = entry.id-6
+		if index<0 or index>=_source.resources.enemy_ids.size(): continue
+		var id := StringName(_source.resources.enemy_ids[index])
+		if not _definitions.has(id): continue
+		if not palettes.has(entry.path): palettes[entry.path] = []
+		palettes[entry.path].append(_definitions[id].armor_colors)
+	for path: String in palettes:
+		var look: EnemyLook = scope.resources[path]
+		var missing: Array[Dictionary] = []
+		for colors: Dictionary in palettes[path]:
+			if not _has_paints(look,colors): missing.append(colors)
+		if missing.is_empty(): continue
+		var prepared := ARMOR_PAINT.prepare_look(load(look.source_path),missing)
+		# 現在の表示が使う配色だけを引き継ぎ、塗るたびに過去の画像を溜めない。
+		for colors: Dictionary in palettes[path]: _keep_paints(prepared,look,colors)
+		# 同じ外観を使う召喚敵など、通常敵IDでない表示のキーも保持する。
+		for entry: Dictionary in resources.visuals:
+			if entry.role!=6 or entry.path!=path: continue
+			if look.painted_armors.has(entry.paint): prepared.painted_armors[entry.paint] = look.painted_armors[entry.paint]
+			if look.previews.has(entry.hull_preview): prepared.previews[entry.hull_preview] = look.previews[entry.hull_preview]
+			if prepared.split_other!=null and look.split_other!=null and entry.has("lower_paint") and look.split_other.painted_armors.has(entry.lower_paint):
+				prepared.split_other.painted_armors[entry.lower_paint] = look.split_other.painted_armors[entry.lower_paint]
+		scope.provide(path,prepared)
+
+func _has_paints(look: EnemyLook, colors: Dictionary) -> bool:
+	return look.painted_armors.has(look.colors_key(colors)) and look.previews.has(look.preview_key(colors)) and (look.split_other==null or _has_paints(look.split_other,colors))
+
+func _keep_paints(target: EnemyLook, previous: EnemyLook, colors: Dictionary) -> void:
+	var paint := previous.colors_key(colors)
+	var preview := previous.preview_key(colors)
+	if previous.painted_armors.has(paint): target.painted_armors[paint] = previous.painted_armors[paint]
+	if previous.previews.has(preview): target.previews[preview] = previous.previews[preview]
+	if target.split_other!=null and previous.split_other!=null: _keep_paints(target.split_other,previous.split_other,colors)
 
 func row_for_id(id: int) -> int:
 	var t = run.enemies.table
