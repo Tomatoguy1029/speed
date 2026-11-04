@@ -5,6 +5,7 @@ const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
 const REFERENCE_SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
 const HORN_LIGHT_SHADER := preload("res://shaders/monoceros_horn_light.gdshader")
+const REFERENCE_WHITE_SHADER := preload("res://shaders/fx_reference_white.gdshader")
 @export var pixel_size := 3.0
 @export var booster_length_scale := 1.0
 @export var booster_core_color := Color("#e0fbff")
@@ -48,11 +49,15 @@ var _horn_overlay: Sprite2D
 var _armor_overlay: Sprite2D
 var _image_nodes: Array[Node2D] = []
 var _image_sprites: Array[Sprite2D] = []
+var _ram_white := 0.0
+var _ram_white_material: ShaderMaterial
+var _ram_white_sprites: Array[Dictionary] = []
 @onready var parts: PartsVisual = $Parts
 @onready var horn: Sprite2D = $Parts/Head/Lower/Horn
 
 func _ready() -> void:
 	_collect_image_nodes(self)
+	_create_ram_white()
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 	z_index = 8
 	_reference_boost = REFERENCE_BOOST.new()
@@ -69,6 +74,42 @@ func _collect_image_nodes(parent: Node) -> void:
 			_image_nodes.append(child)
 			if child is Sprite2D: _image_sprites.append(child)
 		_collect_image_nodes(child)
+
+## G10の白は、法線付き本体画像のalphaにだけ元の強さで加算する。
+func _create_ram_white() -> void:
+	_ram_white_material = ShaderMaterial.new()
+	_ram_white_material.shader = REFERENCE_WHITE_SHADER
+	for source: Sprite2D in _image_sprites:
+		var overlay := Sprite2D.new()
+		overlay.material = _ram_white_material
+		overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		source.add_child(overlay)
+		_ram_white_sprites.append({"source":source,"overlay":overlay})
+	_sync_ram_white()
+
+func set_reference_hit(white: float) -> void:
+	_ram_white = clampf(white,0.0,1.0)
+	_sync_ram_white()
+
+func _sync_ram_white() -> void:
+	if _ram_white_material == null: return
+	_ram_white_material.set_shader_parameter("strength",_ram_white)
+	for entry: Dictionary in _ram_white_sprites:
+		var source: Sprite2D = entry.source
+		var overlay: Sprite2D = entry.overlay
+		overlay.visible = _ram_white>0.0 and source.texture!=null
+		if not overlay.visible: continue
+		overlay.texture = source.texture
+		overlay.centered = source.centered
+		overlay.offset = source.offset
+		overlay.flip_h = source.flip_h
+		overlay.flip_v = source.flip_v
+		overlay.hframes = source.hframes
+		overlay.vframes = source.vframes
+		overlay.frame = source.frame
+		overlay.region_enabled = source.region_enabled
+		overlay.region_rect = source.region_rect
+		overlay.self_modulate.a = source.self_modulate.a
 
 func _make_light_overlay(source: Sprite2D) -> Sprite2D:
 	var light := Sprite2D.new()
@@ -90,7 +131,7 @@ func _make_light_overlay(source: Sprite2D) -> Sprite2D:
 	return light
 
 func frame_event(event: Dictionary) -> void:
-	if event.get("type",&"")==&"combat_damage":
+	if event.get("type",&"")==&"combat_damage" and event.get("cause",&"")!=&"ram":
 		hit = 0.18
 		_sync_parts(0.0)
 		queue_redraw()
@@ -177,6 +218,7 @@ func _sync_parts(dt: float) -> void:
 	_charge_pose()
 	_sync_horn(dt, k)
 	_apply_image_pose(state.get("image_node_poses",[]),state.get("image_parts",[]),reaction)
+	_sync_ram_white()
 
 ## 本番が画像境界に使った全関節を、そのまま表示とFXの基点にも使う。
 func _apply_image_pose(node_poses: Array, sprites: Array, reaction: Dictionary) -> void:
