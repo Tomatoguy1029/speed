@@ -99,7 +99,7 @@ func _ready() -> void:
 			if not result.ok:
 				_fail("戦闘の固定更新に失敗しました: " + str(result))
 				return
-	var metadata := {"id":spec.id,"fps":60,"tick_rate":120,"size":[SIZE.x,SIZE.y],"seed":int(spec.seed),
+	var metadata := {"id":spec.id,"fps":60,"tick_rate":120,"size":[SIZE.x,SIZE.y],"seed":int(spec.seed),"pixel_encoding":"sRGB","hdr_2d":viewport.use_hdr_2d,
 		"index":index_path,"index_input_sha256":index.input_sha256,"camera":spec.camera,"build_identity":spec.build_identity,
 		"library_sha256":FileAccess.get_sha256("res://extensions/run/bin/libspeed_runtime.macos.template_release.arm64.dylib"),
 		"dependencies_sha256":FileAccess.get_sha256(root.path_join("cpp/dependencies.json")),"engine":Engine.get_version_info(),
@@ -162,7 +162,12 @@ func _sync_camera(camera: Dictionary) -> bool:
 	return true
 
 func _save_frame(output: String, frame: int, images: Array) -> bool:
-	if viewport.get_texture().get_image().save_png(output.path_join(images[frame].file))!=OK:
+	var image := viewport.get_texture().get_image()
+	if viewport.use_hdr_2d:
+		# HDRの読み戻しは線形値。8bitへ落とす前に表示用のsRGBへ戻し、暗い予兆光の階調を保つ。
+		image.linear_to_srgb()
+	image.convert(Image.FORMAT_RGBA8)
+	if image.save_png(output.path_join(images[frame].file))!=OK:
 		_fail("コマを保存できません: %d" % frame)
 		return false
 	return true
