@@ -3,6 +3,7 @@ extends Button
 const ICON := preload("res://gyms/enemy_lab/lab_icon.gd")
 var definition: Resource
 var picture: Texture2D
+var display_name := ""
 
 func _ready() -> void:
 	toggle_mode = true
@@ -18,7 +19,7 @@ func _ready() -> void:
 	art.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	box.add_child(art)
 	var label := Label.new()
-	label.text = definition.display_name
+	label.text = display_name if not display_name.is_empty() else definition.display_name
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	label.add_theme_font_size_override("font_size", 12)
 	label.custom_minimum_size.x = 72

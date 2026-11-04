@@ -5,22 +5,44 @@ signal rotation_changed(radians: float)
 
 const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
-const CONSTELLATION_RADIUS := 84.0
-const SYMBOL_ANGLES := [90.0, 180.0, 270.0, 0.0]
+const SYMBOL_ORBIT := Vector2(112, 84)
+const SYMBOL_OFFSET := Vector2(-1, -0.5)
+const SELECTION_RECT := Rect2(141, 207, 112, 59)
+const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAG_THRESHOLD := 4.0
 const REVEAL_SETTINGS := preload("res://data/map_reveal_settings.tres")
-## 周辺装飾画像の四隅のブラケットを囲う、元画像のピクセル範囲。
-const BRACKET_ART_RECT := Rect2(282, 414, 224, 118)
-const TEXTURES := [
-	preload("res://assets/ui/map/constellations_unicorn.png"),
-	preload("res://assets/ui/map/constellations_centeur.png"),
-	preload("res://assets/ui/map/constellations_dog.png"),
-	preload("res://assets/ui/map/constellations_snake.png"),
+const STAR_PHASES := [
+	preload("res://assets/ui/map/stars_phase1.png"),
+	preload("res://assets/ui/map/stars_phase2.png"),
+	preload("res://assets/ui/map/stars_phase3.png"),
+	preload("res://assets/ui/map/stars_phase4.png"),
+	preload("res://assets/ui/map/stars_phase5.png"),
+]
+const PREVIEW_ART := [
+	preload("res://assets/ui/map/preview_unicorn.png"),
+	preload("res://assets/ui/map/preview_centaurus.png"),
+	preload("res://assets/ui/map/preview_dog.png"),
+	preload("res://assets/ui/map/preview_snake.png"),
+]
+const PREVIEW_STARS := [
+	preload("res://assets/ui/map/preview_unicorn_stars.png"),
+	preload("res://assets/ui/map/preview_centaurus_stars.png"),
+	preload("res://assets/ui/map/preview_dog_stars.png"),
+	preload("res://assets/ui/map/preview_snake_stars.png"),
+]
+const SYMBOL_TEXTURES := [
+	preload("res://assets/ui/map/symbols/unicorn.tres"),
+	preload("res://assets/ui/map/symbols/centaurus.tres"),
+	preload("res://assets/ui/map/symbols/dog.tres"),
+	preload("res://assets/ui/map/symbols/snake.tres"),
 ]
 var _stars: Array[TextureButton] = []
+var _star_phases: Array[TextureRect] = []
 var _inner1: Sprite2D
 var _inner2: Sprite2D
 var _preview: TextureRect
+var _preview_stars: TextureRect
+var _selection_frame: TextureRect
 var _heading: Label
 var _status: Label
 var _launch: Button
@@ -40,10 +62,10 @@ var _detail_art: TextureRect
 var _detail_fade: Tween
 var _detail_material: ShaderMaterial
 var _monitor_material: ShaderMaterial
-var _line_progress := 0.0
 # プレビューでは複製した Resource を渡し、本番の調整値を保存せず比較できる。
 var reveal_settings: Resource = REVEAL_SETTINGS
 var _transition_progress := 0.0
+var _debug_unlock: Button
 var _dragging := false
 var _pointer_down := false
 var _press_position := Vector2.ZERO
@@ -59,6 +81,11 @@ func _ready() -> void:
 	var frame_material := ShaderMaterial.new()
 	frame_material.shader = preload("res://assets/ui/map/selection_frame.gdshader")
 	frame.material = frame_material
+	for texture: Texture2D in STAR_PHASES:
+		var layer := _artwork(texture, self)
+		layer.modulate.a = 0.4
+		_star_phases.append(layer)
+	_update_star_phases()
 	var projection := Node2D.new()
 	_projection = projection
 	projection.position = ORIGIN
@@ -69,16 +96,24 @@ func _ready() -> void:
 	_inner2 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle2.png"))
 	_inner2.offset = Vector2(61, 35)
 	_inner2.scale = Vector2.ONE * 0.7
-	for i in TEXTURES.size():
+	for i in SYMBOL_TEXTURES.size():
 		var star := TextureButton.new()
 		star.name = "Constellation%d" % (i + 1)
-		star.texture_normal = TEXTURES[i]
+		star.texture_normal = SYMBOL_TEXTURES[i]
 		star.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		star.tooltip_text = tr("stage.%d.name" % (i + 1))
 		star.pressed.connect(select_constellation.bind(i))
 		star.focus_entered.connect(_on_stage_focus.bind(i))
 		add_child(star)
 		_stars.append(star)
+	_selection_frame = TextureRect.new()
+	_selection_frame.texture = preload("res://assets/ui/map/selection_highlight.png")
+	_selection_frame.position = SELECTION_RECT.position
+	_selection_frame.size = SELECTION_RECT.size
+	_selection_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_selection_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_selection_frame.z_index = 15
+	add_child(_selection_frame)
 	var back_fill := Polygon2D.new()
 	back_fill.polygon = PackedVector2Array([Vector2(9, 9), Vector2(46, 9), Vector2(74, 34), Vector2(9, 34)])
 	back_fill.color = Color("1f323d")
@@ -102,13 +137,9 @@ func _ready() -> void:
 	_detail_material = ShaderMaterial.new()
 	_detail_material.shader = preload("res://assets/ui/map/information_reveal.gdshader")
 	_detail_art.material = _detail_material
-	_preview = TextureRect.new()
-	_preview.position = Vector2(451, 88)
-	_preview.size = Vector2(135, 82)
-	_preview.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	_preview.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_details.add_child(_preview)
+	# 元絵と星は640x360の同じ座標で重ね、右窓の中で再配置しない。
+	_preview_stars = _artwork(PREVIEW_STARS[0], _details)
+	_preview = _artwork(PREVIEW_ART[0], _details)
 	_heading = _label(Vector2(444, 188), Vector2(152, 38), 14)
 	_status = _label(Vector2(444, 235), Vector2(152, 24), 10)
 	_launch = _button(tr("stage_select.launch"), Vector2(431, 293), Vector2(175, 34))
@@ -116,6 +147,15 @@ func _ready() -> void:
 	for content: Control in [_heading, _status, _launch]:
 		content.reparent(_details)
 	_launch.pressed.connect(_start)
+	if OS.is_debug_build():
+		_debug_unlock = _button(tr("stage_select.unlock_all"), Vector2(444, 260), Vector2(150, 26))
+		_debug_unlock.toggle_mode = true
+		_debug_unlock.add_theme_font_size_override("font_size", 10)
+		_debug_unlock.reparent(_details)
+		_debug_unlock.toggled.connect(func(_enabled: bool):
+			_refresh_stage_visibility()
+			_reveal_details()
+		)
 	if ContentManager.stage_count() > 4:
 		var final_stage := _button(tr("stage.5.name"), Vector2(224, 333), Vector2(150, 16))
 		_final_stage = final_stage
@@ -126,7 +166,7 @@ func _ready() -> void:
 		final_stage.focus_entered.connect(_on_stage_focus.bind(4))
 	get_window().focus_exited.connect(func():
 		if _dragging:
-			select_constellation(posmod(roundi(-_angle / 90.0), 4))
+			select_constellation(_nearest_visible_star(_angle))
 		_cancel_drag()
 	)
 	var monitor := ColorRect.new()
@@ -137,7 +177,7 @@ func _ready() -> void:
 	_monitor_material.shader = preload("res://assets/ui/map/monitor.gdshader")
 	monitor.material = _monitor_material
 	add_child(monitor)
-	_select(0)
+	_refresh_stage_visibility()
 	_apply_rotation(0.0)
 	_hide_details()
 	visibility_changed.connect(func():
@@ -183,49 +223,16 @@ func _apply_reveal_settings() -> void:
 	_monitor_material.set_shader_parameter("crt_strength", reveal_settings.crt_strength)
 
 func _set_detail_line(progress: float) -> void:
-	_line_progress = 1.0 - pow(1.0 - progress, reveal_settings.line_ease)
-	_detail_material.set_shader_parameter("line_progress", _line_progress)
-	queue_redraw()
+	var line_progress := 1.0 - pow(1.0 - progress, reveal_settings.line_ease)
+	_detail_material.set_shader_parameter("line_progress", line_progress)
 
 func _set_detail_light(progress: float) -> void:
 	var alpha := smoothstep(0.0, 1.0, progress)
 	var glow: float = sin(progress * PI) * reveal_settings.glow_strength
+	_selection_frame.modulate.a = alpha
 	_details.modulate = Color(1.0 + glow, 1.0 + glow, 1.0 + glow, alpha)
 	_detail_material.set_shader_parameter("information_alpha", alpha)
 	_detail_material.set_shader_parameter("glow", glow)
-
-func _draw() -> void:
-	if _line_progress <= 0.0:
-		return
-	var selected: Control = _stars[_selected] if _selected < _stars.size() else _final_stage
-	if selected == null:
-		return
-	var source := selected.position + selected.size * selected.scale * Vector2(1.0, 0.5)
-	if _selected < _stars.size():
-		var brackets := _selection_bracket_rect()
-		source = Vector2(brackets.end.x, brackets.position.y)
-	var elbow := Vector2(396, source.y).round()
-	var profile_entry := Vector2(423, 210)
-	if _selected < _stars.size():
-		# ブラケット上辺に沿う水平線から、縦横同じ距離の45度線で接続する。
-		elbow = Vector2(profile_entry.x - absf(profile_entry.y - source.round().y), source.round().y)
-	var points := PackedVector2Array([source.round(), elbow, profile_entry, Vector2(430, 210)])
-	var total := 0.0
-	for i in range(1, points.size()):
-		total += points[i - 1].distance_to(points[i])
-	var remaining := total * _line_progress
-	for i in range(1, points.size()):
-		var length := points[i - 1].distance_to(points[i])
-		if length > 0.0:
-			draw_line(points[i - 1], points[i - 1].lerp(points[i], minf(remaining / length, 1.0)).round(), Color("859b9f"), 1.0)
-		remaining -= length
-		if remaining <= 0.0:
-			break
-
-## 星座ボタンの矩形ではなく、実際に表示する装飾画像と同じ座標から線を伸ばす。
-func _selection_bracket_rect() -> Rect2:
-	var factor := _detail_art.size / _detail_art.texture.get_size()
-	return Rect2(_detail_art.position + BRACKET_ART_RECT.position * factor, BRACKET_ART_RECT.size * factor)
 
 func _ring(parent: Node2D, texture: Texture2D) -> Sprite2D:
 	var sprite := Sprite2D.new()
@@ -253,6 +260,8 @@ func _label(at: Vector2, dimensions: Vector2, font_size: int) -> Label:
 	return label
 
 func select_constellation(index: int) -> void:
+	if index < 0 or index >= _visible_stage_count():
+		return
 	if index != _selected:
 		AudioManager.play(&"stage_select_click", -10.0)
 	if _turn != null:
@@ -260,7 +269,7 @@ func select_constellation(index: int) -> void:
 	_hide_details()
 	_select(index)
 	_focus_selected()
-	if index >= TEXTURES.size():
+	if index >= SYMBOL_TEXTURES.size():
 		_reveal_details()
 		return
 	var target := _angle + wrapf(90.0 - SYMBOL_ANGLES[index] - _angle, -180.0, 180.0)
@@ -284,7 +293,7 @@ func _horizontal_neighbor(direction: int) -> int:
 	var wrapped := _selected
 	var wrap_edge := INF
 	for i in buttons.size():
-		if i == _selected:
+		if i == _selected or not buttons[i].visible:
 			continue
 		var x := buttons[i].get_global_rect().get_center().x
 		var distance := (x - from_x) * direction
@@ -312,10 +321,10 @@ func _input(event: InputEvent) -> void:
 				select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
 			else:
 				var step := -1 if event.is_action(&"ui_up") else 1
-				select_constellation(posmod(_selected + step, mini(ContentManager.stage_count(), 5)))
+				select_constellation(posmod(_selected + step, _visible_stage_count()))
 		return
 	# 戻るにフォーカスがあるときは標準の決定を使い、それ以外は選択中の出撃。
-	if event.is_action(&"ui_accept") and focus != _back:
+	if event.is_action(&"ui_accept") and focus != _back and (focus == null or focus != _debug_unlock):
 		get_viewport().set_input_as_handled()
 		if event.is_pressed() and not event.is_echo():
 			_start()
@@ -338,7 +347,7 @@ func _input(event: InputEvent) -> void:
 				_stars[star].grab_focus()
 		elif _pointer_down:
 			if _dragging:
-				select_constellation(posmod(roundi(-_angle / 90.0), 4))
+				select_constellation(_nearest_visible_star(_angle))
 			elif _pressed_star >= 0 and _star_at(point) == _pressed_star:
 				select_constellation(_pressed_star)
 			_cancel_drag()
@@ -358,7 +367,7 @@ func _input(event: InputEvent) -> void:
 			if _radial_drag:
 				delta_angle = rad_to_deg(wrapf(offset.angle() - _last_drag_angle, -PI, PI)) if offset.length() >= 20.0 else 0.0
 			var angle := _angle + delta_angle
-			_select(posmod(roundi(-angle / 90.0), 4))
+			_select(_nearest_visible_star(angle))
 			_apply_rotation(angle)
 			_last_drag_angle = offset.angle()
 			_last_pointer = point
@@ -368,7 +377,7 @@ func _star_at(point: Vector2) -> int:
 	var found := -1
 	for i in _stars.size():
 		var star := _stars[i]
-		if Rect2(star.position, star.size * star.scale).has_point(point):
+		if star.visible and Rect2(star.position, star.size * star.scale).has_point(point):
 			if found < 0 or star.z_index > _stars[found].z_index:
 				found = i
 	return found
@@ -381,11 +390,12 @@ func _cancel_drag() -> void:
 func _select(index: int) -> void:
 	_selected = index
 	var stage := index + 1
-	var unlocked := OS.is_debug_build() or SaveManager.is_stage_unlocked(stage)
 	_heading.text = tr("stage.%d.name" % stage)
-	_preview.texture = TEXTURES[index] if index < TEXTURES.size() else null
-	_launch.disabled = not unlocked or not navigation_enabled
-	_status.text = tr("stage_select.debug") if OS.is_debug_build() else (tr("stage_select.available") if unlocked else tr("stage_select.locked").format({n = stage}))
+	_preview.texture = PREVIEW_ART[index] if index < PREVIEW_ART.size() else null
+	_preview_stars.texture = PREVIEW_STARS[index] if index < PREVIEW_STARS.size() else null
+	_selection_frame.visible = index < SYMBOL_TEXTURES.size()
+	_launch.disabled = not navigation_enabled
+	_status.text = tr("stage_select.debug") if _debug_unlock != null and _debug_unlock.button_pressed else tr("stage_select.available")
 	_apply_rotation(_angle)
 
 func _apply_rotation(degrees: float) -> void:
@@ -402,7 +412,7 @@ func _apply_rotation(degrees: float) -> void:
 		var factor := 0.85 + depth * 0.15
 		var star := _stars[i]
 		star.scale = Vector2.ONE * factor
-		star.position = _origin + Vector2(cos(angle), depth * _flatten) * CONSTELLATION_RADIUS - TEXTURES[i].get_size() * factor * 0.5
+		star.position = _origin + SYMBOL_OFFSET + Vector2(cos(angle), depth * _flatten) * SYMBOL_ORBIT - SYMBOL_TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
 	if _final_stage != null:
@@ -419,7 +429,42 @@ func set_transition(progress: float) -> void:
 	_projection.scale.y = _flatten
 	_apply_rotation(_angle)
 
+func _update_star_phases() -> void:
+	# 通常進行では最高クリア地点までがクリア済み。最終段階は5枚を重ねる。
+	var visible_count := clampi(int(SaveManager.data.cleared_stage) + 1, 1, _star_phases.size())
+	for i in _star_phases.size():
+		_star_phases[i].visible = i < visible_count
+
+func _visible_stage_count() -> int:
+	var count := mini(ContentManager.stage_count(), SYMBOL_TEXTURES.size() + 1)
+	if _debug_unlock != null and _debug_unlock.button_pressed:
+		return count
+	return clampi(int(SaveManager.data.cleared_stage) + 1, 1, count)
+
+func _refresh_stage_visibility() -> void:
+	var count := _visible_stage_count()
+	for i in _stars.size():
+		_stars[i].visible = i < count
+	if _final_stage != null:
+		_final_stage.visible = count > _stars.size()
+	if _selected >= count:
+		select_constellation(0)
+	else:
+		_select(_selected)
+
+func _nearest_visible_star(degrees: float) -> int:
+	var nearest := 0
+	var distance := INF
+	for i in mini(_visible_stage_count(), _stars.size()):
+		var offset := absf(wrapf(90.0 - SYMBOL_ANGLES[i] - degrees, -180.0, 180.0))
+		if offset < distance:
+			nearest = i
+			distance = offset
+	return nearest
+
 func focus_selection() -> void:
+	_update_star_phases()
+	_refresh_stage_visibility()
 	_launch_requested = false
 	_focus_selected()
 	_reveal_details()
@@ -433,7 +478,7 @@ func _focus_selected() -> void:
 func _start() -> void:
 	if not navigation_enabled or _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()):
 		return
-	if OS.is_debug_build() or SaveManager.is_stage_unlocked(_selected + 1):
+	if _selected < _visible_stage_count():
 		_launch_requested = true
 		AudioManager.play(&"ui")
 		GameManager.start_run(_selected + 1)

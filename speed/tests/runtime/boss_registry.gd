@@ -320,6 +320,8 @@ func native_centaurus_body() -> void:
 	for asset: Dictionary in package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
 	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	for path in ["res://assets/effects/landmark/masks.tres", "res://assets/effects/landmark/elite_contacts.tres",
+		"res://data/visuals/landmark_aura_material.tres", "res://data/visuals/elite_runtime.tres"]: scope.provide(path, load(path))
 	var view = load("res://scripts/render/run_frame_view.gd").new()
 	add_child(view)
 	var entries: Array[Dictionary] = []

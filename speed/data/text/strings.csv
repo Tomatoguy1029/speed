@@ -61,6 +61,7 @@ action.debug_panel,調整パネル（開発版）,Tuning Panel (Dev Build)
 action.debug_perf,性能の表示（開発版）,Performance Overlay (Dev Build)
 ,■ ステージ選択,
 stage_select.stage,ステージ {n}　{name},Stage {n}  {name}
+stage_select.unlock_all,デバッグ全開放,Debug: Unlock all stages
 stage_select.debug,開発版：全ステージを選べます,Dev Build: All stages are available
 stage_select.locked,ステージ {n}　（前のステージをクリアすると選べる）,Stage {n}  (Clear the previous stage to unlock)
 stage_select.endless,エンドレス（準備中）,Endless (Coming Soon)
@@ -603,6 +604,7 @@ lab.ui.files,保存,Save
 lab.ui.help,操作のヒント,Controls
 lab.ui.help_text,中ドラッグで移動・ホイールで拡大縮小。Spaceで再生／停止。選択した敵はDeleteで削除、Q／Eで回転。,Middle-drag to pan; wheel to zoom. Space to play/pause. Delete removes selected enemies; Q/E rotates them.
 lab.ui.enemies,敵,Enemies
+lab.look.snake,蛇,Snake
 lab.ui.search,敵を検索,Find an enemy
 lab.ui.all,すべて,All enemies
 lab.ui.drag_hint,ドラッグして配置,Drag onto the field

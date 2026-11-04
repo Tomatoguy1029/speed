@@ -69,24 +69,6 @@ static func draw_capsule_values(c: CanvasItem, at: Vector2, kind: int, now: floa
 			c.draw_rect(Rect2(at+Vector2(-17,0),Vector2(6,10)),Color.WHITE)
 			c.draw_rect(Rect2(at+Vector2(11,0),Vector2(6,10)),Color.WHITE)
 
-static func draw_comet_values(c: CanvasItem, p: Vector2, r: float, vel: Vector2, rare: bool, now: float) -> void:
-	var u := vel.normalized() if vel.length_squared() > 1.0 else Vector2.RIGHT
-	var n := Vector2(-u.y, u.x)
-	var core := Color("#ffe9a0") if rare else Color("#dff6ff")
-	var glow := Color("#ffb52e") if rare else Color("#7fd3ff")
-	var tail_len := r * 9.0
-	c.draw_polygon(PackedVector2Array([p + n * r * 0.9, p - u * tail_len, p - n * r * 0.9]),
-		PackedColorArray([Color(glow, 0.55), Color(glow, 0.0), Color(glow, 0.55)]))
-	c.draw_polygon(PackedVector2Array([p + n * r * 0.45, p - u * tail_len * 0.6, p - n * r * 0.45]),
-		PackedColorArray([Color(core, 0.8), Color(core, 0.0), Color(core, 0.8)]))
-	c.draw_circle(p, r * 1.35, Color(glow, 0.25))
-	c.draw_circle(p, r, Color(glow, 0.55))
-	c.draw_circle(p, r * 0.65, core)
-	if rare:
-		for k in 4:
-			var a := now * 3.0 + k * TAU / 4.0
-			c.draw_circle(p + Vector2.from_angle(a) * r * 1.7, maxf(3.0, r * 0.12), Color("#fff3c4"))
-
 ## 絵がまだない敵の仮の図形（+X が前、半径 1）。orb は円、diamond は菱形、hex は六角形、dart は矢じり、それ以外は四角。
 
 static func _placeholder_points(shape: StringName) -> PackedVector2Array:
