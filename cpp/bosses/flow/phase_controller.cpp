@@ -1,6 +1,7 @@
 #include "phase_controller.h"
 #include "../monoceros/body.h"
 #include "../centaurus/body.h"
+#include "../centaurus/reference_fx.h"
 #include "../centaurus/finish.h"
 #include "../canis_major/body.h"
 #include "../hydra/body.h"
@@ -152,6 +153,7 @@ godot::Array PhaseController::snapshot(const RunRuntime &r) {
     godot::Array out;for (const auto &b:r.state.bosses.bodies) {godot::Dictionary p;p["id"]=b.id;p["definition"]=b.definition;p["actor"]=r.state.enemy_handles.entity_id(b.actor);p["mode"]=int(b.mode);p["phase"]=b.phase;p["pending"]=b.phase_pending;p["clock"]=b.clock;p["initial_wait"]=b.initial_wait;p["phase_remaining"]=b.phase_remaining;p["final_elapsed"]=b.final_elapsed;p["final_landed"]=b.final_landed;p["final_to"]=b.final_to;p["final_width"]=b.final_width;p["final_warning"]=b.final_elapsed<b.final_charge-r.content->boss_bodies[b.definition-1].final_widen_time;p["final_clock"]=r.state.time;p["final_alpha"]=r.state.phase==godot::RunState::Phase::Play?1.0:r.state.phase==godot::RunState::Phase::Dying?std::max(0.0,1.0-r.state.sequence_t/std::max(0.01,r.state.death_freeze)):0.0;p["boss_spawned"]=r.state.world.boss_spawned;p["boss_dead"]=r.state.boss_dead;
         const auto &definition=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1];p["kind"]=int(definition.kind);if (definition.kind==4) DracoBody::snapshot(r,b,p);if (definition.kind==3) HydraBody::snapshot(r,b,p);if (definition.kind==2) {CanisMajorBody::snapshot(r,b,p);p["flames"]=CanisFlames::snapshot(r,b);p["lunges"]=CanisHoundLunge::snapshot(r,b);}p["phase_progress"]=b.phase>=2?(b.mode==BossMode::Phase?1.0-b.phase_remaining/std::max(0.001,r.content->boss_bodies[b.definition-1].phase_time):1.0):0.0;
         godot::Array image_parts;for (const auto &part:b.image_parts) {godot::Dictionary v;v["part"]=part.part;v["region"]=part.region;v["pixel_to_world"]=part.pixel_to_world;v["visible"]=part.visible;image_parts.push_back(v);}p["image_parts"]=image_parts;
+        if (definition.kind==1) p["reference_fx"]=CentaurusReferenceFx::snapshot(b);
         godot::Array sword_slashes;for (const auto &slash:b.monoceros_slashes) {godot::Dictionary v;v["from"]=slash.from;v["to"]=slash.to;v["width"]=slash.width;v["started"]=slash.started;v["seed"]=slash.seed;sword_slashes.push_back(v);}p["sword_slashes"]=sword_slashes;
         godot::Array sweep_visuals;for (const auto &visual:b.monoceros_sweeps) {
             godot::Dictionary item;item["started"]=visual.started;item["duration"]=visual.duration;godot::Array points,motes;

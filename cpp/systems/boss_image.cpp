@@ -1,6 +1,7 @@
 #include "boss_image.h"
 #include "../runtime/run_runtime.h"
 #include "../bosses/centaurus/image_pose_system.h"
+#include "../bosses/centaurus/reference_fx.h"
 #include "../bosses/canis_major/image_pose.h"
 #include "../bosses/canis_major/roar.h"
 #include "../bosses/monoceros/image_pose_system.h"
@@ -30,12 +31,13 @@ bool solid(const ContentBundle &content,const BossBodyState &body,godot::Vector2
 }
 void BossImageSystem::refresh(RunRuntime &r) {
     for (auto &body:r.state.bosses.bodies) {
+        if (!r.state.enemy_handles.contains(body.actor) || r.state.enemies[body.actor.slot].dead) {body.image_parts.clear();continue;}
         if (!body.definition || body.definition>r.content->boss_bodies.size()) continue;
         const auto boss=r.content->boss_bodies[body.definition-1].boss;
         if (!boss || boss>r.content->bosses.size()) continue;
         switch (r.content->bosses[boss-1].kind) {
         case 0:MonocerosImagePoseSystem::refresh(r,body);break;
-        case 1:CentaurusImagePoseSystem::refresh(r,body);break;
+        case 1:CentaurusImagePoseSystem::refresh(r,body);CentaurusReferenceFx::update(r,body);break;
         case 2:CanisImagePose::update(r,body);CanisRoar::update(r,body);break;
         default:break;
         }
