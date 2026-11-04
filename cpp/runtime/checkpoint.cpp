@@ -235,6 +235,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
         if (const auto *wall=std::get_if<WallHazard>(&hazard.shape)) {
+            if (wall->trail_visual_owner<0 || (wall->trail_visual_owner==0 && wall->trail_visual_side!=0) || (wall->trail_visual_owner>0 && wall->trail_visual_side!=1 && wall->trail_visual_side!=-1)) return false;
             if (!wall->definition || wall->definition>content.walls.size() || wall->style>=uint32_t(WallStyle::Count) ||
                 !std::isfinite(wall->angle) || !std::isfinite(wall->length) || wall->length<0 || !std::isfinite(wall->half_width) || wall->half_width<0) return false;
         }

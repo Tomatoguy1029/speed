@@ -2,6 +2,7 @@
 #include "../../systems/enemy_motion.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_budget.h"
+#include "../../systems/attack_system.h"
 #include "../../systems/attacks/wall.h"
 namespace speed {
 void AurigaBehavior::step(RunRuntime &r,uint32_t row,double dt) {
@@ -13,6 +14,6 @@ void AurigaBehavior::step(RunRuntime &r,uint32_t row,double dt) {
         if (!budget.request({owner,{AttackCategory::Residue},handle,0.3,e.attack_priority,s.world.attack_formation_mode?e.attack_value:d.attack_weight})) return;
     }
     e.fire_t=p.trail_step;const auto segment=e.vel*p.trail_step;const auto side=godot::Vector2::from_angle(e.facing+godot::Math::PI/2.0)*p.wheel_gap;
-    for (double sign:{-1.0,1.0}) {WallParams wall;wall.position=e.pos-segment+side*sign;wall.angle=segment.angle();wall.length=segment.length();wall.half_width=p.trail_width*0.5;wall.active=p.trail_time;wall.damage=p.damage;wall.color=godot::Color::html("ff8a3c");if (e.attack_managed) wall.budget.value=budget.token(owner);WallSystem::emit(r,wall);}
+    for (double sign:{-1.0,1.0}) {WallParams wall;wall.position=e.pos-segment+side*sign;wall.angle=segment.angle();wall.length=segment.length();wall.half_width=p.trail_width*0.5;wall.active=p.trail_time;wall.damage=p.damage;wall.color=godot::Color::html("ff8a3c");if (e.attack_managed) wall.budget.value=budget.token(owner);const auto attack=WallSystem::emit(r,wall);if (const auto *record=AttackSystem::get(s,attack)) {auto &visual=std::get<WallHazard>(s.hazards[record->row].shape);visual.trail_visual_owner=e.id;visual.trail_visual_side=int8_t(sign);}}
 }
 }

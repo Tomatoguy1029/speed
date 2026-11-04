@@ -273,6 +273,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (const auto *record=AttackSystem::get(state,ruler_state.beam)) {const auto &hazard=state.hazards[record->row];fx["pos"]=hazard.pos;fx["order"]=record->id;fx["time"]=double(hazard.time);fx["active"]=double(hazard.duration);}
         ruler_fx.push_back(fx);
     }
+    Array auriga_trails;
+    for (const auto &h:state.hazards) {const auto *wall=std::get_if<WallHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
+        if (!h.alive || !wall || !record || wall->trail_visual_owner<=0) continue;
+        Dictionary fx;fx["owner_id"]=wall->trail_visual_owner;fx["side"]=wall->trail_visual_side;fx["order"]=record->id;fx["from"]=h.pos;fx["to"]=h.pos+Vector2::from_angle(wall->angle)*wall->length;fx["width"]=double(wall->half_width)*2;fx["age"]=double(h.time);fx["life"]=double(h.duration);auriga_trails.push_back(fx);
+    }
     PackedFloat64Array triangle_star;
     for (const auto &h:state.hazards) {const auto *w=std::get_if<WallHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
         if (!h.alive || !w || w->style!=uint32_t(WallStyle::Trail) || !record || !state.enemy_handles.contains(record->spec.owner.live_source)) continue;
@@ -398,7 +403,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
-    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;
+    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;out["auriga_trails"]=auriga_trails;
     out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];

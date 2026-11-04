@@ -78,6 +78,7 @@ void WallSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const double k=std::clamp(double(h.time)/std::max(0.001,double(h.delay)),0.0,1.0),left=double(h.delay)+h.duration-h.time;
     Color col=w->style==uint32_t(WallStyle::Lightning)?Color::html("e1f7ff"):h.color;
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    if (w->trail_visual_owner>0) shape["reference_auriga"]=true;
     const auto source=record->spec.owner.source_definition;
     if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Ruler) shape["reference_ruler"]=true;
     PackedVector2Array points;PackedInt32Array offsets;PackedFloat32Array widths;PackedColorArray colors;offsets.push_back(0);
