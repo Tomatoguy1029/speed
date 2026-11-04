@@ -187,6 +187,9 @@ struct CanisRingMember {EnemyHandle actor;double angle=0;};
 struct CanisBurningHound {EnemyHandle actor;int64_t observation_id=0,effect_id=0;godot::Vector2 observation_pos;uint32_t definition=0,technique=0;double base_hp=0,age=0,blink_age=-1;godot::Color color;};
 struct CanisBodyState {
     CanisImagePoseClock image_pose;
+    int64_t roar_last_technique=0,roar_serial=0;
+    uint32_t roar_definition=0;
+    double roar_started=-1;
     TechniqueHandle nova;
     std::vector<CanisBurningHound> burning;
     std::vector<CanisRingMember> ring;
