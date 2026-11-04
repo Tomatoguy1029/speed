@@ -53,6 +53,7 @@ struct MonocerosDanceState {
     double elapsed=0,angle=0,glow=0,run_speed=0,travel=0,traveled=0,heading=0,speed=0;
     uint32_t completed=0;
 };
+struct MonocerosSlashVisual {godot::Vector2 from,to;double width=0,started=0;uint32_t seed=0;};
 struct MonocerosSwordState {
     enum class Stage : uint8_t { Aim,Swing,Gap,Return };
     Stage stage=Stage::Aim;
@@ -298,6 +299,7 @@ struct BossBodyState {
     DracoBodyState draco;
     CanisBodyState canis;
     CentaurusBodyState centaurus;
+    std::vector<MonocerosSlashVisual> monoceros_slashes;
     std::vector<ParticipantState> participants;
     int64_t id=0;
     uint32_t definition=0,phase=1;

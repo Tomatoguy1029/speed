@@ -3,6 +3,7 @@ extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
+const REFERENCE_SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
 const HORN_LIGHT_SHADER := preload("res://shaders/monoceros_horn_light.gdshader")
 @export var pixel_size := 3.0
 @export var booster_length_scale := 1.0
@@ -277,6 +278,9 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
 	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
 	_draw_charge_tell(canvas, move)
+	var slash_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sword_flash")
+	for slash: Dictionary in state.get("sword_slashes",[]):
+		REFERENCE_SLASH.draw(canvas,slash.from,slash.to,float(slash.width),float(state.clock)-float(slash.started),0.6,float(slash.seed),slash_values)
 	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
 	var overlap := Vector2.from_angle(_tail_facing) * (24.0 * float(state.radius) / 96.0)
 	var anchor := to_local(nozzle.to_global(Vector2(37, 0)) + overlap)
