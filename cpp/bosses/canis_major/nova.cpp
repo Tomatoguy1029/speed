@@ -84,5 +84,11 @@ godot::Dictionary CanisNova::snapshot(const RunRuntime &r,const TechniqueState &
     godot::Array pairs;for (const auto &m:v.pairs) {godot::Dictionary q;q["actor"]=r.state.enemy_handles.entity_id(m.actor);q["group"]=m.group;q["angle"]=m.angle;q["side"]=m.side;q["stationed"]=m.stationed;q["position"]=live(r,m.actor)?r.state.enemies[m.actor.slot].pos:godot::Vector2();pairs.push_back(q);}out["pairs"]=pairs;
     return out;
 }
+godot::Vector2 CanisNova::image_head_pose(const RunRuntime &r,const BossBodyState &b) {
+    if (!r.state.bosses.handles.contains(b.canis.nova)) return {42,0};
+    const auto &t=r.state.bosses.techniques[b.canis.nova.slot];
+    const auto pose=head_pose(*r.content,b.clock-std::get<CanisNovaState>(t.detail).started);
+    return godot::Vector2(pose.y,pose.rotation);
+}
 void CanisNova::body_snapshot(const RunRuntime &r,const BossBodyState &b,godot::Dictionary &out) {out["nova"]=r.state.bosses.handles.contains(b.canis.nova)?snapshot(r,r.state.bosses.techniques[b.canis.nova.slot]):godot::Dictionary();}
 }

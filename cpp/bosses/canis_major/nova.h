@@ -14,5 +14,6 @@ namespace speed {class CanisNova {public:
     static void clear(RunRuntime &,BossBodyState &);
     static bool tinted(const RunRuntime &,const BossBodyState &,EnemyHandle);
     static bool validate_body(const godot::RunState &,const ContentBundle &,const BossBodyState &);
+    static godot::Vector2 image_head_pose(const RunRuntime &,const BossBodyState &);
     static void body_snapshot(const RunRuntime &,const BossBodyState &,godot::Dictionary &);
 };}

@@ -120,6 +120,16 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	if not nova.is_empty():
 		parts.get_node("Head").position = Vector2(0,float(nova.head_y))
 		parts.get_node("Head").rotation = float(nova.head_rotation)
+	var image_pose: Array = body.get("image_pose",[])
+	if image_pose.size()==7:
+		parts.scale = Vector2.ONE*k
+		var names := ["Tail","RearLeftLeg","RearRightLeg","FrontLeftLeg","FrontRightLeg","Body","Head"]
+		for i in names.size():
+			var node := parts.get_node(names[i]) as Node2D
+			var pose: Dictionary = image_pose[i]
+			node.position = pose.position
+			node.rotation = pose.rotation
+			node.scale = pose.scale
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
 	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,float(attack.get("glow",body.charge)) if int(attack.get("stage",5)) in [0,1] else float(body.charge),pulse)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
