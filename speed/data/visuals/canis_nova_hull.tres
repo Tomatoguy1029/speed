@@ -1,0 +1,9 @@
+[gd_resource type="Resource" format=3]
+
+[resource]
+metadata/bake_version = 1
+metadata/inputs = {"res://assets/pixel/hound/armor.png": "aa685e951ca924f507688ad436001f2cab72920114cad9c52a7cf4d30adb6b25", "res://assets/pixel/hound/armor.png.import": "e85c469ded8cd5f3a86bbf75c2b58f0a1186a1fceec2b73e2bf67ba8a9c87ec9", "res://assets/pixel/hound/base.png": "f7c946dd9ae4fb4e2f24402f0101b1a3bc67ec1b7ac944faf2cbe7b8668ef642", "res://assets/pixel/hound/base.png.import": "e474c112a693d751587ce6ab8ec51f2050c12a30c26f70cf0d86f05bb311e1da", "res://data/visuals/looks/hound.tres": "c98a2821013ab93d10a498b8cd835906e71848fde90ce86e2b0c2c9f3780e75a", "res://tools/art/bake_canis_fx.py": "2d0707a7dd9acdfc28787779241a9f4209afb2cc636ee6ae556ee0abcc294c6c"}
+metadata/source_width = 20
+metadata/source_height = 38
+metadata/hull = PackedVector2Array(-8, 4, -7, -7, -2, -16, 0, -15, 2, -13, 7, -3, 7, 7, 6, 11, 1, 17, 0, 18, -2, 16, -7, 10, -8, 5)
+metadata/hull_sha256 = "39c4839508361accd678b4b63f9c1086ad31f334f2d5e68516b4c57220c2756d"
