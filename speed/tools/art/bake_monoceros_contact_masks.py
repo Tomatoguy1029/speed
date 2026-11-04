@@ -28,8 +28,13 @@ def bake():
         resource = 'res://' + SOURCE + name
         inputs[resource] = sha(path)
         image = Image.open(path).convert('RGBA')
+        alpha = image.getchannel('A').tobytes()
+        # 角以外は不透明か透明。角は単一Spriteなので閾値以下の半透明も合成で増えない。
+        allowed = (lambda value: value in (0, 255)) if name != 'horn/horn.png' else (lambda value: value <= THRESHOLD or value == 255)
+        if any(not allowed(value) for value in alpha):
+            raise ValueError('半透明の合成を再評価してください: ' + resource)
         bits = bytearray((image.width * image.height + 7) // 8)
-        for index, value in enumerate(image.getchannel('A').tobytes()):
+        for index, value in enumerate(alpha):
             if value > THRESHOLD:
                 bits[index // 8] |= 1 << (index % 8)
         entries.append('"%s": {"width": %d, "height": %d, "bits": PackedByteArray(%s)}' %
