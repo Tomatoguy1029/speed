@@ -159,3 +159,40 @@ static func beam(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
 	painter.glow_line(start.x, start.y, end.x, end.y, width * 2.6 + 3, palette[2], 0.35 * alpha * float(options.get("intensity", 1)))
 	if bool(options.get("source", true)) and d0 <= 0:
 		flare(painter, a, width * 1.3, options.color, time, alpha)
+
+## 三日月の両端を head / tail で切り、残光を色段階のまま冷ます。
+static func crescent(painter, center: Vector2, radius: float, from_angle: float, to_angle: float, head: float, tail: float, thickness: float, color: Color, alpha := 1.0) -> void:
+	var palette := ramp(color)
+	var span := to_angle - from_angle
+	var steps := maxf(8, absf(span) * radius * 1.4)
+	var step := 0
+	while step <= steps:
+		var progress := step / steps
+		if progress <= head and progress >= tail:
+			var angle := from_angle + span * progress
+			var age := (head - progress) / maxf(0.001, head - tail + 0.001)
+			var width := thickness * (0.35 + 0.65 * sin(PI * minf(1, progress * 1.05))) * (1 - 0.6 * age)
+			var q := -width
+			while q <= width:
+				var r := radius + q
+				var x := center.x + cos(angle) * r
+				var y := center.y + sin(angle) * r
+				var edge := absf(q) / maxf(width, 0.01)
+				var level := 4
+				if age >= 0.7:
+					level = 2 if edge < 0.4 else 1
+				elif age >= 0.35:
+					level = 3 if edge < 0.4 else 2
+				elif age >= 0.12:
+					level = 4 if edge < 0.5 else 3
+				var amount := alpha * (1 - age * 0.55)
+				level = maxi(0, level - floori((1 - amount) * 3.2))
+				if level < palette.size():
+					if amount > 0.18 or edge < 0.5:
+						painter.px(x, y, palette[level])
+					else:
+						painter.dot(x, y, palette[level], amount * 3)
+				q += 0.5
+			if step % 3 == 0:
+				painter.light(center.x + cos(angle) * radius, center.y + sin(angle) * radius, palette[2], 0.3 * alpha * (1 - age))
+		step += 1
