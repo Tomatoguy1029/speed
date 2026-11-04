@@ -17,16 +17,12 @@ func _init() -> void:
 	var body := ShaderMaterial.new()
 	body.shader = BODY
 	material = body
-	z_index = 9
+	z_index = 19
 	_copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
-	_copy.z_as_relative = false
-	_copy.z_index = 11
 	add_child(_copy)
 	var light := ShaderMaterial.new()
 	light.shader = LIGHT
 	_light.material = light
-	_light.z_as_relative = false
-	_light.z_index = 11
 	add_child(_light)
 
 func update(row: Dictionary, canvas, clock: float, color: Color, pixel_size: float, opacity: float) -> void:
