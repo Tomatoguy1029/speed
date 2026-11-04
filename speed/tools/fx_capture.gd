@@ -10,6 +10,7 @@ var values := {}
 var checkpoints: Array[int] = []
 var observations: Array = []
 var intent := Intent.new()
+var observe_contacts := false
 
 func _ready() -> void:
 	get_window().set_flag(Window.FLAG_NO_FOCUS,true)
@@ -29,6 +30,7 @@ func _ready() -> void:
 		_fail("撮影用ライブラリとビルド情報が一致しません")
 		return
 	var index_path: String = spec.index
+	observe_contacts = bool(spec.get("observe_contacts",false))
 	var index = JSON.parse_string(FileAccess.get_file_as_string(index_path))
 	if not index is Dictionary or not index.get("input_sha256","") is String:
 		_fail("生成済みランの索引がありません")
@@ -116,6 +118,11 @@ func _present(camera: Dictionary, frame: int, images: Array) -> bool:
 	var center: Vector2 = render.view_override.center
 	render._present_cpp(0.0 if frame==0 else 1.0/60.0)
 	images.append({"file":"%06d.png" % frame,"tick":frame*2,"seconds":frame/60.0,"world_time":state.value.ui.world_time,"camera_center":[center.x,center.y]})
+	if observe_contacts:
+		var ship: Dictionary = state.value.ui.ship
+		images[-1]["ship"] = var_to_str(ship)
+		images[-1]["max_speed"] = state.value.ui.max_speed
+		images[-1]["boss_ram"] = var_to_str(render.frame_view._reference_render_frame.get("boss_ram",{}))
 	return true
 
 ## 撮影中はC++と表示の双方へ、同じ比較用カメラを各固定更新前に渡す。
