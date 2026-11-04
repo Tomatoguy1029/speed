@@ -3,6 +3,7 @@ extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
+const HORN_LIGHT_SHADER := preload("res://shaders/monoceros_horn_light.gdshader")
 @export var pixel_size := 3.0
 @export var booster_length_scale := 1.0
 @export var booster_core_color := Color("#e0fbff")
@@ -41,6 +42,9 @@ var _horn_lengths: PackedFloat32Array
 var _reference_canvas
 var _reference_boost
 var _reference_id := "I-charge"
+var _horn_visual := 0.0
+var _horn_overlay: Sprite2D
+var _armor_overlay: Sprite2D
 @onready var parts: PartsVisual = $Parts
 @onready var horn: Sprite2D = $Parts/Head/Lower/Horn
 
@@ -50,7 +54,28 @@ func _ready() -> void:
 	_reference_boost = REFERENCE_BOOST.new()
 	_reference_boost.z_index = -1
 	add_child(_reference_boost)
+	_horn_overlay = _make_light_overlay(horn)
+	_armor_overlay = _make_light_overlay(parts.get_node("Head/Lower/Sprite/head_gold_armor") as Sprite2D)
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
+
+func _make_light_overlay(source: Sprite2D) -> Sprite2D:
+	var light := Sprite2D.new()
+	light.texture = source.texture
+	light.centered = source.centered
+	light.offset = source.offset
+	light.flip_h = source.flip_h
+	light.flip_v = source.flip_v
+	light.hframes = source.hframes
+	light.vframes = source.vframes
+	light.frame = source.frame
+	light.region_enabled = source.region_enabled
+	light.region_rect = source.region_rect
+	var shader := ShaderMaterial.new()
+	shader.shader = HORN_LIGHT_SHADER
+	light.material = shader
+	light.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	source.add_child(light)
+	return light
 
 func frame_event(event: Dictionary) -> void:
 	if event.get("type",&"")==&"combat_damage":
@@ -67,8 +92,11 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, colors: Dictionary =
 		_head_facing = _body_facing
 		_tail_facing = _body_facing
 		_flame_facing = _body_facing
+		_horn_visual = 0.0
 	state = body
 	technique = attack
+	var move := String(attack.get("technique", ""))
+	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
 	appearance = colors
 	_world_clock = float(body.clock)
 	position = body.position
@@ -102,9 +130,11 @@ func _sync_parts(dt: float) -> void:
 	parts.apply_appearance(appearance)
 	# 角を使う全技で同じ光を絵に乗せ、首の振りと外観の位置補正へ追従させる。
 	var horn_glow := _horn_glow()
-	var horn_light := 1.0 + horn_glow * 3.0
-	var horn_tint := Color(horn_light, horn_light, horn_light)
-	parts.get_node("Head/Lower/Sprite/head_gold_armor").self_modulate = horn_tint
+	_horn_visual = horn_glow if horn_glow > _horn_visual else maxf(horn_glow, _horn_visual-dt/0.22)
+	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
+	var brightness := _horn_visual * (float(values.hornBright) if int(state.phase) > 1 else 1.0) * 0.65
+	(_horn_overlay.material as ShaderMaterial).set_shader_parameter("strength", brightness)
+	(_armor_overlay.material as ShaderMaterial).set_shader_parameter("strength", brightness)
 	_update_turn(dt)
 	# 胴体中心を固定して見た目だけ遅らせる。移動・判定・予告線は役者の方向を使う。
 	parts.rotation = -PI * 0.5 + angle_difference(float(state.facing), _body_facing)
@@ -132,7 +162,7 @@ func _sync_parts(dt: float) -> void:
 		foot.position.y = float(_leg_rest[path])
 	_kick_pose()
 	_charge_pose()
-	_sync_horn(dt, k, horn_tint)
+	_sync_horn(dt, k)
 
 ## 突進の構えと発進は本体と足の見た目だけを動かす。
 func _charge_pose() -> void:
@@ -174,7 +204,7 @@ func _kick_pose() -> void:
 			foot.position.y = lerpf(lerpf(KICK_FOLD,rest,extend),rest,back)
 			leg.scale.y = lerpf(lerpf(1.0,maxf(1.0,toward.length()/natural),extend),1.0,back)
 
-func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
+func _sync_horn(_dt: float, body_scale: float) -> void:
 	var progress: float = state.phase_progress
 	horn.frame = 0
 	if state.phase>=2:
@@ -186,7 +216,10 @@ func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
 	var root := to_local(horn.global_position)
 	var axis := (to_local(horn.to_global(Vector2.DOWN))-root).normalized()
 	horn.scale.y = maxf(1.0,float(state.horn_length)-root.dot(axis))/(body_scale*_horn_lengths[horn.frame])
-	horn.self_modulate = tint
+	_horn_overlay.texture = horn.texture
+	_horn_overlay.hframes = horn.hframes
+	_horn_overlay.vframes = horn.vframes
+	_horn_overlay.frame = horn.frame
 	var source := parts.get_node("Head/Lower/Sprite/head_gold_armor").material as ShaderMaterial
 	for key in ["painted","paint"]: (horn.material as ShaderMaterial).set_shader_parameter(key,source.get_shader_parameter(key))
 
