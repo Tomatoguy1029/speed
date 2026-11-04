@@ -19,7 +19,6 @@ public:
     static void clear_landings(RunRuntime &);
     static void knock_back(RunRuntime &,EnemyHandle);
     static void normal_contact(RunRuntime &,EnemyHandle,godot::Vector2 impact);
-    static bool white_feedback(const RunRuntime &);
     static bool resolve(RunRuntime &,godot::Vector2 from,godot::Vector2 to,double ship_radius);
 };
 }

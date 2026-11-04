@@ -1,4 +1,5 @@
 #include "boss_contact.h"
+#include "boss_contact_feedback.h"
 #include "combat_resolver.h"
 #include "collision_query.h"
 #include "motion_math.h"
@@ -83,7 +84,7 @@ void BossContactSystem::normal_contact(RunRuntime &r,EnemyHandle actor,godot::Ve
     CombatResolver::ship_damage(r,request);EventBuilder::flush_combat(r);
     push(r,actor,impact,impact);
 }
-bool BossContactSystem::white_feedback(const RunRuntime &r) {
+bool boss_contact_white(const RunRuntime &r) {
     const auto &s=r.state;
     if (s.ship.hurt<=0 || !s.lifecycle.has_damage || !s.lifecycle.last_damage.accepted) return false;
     // 既存の被弾記録を読むため、保持復帰でも白色化の種類を維持する。
