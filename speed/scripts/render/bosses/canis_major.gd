@@ -4,6 +4,7 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 const POUNCE_MOTION := preload("res://scripts/render/bosses/canis_motion.gd")
 const LANDING_DUST := preload("res://scripts/render/bosses/canis_landing.gd")
 const NOVA_DISPLAY := preload("res://scripts/render/bosses/canis_nova.gd")
+const BURST_DISPLAY := preload("res://scripts/render/bosses/canis_burst.gd")
 const NOVA_OVERLAY := preload("res://scripts/render/bosses/canis_nova_overlay.gd")
 const FX_SETTINGS := preload("res://data/visuals/fx_reference.tres")
 @export var pixel_size := 3.0
@@ -26,6 +27,7 @@ var _land_feet: Array = []
 var _reference_canvas
 var _nova_params := {}
 var _nova_overlay
+var _burst_overlay
 @onready var parts: Node2D = $Parts
 func _ready() -> void:
 	EFFECT_SETTINGS.apply_key(self,"boss/body/canis_major")
@@ -40,6 +42,8 @@ func setup_flames(scope: ContentResourceScope, assets: Dictionary) -> void:
 func clear_flames() -> void:
 	if flames!=null: flames.clear()
 func frame_event(event: Dictionary) -> void:
+	if event.get("type",&"")==&"canis_cue" and event.get("cue","")=="blaze_explode" and is_instance_valid(_burst_overlay):
+		_burst_overlay.start(event.position,float(event.radius),float(event.world_time)-float(event.get("age",0.0)))
 	if event.get("type",&"")==&"canis_cue" and event.get("cue","")=="landing":
 		_land_clock = float(event.world_time)
 		_land_facing = float(event.angle)
@@ -141,12 +145,16 @@ func setup_reference_overlay(parent: Node2D) -> void:
 	if is_instance_valid(_nova_overlay): return
 	_nova_overlay = NOVA_OVERLAY.new()
 	parent.add_child(_nova_overlay)
+	_burst_overlay = BURST_DISPLAY.new()
+	parent.add_child(_burst_overlay)
 
 func _exit_tree() -> void:
 	if is_instance_valid(_nova_overlay): _nova_overlay.queue_free()
+	if is_instance_valid(_burst_overlay): _burst_overlay.queue_free()
 
 func draw_reference(canvas, _real_dt: float) -> void:
 	if canvas!=_reference_canvas or state.is_empty(): return
+	if is_instance_valid(_burst_overlay): _burst_overlay.apply_clock(float(state.clock))
 	if _land_clock>=0.0: LANDING_DUST.draw(canvas,_land_feet,_land_facing,float(state.clock)-_land_clock)
 	if not _nova.is_empty():
 		NOVA_DISPLAY.draw_field(canvas,_nova,_nova_params)
