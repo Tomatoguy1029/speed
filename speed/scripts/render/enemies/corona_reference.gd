@@ -76,7 +76,7 @@ func _draw_thrown(row: Dictionary, canvas, clock: float) -> void:
 	var d := 0.0
 	while d <= trail:
 		var q := d/maxf(trail,1.0)
-		var heat := 1.0-pow(d/maxf(trail,1.0),0.8)+_noise._noise(d*0.12-clock*40.0,3,int(float(row.seed_angle)*9))*0.12
+		var heat: float = 1.0-pow(d/maxf(trail,1.0),0.8)+_noise._noise(d*0.12-clock*40.0,3,int(float(row.seed_angle)*9))*0.12
 		var width := (0.6+2.6*pow(1.0-minf(1.0,q/0.35),1.4))*(1.0 if q<0.35 else 0.5)
 		var point := center-direction*d
 		if q <= 0.55 or FX.hash_value(floorf(d/3.0)*7.1+frame) >= (q-0.55)*1.6:
