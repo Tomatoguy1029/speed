@@ -52,7 +52,7 @@ parameters = {
     "cutT": 0.09,
     "space0": 0.05,
     "space1": 0.1,
-    "gap": 0.3
+    "gap": 0.1
   },
   "G12-cross": {
     "color": "#ffd27a",
