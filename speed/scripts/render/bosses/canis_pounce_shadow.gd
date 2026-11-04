@@ -23,8 +23,9 @@ func setup(source_parts: Node2D) -> void:
 	for name: String in NAMES:
 		var source_node := source_parts.get_node(name) as Node2D
 		var source := source_node.get_node("Sprite") as Sprite2D
-		var key := source.texture.get_instance_id()
-		if not _images.has(key): _images[key] = _make_image(source.texture)
+		var texture: Texture2D = (source.texture as CanvasTexture).diffuse_texture if source.texture is CanvasTexture else source.texture
+		var key := texture.get_instance_id()
+		if not _images.has(key): _images[key] = _make_image(texture)
 		var image: BlurImage = _images[key]
 		var part := Node2D.new()
 		part.position = source_node.position
