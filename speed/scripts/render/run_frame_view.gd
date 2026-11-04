@@ -994,7 +994,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			if value.actor==body.actor and value.stage<5: attack = value; break
 		var display: Node2D = _boss_body_displays[body.id]
 		var move := String(attack.get("technique",""))
-		if display.get_meta("visual_move",null)!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
+		if display.get_meta("visual_move", "")!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
 			EFFECT_SETTINGS.apply_body(display,["monoceros","centaurus","canis_major","hydra","draco"][body.kind],move)
 			display.set_meta("visual_move",move)
 			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
