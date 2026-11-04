@@ -83,6 +83,15 @@ void BossContactSystem::normal_contact(RunRuntime &r,EnemyHandle actor,godot::Ve
     CombatResolver::ship_damage(r,request);EventBuilder::flush_combat(r);
     push(r,actor,impact,impact);
 }
+bool BossContactSystem::white_feedback(const RunRuntime &r) {
+    const auto &s=r.state;
+    if (s.ship.hurt<=0 || !s.lifecycle.has_damage || !s.lifecycle.last_damage.accepted) return false;
+    // 既存の被弾記録を読むため、保持復帰でも白色化の種類を維持する。
+    switch (s.lifecycle.last_request.cause) {
+    case Cause::Touch:case Cause::Horn:case Cause::Stomp:case Cause::RearAttack:case Cause::Pounce:return true;
+    default:return false;
+    }
+}
 bool BossContactSystem::resolve(RunRuntime &r,godot::Vector2 from,godot::Vector2 to,double ship_radius) {
     const ShipMotion motion{from,to,ship_radius};
     for (auto &entry:r.state.boss_landings) {

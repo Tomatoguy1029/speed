@@ -3,6 +3,7 @@
 #include "../bosses/hydra/body.h"
 #include "../behaviors/weapons/massTow.h"
 #include "render_builder.h"
+#include "../systems/boss_contact.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/phase_controller.h"
 #include "../behaviors/enemies/crow.h"
@@ -414,6 +415,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const auto at=ship-state.ship.heading*std::max(forward_recoil,scatter_recoil);
     const Transform2D transform(angle+godot::Math::PI/2.0,Vector2(config.character_scale,config.character_scale),0,at);
     int32_t visual_state=state.ship.hurt>0?1:0;
+    if (BossContactSystem::white_feedback(run)) visual_state|=4;
     if (state.ship.invuln>0 && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
     for (const auto visual:{config.cannon_visual,config.ship_visual}) {
         Dictionary pose;pose["participant_id"]=0;pose["part_key"]=visual;pose["transform"]=transform;
