@@ -6,44 +6,32 @@ const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 const LIGHTNING := preload("res://scripts/render/enemies/aquila_lightning.gd")
 const JET := preload("res://scripts/render/enemies/aquarius_jet.gd")
 const EDGES := preload("res://assets/effects/reference/edges.tres")
-const WHITE := preload("res://shaders/cepheus_summon_white.gdshader")
 const FLICK := [1.0,0.72,0.3,0.95,0.5,0.8,0.22]
 var _settings: Dictionary = SETTINGS.for_id("G12-aquila")
 var _light = LIGHTNING.new()
 var _noise = JET.new()
 var _edges: Dictionary = EDGES.get_meta("edges")
-var _parent: Node2D
 var _scope: ContentResourceScope
 var _visuals: Dictionary
-var _flashes := {}
 var _zones := {}
 var _last_time := -1.0
 
-func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> void:
-	_parent = parent
+func setup(_parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> void:
 	_scope = scope
 	_visuals = visuals
 
 func render(actors: Array, zones: Array, events: Array, canvas, clock: float) -> void:
 	if _last_time >= 0.0 and clock < _last_time:
 		_zones.clear()
-		for sprite: Sprite2D in _flashes.values(): sprite.queue_free()
-		_flashes.clear()
 	_last_time = clock
 	var colors: Array[Color] = _light.palette(Color(_settings.color))
-	var visible := {}
 	for actor: Dictionary in actors:
 		if not bool(actor.enabled): continue
-		visible[int(actor.id)] = true
 		var mode := int(actor.mode)
 		var k := 0.6+0.4*float(actor.charge) if mode==1 else 1.0
 		if mode==1 and float(actor.charge)>0.0: _aim(actor,canvas,clock,colors)
 		_wake(actor.trace,canvas,clock,colors,1.0 if mode==2 or mode==3 else 0.5)
 		_electrify(actor,canvas,clock,colors,k)
-	for id in _flashes.keys():
-		if not visible.has(id):
-			_flashes[id].queue_free()
-			_flashes.erase(id)
 	var present := {}
 	for row: Dictionary in zones:
 		var id := int(row.order)
@@ -195,7 +183,6 @@ func _wake(history: Array, canvas, clock: float, colors: Array[Color], strength:
 			_light.ink(canvas.back,_light.zigzag(rng,a,b,0.45,0.3),0.6*strength,colors,1,true,0.3)
 
 func _electrify(row: Dictionary, canvas, clock: float, colors: Array[Color], strength: float) -> void:
-	var id := int(row.id)
 	var visual_id := int(row.visual_id)
 	if not _visuals.has(visual_id): return
 	var entry: Dictionary = _visuals[visual_id]
@@ -210,8 +197,6 @@ func _electrify(row: Dictionary, canvas, clock: float, colors: Array[Color], str
 	var center: Vector2 = canvas.to_logical(row.pos)
 	var frame := floori(clock*30.0)
 	var jolt := frame%20<3
-	if jolt: _flash(row,look,entry,(0.7-float(frame%20)*0.2)*strength)
-	elif _flashes.has(id): _flashes[id].hide()
 	var rng = JET.Rng.new((frame>>1)*7+3)
 	var extra := 3 if jolt else floori(rng.between(0,2))
 	var count := roundi((2+extra)*strength)
@@ -246,24 +231,3 @@ func _electrify(row: Dictionary, canvas, clock: float, colors: Array[Color], str
 func _edge(row: Dictionary, point: Vector2, angle: float, scale: float, canvas) -> Vector2:
 	return canvas.to_logical(row.pos+point.rotated(angle)*scale)
 
-func _flash(row: Dictionary, look: EnemyLook, entry: Dictionary, alpha: float) -> void:
-	var preview: String = entry.get("hull_preview","")
-	if not look.previews.has(preview): return
-	var texture := look.previews[preview] as Texture2D
-	if texture==null: return
-	var id := int(row.id)
-	if not _flashes.has(id):
-		var sprite := Sprite2D.new()
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		var mat := ShaderMaterial.new()
-		mat.shader = WHITE
-		sprite.material = mat
-		_parent.add_child(sprite)
-		_flashes[id] = sprite
-	var sprite: Sprite2D = _flashes[id]
-	sprite.texture = texture
-	sprite.position = row.pos
-	sprite.rotation = look.angle if look.fixed_angle else look.angle+float(row.angle)
-	sprite.scale = Vector2.ONE*(2.0*float(row.sprite_radius)/maxf(texture.get_width(),texture.get_height()))
-	sprite.modulate = Color(1,1,1,alpha)
-	sprite.show()
