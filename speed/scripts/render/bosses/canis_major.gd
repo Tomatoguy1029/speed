@@ -154,12 +154,15 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, _appearance: Diction
 	var phase := 1.0-pow(1.0-clampf(float(body.phase_progress),0.0,1.0),3.0)
 	var glow := float(attack.get("glow",0.0))
 	var order_roar: bool = attack.get("technique","") in ["command","stream","howl","bay","relay","hunt","hunt_pounce"] and motion.is_empty() and not bool(attack.get("aiming",false))
+	var reference_nova: bool = attack.get("technique","")=="nova" or not nova.is_empty()
 	var charge := float(attack.get("glow",body.charge)) if int(attack.get("stage",5)) in [0,1] else float(body.charge)
-	if order_roar:
+	if order_roar or reference_nova:
+		if reference_nova: glow = float(nova.get("glow",0.0))
 		phase = 1.0 if int(body.phase)>1 else 0.0
 		charge = 0.0 if glow<=0.0 else maxf(float(body.charge),glow)
-	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,charge,pulse,order_roar)
+	parts.get_node("Head/Sirius").set_state(float(body.clock),phase,charge,pulse,order_roar or reference_nova)
 	modulate = Color(1.6,1.6,1.6) if hit>0.0 else Color.WHITE
+	_sync_reference_white()
 
 func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
@@ -183,11 +186,13 @@ func _create_reference_white() -> void:
 
 func _sync_reference_white() -> void:
 	if _white_material==null: return
-	_white_material.set_shader_parameter("strength",_reference_white)
+	var nova_white := NOVA_DISPLAY.flash(float(_nova.age)-float(_nova.warn))*0.10 if not _nova.is_empty() else 0.0
+	var strength := maxf(_reference_white,nova_white)
+	_white_material.set_shader_parameter("strength",strength)
 	for entry: Dictionary in _white_sprites:
 		var source: Sprite2D = entry.source
 		var overlay: Sprite2D = entry.overlay
-		overlay.visible = _reference_white>0.0 and source.texture!=null
+		overlay.visible = strength>0.0 and source.texture!=null
 		if not overlay.visible: continue
 		overlay.texture = source.texture
 		overlay.centered = source.centered

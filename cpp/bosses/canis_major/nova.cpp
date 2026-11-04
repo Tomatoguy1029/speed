@@ -45,18 +45,52 @@ bool CanisNova::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition)
 double CanisNova::attack_length(const RunRuntime &r,uint32_t) {const auto timing=times(*r.content);return std::max(timing.flash,timing.hound_start)+1.15+0.1;}
 void CanisNova::begin(RunRuntime &r,TechniqueState &t) {
     t.detail=CanisNovaState{};auto &v=std::get<CanisNovaState>(t.detail);auto &b=*PhaseController::find(r,t.actor);const auto &p=rule(*r.content,t.definition);v.started=b.clock;r.state.enemies[t.actor.slot].vel={};
-    auto rows=CanisSequence::shuffled(r,b);rows.erase(std::remove_if(rows.begin(),rows.end(),[&](auto h){return std::any_of(b.canis.lunging.begin(),b.canis.lunging.end(),[&](auto a){return same_handle(a,h);});}),rows.end());if (rows.size()>p.count) rows.resize(p.count);
-    const double base=(r.state.ship_pos-r.state.enemies[t.actor.slot].pos).angle()+(60+r.state.control.rng.randf_range(-17,17))*godot::Math::PI/180.0;
-    for (size_t k=0;k<rows.size();++k) {v.pairs.push_back({rows[k],uint32_t(k/2),base+(k/2)*godot::Math::TAU/3.0,k%2==0?1.0:-1.0,false});b.canis.lunging.push_back(rows[k]);}v.ring_hit.resize(p.rings,false);
+    auto rows=CanisSequence::shuffled(r,b);rows.erase(std::remove_if(rows.begin(),rows.end(),[&](auto h){return std::any_of(b.canis.lunging.begin(),b.canis.lunging.end(),[&](auto a){return same_handle(a,h);});}),rows.end());
+    const size_t groups=std::min(size_t(3),rows.size()/2);
+    const auto &fx=r.content->canis_nova_fx.front();const double dimension=std::max(fx.source_width,fx.source_height);
+    const auto hash=[](double n){const double x=std::sin(n*127.1+311.7)*43758.5453;return x-std::floor(x);};
+    struct WallMember {EnemyHandle actor;double depth,width,position;};
+    for (size_t group=0;group<groups;++group) {
+        const double angle=double(group)*godot::Math::TAU/double(groups)+(hash(group*7+3)-0.5)*0.5;
+        const auto axis=godot::Vector2::from_angle(angle).orthogonal();std::vector<WallMember> members;
+        for (size_t k=group;k<rows.size();k+=groups) {
+            const auto actor=rows[k];const auto &e=r.state.enemies[actor.slot];const auto &definition=r.content->definitions[e.definition];const size_t i=members.size();
+            const double scale=2.0*e.radius*definition.sprite_scale/dimension,turn=angle+godot::Math::PI/2.0+definition.sprite_angle;
+            double lo=std::numeric_limits<double>::infinity(),hi=-lo;
+            for (const auto &point:r.content->canis_nova_hull) {const auto rotated=godot::Vector2(point.x,point.y).rotated(turn);const double lateral=rotated.dot(axis)*scale;lo=std::min(lo,lateral);hi=std::max(hi,lateral);}
+            const double depth=std::max(double(r.state.enemies[t.actor.slot].radius)*1.5,p.pair_dist)+(i%2?e.radius*1.1:0)+e.radius*(hash(i+group*9)-0.5)*1.2;
+            members.push_back({actor,depth,hi-lo,0});
+        }
+        for (size_t i=1;i<members.size();++i) {
+            const double before=std::atan2(members[i-1].width*0.5,members[i-1].depth),next=std::atan2(members[i].width*0.5,members[i].depth);
+            members[i].position=members[i-1].position+(before+next)*0.5*(0.8+0.12*hash(i*5+group*3));
+        }
+        const double center=(members.front().position+members.back().position)*0.5;
+        for (const auto &m:members) {v.pairs.push_back({m.actor,uint32_t(group),angle+m.position-center,m.depth,false});b.canis.lunging.push_back(m.actor);}
+    }
+    v.ring_hit.resize(p.rings,false);
     drop_effect(r,b);b.canis.nova=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));++t.ticket_refs;CanisTechnique::cue(r,t,"nova_windup");
 }
 void CanisNova::step(RunRuntime &r,TechniqueState &t,double dt) {auto *b=PhaseController::find(r,t.actor);if (!b) {t.stage=TechniqueStage::Failed;return;}r.state.enemies[t.actor.slot].vel={};if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}const auto &v=std::get<CanisNovaState>(t.detail);const auto &base=r.content->boss_techniques[t.definition-1];const auto timing=times(*r.content);if (b->clock-v.started>=std::max(timing.flash,timing.hound_start)+1.15) {release_pairs(r,t,*b);t.stage=TechniqueStage::Recovery;t.remaining=base.recover;t.locked=false;CanisTechnique::cue(r,t,"recovery_started");}}
 void CanisNova::cancel(RunRuntime &r,TechniqueState &t) {if (auto *b=PhaseController::find(r,t.actor)) {release_pairs(r,t,*b);if (r.state.bosses.handles.contains(b->canis.nova) && r.state.bosses.techniques[b->canis.nova.slot].id==t.id) drop_effect(r,*b);}}
 void CanisNova::effect_tick(RunRuntime &r,BossBodyState &b,double dt) {
     if (!r.state.bosses.handles.contains(b.canis.nova)) return;auto &t=r.state.bosses.techniques[b.canis.nova.slot];auto &v=std::get<CanisNovaState>(t.detail);const auto &p=rule(*r.content,t.definition);const auto &body=r.state.enemies[t.actor.slot];const double age=b.clock-v.started;const auto timing=times(*r.content);const auto source=mouth(r,t.actor,age);
-    const HoundSteering config{p.arrive,p.decel,p.face_turn,p.turn_slow,p.turn_fast,p.turn_switch,p.gather_speed,p.accel};
-    for (auto &m:v.pairs) {if (!live(r,m.actor) || v.released || age<timing.hound_start) continue;auto &e=r.state.enemies[m.actor.slot];const auto u=godot::Vector2::from_angle(m.angle),side=u.orthogonal()*p.pair_side*m.side,offset=source-body.pos+side;const double clearance=body.radius+e.radius+p.arrive+4,along=offset.dot(u),exit=-along+std::sqrt(std::max(0.0,along*along+clearance*clearance-offset.length_squared()));const auto goal=source+u*std::max(p.pair_dist,exit)+side;
-        if (!m.stationed && e.pos.distance_to(goal)<p.arrive && e.vel.length()<80) {m.stationed=true;GroupSystem::release_order(r.state,m.actor);}if (m.stationed) {GroupSystem::quiet(r.state,m.actor,r.state.world_time+0.3,true,{});const TrackingPolicy tracking{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)};e.facing=tracking.angle(e.facing,e.facing+std::clamp(angle_difference(m.angle-e.facing),-p.face_turn*dt,p.face_turn*dt));}else {auto route=goal;const double obstacle=body.radius+e.radius+6;if (segment_distance(body.pos,e.pos,goal)<obstacle) {const double current=(e.pos-body.pos).angle(),turn=angle_difference((goal-body.pos).angle()-current);route=body.pos+godot::Vector2::from_angle(current+std::clamp(turn,-0.6,0.6))*(clearance+16);}GroupSystem::steer(r.state,m.actor,route,source+u*1000,r.state.world_time+0.3,config);}}
+    const HoundSteering config{2.0,p.decel,8.0,p.turn_slow,p.turn_fast,p.turn_switch,p.gather_speed,p.accel};
+    for (auto &m:v.pairs) {
+        if (!live(r,m.actor) || v.released || age<timing.hound_start) continue;
+        auto &e=r.state.enemies[m.actor.slot];const auto u=godot::Vector2::from_angle(m.angle);
+        if (std::abs(m.side)>1.0) {
+            const auto goal=source+u*m.side;
+            GroupSystem::steer(r.state,m.actor,goal,goal+u.orthogonal()*1000.0,r.state.world_time+0.3,config);
+        } else {
+            // 旧形式の保持中データも、復帰時は保存された配置のまま継続する。
+            const auto side=u.orthogonal()*p.pair_side*m.side,offset=source-body.pos+side;
+            const double clearance=body.radius+e.radius+p.arrive+4,along=offset.dot(u),exit=-along+std::sqrt(std::max(0.0,along*along+clearance*clearance-offset.length_squared()));const auto goal=source+u*std::max(p.pair_dist,exit)+side;
+            if (!m.stationed && e.pos.distance_to(goal)<p.arrive && e.vel.length()<80) {m.stationed=true;GroupSystem::release_order(r.state,m.actor);}
+            if (m.stationed) {GroupSystem::quiet(r.state,m.actor,r.state.world_time+0.3,true,{});const TrackingPolicy tracking{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)};e.facing=tracking.angle(e.facing,e.facing+std::clamp(angle_difference(m.angle-e.facing),-p.face_turn*dt,p.face_turn*dt));}
+            else {auto route=goal;const double obstacle=body.radius+e.radius+6;if (segment_distance(body.pos,e.pos,goal)<obstacle) {const double current=(e.pos-body.pos).angle(),turn=angle_difference((goal-body.pos).angle()-current);route=body.pos+godot::Vector2::from_angle(current+std::clamp(turn,-0.6,0.6))*(clearance+16);}const HoundSteering legacy{p.arrive,p.decel,p.face_turn,p.turn_slow,p.turn_fast,p.turn_switch,p.gather_speed,p.accel};GroupSystem::steer(r.state,m.actor,route,source+u*1000,r.state.world_time+0.3,legacy);}
+        }
+    }
     if (age>=timing.flash && !v.flashed) {v.flashed=true;t.stage=TechniqueStage::Active;CanisTechnique::cue(r,t,"nova_flash");}
     if (age>std::max(timing.flash,timing.hound_start)+1.15) drop_effect(r,b);
 }
@@ -69,7 +103,7 @@ void CanisNova::field_tick(RunRuntime &r,BossBodyState &b) {
 }
 void CanisNova::clear(RunRuntime &r,BossBodyState &b) {if (r.state.bosses.handles.contains(b.canis.nova)) release_pairs(r,r.state.bosses.techniques[b.canis.nova.slot],b);drop_effect(r,b);}
 bool CanisNova::tinted(const RunRuntime &r,const BossBodyState &b,EnemyHandle actor) {if (!r.state.bosses.handles.contains(b.canis.nova)) return false;const auto &v=std::get<CanisNovaState>(r.state.bosses.techniques[b.canis.nova.slot].detail);return !v.released && std::any_of(v.pairs.begin(),v.pairs.end(),[&](const auto &m){return same_handle(m.actor,actor);});}
-bool CanisNova::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=std::get_if<CanisNovaState>(&t.detail);if (!v || !std::isfinite(v->started) || v->started<0 || v->ring_hit.size()!=rule(c,t.definition).rings) return false;std::unordered_set<uint64_t> seen;for (const auto &m:v->pairs) if (!seen.insert(handle_key(m.actor)).second || !std::isfinite(m.angle) || (m.side!=1 && m.side!=-1)) return false;for (const auto &s:v->shadows) if (!std::isfinite(s.angle) || !std::isfinite(s.half) || !std::isfinite(s.near) || s.half<0 || s.near<0) return false;if (!v->field_alpha.empty() && (!v->field_origin.is_finite() || !std::isfinite(v->field_cell) || v->field_cell<=0 || v->field_width==0 || v->field_height==0 || uint64_t(v->field_width)*v->field_height!=v->field_alpha.size() || v->field_frame<0 || v->field_revision==0)) return false;return true;}
+bool CanisNova::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=std::get_if<CanisNovaState>(&t.detail);if (!v || !std::isfinite(v->started) || v->started<0 || v->ring_hit.size()!=rule(c,t.definition).rings) return false;std::unordered_set<uint64_t> seen;for (const auto &m:v->pairs) if (!seen.insert(handle_key(m.actor)).second || !std::isfinite(m.angle) || !std::isfinite(m.side) || (m.side<=1.0 && m.side!=1.0 && m.side!=-1.0)) return false;for (const auto &s:v->shadows) if (!std::isfinite(s.angle) || !std::isfinite(s.half) || !std::isfinite(s.near) || s.half<0 || s.near<0) return false;if (!v->field_alpha.empty() && (!v->field_origin.is_finite() || !std::isfinite(v->field_cell) || v->field_cell<=0 || v->field_width==0 || v->field_height==0 || uint64_t(v->field_width)*v->field_height!=v->field_alpha.size() || v->field_frame<0 || v->field_revision==0)) return false;return true;}
 bool CanisNova::validate_body(const godot::RunState &s,const ContentBundle &c,const BossBodyState &b) {if (!b.canis.nova.generation) return true;if (!s.bosses.handles.contains(b.canis.nova)) return false;const auto &t=s.bosses.techniques[b.canis.nova.slot];return same_handle(t.actor,b.actor) && t.ticket_refs>0 && c.boss_techniques[t.definition-1].kind==49 && validate(t,c);}
 double CanisNova::progress(const RunRuntime &r,const TechniqueState &t) {const auto *b=PhaseController::find(r,t.actor);const auto timing=times(*r.content);if (!b || t.stage!=TechniqueStage::Windup) return 0;const double u=std::clamp((b->clock-std::get<CanisNovaState>(t.detail).started-timing.gather_start)/std::max(timing.flash-timing.gather_start,0.001),0.0,1.0);return u*u*(3-2*u);}
 godot::Dictionary CanisNova::snapshot(const RunRuntime &r,const TechniqueState &t) {
@@ -89,6 +123,14 @@ godot::Vector2 CanisNova::image_head_pose(const RunRuntime &r,const BossBodyStat
     const auto &t=r.state.bosses.techniques[b.canis.nova.slot];
     const auto pose=head_pose(*r.content,b.clock-std::get<CanisNovaState>(t.detail).started);
     return godot::Vector2(pose.y,pose.rotation);
+}
+godot::Vector2 CanisNova::image_brace_flash(const RunRuntime &r,const BossBodyState &b) {
+    if (!r.state.bosses.handles.contains(b.canis.nova)) return {};
+    const auto &t=r.state.bosses.techniques[b.canis.nova.slot];const double age=b.clock-std::get<CanisNovaState>(t.detail).started;const auto timing=times(*r.content);
+    const auto smooth=[](double lo,double hi,double x){const double u=std::clamp((x-lo)/(hi-lo),0.0,1.0);return u*u*(3-2*u);};
+    const double brace=age<timing.flash?smooth(timing.gather_start,timing.flash,age):0;
+    const double flash=smooth(0.0,0.09,age-timing.flash)*(1.0-smooth(0.22,0.98,age-timing.flash));
+    return godot::Vector2(brace,flash);
 }
 void CanisNova::body_snapshot(const RunRuntime &r,const BossBodyState &b,godot::Dictionary &out) {out["nova"]=r.state.bosses.handles.contains(b.canis.nova)?snapshot(r,r.state.bosses.techniques[b.canis.nova.slot]):godot::Dictionary();}
 }

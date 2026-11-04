@@ -102,6 +102,9 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
     }
     if (r.state.bosses.handles.contains(b.canis.nova)) {
         const auto head=CanisNova::image_head_pose(r,b);c.nodes[6].position={0,head.x};c.nodes[6].rotation=head.y;
+        const auto motion=CanisNova::image_brace_flash(r,b);const double brace=motion.x,flash=motion.y;
+        c.nodes[5].position=Vector2(0,-5.0*brace-14.0*flash);c.nodes[5].rotation=0;c.nodes[5].scale=Vector2(1.0+0.04*brace,1.0-0.08*brace);
+        c.nodes[0].rotation+=0.17*brace-0.26*flash;
     }
     const Transform2D root(e.facing-godot::Math::PI/2,c.root_scale,0,e.pos);
     b.image_parts.clear();

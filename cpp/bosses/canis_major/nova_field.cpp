@@ -61,7 +61,7 @@ void raster(const Polygon &polygon,uint32_t width,uint32_t height,std::vector<ui
         }
     }
 }
-void accumulate_blurred(const std::vector<uint8_t> &plane,uint32_t width,uint32_t height,std::vector<double> &sum) {
+void accumulate_blurred(const std::vector<uint8_t> &plane,uint32_t width,uint32_t height,std::vector<uint8_t> &sum) {
     constexpr double sigma=0.8;std::array<double,7> kernel{};double total=0;
     for (int k=-3;k<=3;++k) {kernel[k+3]=std::exp(-(k*k)/(2*sigma*sigma));total+=kernel[k+3];}
     for (auto &v:kernel) v/=total;
@@ -70,7 +70,9 @@ void accumulate_blurred(const std::vector<uint8_t> &plane,uint32_t width,uint32_
         for (int k=-3;k<=3;++k) {const int sx=int(x)+k;if (sx>=0 && sx<int(width)) horizontal[size_t(y)*width+x]+=plane[size_t(y)*width+sx]*kernel[k+3];}
     for (uint32_t y=0;y<height;++y) for (uint32_t x=0;x<width;++x) {
         double value=0;for (int k=-3;k<=3;++k) {const int sy=int(y)+k;if (sy>=0 && sy<int(height)) value+=horizontal[size_t(sy)*width+x]*kernel[k+3];}
-        sum[size_t(y)*width+x]+=value/9.0;
+        auto &dest=sum[size_t(y)*width+x];
+        const int source=std::clamp(int(std::lround(value/9.0)),0,255);
+        dest=uint8_t(std::min(255,int(dest)+source));
     }
 }
 }
@@ -95,7 +97,7 @@ bool CanisNovaField::update(RunRuntime &r,BossBodyState &body,CanisNovaState &fi
         for (const auto &p:r.content->canis_nova_hull) shape.push_back({e.pos.x+(p.x*c-p.y*s)*size,e.pos.y+(p.x*s+p.y*c)*size});
         shapes.push_back(std::move(shape));
     }
-    std::vector<double> sum(size_t(width)*height,0);
+    std::vector<uint8_t> sum(size_t(width)*height,0);
     for (int light_index=0;light_index<9;++light_index) {
         const double radius=light_index==0?0:24.0*std::sqrt((light_index-0.5)/8.0),angle=(light_index-1)*2.399963;
         const Point light{source.x+std::cos(angle)*radius,source.y+std::sin(angle)*radius};
@@ -112,8 +114,7 @@ bool CanisNovaField::update(RunRuntime &r,BossBodyState &body,CanisNovaState &fi
         }
         accumulate_blurred(plane,width,height,sum);
     }
-    field.field_alpha.resize(sum.size());
-    for (size_t i=0;i<sum.size();++i) field.field_alpha[i]=uint8_t(std::clamp(int(std::lround(sum[i])),0,255));
+    field.field_alpha=std::move(sum);
     field.field_origin=origin;field.field_cell=cell;field.field_width=width;field.field_height=height;field.field_frame=frame;++field.field_revision;
     return true;
 }
