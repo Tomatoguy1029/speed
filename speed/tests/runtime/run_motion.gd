@@ -6,6 +6,11 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	check(check_bite_commitment(),"全種類の噛みつきの固定と回復を最後まで確認する")
+	if "--bite-only" in OS.get_cmdline_user_args():
+		print("[bite_commitment] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	check(check_tracking_policy(),"追跡・噛みつきの操舵を最後まで確認する")
 	get_tree().quit(1 if failed else 0)
 
@@ -118,4 +123,64 @@ func check_tracking_policy() -> bool:
 		if kind==&"biter":
 			check(presentation.frame_view.enemy_frames.has(6) and presentation.frame_view.enemy_frames[6]._parts.size()==3,"噛みつく敵の本体・装甲・顎を表示する")
 		session.free()
+	return true
+
+# 機体が横へ逃げても構えの位置・向きを保ち、回復の終了後だけ追跡を再開する。
+func check_bite_commitment() -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	for kind in [&"biter", &"hound", &"defender"]:
+		var config: GameConfig = ContentManager.base.duplicate(true)
+		config.start_radius = 0.0
+		var definition: EnemyDef = ContentManager.enemies[kind].duplicate(true)
+		if kind==&"hound": definition.params.pack_count = 1
+		var stage := RuntimeStage.new()
+		stage.index = 75
+		stage.resources = StageResources.new()
+		stage.resources.enemy_ids = PackedStringArray([String(kind)])
+		stage.resources.look_paths = ContentManager.visual_index.look_paths.duplicate()
+		stage.attack_managed_by_type = {String(kind):false}
+		var output := "res://.content/dev/bite_commitment/"+String(kind)
+		if builder.build(stage,config,output,"噛みつきの固定".sha256_text(),{kind:definition})!=OK:
+			return false
+		var path := output.path_join("stage_75.json")
+		var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
+		for far in [false, true]:
+			var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":42},true)
+			session.auto_step = false
+			var bridge = session.bridge
+			if bridge==null:
+				session.free()
+				return false
+			var core = bridge._core
+			var center := Vector2(3000,3000) if far else Vector2.ZERO
+			core.set_motion_context(Vector2.ZERO,center,Vector2(320,240))
+			var id: int = core.spawn_enemy(kind,Vector2(30,0),{"facing":PI,"attack_managed":false})
+			core.set_enemy_motion(id,{"vel":Vector2(-80,0)})
+			for tick in 3:
+				core.step(0.01)
+				if motion_flags(bridge,id).mode==1: break
+			check(motion_flags(bridge,id).mode==1,"%s: 接近から予備動作に入る" % kind)
+			var pose := motion_row(bridge,id)
+			check(pose.vel==[0.0,0.0],"%s: 構え開始時に慣性を止める" % kind)
+			core.set_motion_context(Vector2(0,300),center,Vector2(320,240))
+			var recovered := false
+			for tick in 100:
+				core.step(0.01)
+				var row := motion_row(bridge,id)
+				check(row.pos==pose.pos and row.facing==pose.facing,"%s: 横へ逃げても予備動作の位置と向きを固定する" % kind)
+				if motion_flags(bridge,id).mode==3:
+					recovered = true
+					break
+			check(recovered and core.hazards_snapshot().size()==1,"%s: 噛みつきを一度発生させて回復へ入る" % kind)
+			var elapsed := 0.0
+			for tick in 200:
+				core.step(0.01)
+				elapsed += 0.01
+				var row := motion_row(bridge,id)
+				check(row.pos==pose.pos and row.facing==pose.facing,"%s: 回復中も位置と向きを固定する" % kind)
+				if motion_flags(bridge,id).mode==0: break
+			check(absf(elapsed-float(definition.params.bite_rest))<=0.04,"%s: 編集値の休み時間で回復を終える" % kind)
+			for tick in 3: core.step(0.01)
+			check(motion_row(bridge,id).pos!=pose.pos,"%s: 回復後に追跡を再開する" % kind)
+			session.free()
 	return true
