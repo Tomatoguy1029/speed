@@ -97,7 +97,8 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
         const auto &enemy = runtime.state.enemies[row];
         const auto target=speed::CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));if (!runtime.state.enemy_handles.contains(target)) continue;const auto &health=runtime.state.enemies[target.slot];
-        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(health.id) > 0 : (health.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
+        const bool normal_boss=enemy.is_boss && !runtime.state.draw.tracing && !runtime.state.ship.glide && runtime.state.ship.vel.length()<runtime.state.ship_config.max_speed*c.ram_speed_ratio;
+        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(health.id) > 0 : (health.hit_cd > 0 && !normal_boss && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
         const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
         if (t >= 0) hits.push_back({t, row});
     }
@@ -113,6 +114,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (runtime.state.draw.tracing) speed::FullChargeBehavior::prepare(runtime,from.distance_to(position));
         const double attack = speed::CombatResolver::attack_power(runtime)*speed::RunUpBehavior::multiplier(runtime,from.distance_to(position));
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
+        if (!fast && enemy.is_boss) {speed::BossContactSystem::normal_contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position);return true;}
         const bool front = blocks_front(hit.row, position, direction);
         if (front && (!fast || (!runtime.state.draw.tracing && health.hit_cd > 0))) {
             Vector2 normal = position - enemy.pos;

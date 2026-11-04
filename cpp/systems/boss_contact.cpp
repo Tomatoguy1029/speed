@@ -76,6 +76,13 @@ void BossContactSystem::register_landing(RunRuntime &r,EnemyHandle actor,godot::
 }
 void BossContactSystem::clear_landings(RunRuntime &r) {r.state.boss_landings.clear();}
 void BossContactSystem::knock_back(RunRuntime &r,EnemyHandle actor) {push(r,actor,r.state.ship.pos,r.state.ship.pos);}
+void BossContactSystem::normal_contact(RunRuntime &r,EnemyHandle actor,godot::Vector2 impact) {
+    if (!r.state.enemy_handles.contains(actor)) return;
+    ShipDamageRequest request;request.amount=r.state.control.boss_touch_damage;request.cause=Cause::Touch;
+    request.source=r.state.enemies[actor.slot].definition+1;request.scale=DamageScale::None;
+    CombatResolver::ship_damage(r,request);EventBuilder::flush_combat(r);
+    push(r,actor,impact,impact);
+}
 bool BossContactSystem::resolve(RunRuntime &r,godot::Vector2 from,godot::Vector2 to,double ship_radius) {
     const ShipMotion motion{from,to,ship_radius};
     for (auto &entry:r.state.boss_landings) {
