@@ -5,7 +5,26 @@
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_budget.h"
 #include "../../systems/attacks/slash.h"
+#include "../../systems/attack_system.h"
+#include <algorithm>
+#include <cmath>
 namespace speed {
+namespace {
+double smooth(double a,double b,double value) {const double k=std::clamp((value-a)/(b-a),0.0,1.0);return k*k*(3.0-2.0*k);}
+}
+LynxPose LynxBehavior::visual_pose(const RunRuntime &r,uint32_t row,godot::Vector2 pos,double facing,double clock) {
+    const auto &enemy=r.state.enemies[row];const auto &state=std::get<LynxState>(enemy.behavior_state);const auto &p=r.content->lynxes[r.content->definitions[enemy.definition].lynx_definition-1];
+    double offset=0,rotation=0;
+    if (enemy.charge>0) {
+        const double side=state.buds%2==0?1:-1,w=smooth(0,0.45,enemy.charge);
+        offset=-0.28*w;rotation=side*0.45*w;
+    } else if (state.last_fire>=0) {
+        const double age=clock-state.last_fire,side=state.last_side;
+        if (age<p.fx_cut) {const double f=smooth(0,p.fx_cut,age);offset=-0.28+(0.50+0.28)*f;rotation=side*(0.45+(-0.35-0.45)*f);}
+        else {const double f=smooth(p.fx_cut,p.fx_cut+0.45,age);offset=0.50*(1-f);rotation=side*(-0.35)*(1-f);}
+    }
+    return {pos+godot::Vector2::from_angle(facing)*(offset*enemy.radius),facing+rotation};
+}
 void LynxBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     auto &s=r.state;auto &e=s.enemies[row];const auto &d=r.content->definitions[e.definition];const auto &p=r.content->lynxes[d.lynx_definition-1];const auto handle=s.enemy_handles.at(row);
     const auto owner=AttackBudgetSystem::owner(s,e.id,e.attack_group);AttackBudgetSystem budget(r);const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};
@@ -22,6 +41,7 @@ void LynxBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     const auto paw_side=godot::Vector2(-paw_forward.y,paw_forward.x);
     const auto paw=e.pos-body_forward*(e.radius*0.28)+paw_forward*(e.radius*0.55)+paw_side*(side*e.radius*0.6);
     shot.lynx_definition=d.lynx_definition;shot.paw_offset=paw-shot.position;
-    if (e.attack_managed) shot.budget.value=budget.token(owner);SlashSystem::emit(r,shot);
+    if (e.attack_managed) shot.budget.value=budget.token(owner);
+    if (const auto result=SlashSystem::emit(r,shot);AttackSystem::get(s,result)) {state.last_fire=s.world_time;state.last_side=int32_t(side);}
 }
 }

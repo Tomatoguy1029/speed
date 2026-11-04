@@ -27,6 +27,7 @@
 #include "../behaviors/enemies/sniper.h"
 #include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/aquarius.h"
+#include "../behaviors/enemies/lynx.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -91,6 +92,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         out.marks.clear();out.ruler_sides.clear();out.modes.clear();out.charges.clear();out.timers.clear();out.rests.clear();out.glows.clear();out.gunner.clear();out.beamer.clear();out.missile.clear();out.battleship.clear();out.sniper.clear();out.dolphin.clear();out.lynx.clear();out.soldier.clear();out.reticle.clear();out.aquarius.clear();out.cross.clear();out.bomber.clear();out.crab.clear();out.pump.clear();
     }
     PackedFloat32Array comet_values,crow_values,petrified_enemies,enemy_health,enemy_weak;
+    Array lynx_actors,lynx_afterimages,lynx_fx;
     const auto batch=[&](uint32_t visual,int32_t layer,int32_t order)->RenderBatchBuffer & {
         auto &out=groups[visual];out.visual=visual;out.layer=layer;out.order=order;return out;
     };
@@ -109,6 +111,15 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         }
         if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor || definition.kind==EnemyDefinition::Kind::Draco || definition.kind==EnemyDefinition::Kind::Hydra || hydra_part) continue;
         auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
+        if (definition.kind==EnemyDefinition::Kind::Lynx) {
+            const auto &motion=std::get<LynxState>(enemy.behavior_state);const auto &p=run.content->lynxes[definition.lynx_definition-1];
+            if (motion.last_fire>=0 && state.world_time-motion.last_fire<p.fx_cut+0.06) for (int ghost=2;ghost>=1;--ghost) {
+                const auto past=LynxBehavior::visual_pose(run,uint32_t(i),pose.position,pose.angle,state.world_time-ghost*0.025);
+                Dictionary row;row["id"]=enemy.id;row["visual_id"]=definition.visual_id;row["pos"]=past.position;row["angle"]=past.facing+definition.sprite_angle;row["radius"]=enemy.radius*definition.sprite_scale;row["alpha"]=0.35/ghost;lynx_afterimages.push_back(row);
+            }
+            const auto fx=LynxBehavior::visual_pose(run,uint32_t(i),pose.position,pose.angle,state.world_time);pose.position=fx.position;pose.angle=fx.facing;
+            if (enemy.charge>0) {Dictionary row;row["id"]=enemy.id;row["pos"]=pose.position;row["angle"]=pose.angle;row["radius"]=enemy.radius;row["charge"]=enemy.charge;row["side"]=motion.buds%2==0?1:-1;row["slash_size"]=p.slash_size;lynx_actors.push_back(row);}
+        }
         if (definition.kind==EnemyDefinition::Kind::Aquarius) {
             const double time=AquariusBehavior::visual_time(run,uint32_t(i));
             if (time>=0) {const auto fx=AquariusBehavior::visual_pose(run,uint32_t(i),enemy.pos,enemy.facing,time);pose.position=fx.position;pose.angle=fx.facing;}
@@ -307,6 +318,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["enemy_radius"]=state.enemies[owner.slot].radius;
         fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);beamer_fx.push_back(fx);
     }
+    for (const auto &shot:state.hostiles) {
+        if (!shot.alive || !shot.slash.lynx_definition) continue;
+        const auto *record=AttackSystem::get(state,shot.attack);if (!record) continue;
+        Dictionary fx;fx["id"]=record->id;fx["pos"]=shot.pos;fx["angle"]=double(shot.vel.angle());fx["side"]=double(shot.slash.side);fx["size"]=double(shot.radius);fx["age"]=shot.slash.age;fx["paw"]=shot.slash.paw_offset;lynx_fx.push_back(fx);
+    }
     Dictionary marlin;PackedInt64Array marlin_ids;PackedFloat64Array marlin_values;
     for (size_t i=0;i<state.enemies.size();++i) {
         const auto &e=state.enemies[i];if (!e.alive || e.dead || (state.control.cinematic_hide_enemies && !e.is_boss) || e.held || e.stone>0) continue;const auto &d=run.content->definitions[e.definition];if (d.kind!=EnemyDefinition::Kind::Marlin) continue;
@@ -360,7 +376,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
-    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
+    out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];
         for (const auto &entry:std::initializer_list<std::pair<const char *,int64_t>>{{"rows",int64_t(state.enemies.size())},{"live",live_rows},{"batched",batched_rows},{"bosses",bodies.size()},{"marked",marked_rows}}) {

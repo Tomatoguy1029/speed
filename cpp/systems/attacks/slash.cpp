@@ -102,6 +102,7 @@ void SlashSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,go
     const auto u=Vector2::from_angle(shot.vel.angle()),across=Vector2(-u.y,u.x)*shot.slash.side;
     const double thickness=run.content->slashes.front().thickness*shot.radius,zoom=std::max(0.01,run.state.control.camera_zoom);
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    if (shot.slash.lynx_definition) shape["reference_lynx"]=true;
     PackedVector2Array points;PackedInt32Array offsets;PackedFloat32Array widths;PackedColorArray colors;offsets.push_back(0);
     for (uint32_t claw=0;claw<3;++claw) for (uint32_t stroke=0;stroke<3;++stroke) {
         for (const auto &point:run.content->slashes) {
