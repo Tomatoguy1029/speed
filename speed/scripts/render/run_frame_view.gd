@@ -1439,7 +1439,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
 		if event.type==&"shield_block":
 			_rings.append({"pos":event.pos,"radius":float(frame.ui.ship_radius)*3.0,"color":Color("#bcefff"),"life":0.18,"max":0.18})
-		var reference_rock_break := event.type==&"rock_break" and _reference_render_frame.has("reticle_fx")
+		var reference_rock_break: bool = event.type==&"rock_break" and _reference_render_frame.has("reticle_fx")
 		if (event.type==&"kill" and event.get("enemy_type")==&"meteor" and event.get("cause",&"")!=&"vortex") or (event.type==&"rock_break" and not reference_rock_break):
 			var frames: SpriteFrames = _scope.resources.get("res://.content/meteor_pieces.res")
 			if frames!=null:
@@ -1461,7 +1461,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"beam" and event.get("visual_key","")!="weapon/bipolar" and not (event.get("visual_key","")=="enemy/reticle" and _reference_render_frame.has("reticle_fx")):
 			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_mutiny_beams.append({"from":event.from,"to":event.to,"width":event.width,"life":life,"max":life,"color":event.get("color",Color(1,0.95,0.6))})
-		var reference_telescope := _reference_render_frame.has("telescope_actors") and _reference_render_frame.has("telescope_beams")
+		var reference_telescope: bool = _reference_render_frame.has("telescope_actors") and _reference_render_frame.has("telescope_beams")
 		if event.type==&"telescope_charge" and not reference_telescope: _rings.append({"pos":event.pos,"radius":30.0,"color":Color(1.0,0.4,0.3),"life":0.2,"max":0.2})
 		if event.type==&"telescope_fire" and not reference_telescope:
 			var direction := Vector2.from_angle(event.angle)

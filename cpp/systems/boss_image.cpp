@@ -2,6 +2,7 @@
 #include "../runtime/run_runtime.h"
 #include "../bosses/centaurus/image_pose_system.h"
 #include "../bosses/canis_major/image_pose.h"
+#include "../bosses/monoceros/image_pose_system.h"
 #include <cmath>
 namespace speed {
 namespace {
@@ -31,6 +32,7 @@ void BossImageSystem::refresh(RunRuntime &r) {
         const auto boss=r.content->boss_bodies[body.definition-1].boss;
         if (!boss || boss>r.content->bosses.size()) continue;
         switch (r.content->bosses[boss-1].kind) {
+        case 0:MonocerosImagePoseSystem::refresh(r,body);break;
         case 1:CentaurusImagePoseSystem::refresh(r,body);break;
         case 2:CanisImagePose::update(r,body);break;
         default:break;

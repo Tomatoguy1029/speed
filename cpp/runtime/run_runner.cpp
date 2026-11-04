@@ -89,6 +89,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.controls_locked) state.ship.vel=godot::Vector2();
     camera(core,0,size);
     state.sim_time+=dt;
+    BossImageSystem::refresh(core.runtime);
     if (!timed("draw_input",[&]{return core.handle_draw_input(input,int64_t(std::round(state.sim_time*1000)),control.camera_zoom);})) return false;
     if (state.control.boss_ram.pending && state.draw.tracing) core.end_trace(false);
     if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);BossRamSystem::advance(core.runtime,dt);return true;}
