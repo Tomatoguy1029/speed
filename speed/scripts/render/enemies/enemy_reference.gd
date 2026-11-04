@@ -15,6 +15,7 @@ const RETICLE := preload("res://scripts/render/enemies/reticle_reference.gd")
 const AQUARIUS := preload("res://scripts/render/enemies/aquarius_reference.gd")
 const SOLDIER := preload("res://scripts/render/enemies/soldier_reference.gd")
 const CEPHEUS := preload("res://scripts/render/enemies/cepheus_reference.gd")
+const CORONA := preload("res://scripts/render/enemies/corona_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -33,6 +34,7 @@ var _reticle = RETICLE.new()
 var _aquarius = AQUARIUS.new()
 var _soldier = SOLDIER.new()
 var _cepheus = CEPHEUS.new()
+var _corona = CORONA.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -46,6 +48,7 @@ func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> 
 	_telescope.setup(parent)
 	_aquarius.setup(parent, scope)
 	_cepheus.setup(parent, scope, visuals)
+	_corona.setup(parent, scope, visuals)
 
 func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_time: float) -> void:
 	var world_dt := 0.0 if _last_world_time < 0.0 or world_time < _last_world_time else world_time - _last_world_time
@@ -86,6 +89,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_soldier.render(frame.soldier_fx, frame.soldier_bolts, canvas, world_time)
 	if frame.has("cepheus_fx") and frame.has("cepheus_actors"):
 		_cepheus.render(frame.cepheus_actors, frame.cepheus_fx, canvas, world_time)
+	if frame.has("corona_selected"):
+		_corona.render(frame.corona, frame.corona_selected, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -105,12 +110,20 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var aquarius := frame.has("aquarius_jets")
 	var soldier := frame.has("soldier_fx") and frame.has("soldier_bolts")
 	var cepheus := frame.has("cepheus_fx") and frame.has("cepheus_actors")
+	var corona := frame.has("corona_selected")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
 	if ruler:
 		result.ruler = PackedFloat64Array()
 	if cepheus:
 		result.cepheus = {"values":PackedFloat64Array(), "marks":PackedFloat64Array()}
+	if corona:
+		result.corona = PackedFloat64Array()
+		var members: PackedFloat64Array = frame.get("corona_members", PackedFloat64Array())
+		var kept := PackedFloat64Array()
+		for index in range(0, members.size(), 10):
+			if members[index+3] > 0.0 or members[index+6] <= 0.0: kept.append_array(members.slice(index,index+10))
+		result.corona_members = kept
 	if beamer or lynx or bite or cross or crab or dolphin or telescope or reticle or aquarius or soldier:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):
