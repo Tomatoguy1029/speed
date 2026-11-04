@@ -15,6 +15,8 @@ class Painter:
 	var lights := PackedByteArray()
 	var fade := 1.0
 	var light_strength := 1.0
+	var has_light := false
+	var has_color := false
 	var tx := 0.0
 	var ty := 0.0
 	var fx := 1.0
@@ -28,6 +30,8 @@ class Painter:
 		lights.resize(w * h * 4)
 		colors.fill(0)
 		lights.fill(0)
+		has_light = false
+		has_color = false
 		fade = 1.0
 		light_strength = 1.0
 		place(0.0, 0.0)
@@ -74,6 +78,7 @@ class Painter:
 		colors[i + 1] = int(clampf(c.g, 0.0, 1.0) * 255.0 * k)
 		colors[i + 2] = int(clampf(c.b, 0.0, 1.0) * 255.0 * k)
 		colors[i + 3] = 255 if k != 1.0 else int(clampf(c.a, 0.0, 1.0) * 255.0)
+		if colors[i + 3]>0: has_color = true
 
 	func _add(x: int, y: int, c: Color, strength: float) -> void:
 		var k := strength * fade * light_strength
@@ -83,6 +88,7 @@ class Painter:
 		lights[i] = mini(255, int(lights[i] + int(c.r * 255.0) * k))
 		lights[i + 1] = mini(255, int(lights[i + 1] + int(c.g * 255.0) * k))
 		lights[i + 2] = mini(255, int(lights[i + 2] + int(c.b * 255.0) * k))
+		if lights[i] | lights[i+1] | lights[i+2]: has_light = true
 
 	func _blend(x: int, y: int, c: Color, alpha: float) -> void:
 		var a := alpha * fade
@@ -96,6 +102,7 @@ class Painter:
 		colors[i + 1] = int(int(c.g * 255.0) * k + colors[i + 1] * (1.0 - k)) & 255
 		colors[i + 2] = int(int(c.b * 255.0) * k + colors[i + 2] * (1.0 - k)) & 255
 		colors[i + 3] = int(oa * 255.0) & 255
+		if colors[i + 3]>0: has_color = true
 
 	func px(x: float, y: float, c: Color) -> void:
 		var p := _cell(x, y)
