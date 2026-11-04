@@ -318,7 +318,14 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         }
         if (p.kind==40) {
             const auto v=std::find_if(bundle->canis_commands.begin(),bundle->canis_commands.end(),[&](const auto &v){return v.technique==p.id;});
-            if (v==bundle->canis_commands.end() || bundle->bosses[p.boss-1].kind!=2 || v->lunge_time<=0 || p.active!=v->lunge_time+0.05 || stages.size()!=2 || stages[0].command!=1 || stages[0].at!=p.warn || stages[1].command!=2 || stages[1].at!=p.warn+v->lunge_time+0.05) return {};continue;
+            const auto fx=std::find_if(records.CanisRoarDefinition_rows.begin(),records.CanisRoarDefinition_rows.end(),[&](const auto &row){return row.technique==p.id;});
+            double start=p.warn;
+            if (fx!=records.CanisRoarDefinition_rows.end()) {
+                constexpr double lives[]={0,.24,.36,.52};
+                if (!fx->has_roar || fx->level<1 || fx->level>3) return {};
+                start=p.warn-std::min(p.warn*.65,.32)+lives[fx->level]*fx->roar_time*fx->timing+fx->order_wait+fx->hound_warn;
+            }
+            if (v==bundle->canis_commands.end() || bundle->bosses[p.boss-1].kind!=2 || v->lunge_time<=0 || p.active!=v->lunge_time+0.05 || stages.size()!=2 || stages[0].command!=1 || stages[0].at!=start || stages[1].command!=2 || stages[1].at!=start+v->lunge_time+0.05) return {};continue;
         }
         if (p.kind==14) {
             const auto shower=std::find_if(bundle->centaurus_showers.begin(),bundle->centaurus_showers.end(),[&](const auto &v){return v.technique==p.id;});
