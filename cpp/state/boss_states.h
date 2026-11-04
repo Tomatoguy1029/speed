@@ -314,6 +314,7 @@ struct BossBodyState {
     MonocerosImagePoseClock monoceros_pose;
     std::vector<MonocerosBreathVisual> monoceros_breaths;
     std::vector<MonocerosShatterVisual> monoceros_shatters;
+    std::vector<MonocerosBurnVisual> monoceros_burns;
     std::vector<MonocerosSweepVisual> monoceros_sweeps;
     std::vector<MonocerosSlashVisual> monoceros_slashes;
     std::vector<ParticipantState> participants;
