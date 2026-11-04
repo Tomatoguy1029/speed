@@ -20,6 +20,7 @@ struct RunControlState {
     double boss_at=-1;
     // G10の停止と出口移動を値として保持し、復帰後も一度だけ適用する。
     double boss_ram_hitstop=0;
+    double boss_touch_damage=0;
     struct BossRam {
         bool pending=false;
         EnemyHandle target;

@@ -98,6 +98,7 @@ struct RunConfig {
     double pickup_life{};
     double trace_radius{};
     double fx_boss_ram_hitstop{};
+    double fx_boss_touch_damage{};
 };
 inline bool read(BinaryReader &input, RunConfig &out) {
     if (!input.read_u32(out.id)) return false;
@@ -275,6 +276,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.trace_radius < 0) return false;
     if (!input.read_f64(out.fx_boss_ram_hitstop)) return false;
     if (out.fx_boss_ram_hitstop < 0) return false;
+    if (!input.read_f64(out.fx_boss_touch_damage)) return false;
+    if (out.fx_boss_touch_damage < 0) return false;
     return true;
 }
 struct StringEntry {
@@ -7531,8 +7534,8 @@ struct ContentRecords {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 10) return false;
-        if (count > input.remaining()/680) return false;
+        if (version != 11) return false;
+        if (count > input.remaining()/688) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -9705,6 +9708,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.pickup_config.pickup_life=config.pickup_life;
     state.trace_radius=config.trace_radius;
     state.control.boss_ram_hitstop=config.fx_boss_ram_hitstop;
+    state.control.boss_touch_damage=config.fx_boss_touch_damage;
 }
 inline godot::Dictionary config_snapshot(const RunConfig &config) {
     godot::Dictionary out;
@@ -9800,6 +9804,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["pickup_life"]=config.pickup_life;
     out["trace_radius"]=config.trace_radius;
     out["fx_boss_ram_hitstop"]=config.fx_boss_ram_hitstop;
+    out["fx_boss_touch_damage"]=config.fx_boss_touch_damage;
     return out;
 }
 inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {

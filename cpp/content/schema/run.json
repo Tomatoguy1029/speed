@@ -626,9 +626,15 @@
           "type": "f64",
           "min": 0,
           "runtime": "control.boss_ram_hitstop"
+        },
+        {
+          "name": "fx_boss_touch_damage",
+          "type": "f64",
+          "min": 0,
+          "runtime": "control.boss_touch_damage"
         }
       ],
-      "version": 10
+      "version": 11
     },
     {
       "name": "StringEntry",

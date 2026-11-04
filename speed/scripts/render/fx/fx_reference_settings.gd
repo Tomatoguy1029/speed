@@ -4,6 +4,8 @@ extends Resource
 
 @export var source_sha256 := ""
 @export var parameters: Dictionary = {}
+## 技の攻撃と区別する、通常のボス本体接触ダメージ。
+@export var boss_touch_damage := 1.0
 
 ## 読取専用として扱う。技の開始時に取得し、共通プリセットで上書きしない。
 func for_id(prototype_id: String) -> Dictionary:

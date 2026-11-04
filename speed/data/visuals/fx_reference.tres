@@ -4,6 +4,7 @@
 
 [resource]
 script = ExtResource("1")
+boss_touch_damage = 1.0
 source_sha256 = "2a01d87f8c2ad056cb865b9ff24ea5aceed005e71b015a8d9be06b3bbda52306"
 parameters = {
   "G10-boss-hit": {

@@ -1393,6 +1393,7 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		if field.has("config"): data.RunConfig[0][field.name] = config.get(field.config)
 		elif field.has("value"): data.RunConfig[0][field.name] = field.value
 	data.RunConfig[0].fx_boss_ram_hitstop = float(preload("res://data/visuals/fx_reference.tres").for_id("G10-boss-hit").hitstop)
+	data.RunConfig[0].fx_boss_touch_damage = preload("res://data/visuals/fx_reference.tres").boss_touch_damage
 	data.RunConfig[0].world_tick_div = maxi(1,int(config.world_tick_div))
 	data.RunConfig[0].time_limit = stage.time_limit if stage != null else -1.0
 	if stage!=null:
