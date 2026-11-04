@@ -67,9 +67,9 @@ func _ready() -> void:
 	render = session.view.get_node("RunPresentation") as RunPresentation
 	render.set_process(false)
 	render.view_override = {"center":Vector2(float(spec.camera.center[0]),float(spec.camera.center[1])),"zoom":float(spec.camera.zoom),"shake":bool(spec.camera.get("shake",false))}
-	var setup: Dictionary = session.bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":false,"invincible":true,"empty":true}})
+	var setup: Dictionary = session.bridge.command("dev_set_scenario",{"kind":"lab","params":{"lab_mode":true,"auto_spawn":false,"auto_boss":false,"invincible":true,"empty":true,"level":1}})
 	if not setup.ok:
-		_fail("撮影場面の初期化に失敗しました")
+		_fail("撮影場面の初期化に失敗しました: " + str(setup))
 		return
 	var images: Array = []
 	var commands: Array = spec.commands
