@@ -262,10 +262,15 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary gravity;PackedFloat64Array well_values;
     for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
     gravity["time"]=state.world_time;gravity["wells"]=well_values;
-    PackedFloat64Array ruler;
+    PackedFloat64Array ruler;Array ruler_fx;
     for (const auto &e:state.enemies) if (e.alive && !e.dead && !state.control.cinematic_hide_enemies && std::holds_alternative<RulerState>(e.behavior_state)) {
         const auto &d=run.content->definitions[e.definition];const auto &p=run.content->rulers[d.ruler_definition-1];const auto color=d.color.lightened(0.2);
         for (double value:{double(e.pos.x),double(e.pos.y),e.radius,e.facing,double(e.mode),e.charge,p.beam_len,p.beam_width,p.beam_start_gap,double(color.r),double(color.g),double(color.b)}) ruler.push_back(value);
+        const auto &ruler_state=std::get<RulerState>(e.behavior_state);if (!ruler_state.side || (e.mode!=EnemyMode::Windup && e.mode!=EnemyMode::Recover)) continue;
+        const auto direction=Vector2::from_angle(e.facing),normal=Vector2(-direction.y,direction.x);const double scale=2*e.radius*d.sprite_scale/58.0;
+        Dictionary fx;fx["id"]=e.id;fx["side"]=ruler_state.side;fx["pos"]=e.pos+direction*(27.5*scale+p.fx_muzzle)+normal*(ruler_state.side*10.5*scale);fx["angle"]=e.facing;fx["radius"]=e.radius;fx["charge"]=e.charge;fx["length"]=p.beam_len;fx["width"]=p.beam_width;fx["windup"]=e.mode==EnemyMode::Windup;fx["time"]=std::max(0.0,p.beam_time-e.timer);fx["active"]=p.beam_time;
+        if (const auto *record=AttackSystem::get(state,ruler_state.beam)) {const auto &hazard=state.hazards[record->row];fx["pos"]=hazard.pos;fx["order"]=record->id;fx["time"]=double(hazard.time);fx["active"]=double(hazard.duration);}
+        ruler_fx.push_back(fx);
     }
     PackedFloat64Array triangle_star;
     for (const auto &h:state.hazards) {const auto *w=std::get_if<WallHazard>(&h.shape);const auto *record=AttackSystem::get(state,h.attack);
@@ -388,7 +393,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
-    out["crab_fx"]=crab_fx;
+    out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;
     out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;
     if (run.frame_workspace.metrics.detail_active) {
         const Array bodies=out["boss_bodies"];

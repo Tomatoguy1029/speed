@@ -78,6 +78,8 @@ void WallSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const double k=std::clamp(double(h.time)/std::max(0.001,double(h.delay)),0.0,1.0),left=double(h.delay)+h.duration-h.time;
     Color col=w->style==uint32_t(WallStyle::Lightning)?Color::html("e1f7ff"):h.color;
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    const auto source=record->spec.owner.source_definition;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Ruler) shape["reference_ruler"]=true;
     PackedVector2Array points;PackedInt32Array offsets;PackedFloat32Array widths;PackedColorArray colors;offsets.push_back(0);
     const auto to=h.pos+Vector2::from_angle(w->angle)*w->length;
     const auto line=[&](double size,Color color) {points.push_back(h.pos);points.push_back(to);offsets.push_back(points.size());widths.push_back(size);colors.push_back(color);};

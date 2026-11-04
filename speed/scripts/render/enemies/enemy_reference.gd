@@ -7,6 +7,7 @@ const LYNX := preload("res://scripts/render/enemies/lynx_reference.gd")
 const BITE := preload("res://scripts/render/enemies/bite_reference.gd")
 const CROSS := preload("res://scripts/render/enemies/cross_reference.gd")
 const CRAB := preload("res://scripts/render/enemies/crab_reference.gd")
+const RULER := preload("res://scripts/render/enemies/ruler_reference.gd")
 
 var _parent: Node2D
 var _scope: ContentResourceScope
@@ -17,6 +18,7 @@ var _lynx = LYNX.new()
 var _bite = BITE.new()
 var _cross = CROSS.new()
 var _crab = CRAB.new()
+var _ruler = RULER.new()
 var _last_world_time := -1.0
 var _ghost_layers := {}
 var _ghosts: Array[Sprite2D] = []
@@ -51,6 +53,8 @@ func render(frame: Dictionary, events: Array, canvas, _real_dt: float, world_tim
 		_cross.render(frame.cross_actors, frame.cross_beams, normalized, canvas, world_time)
 	if frame.has("crab_fx"):
 		_crab.render(frame.crab_fx, canvas, world_time)
+	if frame.has("ruler_fx"):
+		_ruler.render(frame.ruler_fx, normalized, canvas, world_time)
 	_draw_afterimages(frame.get("lynx_afterimages", []))
 
 ## 呼び出し元のフレームや配列は変更せず、移植済みの旧描画だけを除く。
@@ -62,8 +66,11 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 	var bite := frame.has("bite_fx")
 	var cross := frame.has("cross_actors") and frame.has("cross_beams")
 	var crab := frame.has("crab_fx")
+	var ruler := frame.has("ruler_fx")
 	if phoenix:
 		result.phoenix = PackedFloat64Array()
+	if ruler:
+		result.ruler = PackedFloat64Array()
 	if beamer or lynx or bite or cross or crab:
 		var batches: Array = []
 		for source: Dictionary in frame.get("batches", []):
@@ -84,7 +91,7 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 				row["gunner"] = kept
 			batches.append(row)
 		result.batches = batches
-	if phoenix or beamer or lynx or bite or cross or crab:
+	if phoenix or beamer or lynx or bite or cross or crab or ruler:
 		var shapes: Array = []
 		for row: Dictionary in frame.get("shapes", []):
 			if phoenix and int(row.get("zone_style", -1)) == 5:
@@ -98,6 +105,8 @@ func strip_legacy(frame: Dictionary) -> Dictionary:
 			if cross and bool(row.get("reference_cross", false)):
 				continue
 			if crab and bool(row.get("reference_crab", false)):
+				continue
+			if ruler and bool(row.get("reference_ruler", false)):
 				continue
 			shapes.append(row)
 		result.shapes = shapes
