@@ -8769,6 +8769,10 @@ for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []),
 // フィルターは絵の画素ごとに塗り直す（本番では共通 shader）。3案をつまみで切り替える。
 const PC_VIOLET = ['#0d0820', '#1d1446', '#352a7c', '#5e52b8', '#9a8cf0', '#e6e0ff'].map(parseCol);
 const PC_BASE = {};
+const PC_NEB = ['#ff6fd8', '#4fb8ff', '#8ff0ff'].map(parseCol), PC_STAR = ['#ffffff', '#9ff4ff', '#ffb0f0'].map(parseCol);
+const mixC = (a, b, k) => ({ r: a.r + (b.r - a.r) * k, g: a.g + (b.g - a.g) * k, b: a.b + (b.b - a.b) * k });
+function pcNoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), h = (a, b) => hash(a * 57.3 + b * 131.7);
+  return lerp(lerp(h(xi, yi), h(xi + 1, yi), sx), lerp(h(xi, yi + 1), h(xi + 1, yi + 1), sx), sy); }
 function pcBase(type) { // 絵の画素と縁の画素（種類ごとに一度だけ作る）
   if (PC_BASE[type]) return PC_BASE[type]; const im = IMG['enemy/' + type]; if (!im) return null;
   const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
@@ -8784,10 +8788,11 @@ function pcFilter(type, style, t, seed = 0) {
   for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
     const k = (j * w + i) * 4; if (s[k + 3] < 100) { o[k + 3] = 0; continue; }
     const lum = (0.3 * s[k] + 0.59 * s[k + 1] + 0.11 * s[k + 2]) / 255, rim = a(i - 1, j) < 100 || a(i + 1, j) < 100 || a(i, j - 1) < 100 || a(i, j + 1) < 100, pulse = 0.5 + 0.5 * Math.sin(t * 4 + (i + j) * 0.25 + seed);
-    if (style === 0) { // 陰影を紫の段に置き換え、中を星がゆっくり流れてまたたく。縁は光る
-      let c = PC_VIOLET[Math.min(4, Math.floor(lum * 4.2))]; const sx = Math.floor(i + t * 5 + seed * 7), sy = Math.floor(j - t * 2.5), hs = hash(sx * 7.13 + sy * 13.7 + seed);
-      if (hs > 0.975) { const tw = 0.5 + 0.5 * Math.sin(t * 7 + hs * 60); c = tw > 0.55 ? PC_VIOLET[5] : PC_VIOLET[4]; }
-      if (rim) c = pulse > 0.5 ? PC_VIOLET[5] : PC_VIOLET[4]; set(k, c, 255);
+    if (style === 0) { // 星空の窓：陰影を紫の段にし、中を桃・青の星雲がゆっくり流れ、色つきの星がまたたく。縁は水色〜桃色に移ろって光る
+      const base = PC_VIOLET[Math.min(4, Math.floor(lum * 4.2))], neb = pcNoise((i + t * 3 + seed * 9) * 0.11, (j - t * 1.5) * 0.11), neb2 = pcNoise((i - t * 2 + 40) * 0.07, (j + t + seed * 5) * 0.07);
+      let c = mixC(base, neb2 > 0.5 ? PC_NEB[0] : PC_NEB[1], smooth(0.45, 0.85, neb) * 0.55 * (0.4 + lum)); const sx = Math.floor(i + t * 5 + seed * 7), sy = Math.floor(j - t * 2.5), hs = hash(sx * 7.13 + sy * 13.7 + seed);
+      if (hs > 0.972) { const tw = 0.5 + 0.5 * Math.sin(t * 7 + hs * 60); c = tw > 0.55 ? PC_STAR[Math.floor(hs * 997) % 3] : PC_VIOLET[4]; }
+      if (rim) { const hue = 0.5 + 0.5 * Math.sin(i * 0.25 + j * 0.18 + t * 2.2 + seed); c = mixC(PC_NEB[2], PC_NEB[0], hue); if (pulse > 0.7) c = mixC(c, PC_VIOLET[5], 0.6); } set(k, c, 255);
     } else if (style === 1) { // 元の色を暗く紫寄りに。体のあちこちの星がまたたく
       const r0 = s[k] / 255, g0 = s[k + 1] / 255, b0 = s[k + 2] / 255, m = 0.42; let c = { r: r0 * m * 0.6 + 0.16 * 0.4, g: g0 * m * 0.6 + 0.11 * 0.4, b: b0 * m * 0.6 + 0.42 * 0.4 };
       const hs = hash(i * 3.17 + j * 11.3 + seed * 5), star = hs > 0.988, near = !star && (hash((i - 1) * 3.17 + j * 11.3 + seed * 5) > 0.988 || hash((i + 1) * 3.17 + j * 11.3 + seed * 5) > 0.988 || hash(i * 3.17 + (j - 1) * 11.3 + seed * 5) > 0.988 || hash(i * 3.17 + (j + 1) * 11.3 + seed * 5) > 0.988);
@@ -8814,7 +8819,7 @@ function pcAura(R, e, t, k = 1) { // 縁から星屑がはがれて漂い、薄�
   const pal = FX.ramp(R.P.color), c = toL(e.pos), b = pcBase(e.type); if (!b) return;
   R.back.glow(c.x, c.y, e.r * WL * 1.6, pal[1], 0.22 * k * R.P.intensity);
   for (let m = 0; m < 16; m++) { const life = 0.9 + 0.8 * hash(m * 3.3 + (e.seed || 0)), ph = ((t + hash(m * 7.1 + (e.seed || 0)) * life) % life) / life, from = pcEdgeWorld(e, Math.floor(hash(m * 5.7 + (e.seed || 0) + Math.floor((t + hash(m * 7.1) * life) / life) * 0.37) * b.edge.length)), dir = norm(sub(from, e.pos));
-    const q = toL(add(add(from, mul(dir, ph * 26)), V(0, -ph * 18))), f = (1 - ph) * k; if (f < 0.05) continue; if (f > 0.55) R.front.px(q.x, q.y, pal[ph < 0.2 ? 4 : 3]); else R.front.dot(q.x, q.y, pal[2], f * 1.3); R.front.light(q.x, q.y, pal[2], 0.25 * f * R.P.intensity); }
+    const q = toL(add(add(from, mul(dir, ph * 26)), V(0, -ph * 18))), f = (1 - ph) * k; if (f < 0.05) continue; const sc = [hexc('#ffb0f0'), hexc('#9ff4ff'), pal[4]][m % 3]; if (f > 0.55) R.front.px(q.x, q.y, ph < 0.3 ? sc : pal[3]); else R.front.dot(q.x, q.y, m % 3 === 0 ? hexc('#c46bd8') : pal[2], f * 1.3); R.front.light(q.x, q.y, pal[2], 0.25 * f * R.P.intensity); }
 }
 
 // ---------- 見た目の比較：いろいろな敵をピカロにして並べる
@@ -8828,50 +8833,55 @@ DEMOS.push({ id: 'D-picaro_look', ids: ['D04', 'GFX-008'], cat: 'りゅう座（
   draw(S, R) { const st = +(R.P.style ?? 0); if (R.proto) for (const e of S.ents) pcAura(R, e, S.t, R.P.aura ?? 1); R.blitBack(); for (const e of S.ents) { if (R.proto) pcDraw(e, st, S.t); else drawEnemy(e); } drawShip(S.ship); },
   phase() { return '' } });
 
-// ---------- 生成：星が集まって塊になり、半透明の膜がうねる → 帯状に裂けてらせんにほどけ、中から敵が現れる（仕様 8.2）
-const PC_SPAWN = { gather: 0.55, membrane: 1.25, deform: 1.55, tear: 1.95, fade: 2.8 };
-function pcSpawnFx(S, R, e, t0, style) {
-  const t = S.t - t0, pal = FX.ramp(R.P.color), c = toL(e.pos), Rr = e.r * WL * 1.35 * R.P.size, T = PC_SPAWN, seed = e.seed || 0; if (t < 0) return;
-  // 星が渦を巻いて集まる
-  if (t < T.membrane) for (let m = 0; m < 34; m++) { const st = hash(m * 3.1 + seed) * 0.25, a = clamp((t - st) / (T.gather - st)), an = hash(m * 7.7 + seed) * TAU + a * 3.2, rad = (Rr * 3.2 + 30 * hash(m * 1.9)) * (1 - a) ** 1.3 + Rr * 0.3 * a; if (t < st) continue;
-    const q = V(c.x + Math.cos(an) * rad, c.y + Math.sin(an) * rad), f = a < 1 ? 1 : clamp(1 - (t - T.gather) / 0.4); if (f <= 0) continue; dStar(R, q, 1 + 1.2 * (1 - a), t * 6 + m, f, pal); }
-  // 膜：うねる半透明の球。表面に渦模様、明るい縁、まわりを細い帯が回る
-  if (t >= T.gather - 0.1 && t < T.tear) {
-    const grow = smooth(T.gather - 0.1, T.gather + 0.25, t), def = smooth(T.membrane, T.deform, t), sq = 1 + 0.18 * Math.sin((t - T.membrane) * 18) * def * (1 - smooth(T.deform, T.tear, t)), op = 1 - smooth(T.deform + 0.05, T.tear, t);
-    const radius = (th) => Rr * grow * (1 + 0.1 * Math.sin(3 * th + t * 6) + 0.07 * Math.sin(5 * th - t * 9) + 0.05 * Math.sin(2 * th + t * 3.3)) * (1 + 0.06 * Math.sin(t * 7));
-    for (let y = -Rr * 1.4; y <= Rr * 1.4; y += 1) for (let x = -Rr * 1.4; x <= Rr * 1.4; x += 1) { const xx = x / sq, yy = y * sq, th = Math.atan2(yy, xx), rr = Math.hypot(xx, yy), lim = radius(th); if (rr > lim) continue;
-      const e2 = rr / Math.max(1, lim), swirl = 0.5 + 0.5 * Math.sin(th * 3 + rr * 0.45 - t * 7), px2 = c.x + x, py = c.y + y;
-      // 縁は光の強い所だけ明るく、ほかは薄く（輪郭線で囲まない）。中は渦模様が透けて流れる
-      const rimK = smooth(0.78, 1, e2) * (0.35 + 0.65 * (0.5 + 0.5 * Math.sin(th * 2 - t * 5)));
-      if (rimK > 0.55) { R.front.px(px2, py, pal[rimK > 0.8 ? 4 : 3]); R.front.light(px2, py, pal[2], 0.25 * op * R.P.intensity); }
-      else if (rimK > 0.2) R.front.dot(px2, py, pal[3], rimK * op);
-      else if (swirl > 0.45) R.front.dot(px2, py, pal[swirl > 0.8 ? 3 : 2], (0.15 + 0.4 * (swirl - 0.45)) * op * (0.6 + 0.4 * e2)); }
-    for (let rb = 0; rb < 2; rb++) { const tilt = rb ? 0.9 : -0.5, len0 = 1.7, rot = t * (rb ? 5.5 : -4.2); // 帯は全周を描かず、先が細る弧
-      for (let u = 0; u < len0; u += 0.04) { const an = rot + u, ex = Math.cos(an) * Rr * 1.4, ey = Math.sin(an) * Rr * 0.8, q = V(c.x + ex * Math.cos(tilt) - ey * Math.sin(tilt), c.y + ex * Math.sin(tilt) + ey * Math.cos(tilt)), f = Math.sin(Math.PI * u / len0) * grow * op; if (f > 0.4) R.front.px(q.x, q.y, pal[f > 0.8 ? 4 : 3]); else R.front.dot(q.x, q.y, pal[2], f); } }
-  }
-  // 裂けて、帯がらせんにほどけながら外へ飛ぶ
-  if (t >= T.deform + 0.15 && t < T.fade) { const a = (t - T.deform - 0.15) / (T.fade - T.deform - 0.15);
-    // 帯は5本の太い腕。途切れずにねじれながら外へほどけ、終わり際だけ虫食いで消える
-    for (let s2 = 0; s2 < 5; s2++) { const base = s2 * TAU / 5 + seed + hash(s2 * 2.9) * 0.8, len0 = 0.7 + 0.4 * hash(s2 * 4.4), sp2 = 0.7 + 0.9 * hash(s2 * 6.1);
-      for (let u = 0; u < len0; u += 0.012) { const an = base + u * 0.8 + a * (1.4 + 1.2 * hash(s2)) * (1 + u * 0.4), rad = Rr * (0.8 + u * 1.6 * (0.35 + a) + a * 1.5 * sp2), f = (1 - a) * Math.sin(Math.PI * u / len0) ** 0.6; if (f < 0.06) continue;
-        if (a > 0.55 && hash(s2 * 9 + Math.floor(u * 60) + Math.floor(t * 20)) > (1 - a) * 2.2) continue;
-        const q = V(c.x + Math.cos(an) * rad, c.y + Math.sin(an) * rad), w = 0.5 + 1.5 * f, nx = Math.cos(an), ny = Math.sin(an);
-        for (let o = -w; o <= w; o += 0.5) { const e3 = Math.abs(o) / w; if (e3 < 0.5 && f > 0.5) R.front.px(q.x + nx * o, q.y + ny * o, pal[f > 0.8 ? 4 : 3]); else R.front.dot(q.x + nx * o, q.y + ny * o, pal[2], f * (1 - e3 * 0.6)); } } }
-    for (let m = 0; m < 20; m++) { const an = hash(m * 4.1 + seed) * TAU + a * (hash(m * 2.2) - 0.5) * 3, d = Rr * (0.3 + hash(m * 8.8) * 0.6 + a * (0.6 + 2.6 * hash(m))), q = V(c.x + Math.cos(an) * d, c.y + Math.sin(an) * d - a * 10); dStar(R, q, 1.2, t * 5 + m, (1 - a) * 0.9, pal); }
-    if (t < T.tear + 0.08) R.front.glow(c.x, c.y, Rr * 1.4, pal[4], 0.6 * (1 - (t - T.deform - 0.15) / 0.4) * R.P.intensity); }
+// ---------- 生成：紫の塊がもにょもにょうねりながら、だんだん敵の形に変わる
+// 塊の形（うねる円と回るこぶ）と敵の絵の形の距離場を、時間でなめらかに移す。色は紫の塊からピカロの姿へ移る
+const PC_SDF = {};
+function pcSdf(type) {
+  if (PC_SDF[type]) return PC_SDF[type]; const b = pcBase(type); if (!b) return null; const pad = Math.ceil(Math.max(b.w, b.h) * 0.4), W2 = b.w + pad * 2, H2 = b.h + pad * 2, s = b.src.data, inside = (i, j) => i >= 0 && j >= 0 && i < b.w && j < b.h && s[(j * b.w + i) * 4 + 3] > 100;
+  const d = new Float32Array(W2 * H2); let area = 0; for (let j = 0; j < b.h; j++) for (let i = 0; i < b.w; i++) if (inside(i, j)) area++;
+  for (let y = 0; y < H2; y++) for (let x = 0; x < W2; x++) { const i = x - pad, j = y - pad, inn = inside(i, j); let best = 1e9; for (const [ei, ej] of b.edge) { const dd = (ei - i) ** 2 + (ej - j) ** 2; if (dd < best) best = dd; } d[y * W2 + x] = (inn ? -1 : 1) * Math.sqrt(best); }
+  const c = document.createElement('canvas'); c.width = W2; c.height = H2;
+  return (PC_SDF[type] = { pad, W2, H2, d, R0: Math.sqrt(area / Math.PI), canvas: c, ctx: c.getContext('2d'), img: c.getContext('2d').createImageData(W2, H2) });
 }
-DEMOS.push({ id: 'D-picaro_spawn', ids: ['D04', 'GFX-008'], cat: 'りゅう座（D）', group: 'りゅう座', title: 'ピカロの生成', duration: 5.2, color: '#ab9cff',
-  params: [{ k: 'style', label: '現れる姿の案（0 星空の窓／1 星座／2 光の霊）', type: 'select', options: [{ value: 0, label: '星空の窓' }, { value: 1, label: '星座' }, { value: 2, label: '光の霊' }], def: 0 }],
-  status: { '状態': '試作（未承認）', '作り': '星が渦を巻いて集まり塊になる → 半透明の膜がスライムのようにうねり、表面に渦模様と明るい縁、まわりを細い帯が回る → 塊がゆがんだあと、膜が帯状に裂けてらせんにほどけながら外へ飛ぶ → 中から白く光った敵が現れ、ピカロの姿へ落ち着く。星と粒が残って消える（仕様 8.2）', '現行': '現行表示は敵がそのまま出る' },
+const PC_BLOB = ['#2a0c4e', '#4a1a86', '#7a2fc4', '#b25cff', '#e3b8ff', '#ffffff'].map(parseCol);
+function pcMorph(e, t, k, style) { // k：0＝塊 → 1＝敵の形
+  const f = pcSdf(e.type), b = pcBase(e.type); if (!f) return null; const pic = pcFilter(e.type, style, t, e.seed || 0), pd = pic.getContext('2d').getImageData(0, 0, b.w, b.h).data, o = f.img.data, cx = f.W2 / 2, cy = f.H2 / 2, R0 = f.R0;
+  const kk = smooth(0, 1, k), wobK = 1 - smooth(0.55, 1, k), lobes = [0, 1, 2].map(n => { const an = t * (2.2 + n * 0.7) + n * 2.1; return [cx + Math.cos(an) * R0 * 0.55, cy + Math.sin(an * 1.3) * R0 * 0.45, R0 * (0.42 + 0.1 * Math.sin(t * 5 + n))]; });
+  const sqx = 1 + 0.12 * Math.sin(t * 9) * wobK, sqy = 1 - 0.12 * Math.sin(t * 9) * wobK;
+  for (let y = 0; y < f.H2; y++) for (let x = 0; x < f.W2; x++) { const q = (y * f.W2 + x) * 4, X = (x - cx) / sqx, Y = (y - cy) / sqy, th = Math.atan2(Y, X), rho = Math.hypot(X, Y);
+    let db = rho - R0 * (1 + 0.15 * Math.sin(3 * th + t * 7) + 0.1 * Math.sin(5 * th - t * 11) + 0.06 * Math.sin(2 * th + t * 4));
+    for (const [lx, ly, lr] of lobes) { const dl = Math.hypot(x - lx, y - ly) - lr, h = clamp(0.5 + 0.5 * (dl - db) / 6); db = lerp(dl, db, h) - 6 * h * (1 - h); } // こぶをなめらかにつなぐ
+    const de = f.d[y * f.W2 + x], dd = lerp(db, de, kk) + Math.sin(x * 0.4 + t * 8) * Math.cos(y * 0.35 - t * 7) * 1.6 * wobK;
+    if (dd > 0) { o[q + 3] = 0; continue; }
+    const depth = clamp(-dd / (R0 * 0.55)), swirl = 0.5 + 0.5 * Math.sin(th * 3 + rho * 0.35 - t * 6), lv = depth < 0.12 ? 4 : depth < 0.3 ? 3 : swirl > 0.75 ? 3 : depth < 0.6 ? 2 : 1; let c = PC_BLOB[lv];
+    if (depth < 0.08 && swirl > 0.6) c = PC_BLOB[5];
+    const i = x - f.pad, j = y - f.pad, pk = (j * b.w + i) * 4, show = smooth(0.62, 1, k); if (show > 0 && i >= 0 && j >= 0 && i < b.w && j < b.h && pd[pk + 3] > 0) c = mixC(c, { r: pd[pk] / 255, g: pd[pk + 1] / 255, b: pd[pk + 2] / 255 }, show);
+    o[q] = c.r * 255; o[q + 1] = c.g * 255; o[q + 2] = c.b * 255; o[q + 3] = 255; }
+  f.ctx.putImageData(f.img, 0, 0); return f;
+}
+function pcDrawMorph(e, f, alpha = 1, white = 0) { const d = enemyDef(e.type), b = pcBase(e.type), ang = d.look.fixed_angle ? d.look.angle : d.look.angle + e.facing, sc = 2 * spriteR(e.type, e.r) / Math.max(b.w, b.h);
+  g.save(); g.translate(e.pos.x, e.pos.y); g.rotate(ang); g.globalAlpha = alpha; g.imageSmoothingEnabled = false; g.drawImage(f.canvas, -f.W2 * sc / 2, -f.H2 * sc / 2, f.W2 * sc, f.H2 * sc);
+  if (white > 0) { g.globalCompositeOperation = 'lighter'; g.globalAlpha = white; g.filter = 'brightness(0) invert(1)'; g.drawImage(f.canvas, -f.W2 * sc / 2, -f.H2 * sc / 2, f.W2 * sc, f.H2 * sc); g.filter = 'none'; } g.restore(); }
+const PC_SPAWN = { grow: 0.35, blob: 1.3, morph: 2.3, settle: 2.7 };
+function pcSpawnFx(S, R, e, t) { // まわりの粒：塊のしずくが飛び、ふくらむ紫の煙、形が決まる瞬間にきらめき
+  if (t < 0) return; const c = toL(e.pos), Rr = e.r * WL * 1.3, P2 = PC_SPAWN, purple = [hexc('#4a1a86'), hexc('#7a2fc4'), hexc('#b25cff'), hexc('#e3b8ff')];
+  for (let m = 0; m < 10; m++) { const born = 0.2 + hash(m * 3.3 + (e.seed || 0)) * (P2.morph - 0.4), a = t - born, life = 0.5; if (a < 0 || a > life) continue; const an = hash(m * 7.1) * TAU, d = Rr * (0.9 + a * 2.4), q = V(c.x + Math.cos(an) * d, c.y + Math.sin(an) * d + a * a * 20), k = a / life; R.front.px(q.x, q.y, purple[k < 0.4 ? 3 : 2]); if (k < 0.5) R.front.px(q.x + 1, q.y, purple[2]); }
+  if (t < P2.blob) for (let m = 0; m < 18; m++) { const ph = (t * 0.8 + hash(m * 2.7)) % 1, an = hash(m * 5.3) * TAU + t, d = Rr * (0.7 + ph * 1.2), q = V(c.x + Math.cos(an) * d, c.y + Math.sin(an) * d - ph * 6); R.back.dot(q.x, q.y, purple[0], (1 - ph) * 0.6 * smooth(0, P2.grow, t)); }
+  const pop = t - P2.morph; if (pop > 0 && pop < 0.6) { const pal = FX.ramp(R.P.color); for (let m = 0; m < 12; m++) { const an = hash(m * 4.1 + 9) * TAU, d = Rr * (0.8 + pop * 2.5 * (0.5 + hash(m))), q = V(c.x + Math.cos(an) * d, c.y + Math.sin(an) * d); dStar(R, q, 1.5, t * 6 + m, 1 - pop / 0.6, pal); } if (pop < 0.1) R.front.glow(c.x, c.y, Rr * 1.3, purple[3], (1 - pop / 0.1) * 0.6 * R.P.intensity); }
+}
+DEMOS.push({ id: 'D-picaro_spawn', ids: ['D04', 'GFX-008'], cat: 'りゅう座（D）', group: 'りゅう座', title: 'ピカロの生成', duration: 4.6, color: '#ab9cff', params: [],
+  status: { '状態': '試作（未承認）', '作り': '紫の塊がふくらんで現れ、こぶを回しながらもにょもにょうねる（押しつぶし・伸び）→ 塊の形がだんだん敵の形へ移り、色もピカロの姿（星空の窓）へ移る → 形が決まる瞬間に白く光り、星がはじけて落ち着く。まわりにしずくと紫の煙', '現行': '現行表示は敵がそのまま出る' },
   refs: ['docs/game/bosses/draco.md 8.2'],
-  setup(S) { cam.zoom = 1.6; S.ents = ['biter', 'telescope', 'lynx'].map((type, i) => { const e = mkE(type, V(-260 + i * 260, 0), Math.PI); e.seed = i * 5.3; e.t0 = 0.3 + i * 0.6; return e; }); S.ship = shipState(V(0, 380), -Math.PI / 2, 0); },
+  setup(S) { cam.zoom = 1.8; S.ents = ['biter', 'telescope', 'lynx'].map((type, i) => { const e = mkE(type, V(-240 + i * 240, 0), Math.PI); e.seed = i * 5.3; e.t0 = 0.2 + i * 0.35; return e; }); S.ship = shipState(V(0, 260), -Math.PI / 2, 0); },
   step() {},
-  draw(S, R) { const st = +(R.P.style ?? 0);
-    if (R.proto) for (const e of S.ents) { pcSpawnFx(S, R, e, e.t0, st); if (S.t - e.t0 > PC_SPAWN.tear) pcAura(R, e, S.t, smooth(PC_SPAWN.tear, PC_SPAWN.tear + 0.6, S.t - e.t0)); }
+  draw(S, R) {
+    if (R.proto) for (const e of S.ents) { const t = S.t - e.t0; pcSpawnFx(S, R, e, t); if (t > PC_SPAWN.morph) pcAura(R, e, S.t, smooth(PC_SPAWN.morph, PC_SPAWN.settle, t)); }
     R.blitBack();
-    for (const e of S.ents) { const t = S.t - e.t0; if (!R.proto) { if (t > 0) drawEnemy(e); continue; } if (t > PC_SPAWN.deform + 0.2) { const k = smooth(PC_SPAWN.deform + 0.2, PC_SPAWN.tear + 0.1, t); pcDraw(e, st, S.t, k, 1 - smooth(PC_SPAWN.tear, PC_SPAWN.tear + 0.5, t)); } }
+    for (const e of S.ents) { const t = S.t - e.t0; if (!R.proto) { if (t > 0) drawEnemy(e); continue; } if (t < 0) continue;
+      if (t < PC_SPAWN.settle) { const grow = smooth(0, PC_SPAWN.grow, t), k = smooth(PC_SPAWN.blob, PC_SPAWN.morph, t), f = pcMorph(e, S.t, k, 0); const save = e.r; e.r = save * (0.3 + 0.7 * grow); pcDrawMorph(e, f, 1, Math.max(0, 1 - Math.abs(t - PC_SPAWN.morph) / 0.12) * 0.45); e.r = save; }
+      else pcDraw(e, 0, S.t); }
     drawShip(S.ship); },
-  phase(S) { return '' } });
+  phase() { return '' } });
 
 const CAT_ORDER = ['ボスへの命中 G10', '鳳凰 G11', '敵（ステージ1以外）G12', 'ケンタウルス座（C）', 'おおいぬ座（O）', 'いっかくじゅう座（I）', 'うみへび座（H）', 'りゅう座（D）', '参照（ステージ1）'];
 DEMOS.sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat));
