@@ -65,6 +65,7 @@ var _monitor_material: ShaderMaterial
 # プレビューでは複製した Resource を渡し、本番の調整値を保存せず比較できる。
 var reveal_settings: Resource = REVEAL_SETTINGS
 var _transition_progress := 0.0
+var _debug_unlock: Button
 var _dragging := false
 var _pointer_down := false
 var _press_position := Vector2.ZERO
@@ -144,6 +145,15 @@ func _ready() -> void:
 	for content: Control in [_heading, _status, _launch]:
 		content.reparent(_details)
 	_launch.pressed.connect(_start)
+	if OS.is_debug_build():
+		_debug_unlock = _button(tr("stage_select.unlock_all"), Vector2(444, 260), Vector2(150, 26))
+		_debug_unlock.toggle_mode = true
+		_debug_unlock.add_theme_font_size_override("font_size", 10)
+		_debug_unlock.reparent(_details)
+		_debug_unlock.toggled.connect(func(_enabled: bool):
+			_refresh_stage_visibility()
+			_reveal_details()
+		)
 	if ContentManager.stage_count() > 4:
 		var final_stage := _button(tr("stage.5.name"), Vector2(224, 333), Vector2(150, 16))
 		_final_stage = final_stage
@@ -154,7 +164,7 @@ func _ready() -> void:
 		final_stage.focus_entered.connect(_on_stage_focus.bind(4))
 	get_window().focus_exited.connect(func():
 		if _dragging:
-			select_constellation(posmod(roundi(_angle / 90.0), 4))
+			select_constellation(_nearest_visible_star(_angle))
 		_cancel_drag()
 	)
 	var monitor := ColorRect.new()
@@ -165,7 +175,7 @@ func _ready() -> void:
 	_monitor_material.shader = preload("res://assets/ui/map/monitor.gdshader")
 	monitor.material = _monitor_material
 	add_child(monitor)
-	_select(0)
+	_refresh_stage_visibility()
 	_apply_rotation(0.0)
 	_hide_details()
 	visibility_changed.connect(func():
@@ -248,6 +258,8 @@ func _label(at: Vector2, dimensions: Vector2, font_size: int) -> Label:
 	return label
 
 func select_constellation(index: int) -> void:
+	if index < 0 or index >= _visible_stage_count():
+		return
 	if index != _selected:
 		AudioManager.play(&"stage_select_click", -10.0)
 	if _turn != null:
@@ -279,7 +291,7 @@ func _horizontal_neighbor(direction: int) -> int:
 	var wrapped := _selected
 	var wrap_edge := INF
 	for i in buttons.size():
-		if i == _selected:
+		if i == _selected or not buttons[i].visible:
 			continue
 		var x := buttons[i].get_global_rect().get_center().x
 		var distance := (x - from_x) * direction
@@ -307,10 +319,10 @@ func _input(event: InputEvent) -> void:
 				select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
 			else:
 				var step := -1 if event.is_action(&"ui_up") else 1
-				select_constellation(posmod(_selected + step, mini(ContentManager.stage_count(), 5)))
+				select_constellation(posmod(_selected + step, _visible_stage_count()))
 		return
 	# 戻るにフォーカスがあるときは標準の決定を使い、それ以外は選択中の出撃。
-	if event.is_action(&"ui_accept") and focus != _back:
+	if event.is_action(&"ui_accept") and focus != _back and (focus == null or focus != _debug_unlock):
 		get_viewport().set_input_as_handled()
 		if event.is_pressed() and not event.is_echo():
 			_start()
@@ -333,7 +345,7 @@ func _input(event: InputEvent) -> void:
 				_stars[star].grab_focus()
 		elif _pointer_down:
 			if _dragging:
-				select_constellation(posmod(roundi(_angle / 90.0), 4))
+				select_constellation(_nearest_visible_star(_angle))
 			elif _pressed_star >= 0 and _star_at(point) == _pressed_star:
 				select_constellation(_pressed_star)
 			_cancel_drag()
@@ -353,7 +365,7 @@ func _input(event: InputEvent) -> void:
 			if _radial_drag:
 				delta_angle = rad_to_deg(wrapf(offset.angle() - _last_drag_angle, -PI, PI)) if offset.length() >= 20.0 else 0.0
 			var angle := _angle + delta_angle
-			_select(posmod(roundi(angle / 90.0), 4))
+			_select(_nearest_visible_star(angle))
 			_apply_rotation(angle)
 			_last_drag_angle = offset.angle()
 			_last_pointer = point
@@ -363,7 +375,7 @@ func _star_at(point: Vector2) -> int:
 	var found := -1
 	for i in _stars.size():
 		var star := _stars[i]
-		if Rect2(star.position, star.size * star.scale).has_point(point):
+		if star.visible and Rect2(star.position, star.size * star.scale).has_point(point):
 			if found < 0 or star.z_index > _stars[found].z_index:
 				found = i
 	return found
@@ -376,13 +388,12 @@ func _cancel_drag() -> void:
 func _select(index: int) -> void:
 	_selected = index
 	var stage := index + 1
-	var unlocked := OS.is_debug_build() or SaveManager.is_stage_unlocked(stage)
 	_heading.text = tr("stage.%d.name" % stage)
 	_preview.texture = PREVIEW_ART[index] if index < PREVIEW_ART.size() else null
 	_preview_stars.texture = PREVIEW_STARS[index] if index < PREVIEW_STARS.size() else null
 	_selection_frame.visible = index < SYMBOL_TEXTURES.size()
-	_launch.disabled = not unlocked or not navigation_enabled
-	_status.text = tr("stage_select.debug") if OS.is_debug_build() else (tr("stage_select.available") if unlocked else tr("stage_select.locked").format({n = stage}))
+	_launch.disabled = not navigation_enabled
+	_status.text = tr("stage_select.debug") if _debug_unlock != null and _debug_unlock.button_pressed else tr("stage_select.available")
 	_apply_rotation(_angle)
 
 func _apply_rotation(degrees: float) -> void:
@@ -422,8 +433,36 @@ func _update_star_phases() -> void:
 	for i in _star_phases.size():
 		_star_phases[i].visible = i < visible_count
 
+func _visible_stage_count() -> int:
+	var count := mini(ContentManager.stage_count(), SYMBOL_TEXTURES.size() + 1)
+	if _debug_unlock != null and _debug_unlock.button_pressed:
+		return count
+	return clampi(int(SaveManager.data.cleared_stage) + 1, 1, count)
+
+func _refresh_stage_visibility() -> void:
+	var count := _visible_stage_count()
+	for i in _stars.size():
+		_stars[i].visible = i < count
+	if _final_stage != null:
+		_final_stage.visible = count > _stars.size()
+	if _selected >= count:
+		select_constellation(0)
+	else:
+		_select(_selected)
+
+func _nearest_visible_star(degrees: float) -> int:
+	var nearest := 0
+	var distance := INF
+	for i in mini(_visible_stage_count(), _stars.size()):
+		var offset := absf(wrapf(90.0 - SYMBOL_ANGLES[i] - degrees, -180.0, 180.0))
+		if offset < distance:
+			nearest = i
+			distance = offset
+	return nearest
+
 func focus_selection() -> void:
 	_update_star_phases()
+	_refresh_stage_visibility()
 	_launch_requested = false
 	_focus_selected()
 	_reveal_details()
@@ -437,7 +476,7 @@ func _focus_selected() -> void:
 func _start() -> void:
 	if not navigation_enabled or _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()):
 		return
-	if OS.is_debug_build() or SaveManager.is_stage_unlocked(_selected + 1):
+	if _selected < _visible_stage_count():
 		_launch_requested = true
 		AudioManager.play(&"ui")
 		GameManager.start_run(_selected + 1)
