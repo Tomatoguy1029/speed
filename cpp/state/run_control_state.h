@@ -26,7 +26,7 @@ struct RunControlState {
         EnemyHandle target;
         int64_t target_id=0,serial=0;
         godot::Vector2 entry,exit,direction;
-        double remaining=0;
+        double remaining=0,started_at=-1,released_at=-1;
     } boss_ram;
     int64_t next_boss_ram_serial=1;
     bool draco_finish_done=false;

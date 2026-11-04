@@ -38,7 +38,7 @@ bool BossRamSystem::begin(RunRuntime &r,EnemyHandle target,godot::Vector2 contac
     ram.pending=true;ram.target=target;ram.target_id=enemy.id;ram.serial=control.next_boss_ram_serial++;
     ram.direction=direction;ram.entry=contact+direction*ship_radius;
     ram.exit=contact+direction*(-projection+std::sqrt(discriminant)+4.0);
-    ram.remaining=s.hitstop_enabled?control.boss_ram_hitstop:0;
+    ram.remaining=s.hitstop_enabled?control.boss_ram_hitstop:0;ram.started_at=s.sim_time;ram.released_at=-1;
     s.ship.pos=contact;s.ship_pos=contact;s.hitstop=std::max(s.hitstop,ram.remaining);
     notify(r,"in",ram.entry);
     return true;
@@ -49,6 +49,7 @@ void BossRamSystem::advance(RunRuntime &r,double real_dt) {
     ram.remaining=std::max(0.0,ram.remaining-real_dt);
     if (ram.remaining>0) return;
     // 世界の地形との接触は、瞬間移動後も通常と同じ解決器へ渡す。
+    ram.released_at=s.sim_time;
     s.ship.pos=ram.exit;s.ship_pos=ram.exit;
     FieldSystem::collide_ship(r);
     notify(r,"out",ram.exit-ram.direction*(s.ship_config.ship_radius+4.0));

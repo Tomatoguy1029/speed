@@ -55,7 +55,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         state.behavior_kinds.size()!=state.behavior_rows.size()) return false;
     const auto &ram=state.control.boss_ram;
     if (!std::isfinite(state.control.boss_ram_hitstop) || state.control.boss_ram_hitstop<0 || state.control.next_boss_ram_serial<1 ||
-        !std::isfinite(ram.remaining) || ram.remaining<0 || !ram.entry.is_finite() || !ram.exit.is_finite() || !ram.direction.is_finite()) return false;
+        !std::isfinite(ram.remaining) || ram.remaining<0 || !std::isfinite(ram.started_at) || !std::isfinite(ram.released_at) || ram.started_at< -1 || ram.released_at< -1 || !ram.entry.is_finite() || !ram.exit.is_finite() || !ram.direction.is_finite()) return false;
     if (ram.pending && (!ram.target.generation || ram.target_id<=0 || ram.serial<=0 || ram.serial>=state.control.next_boss_ram_serial)) return false;
     if (!std::isfinite(state.control.boss_at) || state.control.boss_at<-1 || !std::isfinite(state.control.world_real_accum) || !std::isfinite(state.control.world_dt_accum) ||
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
