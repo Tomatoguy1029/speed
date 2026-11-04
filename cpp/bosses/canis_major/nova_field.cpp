@@ -1,5 +1,6 @@
 #include "nova_field.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <array>
 #include <cmath>

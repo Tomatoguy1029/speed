@@ -2,6 +2,7 @@
 #include "../attack_system.h"
 #include "../../output/render_builder.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 namespace speed {
 AttackHandle StarBoltSystem::emit(RunRuntime &run,const StarBoltParams &p) {

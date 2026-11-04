@@ -11,6 +11,7 @@
 #include "../bosses/draco/body.h"
 #include "../systems/attack_system.h"
 #include "../state/boss_states.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

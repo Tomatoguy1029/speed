@@ -8,6 +8,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/attacks/bolt.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

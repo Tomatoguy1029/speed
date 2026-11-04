@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../systems/attacks/shell.h"
 #include "../systems/attack_system.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_shell_command(const Dictionary &p) {

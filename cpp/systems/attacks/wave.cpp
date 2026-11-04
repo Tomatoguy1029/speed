@@ -3,6 +3,7 @@
 #include "../combat_resolver.h"
 #include "../motion_math.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

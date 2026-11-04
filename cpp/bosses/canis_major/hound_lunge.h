@@ -1,6 +1,7 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 struct HoundLungeSettings {
     double speed=0,duration=0,damage=0,grace=0;

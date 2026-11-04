@@ -5,6 +5,7 @@
 #include "../../systems/motion_math.h"
 #include "../../systems/attack_budget.h"
 #include "../../systems/attacks/wave.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void DolphinBehavior::step(RunRuntime &r,uint32_t row,double dt) {

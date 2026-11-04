@@ -5,6 +5,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void HydraTechnique::pincer(RunRuntime &r,TechniqueState &t) {

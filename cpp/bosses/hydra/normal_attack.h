@@ -1,6 +1,7 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 struct HydraNormalContext {BossBodyState *boss;HydraNeckState *neck;TechniqueHandle parent;double neck_rest;uint32_t damage_source;};
 class HydraNormalAttack {public:

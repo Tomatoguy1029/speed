@@ -3,6 +3,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attacks/blast.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void RocketBehavior::step(RunRuntime &run,uint32_t row,double dt) {
     auto &state=run.state;auto &enemy=state.enemies[row];const auto &def=run.content->definitions[enemy.definition];

@@ -9,6 +9,7 @@
 #include "../bosses/canis_major/fire_visual_state.h"
 #include "../content/generated/combat_ids.h"
 #include "../content/boss_image_data.h"
+#include "../content/boss_image_data.h"
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <string>

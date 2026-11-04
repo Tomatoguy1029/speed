@@ -6,6 +6,7 @@
 #include "../../systems/attacks/friend_debris.h"
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

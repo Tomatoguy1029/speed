@@ -13,6 +13,8 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../state/boss_states.h"
+#include "../../state/loadout_state.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -28,7 +30,7 @@ void scan(RunRuntime &r,BossBodyState &b) {
     std::vector<CanisHoundRef> next;for (const auto &entry:found) {const auto actor=entry.second;const auto old=std::find_if(b.canis.led.begin(),b.canis.led.end(),[&](const auto &v){return same_handle(v.actor,actor);});const auto &e=s.enemies[actor.slot];next.push_back(old==b.canis.led.end()?CanisHoundRef{actor,e.max_hp,r.content->definitions[e.definition].color}:*old);}
     for (const auto &old:b.canis.led) if (s.enemy_handles.contains(old.actor) && std::none_of(next.begin(),next.end(),[&](const auto &v){return same_handle(v.actor,old.actor);})) {auto &e=s.enemies[old.actor.slot];resize(e,old.base_hp);}
     std::sort(next.begin(),next.end(),[&](const auto &a,const auto &b){return s.enemy_handles.entity_id(a.actor)<s.enemy_handles.entity_id(b.actor);});b.canis.led=std::move(next);
-    const auto &c=s.combat_config;double burst=std::max(1.0,s.loadout.full_charge_maximum);
+    const auto &c=s.combat_config;double burst=std::max(1.0,s.loadout->full_charge_maximum);
     const double power=c.base_attack*c.attack_mult*c.atk_scale*burst;for (const auto &v:b.canis.led) {auto &e=s.enemies[v.actor.slot];resize(e,std::max(v.base_hp,power*(std::max(1.0,p.led_hits)-0.5)));}
 }
 void spawn_pack(RunRuntime &r,BossBodyState &b,bool call) {

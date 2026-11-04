@@ -7,6 +7,8 @@
 #include "../bosses/draco/body.h"
 #include "../output/frame_builder.h"
 #include "../content/generated/run_schema_read.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -106,7 +108,7 @@ godot::Dictionary DevCommands::set_profile(RunRuntime &run,const godot::Dictiona
             *target=value;
         }
     }
-    auto &p=run.state.loadout;p.charge_profile_factor=charge;p.speed_profile_factor=speed;p.attack_profile_factor=attack;p.pickup_profile_factor=pickup;p.length_profile_factor=length;p.xp_profile_factor=xp;p.hp_profile_add=hp;p.reroll_profile_add=reroll;
+    auto &p=*run.state.loadout;p.charge_profile_factor=charge;p.speed_profile_factor=speed;p.attack_profile_factor=attack;p.pickup_profile_factor=pickup;p.length_profile_factor=length;p.xp_profile_factor=xp;p.hp_profile_add=hp;p.reroll_profile_add=reroll;
     if (p.ready) EquipmentSystem::refresh_effects(run);
     return reply(true);
 }

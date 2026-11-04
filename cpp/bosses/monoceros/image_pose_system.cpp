@@ -2,6 +2,7 @@
 #include "sweep_visual.h"
 #include "../flow/technique_runner.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>

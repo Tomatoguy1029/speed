@@ -4,6 +4,7 @@
 #include "roar.h"
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <algorithm>

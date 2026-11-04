@@ -13,6 +13,7 @@
 #include "../bosses/centaurus/stomp.h"
 #include "../output/event_builder.h"
 #include "../state/boss_states.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 namespace {

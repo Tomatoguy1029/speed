@@ -51,6 +51,8 @@
 #include "../systems/attack_budget.h"
 #include "../behaviors/enemies/pursuit.h"
 #include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>

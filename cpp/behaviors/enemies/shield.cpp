@@ -3,6 +3,7 @@
 #include "../../systems/motion_math.h"
 #include "../../output/event_builder.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <cmath>
 namespace speed {

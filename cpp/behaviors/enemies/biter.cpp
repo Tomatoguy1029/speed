@@ -9,6 +9,7 @@
 #include "defender.h"
 #include "../../systems/attacks/zone.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>

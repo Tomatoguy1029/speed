@@ -2,6 +2,7 @@
 #include "../../content/boss_image_data.h"
 #include "../../content/boss_image_pose_data.h"
 #include "image_pose_state.h"
+#include "../../content/content_bundle.h"
 #include <string>
 #include <vector>
 

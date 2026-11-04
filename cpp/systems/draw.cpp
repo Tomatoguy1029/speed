@@ -17,6 +17,8 @@
 #include "../behaviors/weapons/sonic.h"
 #include "../behaviors/weapons/endBlast.h"
 #include "../behaviors/weapons/mines.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -133,7 +135,7 @@ void SpeedRunCore::commit_draw() {
     speed::RampageBehavior::launch(runtime);
     speed::SonicBehavior::launch(runtime);
     speed::KillSonicBehavior::launch(runtime);
-    for (const auto &owned:runtime.state.loadout.weapons) {
+    for (const auto &owned:runtime.state.loadout->weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
         if (id=="W27") speed::AfterimageBehavior::launch(runtime);
         else if (id=="W22") speed::BipolarBehavior::launch(runtime);
@@ -174,7 +176,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
 
 void SpeedRunCore::end_trace(bool completed) {
     runtime.state.draw.tracing = false;
-    for (const auto &owned:runtime.state.loadout.weapons) {
+    for (const auto &owned:runtime.state.loadout->weapons) {
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
         if (id=="W28") speed::FlashSlashBehavior::end(runtime);
         else if (id=="W27") speed::AfterimageBehavior::end(runtime);
@@ -184,7 +186,7 @@ void SpeedRunCore::end_trace(bool completed) {
         else if (id=="W29") speed::EndBlastBehavior::end(runtime);
         else if (id=="W07") speed::MinesBehavior::end(runtime);
     }
-    for (const auto &owned:runtime.state.loadout.traits) {
+    for (const auto &owned:runtime.state.loadout->traits) {
         if (runtime.state.phase!=RunState::Phase::Play) break;
         const auto &id=runtime.content->equipment[owned.definition-1].external_id;
         if (id=="T05") speed::KillSonicBehavior::end(runtime);
@@ -219,7 +221,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
     }
     const auto trail=[&](Vector2 from) {
         speed::FullChargeBehavior::trail(runtime,from,runtime.state.ship.pos);
-        for (const auto &owned:runtime.state.loadout.weapons) {
+        for (const auto &owned:runtime.state.loadout->weapons) {
             if (runtime.state.phase!=RunState::Phase::Play) return;
             if (runtime.content->equipment[owned.definition-1].external_id=="W27") speed::AfterimageBehavior::trail(runtime,from,runtime.state.ship.pos);
             else if (runtime.content->equipment[owned.definition-1].external_id=="W26") speed::DashRangeDroneBehavior::trail(runtime,from,runtime.state.ship.pos);

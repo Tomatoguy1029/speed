@@ -5,6 +5,7 @@
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 namespace {

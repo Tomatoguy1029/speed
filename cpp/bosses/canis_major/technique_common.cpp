@@ -5,6 +5,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void CanisTechnique::cue(RunRuntime &r,const TechniqueState &t,const char *name,EnemyHandle actor,double radius,uint32_t profile,double initial_age) {const auto &e=r.state.enemies[r.state.enemy_handles.contains(actor)?actor.slot:t.actor.slot];godot::Dictionary p;p["id"]=r.state.enemy_handles.entity_id(t.actor);p["technique"]=t.definition;p["cue"]=name;p["position"]=e.pos;p["angle"]=r.state.enemies[t.actor.slot].facing;const auto *body=PhaseController::find(r,t.actor);p["world_time"]=body?body->clock:r.state.world_time;if (radius>=0) {p["radius"]=radius;p["profile"]=profile;p["age"]=initial_age;}FrameBuilder::append(r,"canis_cue",p);}

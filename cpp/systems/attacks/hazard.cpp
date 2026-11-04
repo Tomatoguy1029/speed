@@ -7,6 +7,7 @@
 #include "wall.h"
 #include "zone.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 #include <algorithm>
 namespace speed {

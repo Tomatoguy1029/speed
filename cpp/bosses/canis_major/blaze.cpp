@@ -9,6 +9,8 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/attack_system.h"
 #include "../../state/boss_states.h"
+#include "../../state/loadout_state.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -17,7 +19,7 @@ const CanisBlazeDefinition &rule(const ContentBundle &c,uint32_t definition) {re
 bool live(const RunRuntime &r,EnemyHandle h) {return r.state.enemy_handles.contains(h) && !r.state.enemies[h.slot].dead;}
 void resize(godot::RunState::Enemy &e,double hp) {e.hp=hp*e.hp/std::max(0.001,e.max_hp);e.max_hp=hp;}
 void ignite(RunRuntime &r,BossBodyState &b,const TechniqueState &t,EnemyHandle actor) {
-    auto &e=r.state.enemies[actor.slot];const auto old=std::find_if(b.canis.led.begin(),b.canis.led.end(),[&](const auto &v){return same_handle(v.actor,actor);});CanisBurningHound v;v.actor=actor;v.observation_id=t.observation_id;v.effect_id=-r.state.enemy_handles.entity_id(actor);v.observation_pos=e.pos;r.state.observations.retain(v.observation_id);r.state.observations.effect_begin(v.effect_id,v.observation_id,e.pos);v.definition=rule(*r.content,t.definition).id;v.technique=t.definition;v.base_hp=old==b.canis.led.end()?e.max_hp:old->base_hp;v.color=old==b.canis.led.end()?r.content->definitions[e.definition].color:old->color;if (old!=b.canis.led.end()) b.canis.led.erase(old);b.canis.burning.push_back(v);const auto &c=r.state.combat_config;resize(e,c.base_attack*c.attack_mult*c.atk_scale*std::max(1.0,r.state.loadout.full_charge_maximum)*0.5);GroupSystem::release_order(r.state,actor);CanisTechnique::cue(r,t,"blaze_ignite",actor);
+    auto &e=r.state.enemies[actor.slot];const auto old=std::find_if(b.canis.led.begin(),b.canis.led.end(),[&](const auto &v){return same_handle(v.actor,actor);});CanisBurningHound v;v.actor=actor;v.observation_id=t.observation_id;v.effect_id=-r.state.enemy_handles.entity_id(actor);v.observation_pos=e.pos;r.state.observations.retain(v.observation_id);r.state.observations.effect_begin(v.effect_id,v.observation_id,e.pos);v.definition=rule(*r.content,t.definition).id;v.technique=t.definition;v.base_hp=old==b.canis.led.end()?e.max_hp:old->base_hp;v.color=old==b.canis.led.end()?r.content->definitions[e.definition].color:old->color;if (old!=b.canis.led.end()) b.canis.led.erase(old);b.canis.burning.push_back(v);const auto &c=r.state.combat_config;resize(e,c.base_attack*c.attack_mult*c.atk_scale*std::max(1.0,r.state.loadout->full_charge_maximum)*0.5);GroupSystem::release_order(r.state,actor);CanisTechnique::cue(r,t,"blaze_ignite",actor);
 }
 void cue(RunRuntime &r,const BossBodyState &b,const CanisBurningHound &v,const char *name,double radius=-1,double initial_age=0) {TechniqueState t;t.actor=b.actor;t.definition=v.technique;CanisTechnique::cue(r,t,name,v.actor,radius,v.definition,initial_age);}
 }

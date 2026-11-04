@@ -1,6 +1,7 @@
 #include "blast.h"
 #include "../attack_system.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 #include <algorithm>
 namespace speed {

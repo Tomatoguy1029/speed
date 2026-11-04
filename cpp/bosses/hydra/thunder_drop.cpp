@@ -5,6 +5,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/tracking_policy.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void HydraNormalAttack::lightning(RunRuntime &r,BossBodyState &b,TechniqueState &t,godot::Vector2 at,double delay,const HydraThunderDefinition &v,const HydraNormalContext *ctx) {

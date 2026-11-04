@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../systems/field.h"
 #include "../behaviors/enemies/defender.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 using namespace godot;
 namespace {

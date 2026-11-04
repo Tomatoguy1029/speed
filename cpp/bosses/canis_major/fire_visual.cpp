@@ -2,6 +2,7 @@
 #include "image_pose.h"
 #include "../../systems/attack_system.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>

@@ -6,6 +6,7 @@
 #include "../bosses/canis_major/roar.h"
 #include "../bosses/monoceros/image_pose_system.h"
 #include "../state/boss_states.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 #include <algorithm>
 namespace speed {

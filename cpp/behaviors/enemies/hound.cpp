@@ -2,6 +2,7 @@
 #include "pursuit.h"
 #include "../../systems/group_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

@@ -8,6 +8,7 @@
 #include "../../systems/collision_query.h"
 #include "../../systems/tracking_policy.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void HydraTechnique::debris_shatter(RunRuntime &r,TechniqueState &t,double) {

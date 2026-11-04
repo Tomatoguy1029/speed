@@ -3,6 +3,7 @@
 #include "pose.h"
 #include "../flow/phase_controller.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

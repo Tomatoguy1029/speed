@@ -1,6 +1,7 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {class DracoTechnique {public:
     static bool supports(uint32_t kind);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);

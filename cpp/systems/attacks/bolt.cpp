@@ -2,6 +2,7 @@
 #include "../attack_system.h"
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 namespace speed {
 AttackHandle BoltSystem::emit(RunRuntime &run,const BoltParams &p) {

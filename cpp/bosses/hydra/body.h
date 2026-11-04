@@ -1,6 +1,7 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {class HydraBody {public:
     static const HydraBodyDefinition &rule(const RunRuntime &,const BossBodyState &);
     static EnemyHandle spawn(RunRuntime &,uint32_t,godot::Vector2,bool);

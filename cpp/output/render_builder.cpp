@@ -30,6 +30,8 @@
 #include "../behaviors/enemies/aquarius.h"
 #include "../behaviors/enemies/lynx.h"
 #include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -234,7 +236,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):CanisMajorBody::color(run,state.enemy_handles.at(i),definition.color)):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode==EnemyMode::Windup) color.g=std::fmod(enemy.charge*3.0,1.0)>=0.45?1.0:0.0;
         godot::Vector2 deform;double amount=0;bool flash=false;
-        for (const auto &w:state.loadout.contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
+        for (const auto &w:state.loadout->contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
         if (flash) color.r=1;
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,iron?Color(0,0,0,1):color,iron?int32_t((state.field.rock_handles.contains(enemy.rock)?int64_t(enemy.rock.slot):enemy.id)%3):(enemy.flash>0 || warning || flash?1:0));
         const auto *parent=state.enemy_handles.contains(enemy.parent)?&state.enemies[enemy.parent.slot]:nullptr;
@@ -437,7 +439,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Vector2 ship=state.ship.pos;double angle=state.ship.heading.angle();
     if (previous.ready) {ship=previous.ship_position.lerp(ship,alpha);angle=previous.ship_angle+angle_difference(angle-previous.ship_angle)*alpha;}
     const double forward_recoil=state.forward.recoil>0?(state.forward.recoil>0.06?2.0:1.0)*pixel:0;
-    const auto &scatter=state.loadout.scatter;
+    const auto &scatter=state.loadout->scatter;
     const double scatter_recoil=scatter.recoil>0?(scatter.recoil>0.035?2.0:1.0)*pixel:0;
     const auto at=ship-state.ship.heading*std::max(forward_recoil,scatter_recoil);
     const Transform2D transform(angle+godot::Math::PI/2.0,Vector2(config.character_scale,config.character_scale),0,at);

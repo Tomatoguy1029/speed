@@ -9,6 +9,7 @@
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void HydraFinish::begin(RunRuntime &r,BossBodyState &b) {

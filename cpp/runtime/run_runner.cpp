@@ -38,6 +38,8 @@
 #include "../systems/pickup_system.h"
 #include "../api/run_core.h"
 #include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -139,14 +141,14 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.phase==Phase::Play && !state.controls_locked) {
         MetricsDetailTimer equipment_time(core.runtime.frame_workspace.metrics,"equipment");
         timed("light_lances",[&]{LightLancesSystem::step(core.runtime,world_dt);});
-        for (const auto &owned:state.loadout.weapons) {
+        for (const auto &owned:state.loadout->weapons) {
             if (core.runtime.content->equipment[owned.definition-1].external_id=="W27") {MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.W27");AfterimageBehavior::step(core.runtime,dt);}
             if (state.phase!=Phase::Play) break;
         }
         if (state.phase!=Phase::Play) return true;
         // 取得順で更新し、各武器の後に進行状態を確認する。
-        if (state.loadout.ready) {
-            for (const auto &owned:state.loadout.weapons) {
+        if (state.loadout->ready) {
+            for (const auto &owned:state.loadout->weapons) {
                 const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
                 if (id=="W27") continue;
                 MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.",id);
@@ -167,7 +169,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
                 if (state.phase!=Phase::Play) break;
             }
         } else if (state.forward.ready) core.step_forward(world_dt);
-        if (state.phase==Phase::Play) for (const auto &owned:state.loadout.traits) {
+        if (state.phase==Phase::Play) for (const auto &owned:state.loadout->traits) {
             const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
             MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.",id);
             if (id=="T05") KillSonicBehavior::step(core.runtime,world_dt);
@@ -201,7 +203,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (world_step && state.phase==Phase::Play)
         for (auto &body:state.bosses->bodies) {CanisNova::field_tick(core.runtime,body);CanisFireVisualSystem::tick(core.runtime,body);}
     if (!core.check_run_end()) {
-        if (state.loadout.ready) timed("progression",[&]{ProgressionSystem::open(core);});
+        if (state.loadout->ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);
     }
     return true;

@@ -1,6 +1,7 @@
 #include "split.h"
 #include "pursuit.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 namespace speed {
 void SplitBehavior::step(RunRuntime &r,uint32_t row,double dt) {
