@@ -5418,6 +5418,7 @@ struct CanisRoarDefinition {
     double hound_warn{};
     bool has_hound_speed{};
     double hound_speed{};
+    double burst_duration{};
 };
 inline bool read(BinaryReader &input, CanisRoarDefinition &out) {
     if (!input.read_u32(out.id)) return false;
@@ -5439,6 +5440,8 @@ inline bool read(BinaryReader &input, CanisRoarDefinition &out) {
     if (!input.read_bool(out.has_hound_speed)) return false;
     if (!input.read_f64(out.hound_speed)) return false;
     if (out.hound_speed < 0) return false;
+    if (!input.read_f64(out.burst_duration)) return false;
+    if (out.burst_duration < 0) return false;
     return true;
 }
 struct MonocerosImageNode {
@@ -9104,7 +9107,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 364: {
         if (version != 1) return false;
-        if (count > input.remaining()/58) return false;
+        if (count > input.remaining()/66) return false;
         for (uint32_t i=0; i<count; ++i) { CanisRoarDefinition row; if (!read(input,row)) return false; out.CanisRoarDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
