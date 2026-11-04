@@ -1,5 +1,6 @@
 #include "boss_ram.h"
 #include "field.h"
+#include "../bosses/flow/phase_controller.h"
 #include "../runtime/run_runtime.h"
 #include "../output/frame_builder.h"
 #include <algorithm>
@@ -20,7 +21,8 @@ void notify(RunRuntime &r,const char *kind,godot::Vector2 at) {
 void BossRamSystem::cancel_invalid(RunRuntime &r) {
     auto &s=r.state;auto &ram=s.control.boss_ram;
     if (!ram.pending) return;
-    if (s.phase!=godot::RunState::Phase::Play || s.controls_locked || s.encounter_protected ||
+    const auto *body=PhaseController::find(r,ram.target);
+    if (!body || body->mode>=BossMode::Phase || s.phase!=godot::RunState::Phase::Play || s.controls_locked || s.encounter_protected ||
         !s.enemy_handles.contains(ram.target) || s.enemies[ram.target.slot].dead ||
         s.enemy_handles.entity_id(ram.target)!=ram.target_id) ram={};
 }
