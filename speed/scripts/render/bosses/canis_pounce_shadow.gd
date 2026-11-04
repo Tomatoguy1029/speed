@@ -42,6 +42,8 @@ func setup(source_parts: Node2D) -> void:
 	_material = ShaderMaterial.new()
 	_material.shader = COMPOSITE
 	_material.set_shader_parameter("color_pixels",_display.texture)
+	_material.set_shader_parameter("linear_color_pixels",_display.texture)
+	_material.set_shader_parameter("filter_color_linear",true)
 	_material.set_shader_parameter("light_pixels",_display.texture)
 	_material.set_shader_parameter("has_light",false)
 	_display.material = _material
