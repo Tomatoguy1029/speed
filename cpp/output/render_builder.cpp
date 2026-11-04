@@ -275,13 +275,16 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (const auto &well:state.field.wells) for (double value:{double(well.position.x),double(well.position.y),well.born,well.life,well.radius}) well_values.push_back(value);
     gravity["time"]=state.world_time;gravity["wells"]=well_values;
     PackedFloat64Array ruler;Array ruler_fx;
-    for (const auto &e:state.enemies) if (e.alive && !e.dead && !state.control.cinematic_hide_enemies && std::holds_alternative<RulerState>(e.behavior_state)) {
+    for (size_t i=0;i<state.enemies.size();++i) {
+        const auto &e=state.enemies[i];
+        if (!e.alive || e.dead || state.control.cinematic_hide_enemies || !std::holds_alternative<RulerState>(e.behavior_state)) continue;
         const auto &d=run.content->definitions[e.definition];const auto &p=run.content->rulers[d.ruler_definition-1];const auto color=d.color.lightened(0.2);
         for (double value:{double(e.pos.x),double(e.pos.y),e.radius,e.facing,double(e.mode),e.charge,p.beam_len,p.beam_width,p.beam_start_gap,double(color.r),double(color.g),double(color.b)}) ruler.push_back(value);
         const auto &ruler_state=std::get<RulerState>(e.behavior_state);if (!ruler_state.side || (e.mode!=EnemyMode::Windup && e.mode!=EnemyMode::Recover)) continue;
-        const auto direction=Vector2::from_angle(e.facing),normal=Vector2(-direction.y,direction.x);const double scale=2*e.radius*d.sprite_scale/58.0;
-        Dictionary fx;fx["id"]=e.id;fx["side"]=ruler_state.side;fx["pos"]=e.pos+direction*(27.5*scale+p.fx_muzzle)+normal*(ruler_state.side*10.5*scale);fx["angle"]=e.facing;fx["radius"]=e.radius;fx["charge"]=e.charge;fx["length"]=p.beam_len;fx["width"]=p.beam_width;fx["windup"]=e.mode==EnemyMode::Windup;fx["time"]=std::max(0.0,p.beam_time-e.timer);fx["active"]=p.beam_time;
-        if (const auto *record=AttackSystem::get(state,ruler_state.beam)) {const auto &hazard=state.hazards[record->row];fx["pos"]=hazard.pos;fx["order"]=record->id;fx["time"]=double(hazard.time);fx["active"]=double(hazard.duration);}
+        const auto pose=interpolate(previous,{e.id,e.pos,e.facing},i,false,alpha);
+        const auto direction=Vector2::from_angle(pose.angle),normal=Vector2(-direction.y,direction.x);const double scale=2*e.radius*d.sprite_scale/58.0;
+        Dictionary fx;fx["id"]=e.id;fx["side"]=ruler_state.side;fx["pos"]=pose.position+direction*(27.5*scale+p.fx_muzzle)+normal*(ruler_state.side*10.5*scale);fx["angle"]=pose.angle;fx["radius"]=e.radius;fx["charge"]=e.charge;fx["length"]=p.beam_len;fx["width"]=p.beam_width;fx["windup"]=e.mode==EnemyMode::Windup;fx["time"]=std::max(0.0,p.beam_time-e.timer);fx["active"]=p.beam_time;
+        if (const auto *record=AttackSystem::get(state,ruler_state.beam)) {const auto &hazard=state.hazards[record->row];fx["order"]=record->id;fx["time"]=double(hazard.time);fx["active"]=double(hazard.duration);}
         ruler_fx.push_back(fx);
     }
     Array auriga_trails;
