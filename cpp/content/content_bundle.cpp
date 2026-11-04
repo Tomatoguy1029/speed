@@ -169,6 +169,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->canis_sirius=records.CanisSiriusDefinition_rows;
     bundle->canis_bays=records.CanisBayDefinition_rows;
     bundle->canis_blazes=records.CanisBlazeDefinition_rows;bundle->canis_streams=records.CanisStreamDefinition_rows;bundle->canis_hunts=records.CanisHuntDefinition_rows;bundle->canis_hunt_pounces=records.CanisHuntPounceDefinition_rows;bundle->canis_novas=records.CanisNovaDefinition_rows;bundle->canis_relays=records.CanisRelayDefinition_rows;bundle->canis_sirius_flames=records.CanisSiriusFlameDefinition_rows;
+    bundle->canis_nova_hull=records.CanisNovaHullPoint_rows;bundle->canis_nova_fx=records.CanisNovaFxDefinition_rows;
     bundle->canis_flames=records.CanisFlameDefinition_rows;
     for (size_t i=0;i<bundle->canis_flames.size();++i) {const auto &p=bundle->canis_flames[i];if (p.id!=i+1 || records.BossDefinition_rows[p.boss-1].kind!=2 || p.particle_life<=0 || p.duration<=0) return {};}
     bundle->boss_bodies=records.BossBodyDefinition_rows;
@@ -346,6 +347,10 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=0;i<bundle->canis_sirius_flames.size();++i) if (bundle->canis_sirius_flames[i].id!=i+1 || bundle->boss_techniques[bundle->canis_sirius_flames[i].technique-1].kind!=51) return {};
     for (size_t i=0;i<bundle->canis_relays.size();++i) if (bundle->canis_relays[i].id!=i+1 || bundle->boss_techniques[bundle->canis_relays[i].technique-1].kind!=50) return {};
     for (size_t i=0;i<bundle->canis_novas.size();++i) if (bundle->canis_novas[i].id!=i+1 || bundle->boss_techniques[bundle->canis_novas[i].technique-1].kind!=49) return {};
+    if (!bundle->canis_novas.empty()) {
+        if (bundle->canis_nova_fx.size()!=1 || bundle->canis_nova_fx[0].id!=1 || bundle->canis_nova_hull.size()<3) return {};
+        for (size_t i=0;i<bundle->canis_nova_hull.size();++i) if (bundle->canis_nova_hull[i].id!=i+1) return {};
+    } else if (!bundle->canis_nova_fx.empty() || !bundle->canis_nova_hull.empty()) return {};
     for (size_t i=0;i<bundle->canis_hunt_pounces.size();++i) if (bundle->canis_hunt_pounces[i].id!=i+1 || bundle->boss_techniques[bundle->canis_hunt_pounces[i].technique-1].kind!=48) return {};
     for (size_t i=0;i<bundle->canis_hunts.size();++i) if (bundle->canis_hunts[i].id!=i+1 || bundle->boss_techniques[bundle->canis_hunts[i].technique-1].kind!=47) return {};
     for (size_t i=0;i<bundle->canis_streams.size();++i) if (bundle->canis_streams[i].id!=i+1 || bundle->boss_techniques[bundle->canis_streams[i].technique-1].kind!=46) return {};
