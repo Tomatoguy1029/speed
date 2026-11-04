@@ -365,6 +365,7 @@ bool SpeedRunCore::advance_enemies(double delta) {
         }
         auto &moving=runtime.state.enemies[row];moving.pos += moving.vel * delta;
         if (!far || (moving.id+runtime.state.ticks)%3==0) speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);
+        if (def.kind==speed::EnemyDefinition::Kind::Aquarius) speed::AquariusBehavior::after_move(runtime,update_handles[row],delta);
       }
     }
     speed::MarlinBehavior::after_tick(runtime,marlins);

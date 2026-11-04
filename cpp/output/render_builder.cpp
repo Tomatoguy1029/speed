@@ -26,6 +26,7 @@
 #include "../systems/group_system.h"
 #include "../behaviors/enemies/sniper.h"
 #include "../behaviors/enemies/pulser.h"
+#include "../behaviors/enemies/aquarius.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -107,7 +108,11 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             if (enemy.stone>0) for (float value:{enemy.pos.x,enemy.pos.y,float(enemy.radius)}) petrified_enemies.push_back(value);
         }
         if (!definition.visual_id || definition.kind==EnemyDefinition::Kind::Triangle || definition.kind==EnemyDefinition::Kind::Monoceros || definition.kind==EnemyDefinition::Kind::Centaurus || definition.kind==EnemyDefinition::Kind::CanisMajor || definition.kind==EnemyDefinition::Kind::Draco || definition.kind==EnemyDefinition::Kind::Hydra || hydra_part) continue;
-        const auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
+        auto pose=interpolate(previous,{enemy.id,enemy.pos,enemy.facing},i,false,alpha);
+        if (definition.kind==EnemyDefinition::Kind::Aquarius) {
+            const double time=AquariusBehavior::visual_time(run,uint32_t(i));
+            if (time>=0) {const auto fx=AquariusBehavior::visual_pose(run,uint32_t(i),enemy.pos,enemy.facing,time);pose.position=fx.position;pose.angle=fx.facing;}
+        }
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
         const bool iron=definition.kind==EnemyDefinition::Kind::Obstacle && definition.id==StringName("iron");
         if (meteor && state.field.rock_handles.contains(enemy.rock) && state.field.rocks[enemy.rock.slot].kind==RockKind::Comet) {
