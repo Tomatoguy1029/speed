@@ -3,6 +3,7 @@ extends Node2D
 const VISUAL_ROLE = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.VisualRole
 const SHAPE_KIND = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.RenderShapeKind
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
+const COMET_VISUAL := preload("res://scripts/render/comet_visual.gd")
 var perf := PerfLog.new()
 var boss_hit_feedback := preload("res://scripts/bosses/boss_hit_feedback.gd").new()
 var metrics_record := {}
@@ -293,9 +294,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		for n in range(0,values.size(),6): preload("res://scripts/render/enemies/crow.gd").draw_bundle(canvas,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],int(values[n+5]),_crows.time,_pixel)
 	_layer(9).add_child(_crow_canvas)
 	_comet_canvas = DrawLayer.new()
+	_comet_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_comet_canvas.draw_fn = func(canvas: CanvasItem):
 		var values: PackedFloat32Array = _comets.get("values",PackedFloat32Array())
-		for n in range(0,values.size(),6): RunPresentation.draw_comet_values(canvas,Vector2(values[n],values[n+1]),values[n+2],Vector2(values[n+3],values[n+4]),values[n+5]>0.0,_comets.time)
+		for n in range(0, values.size(), 7):
+			COMET_VISUAL.draw(canvas, Vector2(values[n], values[n+1]), values[n+2], Vector2(values[n+3], values[n+4]), values[n+5] > 0.0, values[n+6])
 	_layer(8).add_child(_comet_canvas)
 	_capsule_canvas = DrawLayer.new()
 	_capsule_canvas.z_index = 1
@@ -481,7 +484,9 @@ func _valid(frame: Dictionary) -> bool:
 	for key in ["comets","capsules","crows"]:
 		if frame.has(key):
 			var data = frame[key]
-			if not data is Dictionary or not data.get("values") is PackedFloat32Array or data.values.size()%(3 if key=="capsules" else 6)!=0 or not (data.get("time") is float or data.get("time") is int) or not is_finite(data.time): return false
+			var stride := 7 if key == "comets" else (3 if key == "capsules" else 6)
+			if not data is Dictionary or not data.get("values") is PackedFloat32Array or data.values.size() % stride != 0: return false
+			if key != "comets" and (not (data.get("time") is float or data.get("time") is int) or not is_finite(data.time)): return false
 			for value: float in data.values:
 				if not is_finite(value): return false
 	if frame.has("warp"):
@@ -1455,7 +1460,18 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
 	for event: Dictionary in _queued_events:
-		if event.type==&"kill" and not captured.has(event.id): _elite_deaths.add_event(event,frame.ui.world_time,death_view)
+		if event.type==&"kill" and not captured.has(event.id):
+			_elite_deaths.add_event(event,frame.ui.world_time,death_view)
+			var enemy_type := StringName(event.enemy_type)
+			if enemy_type not in [&"meteor", &"iron", &"saw", &"hydra_rubble"] and ContentManager.catalog.table(&"enemies").has(enemy_type) and death_view.grow(96.0).has_point(event.pos):
+				var radius: float = event.r
+				if not event.has("death_visual") and enemy_type != &"pump":
+					_burst(event.pos, event.color, 6 + roundi(radius / 3.0), 260.0 + radius * 4.0, event.dir)
+				# 他の揺れと最大値で合成し、カメラ側で設定の強度を掛ける。
+				if radius > 25.0:
+					ruler_shake = maxf(ruler_shake, 8.0)
+				elif event.cause == &"ram":
+					ruler_shake = maxf(ruler_shake, 5.0)
 		if event.type==&"combat_damage" and event.get("target","")=="enemy" and float(event.get("applied",0.0))>0.0:
 			for display in _boss_body_displays.values():
 				if display.state.get("kind",-1) in [0,1,2] and display.state.get("actor",0)==event.get("target_id",0): display.frame_event(event)

@@ -231,7 +231,7 @@ void EventBuilder::crystal_transferred(RunRuntime &run,const CrystalState &cryst
     auto event=carried_record(run,crystal,enemy_id);event["was_absorber"]=was_absorber;FrameBuilder::append(run,"xp_transfer",event);
 }
 void EventBuilder::crystal_lost(RunRuntime &run,const CrystalState &crystal,int64_t enemy_id,CargoLoss reason) {
-    auto event=carried_record(run,crystal,enemy_id);event["reason"]=godot::StringName(reason==CargoLoss::Retreat?"retreat":reason==CargoLoss::Released?"released":reason==CargoLoss::Cleared?"cleared":"owner_removed");FrameBuilder::append(run,"xp_lost",event);
+    auto event=carried_record(run,crystal,enemy_id);if (reason==CargoLoss::Capacity) event["method"]=godot::StringName("capacity");event["reason"]=godot::StringName(reason==CargoLoss::Capacity?"capacity":reason==CargoLoss::Retreat?"retreat":reason==CargoLoss::Released?"released":reason==CargoLoss::Cleared?"cleared":"owner_removed");FrameBuilder::append(run,"xp_lost",event);
 }
 
 void EventBuilder::crystal_absorber_selected(RunRuntime &run,const CrystalState &target,uint8_t before_kind) {

@@ -96,7 +96,6 @@ func cpp_save(parent: Node, failure_only: bool) -> bool:
 	var panel: Control = overlay.panel
 	panel.stage_path = fixture
 	panel._select_enemy("drifter")
-	panel.generate_saved = func(stage): return overlay.content_edit.generate_saved(stage,output)
 	var base: float = ContentManager.enemies[&"drifter"].base_hp(config)
 	panel._edit_value(base*2.0,"hp",base)
 	if failure_only:
@@ -105,23 +104,23 @@ func cpp_save(parent: Node, failure_only: bool) -> bool:
 		check(overlay.panel==panel and panel.is_dirty() and panel.values.drifter.hp==base*2.0 and IO.read_stage(fixture).enemy_tuning.is_empty(),"F4を閉じても未保存値を保持し編集元には書かない")
 		var previous := FileAccess.get_sha256(path)
 		var generated: Array = []
-		panel.generated.connect(func(_stage): generated.append(true))
-		panel.generate_saved = func(_stage): return ERR_INVALID_DATA
+		panel.saved.connect(func(_stage): generated.append(true))
 		panel._save()
-		check(panel._status.text.contains("生成失敗") and generated.is_empty() and overlay.content_edit.saved_index_path.is_empty(),"生成失敗を成功表示や生成完了通知に変えない")
+		check(panel._status.text.contains("次回起動時") and generated.size()==1,"Saveは編集元の保存だけを通知する")
 		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous,"保存済みの編集元と古い生成物を区別する")
 		panel.values = {"drifter":{"hp":NAN}}
 		panel._save()
-		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous and not panel._status.text.contains("生成完了"),"不正な保存値で編集元と生成物を変更しない")
+		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous and not panel._status.text.contains("次回起動時"),"不正な保存値で編集元と生成物を変更しない")
 	else:
 		var notifications: Array = []
 		bridge.subscribe("保存確認",func(frame: Dictionary) -> bool:
 			notifications.append_array(frame.events)
 			return true)
 		panel._save()
-		check(panel._status.text.contains("生成完了") and not panel.is_dirty() and IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0,"Saveが編集元へ保存して共通生成の完了を表示する")
-		var saved_path: String = overlay.content_edit.saved_index_path
-		if saved_path.is_empty(): return false
+		check(panel._status.text.contains("次回起動時") and not panel.is_dirty() and IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0,"Saveが編集元へ保存し、次回起動時の生成を表示する")
+		# 次回起動と同じ共通入口で、保存済みSourceから実行用データを生成する。
+		if load("res://addons/content_build/builder.gd").build_cpp_stage(IO.read_stage(fixture),config,output)!=OK: return false
+		var saved_path: String = output.path_join("run/stage_%d.json" % source.index)
 		var saved_index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(saved_path))
 		var next: RunSession = RunManager.create_session(parent,{"runtime":"cpp","cpp_index":saved_path,"cpp_signature":saved_index.input_sha256,"seed":53},false)
 		next.auto_step = false

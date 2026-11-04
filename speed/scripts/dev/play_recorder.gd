@@ -143,7 +143,8 @@ func _begin(session: RunSession, during_run := false) -> void:
 		_begin_cpp(session,during_run)
 
 func _xp_window(current: Dictionary, previous: Dictionary, scope: String) -> Dictionary:
-	var out := {"scope": scope, "counter_color_basis": "supplied_before_absorption_collected_after_conversion"}
+	var basis := "crystal_kind_preserved" if current.get("cap",{}).get("mode","")=="offscreen_low_far_old" else "supplied_before_absorption_collected_after_conversion"
+	var out := {"scope": scope, "counter_color_basis": basis}
 	for key in ["supplied", "collected", "lost", "gold_rolls"]:
 		out[key] = _counter_difference(current.get(key, {}), previous.get(key, {}))
 	out["collected_actual_xp"] = float(current.get("collected_actual_xp", 0.0)) - float(previous.get("collected_actual_xp", 0.0))

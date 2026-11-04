@@ -2330,7 +2330,9 @@ static func preparation_signature(stage: RuntimeStage, config: GameConfig, defin
 	bytes.append_array(var_to_bytes(values))
 	return Schema.sha256(bytes).hex_encode()
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray(), reuse_prepared := true) -> Error:
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray(), reuse_prepared := true, live_result: Variant = null) -> Error:
+	# ライブ編集は同じ変換・検証を使い、生成物をディスクへ保存しない。
+	if live_result != null: live_result.clear()
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
 	var data := {}
 	var appearance_metadata := {}
@@ -2339,7 +2341,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var field_visuals: Array = []
 	var attack_visuals: Array = []
 	for record in Schema.SCHEMA.records: data[record.name] = []
-	var preparation_key := preparation_signature(stage,config,definitions,extra_formations,boss_definitions,boss_programs)
+	var preparation_key := preparation_signature(stage,config,definitions,extra_formations,boss_definitions,boss_programs) if live_result==null else ""
 	var preparation_path := "res://.content/dev/prepared/"+preparation_key+".res"
 	var prepared: Resource = ResourceLoader.load(preparation_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) if reuse_prepared and FileAccess.file_exists(preparation_path) else null
 	var cycle_dependencies: Array = []
@@ -2744,10 +2746,11 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		prepared.set_meta("visuals",visuals)
 		prepared.set_meta("appearance",appearance_metadata)
 		prepared.set_meta("cycles",cycle_dependencies)
-		var directory_error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(preparation_path.get_base_dir()))
-		if directory_error != OK: return directory_error
-		var preparation_error := ResourceSaver.save(prepared,preparation_path,ResourceSaver.FLAG_COMPRESS)
-		if preparation_error != OK: return preparation_error
+		if live_result == null:
+			var directory_error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(preparation_path.get_base_dir()))
+			if directory_error != OK: return directory_error
+			var preparation_error := ResourceSaver.save(prepared,preparation_path,ResourceSaver.FLAG_COMPRESS)
+			if preparation_error != OK: return preparation_error
 		preparation_build_count += 1
 	var order_error := preserve_definition_order(data, previous_definition_ids)
 	if order_error != OK: return order_error
@@ -2830,17 +2833,6 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var validator = ClassDB.instantiate(&"SpeedRunCore")
 	if not validator.configure_content(bytes): return ERR_INVALID_DATA
 	validator.close()
-	var directory := output.path_join(input_sha256+"_"+bytes.slice(56,88).hex_encode())
-	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
-	if error!=OK: return error
-	var binary_path := directory.path_join("content.bin")
-	var resources_path := directory.path_join("run_resources.tres")
-	if not FileAccess.file_exists(binary_path):
-		var file := FileAccess.open(binary_path,FileAccess.WRITE)
-		if file == null: return FileAccess.get_open_error()
-		file.store_buffer(bytes)
-		file.close()
-	if FileAccess.get_file_as_bytes(binary_path)!=bytes: return ERR_FILE_CORRUPT
 	var resources = preload("res://scripts/data_types/run_resources.gd").new()
 	resources.input_sha256 = input_sha256
 	resources.paths = paths
@@ -2857,6 +2849,21 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if appearance_metadata.has(visual.id): visual.merge(appearance_metadata[visual.id])
 	for visual: Dictionary in visuals:
 		if not visual.path.is_empty(): resources.keys[visual.id] = visual.path
+	if live_result != null:
+		live_result.bytes = bytes
+		live_result.resources = resources
+		return OK
+	var directory := output.path_join(input_sha256+"_"+bytes.slice(56,88).hex_encode())
+	var error := DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(directory))
+	if error!=OK: return error
+	var binary_path := directory.path_join("content.bin")
+	var resources_path := directory.path_join("run_resources.tres")
+	if not FileAccess.file_exists(binary_path):
+		var file := FileAccess.open(binary_path,FileAccess.WRITE)
+		if file == null: return FileAccess.get_open_error()
+		file.store_buffer(bytes)
+		file.close()
+	if FileAccess.get_file_as_bytes(binary_path)!=bytes: return ERR_FILE_CORRUPT
 	if not FileAccess.file_exists(resources_path):
 		error = ResourceSaver.save(resources,resources_path)
 		if error!=OK: return error

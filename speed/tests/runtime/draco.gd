@@ -694,7 +694,8 @@ func native_spiral() -> void:
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
 		var key:=spiral_key(attack)
-		if key not in saved and key<6:
+		if attack.stage==2 and attack.return_stage>=0:key=7+int(attack.return_stage)
+		if key not in saved and (key<6 or key>=7):
 			saved.append(key)
 			var held: Dictionary=bridge.checkpoint()
 			check(held.ok,"退場・再入場・巻き・予告・収縮・回復を保持する")
@@ -706,19 +707,24 @@ func native_spiral() -> void:
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 			check(future==bridge.command("dev_boss_state").value and future_body==bridge.command("dev_boss_body_state").value and future_hazards==bridge._core.hazards_snapshot(),"復帰後の胴・壁・カメラと拘束が同じになる")
 			bridge.restore(held.value);bridge.release_checkpoint(held.value)
-		if key in [0,2,3,4,5] and key not in shown:
-			shown.append(key);await show_native_draco(fixture,body,attack)
+		var display_key:=spiral_key(attack)
+		if display_key in [0,2,3,4,5] and display_key not in shown:
+			shown.append(display_key);await show_native_draco(fixture,body,attack)
 		if attack.stage==5:break
-	check(saved.size()==6 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"各段階の復帰と表示を通り、終了時に壁を解放する")
+	check(saved.has(8) and saved.has(9) and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"各段階の復帰と表示を通り、終了時に壁を解放する")
+	for stage in [0,1,2,3,4,8,9]:check(saved.has(stage),"螺旋と復帰の各段階を巻き戻し検証する")
 	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.cause==&"spiral" and e.payload.source==&"draco" and e.payload.technique==&"spiral"),"収縮中の接触の実HPと原因・出所・技名を記録する")
 	check(fixture.captured.filter(func(e):return e.type==&"draco_roar").size()==1,"巻き終わりの咆哮を1回だけ渡す")
+	var returned: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+	check(bridge.command("dev_boss_state").value[0].stage==5 and returned.position.distance_to(Vector2(700,0))<900.0,"螺旋終了時に自機の近くへ戻り、遠方からの通常接近を待たせない")
 	bridge.dispose()
-	for target in [0,1,2,3,4,5]:
+	for target in [0,1,2,3,4,5,8,9]:
 		fixture=breath_fixture(move);bridge=fixture.bridge;spiral_camera(bridge)
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
 		for frame in 2400:
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
-			if spiral_key(bridge.command("dev_boss_state").value[0])==target:break
+			var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+			if (spiral_key(attack) if target<8 else 7+int(attack.return_stage) if attack.stage==2 else -1)==target:break
 		bridge.command("dev_cancel_technique",{"ticket":started.value})
 		var output: Dictionary=bridge.read_frame().value
 		check(bridge._core.hazards_snapshot().is_empty() and not output.ui.controls_locked and not output.ui.encounter_protected and not output.ui.cinematic_camera,"螺旋の各段階取消は壁・拘束・カメラを返す")
@@ -731,6 +737,19 @@ func native_spiral() -> void:
 	bridge.command("dev_cancel_boss",{"entity_id":fixture.boss})
 	check(bridge._core.hazards_snapshot().is_empty() and not bridge.read_frame().value.ui.controls_locked,"本体消失でも巻き中の拘束と壁を解放する")
 	bridge.dispose()
+	# At either field edge, the return must remain reachable even when the view straddles the boundary.
+	for ship_at in [Vector2(9900,0),Vector2(0,9900)]:
+		fixture=breath_fixture(move);bridge=fixture.bridge
+		bridge.command("dev_edit",{"kind":"ship","payload":{"position":ship_at,"velocity":Vector2.ZERO}})
+		bridge.command("dev_edit",{"kind":"camera","payload":{"center":ship_at,"size":Vector2(1600,900),"zoom":1.0,"bars":0.0}})
+		bridge._core.set_motion_context(ship_at,ship_at,Vector2(800,450))
+		bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		for frame in 3600:
+			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+			if bridge.command("dev_boss_state").value[0].stage==5:break
+		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
+		check(bridge.command("dev_boss_state").value[0].stage==5 and body.position.length()<10000.0 and body.position.distance_to(ship_at)<900.0,"外周付近でも螺旋の後にフィールド内・自機の近くへ復帰する")
+		bridge.dispose()
 	native_draco_move_flow(move)
 
 func native_spiral_contact() -> void:

@@ -385,6 +385,7 @@ bool SpeedRunCore::advance_enemies(double delta) {
         speed::FlowRunner::step(runtime,delta);
         for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisNova::effect_tick(runtime,body,delta);speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
     }
+    speed::RulerBehavior::after_tick(runtime);
     return true;
 }
 
@@ -416,7 +417,7 @@ void SpeedRunCore::close() {
     runtime.state.hostiles.clear(); runtime.state.free_hostiles.clear();
     runtime.state.hazards.clear(); runtime.state.free_hazards.clear(); runtime.state.bite_zone_config = BiteZoneConfig();
     runtime.state.friends.clear(); runtime.state.free_friends.clear(); runtime.state.live_friends = 0; runtime.state.live_debris = 0;
-    runtime.state.pickups.gems.clear(); runtime.state.pickups.coins.clear();runtime.state.pickups.capsules.clear(); runtime.state.pickups.free_gems.clear(); runtime.state.pickups.free_coins.clear(); runtime.state.pickups.gem_queue.clear(); runtime.state.collections.clear();
+    runtime.state.pickups.gem_cells.clear();runtime.state.pickups.moving_gems.clear();runtime.state.pickups.gems.clear(); runtime.state.pickups.coins.clear();runtime.state.pickups.capsules.clear(); runtime.state.pickups.free_gems.clear(); runtime.state.pickups.free_coins.clear(); runtime.state.pickups.gem_queue.clear(); runtime.state.collections.clear();
 }
 
 Dictionary SpeedRunCore::inspect() const {

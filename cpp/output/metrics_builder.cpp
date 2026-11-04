@@ -155,7 +155,7 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         Array rows;for (const auto &g:entry.crystals) {++carried[g.kind].count;carried[g.kind].base_xp+=g.value;if (initial) rows.push_back(crystal(g));}
         if (initial) {Dictionary row;row["enemy_id"]=entry.enemy_id;row["crystals"]=rows;existing_cargo.push_back(row);}
     }
-    Dictionary cap;cap["mode"]="oldest_high_absorber";cap["limit"]=s.pickup_config.gem_max;cap["absorber_id"]=p.gem_absorber_id?int64_t(p.gem_absorber_id):-1;
+    Dictionary cap;cap["mode"]="offscreen_low_far_old";cap["limit"]=s.pickup_config.gem_max;cap["absorber_id"]=p.gem_absorber_id?int64_t(p.gem_absorber_id):-1;
     Dictionary xp;xp["supplied"]=totals(p.supplied);xp["collected"]=totals(p.collected);xp["lost"]=totals(p.lost);xp["ground"]=totals(ground);xp["carried"]=totals(carried);xp["cap"]=cap;
     Dictionary rolls;rolls["eligible"]=int64_t(p.gold_rolls);rolls["won"]=int64_t(p.gold_won);xp["gold_rolls"]=rolls;xp["collected_actual_xp"]=p.collected_actual_xp;
     int64_t weapons=0,traits=0,wm=0,tm=0;Dictionary weapon_levels,trait_levels;
@@ -196,7 +196,7 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         Dictionary existing;existing["ground"]=existing_ground;existing["carried"]=existing_cargo;existing["cap"]=cap;out["existing"]=existing;
         Dictionary values,rewards;for (size_t i=0;i<3;++i) values[names[i]]=c.crystal_values[i];
         for (const auto &d:c.definitions) {Array counts;for (auto n:d.xp_rewards) counts.push_back(int64_t(n));Dictionary reward;reward["rank"]=d.rank;reward["counts"]=counts;reward["strong_gold"]=d.gold_eligible;rewards[d.id]=reward;}
-        Dictionary config;config["xp_reward_version"]=2;config["xp_crystal_values"]=values;config["enemy_rewards"]=rewards;config["strong_gold_chance"]=s.pickup_config.strong_gold_chance;Dictionary limit=cap.duplicate();limit.erase("absorber_id");config["cap"]=limit;
+        Dictionary config;config["xp_reward_version"]=2;config["xp_crystal_values"]=values;config["enemy_rewards"]=rewards;config["strong_gold_chance"]=s.pickup_config.strong_gold_chance;config["gem_draw_max"]=s.pickup_config.gem_draw_max;Dictionary limit=cap.duplicate();limit.erase("absorber_id");config["cap"]=limit;
         config["ship_multiplier"]=s.pickup_config.xp_mult;config["run_multiplier"]=s.loadout.xp_gain_mult;config["collection_multiplier"]=s.pickup_config.xp_mult*s.loadout.xp_gain_mult;config["multiplier_application"]="collection_once";
         config["xp_base"]=c.progression.xp_base;config["xp_growth"]=c.progression.xp_growth;config["xp_curve"]=c.progression.xp_curve;out["xp_config"]=config;
         PackedByteArray digest;digest.resize(32);std::copy(c.payload_sha256.begin(),c.payload_sha256.end(),digest.ptrw());Dictionary identity;identity["payload_sha256"]=digest.hex_encode();

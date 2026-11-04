@@ -71,6 +71,7 @@ func check_restore_outputs() -> void:
 	config.planet_radius=0;config.moon_count=0;config.meteor_count=0;config.iron_count=0;config.saw_count=0
 	var stage := RuntimeStage.new()
 	stage.index=198;stage.resources=StageResources.new()
+	stage.boss_enabled = false
 	var definitions := {}
 	for id in ContentManager.enemies:
 		var definition: EnemyDef = ContentManager.enemies[id]

@@ -10,8 +10,7 @@ var definitions: Dictionary = {}
 var values: Dictionary = {}
 var signature := ""
 var error := ""
-var saved_index_path := ""
-var _saved_bytes := PackedByteArray()
+var _applied_bytes := PackedByteArray()
 var _busy := false
 var _definition_order := PackedStringArray()
 
@@ -68,6 +67,9 @@ func attach(owner: RunSession) -> bool:
 			var entry: ContentEntry = ContentManager.catalog.find(&"enemies", id)
 			var definition: EnemyDef = ResourceLoader.load(entry.path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) if entry != null else null
 			if definition!=null: definitions[StringName(id)] = definition.duplicate(true)
+	var prepared := LOADER.read_bundle(owner.cpp_index_path,index.input_sha256)
+	if prepared.is_empty(): return false
+	_applied_bytes = prepared.bytes
 	values = source.enemy_tuning.duplicate(true)
 	signature = index.source_sha256
 	return true
@@ -92,15 +94,12 @@ func apply(tuning: Dictionary) -> Dictionary:
 		if not problem.is_empty(): return _failure(problem)
 	var next := source.duplicate(true) as RuntimeStage
 	next.enemy_tuning = tuning.duplicate(true)
-	var output := "res://.content/dev/live_%d" % owner.id
-	var built: Error = BUILD.build(next,config,output,signature,definitions,[],{},owner.cpp_resources,{},_definition_order)
-	if built!=OK: return _failure("定義の生成に失敗しました: %s" % error_string(built))
-	var index_path := output.path_join("stage_%d.json" % next.index)
-	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(index_path))
-	var prepared := LOADER.read_bundle(index_path,index.input_sha256)
-	if prepared.is_empty(): return _failure("生成した定義を読み込めません。")
+	var built := _build(next,config)
+	if not built.ok: return built
+	var prepared: Dictionary = built.value
 	var result: Dictionary = owner.bridge.replace_definition("config",prepared.bytes,"config")
 	if result.ok:
+		_applied_bytes = prepared.bytes
 		values = tuning.duplicate(true)
 		source = next
 		error = ""
@@ -111,25 +110,13 @@ func _failure(message: String) -> Dictionary:
 	error = message
 	return {"ok":false,"code":1,"field":"tuning","message":message,"value":null}
 
-## 保存済みの編集元を、正規のC++生成入口から次のラン用に作る。
-func generate_saved(stage: StageDef, output := "res://.content") -> Error:
-	_saved_bytes = PackedByteArray()
-	saved_index_path = ""
-	var built: Error = load("res://addons/content_build/builder.gd").build_cpp_stage(stage,config,output)
-	if built!=OK: return built
-	var path := output.path_join("run/stage_%d.json" % stage.index)
-	var index = JSON.parse_string(FileAccess.get_file_as_string(path))
-	if not index is Dictionary: return ERR_FILE_CORRUPT
-	var prepared := LOADER.read_bundle(path,index.input_sha256)
-	if prepared.is_empty(): return ERR_FILE_CORRUPT
-	_saved_bytes = prepared.bytes
-	saved_index_path = path
-	return OK
-
+## 保存は編集元だけを更新し、通知には適用済みのメモリ上の定義を使う。
 func notify_saved(path: String) -> Dictionary:
 	var owner: RunSession = session.get_ref() if session!=null else null
-	if owner==null or owner.bridge==null or _saved_bytes.is_empty(): return _failure("保存済みの生成物を通知できません。")
-	return owner.bridge.command("dev_tuning_saved",{"path":path,"bundle":_saved_bytes})
+	var saved: StageDef = ResourceLoader.load(path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
+	if owner==null or owner.bridge==null or _applied_bytes.is_empty() or saved==null or saved.enemy_tuning!=values or source.enemy_tuning!=values:
+		return _failure("保存内容と試行の値が一致しないため、保存通知を送れません。")
+	return owner.bridge.command("dev_tuning_saved",{"path":path,"bundle":_applied_bytes})
 
 ## パネルの値は、このSessionの複製を正規生成してからまとめて適用する。
 func apply_config(next_config: GameConfig) -> Dictionary:
@@ -139,19 +126,17 @@ func apply_config(next_config: GameConfig) -> Dictionary:
 	var built: Dictionary = _build(source,next_config)
 	if not built.ok: return built
 	var result: Dictionary = owner.bridge.replace_definition("config",built.value.bytes,"config")
-	if result.ok: config = next_config
+	if result.ok:
+		config = next_config
+		_applied_bytes = built.value.bytes
 	return result
 
 func _build(stage: RuntimeStage, next_config: GameConfig) -> Dictionary:
 	var owner: RunSession = session.get_ref() if session!=null else null
 	if owner==null or owner.bridge==null: return _failure("対象のランは終了しています。")
-	var output := "res://.content/dev/debug_%d" % owner.id
-	var built: Error = BUILD.build(stage,next_config,output,signature,definitions,[],{},owner.cpp_resources,{},_definition_order)
-	if built!=OK: return _failure("定義の生成に失敗しました: %s" % error_string(built))
-	var path := output.path_join("stage_%d.json" % stage.index)
-	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	var prepared: Dictionary = LOADER.read_bundle(path,index.input_sha256)
-	return {"ok":true,"value":prepared} if not prepared.is_empty() else _failure("生成した定義を読み込めません。")
+	var prepared := {}
+	var built: Error = BUILD.build(stage,next_config,"",signature,definitions,[],{},owner.cpp_resources,{},_definition_order,false,prepared)
+	return {"ok":true,"value":prepared} if built==OK else _failure("定義の生成に失敗しました: %s" % error_string(built))
 
 ## ステージ外の敵は、明示生成時にだけ追加する。古い資源番号と装備の保留要求を保つ。
 func prepare_debug_enemies() -> Dictionary:
@@ -201,5 +186,6 @@ func prepare_debug_enemies() -> Dictionary:
 		if presentation.frame_view!=null: presentation.frame_view.replace_lab_visuals(owner.resources,prepared.resources.visuals)
 		presentation.sync_canvas_layers()
 	source = next
+	_applied_bytes = prepared.bytes
 	_definition_order = owner.bridge.read_lab().value.definition_ids.duplicate()
 	return {"ok":true,"value":choices}
