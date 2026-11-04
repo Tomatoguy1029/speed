@@ -3,6 +3,8 @@
 #include "pose.h"
 #include "picaro.h"
 #include "cinematic.h"
+#include "screen_staging.h"
+#include "../../systems/field.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/attacks/wall.h"
 #include "../../systems/attack_system.h"
@@ -53,7 +55,31 @@ void DracoSpiral::active(RunRuntime &r,TechniqueState &t,double dt) {
     for (size_t j=0;j<s.walls.size();++j) {const auto delta=s.points[j+1]-s.points[j];WallSystem::move(r,s.walls[j],s.points[j],delta.angle(),delta.length());const auto *a=AttackSystem::get(r.state,s.walls[j]);if (!a || a->pool!=AttackPool::Hazard) continue;auto &h=r.state.hazards[a->row];std::get<WallHazard>(h.shape).half_width=b.draco.width*0.5*taper((fractions[j]+fractions[j+1])*0.5);if (at>=shrink_at) h.damage=0;}
 }
 void DracoSpiral::end(RunRuntime &r,TechniqueState &t,bool cancelled) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoSpiralState>(v.move);release(r,s);r.state.control.cinematic_camera=s.camera_before;if (auto *b=PhaseController::find(r,t.actor)) DracoPicaro::pause(r,*b,false);for (auto h:s.walls) AttackSystem::end(r.state,h,cancelled?AttackEndReason::TechniqueCancel:AttackEndReason::TechniqueEnd);s.recovery=r.state.enemies[t.actor.slot].pos;v.warning_paths.clear();}
-void DracoSpiral::recover(RunRuntime &r,TechniqueState &t) {auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoSpiralState>(v.move);if (s.trail.empty()) return;head(r,t,s.recovery+godot::Vector2(0,1)*((s.extent*2+s.length)/s.shrink)*v.stage_time,s.length);r.state.enemies[t.actor.slot].facing=PI*0.5;}
-bool DracoSpiral::validate(const DracoSpiralState &s) {for (double q:{s.extent,s.horizontal,s.length,s.inner,s.coil,s.pause,s.first,s.second,s.bend,s.shrink,s.offset,s.bend_radius,s.zoom,s.departure_time,s.departure_angle,s.hp_before}) if (!std::isfinite(q)) return false;if (s.extent<=0 || s.horizontal<=0 || s.length<0 || s.shrink<=0 || s.coil<=0 || s.pause<=0 || s.zoom<=0 || s.departure_time<0 || s.points.size()<2 || s.trail.size()<2) return false;for (auto q:{s.center,s.correction,s.held_ship,s.outside,s.control,s.inside,s.recovery}) if (!q.is_finite()) return false;for (const auto *points:{&s.trail,&s.entry,&s.points}) for (auto q:*points) if (!q.is_finite()) return false;return true;}
-godot::Dictionary DracoSpiral::snapshot(const TechniqueState &t) {const auto &s=std::get<DracoSpiralState>(std::get<DracoTechniqueState>(t.detail).move);godot::Dictionary out;out["spiral_center"]=s.center;out["spiral_extent"]=s.extent;out["spiral_horizontal"]=s.horizontal;out["spiral_inner"]=s.inner;out["coil_time"]=s.coil;out["pause_time"]=s.pause;out["departing"]=s.departing;out["holding_player"]=s.holding;out["charging"]=s.charging;out["trapped_hit"]=s.trapped_hit;out["cosmic_body"]=true;out["wall_count"]=int64_t(s.walls.size());return out;}
+bool DracoSpiral::recover(RunRuntime &r,TechniqueState &t,double dt) {
+    auto &v=std::get<DracoTechniqueState>(t.detail);auto &s=std::get<DracoSpiralState>(v.move);
+    auto &b=*PhaseController::find(r,t.actor);auto &e=r.state.enemies[t.actor.slot];auto &entry=s.return_staging;
+    if (entry.points.empty()) {
+        // Keep the authored downward departure until the entire spiral has left the view.
+        head(r,t,s.recovery+godot::Vector2(0,1)*((s.extent*2+s.length)/s.shrink)*v.stage_time,s.length);
+        e.facing=PI*0.5;
+        for (size_t j=0;j<s.points.size();++j) {
+            const double radius=j==0?e.radius:b.draco.width*0.5*taper(double(j)/(s.points.size()-1));
+            const auto relative=s.points[j]-r.state.view_center;
+            if (std::abs(relative.x)<=r.state.view_half.x+radius && std::abs(relative.y)<=r.state.view_half.y+radius) return false;
+        }
+        DracoScreenStaging::begin(r,t,entry,true);
+        entry.side=r.state.ship_pos.x>0?-1:1;
+    }
+    const auto phase=entry.phase;
+    const bool ready=DracoScreenStaging::advance(r,t,entry,dt);
+    if (phase==0 && entry.phase==1) {
+        // Only the return destination is constrained; the exit and entry remain offscreen.
+        const double margin=e.radius+40,limit=std::max(margin,r.state.ship_config.field_radius-margin);
+        entry.entry_to=(r.state.ship_pos+godot::Vector2(entry.side*std::min(500.0,double(r.state.view_half.x)*0.68),0)).limit_length(limit);
+        for (int j=0;j<4;++j) entry.entry_to=FieldSystem::push_out(r,entry.entry_to,margin).limit_length(limit);
+    }
+    return ready;
+}
+bool DracoSpiral::validate(const DracoSpiralState &s) {for (double q:{s.extent,s.horizontal,s.length,s.inner,s.coil,s.pause,s.first,s.second,s.bend,s.shrink,s.offset,s.bend_radius,s.zoom,s.departure_time,s.departure_angle,s.hp_before}) if (!std::isfinite(q)) return false;if (s.extent<=0 || s.horizontal<=0 || s.length<0 || s.shrink<=0 || s.coil<=0 || s.pause<=0 || s.zoom<=0 || s.departure_time<0 || s.points.size()<2 || s.trail.size()<2) return false;for (auto q:{s.center,s.correction,s.held_ship,s.outside,s.control,s.inside,s.recovery}) if (!q.is_finite()) return false;for (const auto *points:{&s.trail,&s.entry,&s.points}) for (auto q:*points) if (!q.is_finite()) return false;return s.return_staging.points.empty() || DracoScreenStaging::validate(s.return_staging);}
+godot::Dictionary DracoSpiral::snapshot(const TechniqueState &t) {const auto &s=std::get<DracoSpiralState>(std::get<DracoTechniqueState>(t.detail).move);godot::Dictionary out;out["spiral_center"]=s.center;out["spiral_extent"]=s.extent;out["spiral_horizontal"]=s.horizontal;out["spiral_inner"]=s.inner;out["coil_time"]=s.coil;out["pause_time"]=s.pause;out["departing"]=s.departing;out["holding_player"]=s.holding;out["charging"]=s.charging;out["trapped_hit"]=s.trapped_hit;out["cosmic_body"]=true;out["wall_count"]=int64_t(s.walls.size());out["return_stage"]=s.return_staging.points.empty()?-1:int(s.return_staging.phase);return out;}
 }
