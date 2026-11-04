@@ -1174,13 +1174,13 @@ func receive_frame(frame: Dictionary) -> bool:
 			boss_hit_feedback.pulse(int(payload.target_id))
 		payload["type"] = event.type
 		_queued_events.append(payload)
-		_reference_events.append(payload)
+		_reference_events.append(event.duplicate(true))
 	return true
 
 func update_reference_effects(frame: Dictionary, real_dt: float) -> void:
 	if _reference_layer == null: return
 	_update_hound_warnings(_reference_render_frame.get("hound_warning",[]),float(frame.ui.get("world_time",0.0)))
-	_enemy_reference.render(_reference_render_frame, frame.events, _reference_layer.canvas, real_dt, float(frame.ui.get("world_time",0.0)))
+	_enemy_reference.render(_reference_render_frame, _reference_events, _reference_layer.canvas, real_dt, float(frame.ui.get("world_time",0.0)))
 	for display: Node2D in _boss_body_displays.values():
 		if display.visible and display.has_method("draw_reference"):
 			display.draw_reference(_reference_layer.canvas, 0.0 if authoring_paused else real_dt)
