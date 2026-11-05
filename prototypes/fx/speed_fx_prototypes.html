@@ -7851,12 +7851,39 @@ function hStrike(S, R, L, rr, a, seed, C, src) {
   if (a < 0.3) R.back.glow(L.x, L.y, rr * 1.2, C[4], 0.5 * (1 - a / 0.3) * R.P.intensity);
   if (a < 0.08) { R.front.glow(L.x, L.y, rr * 1.1, C[6], (1 - a / 0.08) * 0.9 * R.P.intensity); R.front.glow(L.x, L.y, rr * 0.4, C[7], (1 - a / 0.08) * R.P.intensity); }
 }
+// 帯電頭突きの予兆：目が雷の色に変わって光り、目から細い放電が走る（pixelFX lightning/electrified の作り）
+function hEyeCharge(S, R, n, pose, C) {
+  const T = pose.T, rel = pose.rel, k = rel < 0 ? clamp(S.age / T.warn) ** 1.1 : Math.exp(-Math.max(0, rel - T.active) / 0.12), f = Math.floor(S.t / 0.06), eyes = [-8.5, 8.5].map((sx) => toL(hLocal(pose.head, pose.angle, sx, -9.5, pose.sx, pose.sy))), back = pose.angle + Math.PI;
+  eyes.forEach((e, i) => { R.front.glow(e.x, e.y, 3 + 5 * k, C[4], (0.35 + 0.5 * k) * R.P.intensity); R.front.disc(e.x, e.y, 1.4 + 0.5 * k, C[k > 0.6 ? 7 : 6], 1); R.front.glow(e.x, e.y, 1.6 + 1.6 * k, C[6], 0.6 * k * R.P.intensity);
+    if (rel >= 0) return;
+    for (let j = 0; j < 1 + Math.round(3 * k); j++) { const Rg = new PX.Rng((f * 17 + i * 29 + j * 7 + 3) >>> 0 || 1), side = i ? 1 : -1, an = back + side * Rg.range(0.35, 1.9), l = Rg.range(5, 12) * (0.6 + 0.8 * k) * R.P.size; voltInk(R.front, zigzag(Rg, e.x, e.y, e.x + Math.cos(an) * l, e.y + Math.sin(an) * l, 0.4, 0.3), k * Rg.range(0.6, 1), C, 1, true, 0.3); } });
+  if (rel < 0 && k > 0.45) { const Rg = new PX.Rng((f * 41 + 5) >>> 0 || 1); if (Rg.chance(0.75)) voltInk(R.front, zigzag(Rg, eyes[0].x, eyes[0].y, eyes[1].x, eyes[1].y, 0.5, 0.1), k, C, 1, true, 0.25); } // 目から目へ飛ぶ
+}
+// 帯電頭突きの命中：pixelFX lightning/zap-hit の作り。当たった点が細かい放電の塊になり、シダのように枝分かれする焼け跡が外へ広がって冷え、火花がジグザグに跳ねる
+const H_FERNS = new Map();
+function hFern(rr) {
+  const key = Math.round(rr); if (H_FERNS.has(key)) return H_FERNS.get(key); const Rg = new PX.Rng(3), out = [];
+  const grow = (x, y, an, l, w, d, depth) => { const pts = [[x, y, d]]; let side = Rg.sign(); for (let s = 0; s < l; s += 1.4) { an += Rg.range(-0.3, 0.3); x += Math.cos(an) * 1.4; y += Math.sin(an) * 1.4; d += 1.4; pts.push([x, y, d]); if (depth < 2 && s > 2 && Rg.chance(0.24)) { side = -side; grow(x, y, an + side * Rg.range(0.55, 1.05), (l - s) * Rg.range(0.3, 0.55), w * 0.6, d, depth + 1); } } out.push({ pts, w }); };
+  for (let i = 0; i < 7; i++) grow(0, 0, i / 7 * TAU + Rg.range(-0.35, 0.35), rr * Rg.range(0.6, 1), 1, 0, 0);
+  H_FERNS.set(key, out); return out;
+}
+function hZap(S, R, L, rr, a, dirA, C) {
+  const f = Math.floor(a * 30 + 1e-4), cool = smooth(0.3, 0.7, a), fade = 1 - smooth(0.62, 0.75, a), I = R.P.intensity, W = PX.WHITE;
+  if (fade > 0) for (const br of hFern(rr)) for (let i = 1; i < br.pts.length; i++) { const [x0, y0] = br.pts[i - 1], [x, y, d] = br.pts[i], age = a - d / 260; if (age < 0) break; const k = Math.exp(-age / 0.2) - cool * 0.3, c = k > 0.75 ? W : k > 0.45 ? C[6] : k > 0.25 ? C[5] : k > 0.1 ? C[4] : k > -0.05 ? C[2] : C[1]; R.back.line(L.x + x0, L.y + y0, L.x + x, L.y + y, c, fade); if (br.w >= 1 && d < 7) R.back.line(L.x + x0 + 1, L.y + y0, L.x + x + 1, L.y + y, k > 0.45 ? C[5] : C[2], fade); if ((i & 3) === 0 && k > 0) R.back.glow(L.x + x, L.y + y, 4, C[5], 0.3 * k * fade * I); }
+  if (a < 0.4) { const u = a / 0.4, R0 = rr * 0.32 * (1 - u * 0.6), m = Math.round(11 * (1 - u * 0.5)), Rg = new PX.Rng((f * 53 + 7) >>> 0 || 1); for (let i = 0; i < m; i++) { const an = Rg.range(0, TAU), d0 = Rg.range(0.5, R0 * 0.5), an2 = an + Rg.range(-1.2, 1.2), d1 = Rg.range(R0 * 0.55, R0); voltInk(R.front, zigzag(Rg, L.x + Math.cos(an) * d0, L.y + Math.sin(an) * d0, L.x + Math.cos(an2) * d1, L.y + Math.sin(an2) * d1, 0.5, 0), 0.75 * (1 - u) + 0.25, C, 1, true, 0.2); }
+    R.front.disc(L.x, L.y, 3 * (1 - u) + 1, C[5], 1); R.front.disc(L.x, L.y, 2 * (1 - u) + 0.5, W, 1); R.front.glow(L.x, L.y, rr * 0.5, C[4], 0.5 * (1 - u) * I); if (a < 0.07) R.front.glow(L.x, L.y, rr * 0.28, W, 0.5 * I); }
+  for (let j = 0; j < 14; j++) { const Rg = new PX.Rng(j * 19 + 11), life = Rg.range(0.2, 0.38); if (a >= life) continue; let x = 0, y = 0, an = dirA + Rg.range(-1.3, 1.3) + (Rg.chance(0.75) ? 0 : Math.PI), sp = Rg.range(45, 80), t = 0; const path = [[0, 0]]; while (t < a) { const dt = Math.min(a - t, Rg.range(0.025, 0.055)); x += Math.cos(an) * sp * dt; y += Math.sin(an) * sp * dt; sp *= 1 - 3 * dt; t += dt; path.push([x, y]); an += Rg.sign() * Rg.range(0.6, 1.3); }
+    const k = 1 - a / life, tail = path.slice(-5); for (let i = 0; i < tail.length - 1; i++) R.front.line(L.x + tail[i][0], L.y + tail[i][1], L.x + tail[i + 1][0], L.y + tail[i + 1][1], i === tail.length - 2 ? (k > 0.5 ? W : C[6]) : k > 0.5 ? C[5] : C[4], 0.6 + 0.4 * i / tail.length); R.front.px(L.x + x, L.y + y, k > 0.4 ? W : C[5]); R.front.glow(L.x + x, L.y + y, 3, C[5], 0.35 * k * I); }
+  for (let j = 0; j < 3; j++) { const u = clamp(a / 0.7); if (u >= 1) break; const q = (k) => hash(j * 3.3 + k * 1.9 + 4), x = L.x + (q(1) - 0.5) * 8, y = L.y + (q(2) - 0.5) * 6 - 12 * u; R.back.disc(x, y, (2.4 + q(3) * 1.4) * (0.8 + u), hexc('#6a6680'), (d) => (1 - u) * 0.35 * (1 - d * d)); } // オゾンの煙
+  if (a < 0.85) R.back.glow(L.x, L.y, rr * 0.95 * (1 - a / 0.85), C[3], 0.45 * Math.exp(-a * 5) * (f % 2 ? 0.7 : 1) * I); // 消えながら点滅する光
+}
 function hThunder(S, R, n, pose) {
   if (hTech(S).kind !== 'thunder' || S.age < 0) return; const r = S.r, T = pose.T, C = voltRamp(R.P.color), rr = r.thunder_radius * WL * R.P.size;
-  if (pose.rel < 0) hCrackle(S, R, pose.head, 34, clamp(S.age / T.warn) ** 1.2, 3, C);
+  if (pose.rel < 0 && S.tech !== 'thunder_headbutt') hCrackle(S, R, pose.head, 34, clamp(S.age / T.warn) ** 1.2, 3, C);
+  if (S.tech === 'thunder_headbutt' && pose.rel < T.active + 0.4) hEyeCharge(S, R, n, pose, C);
   if (S.tech === 'thunder_headbutt') {
     if (pose.rel >= 0 && pose.rel < T.active + 0.3 && n.from) { const k = Math.exp(-Math.max(0, pose.rel - T.active) / 0.1), f = Math.floor(S.t / 0.05), Rg = new PX.Rng(f * 7 + 3), A = toL(n.from), B = toL(n.pos); if (dist(n.from, n.pos) > 20) voltInk(R.back, zigzag(Rg, A.x, A.y, B.x, B.y, 0.3, 0.3), 0.7 * k, C, 1, true, 0.4); }
-    if (n.struck) hStrike(S, R, toL(n.target), rr, S.t - n.struck, 17, C, null);
+    if (n.struck) hZap(S, R, toL(n.target), rr, S.t - n.struck, n.angle, C);
   }
   if (S.tech === 'thunder_drop') {
     const L = toL(n.target), M = toL(hMouthAt(n, pose));
@@ -7911,7 +7938,7 @@ const H_DESC = {
   rubble_fan: '予兆：首の瓦礫が口へ送られ、口で小石が暴れる → 頭を突き出して扇に吐き、広い土煙と砂利。小岩はそれぞれ砂ぼこりの尾',
   beam_fixed: '予兆：口から射線いっぱいへ流れる照準の光（白くしない）と口へ集まる光。頭がふくらんで止まる → 先が伸びる光線、口の閃光、縁からこぼれる光。頭は反動で押されて震える → 根元から消え、口に光が残って消える',
   beam_bolt: '予兆：口へ光が集まる → 頭を突き出して撃ち、口の閃光。両端のとがった短い光の棒が飛び、後ろにちらつく光の粒を引く → 寿命の終わりに薄れて消える',
-  thunder_headbutt: '予兆：頭のまわりに短い放電がちらつき、首をS字にためて止まる → 伸びる通り道に稲妻が残る → 到達点で中心から枝分かれする放電、最初の1コマは白、照らされた地面と冷える割れ目、火花',
+  thunder_headbutt: '予兆：赤い目が雷の色に変わって強く光り、目から細い放電が走って目から目へ飛ぶ。首をS字にためて止まる → 伸びる通り道に稲妻が残る → 当たった点が細かい放電の塊になり、シダのように枝分かれする焼け跡が外へ広がって冷え、火花がジグザグに跳ね、オゾンの煙が上がる',
   thunder_drop: '予兆：頭が帯電し、機体の進む先の範囲で放電が増え、頭から着弾点へ細い放電が伸びかける（円は描かない）→ 頭から着弾点へ幹が走り、中心から枝分かれ、最初の1コマは白、冷える割れ目',
 };
 const H_REFS = ['cpp/bosses/hydra/body.cpp（chain・待機の狙い）', 'cpp/bosses/hydra/ の各技（bite_thrust・bite_sweep・wind_band・wind_blades・rubble_lump・beam_fixed・beam_bolt・thunder_drop）', 'data/bosses/hydra.tres・hydra_moves/*.tres', 'scripts/render/attacks/hydra_shape.gd（現行表示の近似）', 'pixelFX の作り方を下敷き（impacts/hit-spark・melee/sword-slash・わしの稲妻 zigzag・voltInk）'];
