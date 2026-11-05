@@ -17,7 +17,7 @@ function dTellDraw(S, R, pose) {
   else if (id === 'picaro_wall') { const e = smooth(0.62, 1, k); if (e > 0) dDarkGather(S, R, pose.mouth, e); }
   else if (!['charge', 'leap', 'bite', 'spiral', 'clones'].includes(id)) { bossGather(R, pose.mouth, 85, k, S.t, 191); dSupply(R, pose.chest, pose.mouth, k, S.t, 215, 30); }
   if (id === 'tail_slam' && S.target) dGroundTremble(S, R, S.target, S.r.radius, k, 121);
-  if (id === 'star_fan') (S.starPositions || []).forEach((q, i) => { dSupply(R, pose.mouth, q.pos, smooth(0.15, 0.8, k), S.t, 230 + i, (i - S.starPositions.length * 0.5) * 7); dStar(R, toL(q.pos), 1 + 2.5 * k, S.t * 3 + i, k, dRamp(R)); });
+  if (id === 'star_fan') (S.starPositions || []).forEach((q, i) => { dSupply(R, pose.mouth, q.pos, smooth(0.1, 0.75, k), S.t, 230 + i, (i - S.starPositions.length * 0.5) * 7); dStarCharge(S, R, q, i, smooth(0.08 + i * 0.03, 0.85, k)); });
 }
 // 目の光：飛びかかる技の合図。ゆっくり灯って、出る直前に強くまたたく
 function dEyes(S, R, pose, k, color) {
@@ -74,6 +74,26 @@ function dRockTrail(S, R, b, age, dir, stop) {
   for (let i = Math.max(0, Math.floor((age - 0.75) * rate)); i / rate <= flying; i++) { const tb = i / rate, a = age - tb, rnd = k => hash(i * 6.13 + k * 2.71 + b.seed * 3), life = lerp(0.28, 0.55, rnd(1)), smokeLife = life + 0.3; if (a > smokeLife) continue; const off = (rnd(2) - 0.5) * b.radius * (1.5 + a * 3), at = toL(add(add(b.from, mul(dir, b.speed * tb - b.radius * 0.5 - a * 60)), mul(side, off)));
     if (a > life) fire.smokePuff(p, at.x, at.y, 1 - (a - life) / 0.3, rad * 0.45, H[7], true, 0.7); else fire.firePuff(p, at.x, at.y, 1 - a / life, rad * lerp(0.3, 0.62, rnd(3)), rnd(4), H, 0.05, -dir.x * 0.8, -dir.y * 0.8); }
   if (age < stop) { const c = toL(head), on = smooth(0, 0.05, age); fire.soft(p, c.x, c.y, rad * 1.7, H[4], 0.4 * on); fire.soft(p, c.x + dir.x * rad * 0.35, c.y + dir.y * rad * 0.35, rad * 1.25, H[2], 0.55 * on); p.glow(c.x, c.y, rad * 2.8, H[3], 0.6 * on * R.P.intensity); }
+}
+// 星弾のため：空に星が生まれてふくらみ、光の芯が脈打つ
+function dStarCharge(S, R, q, i, k) {
+  if (k <= 0) return; const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_FLAME, s = R.P.size, c = toL(q.pos), rad = (3 + 9 * k) * s * (1 + 0.06 * Math.sin(S.t * 22 + i));
+  fire.soft(p, c.x, c.y, rad * 2.4, H[5], 0.28 * k); fire.solid(p, c.x, c.y, rad, H[3]); fire.solid(p, c.x, c.y, rad * 0.6, H[0]); p.glow(c.x, c.y, rad * 3.6, H[4], 0.6 * k * R.P.intensity); dStar(R, c, (5 + 13 * k) * s, S.t * 2 + i, k, dRamp(R));
+}
+// 星弾を放つ口元：光が前へ扇に吹き出す
+function dStarBlast(S, R, pose) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_FLAME, s = R.P.size, c = toL(pose.mouth), NL = fire.noiseFor(1.5);
+  for (const at of S.shotTimes || []) { const age = S.t - at; if (age < 0 || age > 0.5) continue; const k = 1 - age / 0.5, N = (rate, seed = 0, off = 0) => NL(age, rate, seed, off); if (at !== S.shotTimes[0]) continue;
+    for (let i = 0; i < 9; i++) { const off = (i - 4) * 0.28; fire.flameBlade(p, c.x, c.y, Math.cos(pose.facing + off), Math.sin(pose.facing + off), (92 - Math.abs(off) * 40) * s * k, 8 * s * k, N(3, i) * 3, N, 40 + i * 13, H, fire.LAYERS, 0.5, 1.4); }
+    p.glow(c.x, c.y, 34 * s, H[3], 0.9 * k * R.P.intensity); fire.solid(p, c.x, c.y, 8 * s * k, H[0]); }
+}
+function dStarDim(S) { if (S.tech !== 'star_fan') return; const r = S.r, on = S.B.mode === 'windup' ? 0.5 * smooth(0.1, 1, S.elapsed / r.warn) : S.B.mode === 'active' ? 0.5 : S.B.mode === 'recovery' ? 0.5 * (1 - smooth(0.1, 0.8, S.elapsed / r.recover)) : 0, flash = S.shotTimes.length ? Math.exp(-(S.t - S.shotTimes[0]) / 0.08) : 0; if (on <= 0 && flash < 0.01) return; g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = `rgba(4,2,12,${on})`; g.fillRect(0, 0, W, H); if (flash > 0.01) { g.fillStyle = `rgba(190,170,255,${flash * 0.3})`; g.fillRect(0, 0, W, H); } g.restore(); }
+// 尻尾の薙ぎ払い：尾の先と胴の後ろが通った跡に、光の帯が太く残って後ろから消える。地面の土ぼこりが帯に沿って立つ
+function dSweepWake(S, R, pose) {
+  if (S.tech !== 'tail_sweep' || !S.wake) return; const life = 0.42, list = S.wake.filter(q => S.t - q.t < life); if (list.length < 3) return; const H = D_FLAME, p = R.back, ramp = v => { const q = lerp(7, 1, clamp(v)), i = Math.min(6, Math.floor(q)); return PX.mix(H[i], H[i + 1], q - i); };
+  for (let i = 1; i < list.length; i++) { const q0 = list[i - 1], q1 = list[i], f = (S.t - q1.t) / life, A0 = toL(q0.a), A1 = toL(q1.a), B0 = toL(q0.b), B1 = toL(q1.b), steps = Math.ceil(Math.max(dist(A0, A1), dist(B0, B1)) * 2 + 1), span = Math.ceil(dist(A1, B1) * 2 + 1);
+    for (let n = 0; n <= steps; n++) { const u = n / steps, A = lerpV(A0, A1, u), B = lerpV(B0, B1, u); for (let m = 0; m <= span; m++) { const v = m / span, heat = Math.pow(1 - v, 1.5) * (1 - f), at = lerpV(A, B, v); if (heat > 0.03) p.blend(at.x, at.y, ramp(heat * 1.35), Math.min(0.85, heat * 1.1)); } } }
+  const tip = list[list.length - 1]; R.front.glow(toL(tip.a).x, toL(tip.a).y, 16 * R.P.size, H[3], 0.8 * R.P.intensity);
 }
 // 星：白い芯と4本の光条。回りながらまたたく
 function dStar(R, c, size, spin, a, pal) {
@@ -232,8 +252,8 @@ function dCloneFx(S, R) {
   }
 }
 // 彗星弾：丸く光る頭から、細くなりながら冷えていく炎の尾が伸びる
-function dCometShot(R, q, age, u) {
-  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_FLAME, s = R.P.size, on = smooth(0, 0.12, age), head = toL(q.pos), rad = q.radius * WL * 1.5 * s * on, L = Math.min(age * q.speed, 240) * WL * s, ux = u.x, uy = u.y, nx = -uy, ny = ux;
+function dCometShot(R, q, age, u, tail = 240) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_FLAME, s = R.P.size, on = smooth(0, 0.12, age), head = toL(q.pos), rad = q.radius * WL * 1.5 * s * on, L = Math.min(age * q.speed, tail) * WL * s, ux = u.x, uy = u.y, nx = -uy, ny = ux;
   for (let d = 0; d < L; d += 0.5) { const f = d / L, w = rad * Math.pow(1 - f, 1.3); for (let o = -w; o <= w; o += 0.5) { const e = Math.abs(o) / Math.max(0.5, w), heat = clamp((1 - f) * (1.1 - e * 0.7)), c = H[Math.min(7, Math.round(lerp(7, 2, heat)))]; p.blend(head.x - ux * d + nx * o, head.y - uy * d + ny * o, c, Math.min(0.9, (1 - f) * (1 - e * e) * 1.1 * on)); } }
   fire.soft(p, head.x, head.y, rad * 2, H[5], 0.3 * on); fire.solid(p, head.x, head.y, rad, H[3]); fire.solid(p, head.x, head.y, rad * 0.6, H[0]); p.glow(head.x, head.y, rad * 3, H[4], 0.5 * on * R.P.intensity);
 }
@@ -243,13 +263,14 @@ function dShotsFx(S, R) {
     if (q.kind === 'arrow') { drawArrow(q.pos, q.a, q.radius); for (let d = 0; d < 60; d += 2) { const w = toL(sub(q.pos, mul(u, d))); R.front.light(w.x, w.y, pal[2], (1 - d / 60) * 0.3 * R.P.intensity); } continue; }
     if (q.kind === 'comet') { dCometShot(R, q, age, u); continue; }
     if (q.kind === 'dark') { dDarkShot(R, q, age, u); continue; }
+    if (q.kind === 'star') { dCometShot(R, { ...q, radius: 44 }, age, u, 620); dStar(R, toL(q.pos), 17 * R.P.size, age * 5, 1, pal); continue; }
     const big = false, tl = 70; // 星弾：回る星と、後ろへ冷えていくまたたきの尾
     for (let d = 2; d < Math.min(tl, age * q.speed); d += 0.5 / WL) { const w = toL(add(sub(q.pos, mul(u, d)), mul(orth(u), Math.sin(d * 0.03 - age * 14) * 5 * (d / tl)))), f = 1 - d / tl; R.front.blend(w.x, w.y, pal[f > 0.6 ? 4 : f > 0.3 ? 3 : 2], f * f * 0.9); R.front.light(w.x, w.y, pal[2], f * 0.2 * R.P.intensity); }
     dStar(R, toL(q.pos), (big ? 4 : 2.5) * R.P.size, age * 8, 1, pal); }
 }
 function dDraw(S, R) {
   R = bossView(R, '#ab9cff');
-  if (R.proto) dExhaleDim(S);
+  if (R.proto) { dExhaleDim(S); dStarDim(S); }
   const r = S.r, B = S.B, P = R.P, id = S.tech, t = S.t, pose = R.proto ? dOrganic(S, R, dPresentation(S)) : null; dTellDraw(S, R, pose);
   if (!R.proto) {
     if (S.fan && B.mode === 'active') { D2.poly(S.fan, rgba('#5775ff', 0.5)); D2.polyline(S.fan, '#addbff', 4); }
@@ -260,6 +281,8 @@ function dDraw(S, R) {
     for (const impact of S.impacts) { const age = t - impact.t, seed = 83 + Math.floor(impact.t * 10); if (impact.big) { dImpactFx(S, R, impact.at, age, impact.radius * 2.6, seed); dDarkBlast(S, R, impact.at, age, impact.radius * 1.5, seed, D_FLAME); for (let m = 0; m < 6; m++) hDust(S, R, impact.at, age - m * 0.02, seed + m, m * TAU / 6, 2.4); } else (impact.dark ? dDarkBlast : dImpactFx)(S, R, impact.at, age, impact.radius, seed); }
     for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dDarkFall(S, R, q);
     if (id === 'picaro_wall') dDarkMuzzle(S, R, pose);
+    if (id === 'star_fan') dStarBlast(S, R, pose);
+    dSweepWake(S, R, pose);
   }
   if (R.proto) for (const q of S.projectiles) if (q.vel && q.t != null) { const sp = len(q.vel), dir = norm(q.vel), age = t - q.t; dRockTrail(S, R, { from: sub(q.pos, mul(q.vel, age)), speed: sp, radius: q.radius, seed: q.seed || 1 }, age, dir, Infinity); }
   if (R.proto) S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / DR_FLIGHT; if (age < DR_FLIGHT + 0.5) dRockTrail(S, R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, DR_FLIGHT); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
@@ -285,9 +308,14 @@ for (const d of DEMOS) if (d.id === 'D-spiral') d.params = [...(d.params || []),
 
 // 生き物らしさ（螺旋）：絵の動きだけに、頭から尾へ流れるうねり・頭の振り・直進前のための引きを足す（当たりの点列は変えない）
 // 胴のうねり：頭は動かさず、尾へ向かって流れる波を足す。少し弓なりにして、棒のように伸びきらせない
+// 不規則なうねり：長さと速さの違う波を重ね、胴の場所と時間で強さをむらにする。ときどき一部だけ大きく力む
+function dLiveWave(s, t, seed = 0) {
+  const n = PX.tileNoise(s * 0.0016 - t * 0.55, t * 0.37 + seed, 0, 0, 7), surge = Math.pow(0.5 + 0.5 * PX.tileNoise(s * 0.0009 + t * 0.9, seed - t * 0.23, 0, 0, 19), 3) * 2.6;
+  return (0.62 * Math.sin(s * 0.0071 - t * 3.3 + 1.4 * n + seed) + 0.42 * Math.sin(s * 0.0029 + t * 1.7 + seed * 2) + 0.3 * Math.sin(s * 0.016 - t * 6.1 + 2 * n)) * (0.45 + 0.75 * Math.abs(n) + surge);
+}
 function dSwimPoints(pts, t, swim, seed = 0, bow = 1) {
   const N = pts.length - 1; let s = 0;
-  return pts.map((p, i) => { if (i > 0) s += dist(pts[i - 1], p); const u = i / N, n = orth(norm(sub(pts[Math.min(N, i + 8)], pts[Math.max(0, i - 8)]))), amp = 34 * swim * smooth(0.04, 0.4, u) * (0.75 + 0.25 * Math.sin(t * 3.1 + u * 4)), arch = bow * 70 * smooth(0.06, 0.32, u) * Math.sin(u * Math.PI * 1.35 + 0.5 + seed); return add(p, mul(n, Math.sin(s / 620 * TAU - t * 6.5) * amp + arch)); });
+  return pts.map((p, i) => { if (i > 0) s += dist(pts[i - 1], p); const u = i / N, n = orth(norm(sub(pts[Math.min(N, i + 8)], pts[Math.max(0, i - 8)]))), amp = 30 * swim * smooth(0.04, 0.4, u), arch = bow * 70 * smooth(0.06, 0.32, u) * Math.sin(u * Math.PI * 1.35 + 0.5 + seed); return add(p, mul(n, dLiveWave(s, t, seed) * amp + arch)); });
 }
 // 静と動：予兆が進むほど波を止めて力をため、最後に震える。発動で一気に動き、戻りながら波が戻る
 function dSwimAmount(S) {
@@ -296,7 +324,7 @@ function dSwimAmount(S) {
   if (B.mode === 'active') return ['charge', 'leap'].includes(S.tech) ? 1 : ['breath', 'meteor', 'star_fan', 'inhale'].includes(S.tech) ? 0.25 : 0.35;
   if (B.mode === 'recovery') return 0.7 * smooth(0, 1, e / Math.max(0.01, r.recover)); return 0.7;
 }
-function dSpitKick(S) { if (S.tech === 'picaro_wall') { let kick = 0; for (const at of S.shotTimes || []) { const t = S.t - at; if (t >= 0) kick -= 1.1 * Math.exp(-t / 0.12) * (1 - Math.exp(-t / 0.015)); } return kick; } if (!S.rocks.length || S.B.mode !== 'windup') return 0; let kick = 0; S.rocks.forEach((q, i) => { const t = dRockAge(S, i); if (t >= -0.16) kick += t < 0 ? -0.6 * smooth(-0.16, 0, t) : Math.exp(-t / 0.1) * (1 - Math.exp(-t / 0.02)) - 0.6 * Math.exp(-t / 0.02); }); return kick; }
+function dSpitKick(S) { if (['picaro_wall', 'star_fan'].includes(S.tech)) { let kick = 0; for (const at of S.shotTimes || []) { const t = S.t - at; if (t >= 0) kick -= 1.1 * Math.exp(-t / 0.12) * (1 - Math.exp(-t / 0.015)); } return kick; } if (!S.rocks.length || S.B.mode !== 'windup') return 0; let kick = 0; S.rocks.forEach((q, i) => { const t = dRockAge(S, i); if (t >= -0.16) kick += t < 0 ? -0.6 * smooth(-0.16, 0, t) : Math.exp(-t / 0.1) * (1 - Math.exp(-t / 0.02)) - 0.6 * Math.exp(-t / 0.02); }); return kick; }
 function dBodyAlive(S, R, pose) {
   const roar = dExhaleLife(S); if (roar > 0) { const fw = fromA(pose.facing), sd = orth(fw), back = 26 * Math.min(1.4, roar), rattle = Math.sin(S.t * 74) * 4 * roar; pose = { ...pose, points: pose.points.map((p, i) => { const w = 1 - smooth(0, 0.35, i / (pose.points.length - 1)); return add(p, add(mul(fw, -back * w), mul(sd, rattle * w))); }) }; }
   const kick = dSpitKick(S); if (kick) { const fw = fromA(pose.facing); pose = { ...pose, points: pose.points.map((p, i) => add(p, mul(fw, 46 * kick * (1 - smooth(0, 0.3, i / (pose.points.length - 1)))))) }; }
@@ -310,7 +338,7 @@ function dOrganic(S, R, pose) {
   const t = S.t, active = S.B.mode === 'active', e = S.elapsed, shrinkAt = sp.coil + sp.pause;
   const swim = !active ? 1 : e < sp.coil ? 1 : e < shrinkAt ? 0.35 : 0.7, pts = pose.points, N = pts.length - 1;
   let s = 0; const out = pts.map((p, i) => { if (i > 0) s += dist(pts[i - 1], p); const a = i === 0 ? sub(pts[1], pts[0]) : sub(p, pts[i - 1]), n = orth(norm(a)), u = i / N;
-    const amp = 26 * k * swim * (0.15 + 0.85 * smooth(0, 0.35, u)) * (0.75 + 0.25 * Math.sin(t * 3.1 + u * 4)), wave = Math.sin(s / 560 * TAU - t * 7.5) * amp;
+    const amp = 34 * k * swim * (0.15 + 0.85 * smooth(0, 0.35, u)), wave = dLiveWave(s, t * 1.15) * amp;
     return add(p, mul(n, wave)); });
   let facing = pose.facing + Math.sin(t * 5.3) * 0.07 * k * swim;
   // 直進の前：頭を少し引いて力み、震えて止まる → 飛び出す

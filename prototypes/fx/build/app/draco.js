@@ -110,7 +110,7 @@ function dJetPicture(S, R) {
   g.restore();
 }
 function dPredict(S, seconds, cap = DP.aim_lead_cap) { const lead = mul(S.shipVel, Math.max(0, seconds)), l = len(lead); return add(S.ship.pos, l > cap ? mul(lead, cap / l) : lead); }
-function dTailPose(S, offset) { const r = S.r, bow = orth(fromA(S.axis)), points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(S.origin, mul(fromA(S.axis + Math.PI + offset * t * t), r.reach * t)), mul(bow, 240 * Math.sin(Math.PI * t))); }); return dFit(points, S.base, true); } // 胴の余りを同じ側へ逃がし、振りの途中で折れ方が裏返らないようにする
+function dTailPose(S, offset) { const r = S.r, bow = orth(fromA(S.axis)), u = offset / r.half_angle, head = add(S.origin, add(mul(bow, u * 240), mul(fromA(S.axis), -Math.abs(u) * 60))); S.B.facing = S.axis - u * 0.95; const points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(head, mul(fromA(S.axis + Math.PI + offset * t * t), r.reach * t)), mul(bow, 240 * Math.sin(Math.PI * t))); }); return dFit(points, S.base, true); } // 胴の余りを同じ側へ逃がし、振りの途中で折れ方が裏返らないようにする
 function dTailCurve(S, tip) { const head = S.slamHead || S.origin, back = mul(fromA(S.axis), -1), side = orth(back), c1 = add(head, mul(back, DP.body_length * 0.7)), c2 = add(add(tip, mul(back, 220)), mul(side, DP.body_length * 0.35)); return dFit(Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(mul(head, (1 - t) ** 3), mul(c1, 3 * (1 - t) ** 2 * t)), add(mul(c2, 3 * (1 - t) * t * t), mul(tip, t ** 3))); }), S.base, true); }
 // 叩きつけ：ためで頭と胸を尾と逆へひねり、尾を横へ振りかぶる。振り下ろしで体ごとひねり返し、その勢いで尾を落とす
 const DT_TWIST = 0.95, DT_SHIFT = 170, DT_SWING = 620;
@@ -130,6 +130,8 @@ function dSetup(S, id) {
   }
   if (id === 'breath') { S.r.warn = DB_WARN; S.r.active = DB_ACTIVE; }
   if (id === 'rifts') S.r.active = DS.active;
+  if (id === 'star_fan') S.r.warn = 1.5;
+  if (id === 'tail_sweep') S.r.active = 0.8;
   if (['picaro_wall', 'clones'].includes(id)) S.r.warn = DP_WARN;
   if (id === 'spiral') dSpiralBegin(S);
 }
@@ -171,13 +173,13 @@ function dActive(S, dt) {
   if (id === 'bite') dNeckPose(S, S.base, lerpV(S.retracted, S.destination, dBurst(t / r.active)));
   else if (id === 'charge') B.pos = lerpV(S.origin, S.destination, dBurst(t / r.active));
   else if (id === 'leap') B.pos = lerpV(S.takeoff, S.destination, dBurst(t / r.active));
-  else if (id === 'tail_sweep') S.override = dTailPose(S, lerp(-r.half_angle, r.half_angle, smooth(0.04, 0.92, t / r.active)));
+  else if (id === 'tail_sweep') { S.override = dTailPose(S, lerp(-r.half_angle, r.half_angle, smooth(0.1, 0.85, t / r.active))); S.B.pos = S.override[0]; const N = S.override.length - 1; (S.wake ||= []).push({ t: S.t, a: { ...S.override[N] }, b: { ...S.override[Math.round(N * 0.62)] } }); }
   else if (id === 'tail_slam') { const drop = dSlam(t / (r.active * 0.65)); dSlamPose(S, lerp(-1, 1, drop)); S.override = dTailCurve(S, dSlamTip(S, 1 - drop)); S.B.pos = S.override[0]; if (drop >= 1 && !S.landed) { S.landed = true; S.impacts.push({ at: S.target, t: S.t, radius: r.radius, big: true }); } }
   else if (id === 'breath') { S.fanAngle = S.axis + lerp(-r.sweep, r.sweep, smooth(0, 1, t / r.active)); B.facing = S.fanAngle; S.override = S.base; S.fan = [dMouth(S)];
     for (let j = 0; j <= 64; j++) { const a = S.fanAngle - r.half_angle + r.half_angle * 2 * j / 64, u = fromA(a), origin = dMouth(S); let reach = r.reach;
       for (const rock of S.rocks) { const off = sub(rock.pos, origin), projection = off.x * u.x + off.y * u.y, perp2 = len(off) ** 2 - projection ** 2; if (projection > 0 && perp2 < rock.radius ** 2) { rock.hit = true; reach = Math.min(reach, Math.max(0, projection - Math.sqrt(rock.radius ** 2 - perp2))); } } S.fan.push(add(origin, mul(u, reach))); }
     for (const rock of S.rocks) { if (rock.hit) rock.burn = (rock.burn || 0) + dt; rock.hit = false; }
-  } else if (id === 'star_fan' && !S.fired) { S.fired = true; for (const q of S.starPositions) S.shots.push({ pos: { ...q.pos }, a: q.a, speed: r.speed, t: S.t, radius: r.width, life: 4, kind: 'star' }); }
+  } else if (id === 'star_fan' && !S.fired) { S.fired = true; for (const q of S.starPositions) S.shots.push({ pos: { ...q.pos }, a: q.a, speed: r.speed, t: S.t, radius: r.width, life: 4, kind: 'star' }); S.shotTimes.push(S.t); }
   else if (id === 'rifts') dSwipes(S, dt);
   else if (id === 'inhale') dInhale(S, dt);
   else if (id === 'clones') dClones(S, dt);
@@ -272,7 +274,8 @@ function dEnd(S) {
 function dRecover(S) {
   const r = S.r, id = S.tech, k = S.elapsed / r.recover;
   if (id === 'tail_slam') { S.B.facing = S.axis - S.slamSide * DT_TWIST * (1 - smooth(0.05, 1, k)); dSettle(S, S.landedPoints, dNeutral(S.origin, S.axis, S.t), k); }
-  else if (['bite', 'tail_sweep'].includes(id)) dSettle(S, S.landedPoints, dNeutral(S.origin, S.axis, S.t), k);
+  else if (id === 'tail_sweep') { S.B.facing = S.axis - 0.95 * (1 - smooth(0.05, 1, k)); dSettle(S, S.landedPoints, dNeutral(S.origin, S.axis, S.t), k); }
+  else if (id === 'bite') dSettle(S, S.landedPoints, dNeutral(S.origin, S.axis, S.t), k);
   else if (id === 'charge') S.B.pos = add(S.settled, mul(S.direction, 45 * smooth(0, 1, k)));
   else if (id === 'leap') S.B.pos = add(S.settled, mul(S.direction, 30 * smooth(0, 1, k)));
   else if (id === 'breath') { S.B.facing = lerp(S.axis + r.sweep, S.axis, smooth(0, 1, k)); dSettle(S, S.landedPoints, dNeutral(S.B.pos, S.axis, S.t), k); }
@@ -282,7 +285,7 @@ function dRecover(S) {
 }
 function dExhaleShake(S) { // 吐いた瞬間に大きく揺れ、吐いている間は小さく震え続ける
   S.camBase ||= { x: cam.x, y: cam.y }; const e = S.exhale, age = e && S.B.mode === 'active' ? S.t - e.t - S.r.beam_warn : -1, power = age < 0 ? 0 : (14 + 26 * Math.exp(-age / 0.25)) * (1 - smooth(S.r.active - 0.45, S.r.active, S.elapsed)) + 0;
-  if (['picaro_wall', 'rifts', 'tail_slam'].includes(S.tech)) { let hit = 0; for (const at of S.shotTimes) hit += 12 * Math.exp(-Math.max(0, S.t - at) / 0.1) * (S.t >= at ? 1 : 0); for (const q of S.impacts) hit += (q.big ? 30 : 20) * Math.exp(-Math.max(0, S.t - q.t) / (q.big ? 0.2 : 0.14)); cam.x = S.camBase.x + Math.sin(S.t * 61) * hit; cam.y = S.camBase.y + Math.sin(S.t * 53 + 2) * hit; return; }
+  if (['picaro_wall', 'rifts', 'tail_slam', 'star_fan', 'tail_sweep'].includes(S.tech)) { let hit = S.tech === 'tail_sweep' && S.B.mode === 'active' ? 16 * Math.sin(Math.PI * clamp(S.elapsed / S.r.active)) : 0; for (const at of S.shotTimes) hit += 12 * Math.exp(-Math.max(0, S.t - at) / 0.1) * (S.t >= at ? 1 : 0); for (const q of S.impacts) hit += (q.big ? 30 : 20) * Math.exp(-Math.max(0, S.t - q.t) / (q.big ? 0.2 : 0.14)); cam.x = S.camBase.x + Math.sin(S.t * 61) * hit; cam.y = S.camBase.y + Math.sin(S.t * 53 + 2) * hit; return; }
   cam.x = S.camBase.x + (Math.sin(S.t * 61) + Math.sin(S.t * 37 + 1)) * 0.5 * power; cam.y = S.camBase.y + (Math.sin(S.t * 53 + 2) + Math.sin(S.t * 41)) * 0.5 * power;
 }
 function dSwipes(S, dt) { // 予兆を出す瞬間の自機の位置へ、竜から見て横向きの3本の裂け目を置く。左右の爪で交互に切り裂く
@@ -293,7 +296,7 @@ function dSwipes(S, dt) { // 予兆を出す瞬間の自機の位置へ、竜か
 // 咆哮：おおいぬ座と同じ段階3（ブラー大）の値をそのまま使う
 function dPicaroRoar(S, R) { postCanisRoar({ ...S, tech: 'nova' }, { ...R, P: { ...R.P, ...ROAR_LEVEL_DEFAULTS[3], roarLevel: 3 } }); }
 function dStep(S, dt) {
-  S.age += dt; if (S.age < 0) return; if (['inhale', 'picaro_wall', 'rifts', 'tail_slam'].includes(S.tech)) dExhaleShake(S);
+  S.age += dt; if (S.age < 0) return; if (['inhale', 'picaro_wall', 'rifts', 'tail_slam', 'star_fan', 'tail_sweep'].includes(S.tech)) dExhaleShake(S);
   if (S.tech !== 'inhale' && !(S.tech === 'spiral' && S.B.mode === 'active' && S.elapsed < S.spiral.coil)) { S.ship.pos.y = 90 + Math.sin(S.t * 0.5) * 50; S.shipVel = V(0, Math.cos(S.t * 0.5) * 25); }
   if (S.tech === 'rifts') { S.ship.pos = V(520 + Math.cos(S.t * 0.75) * 300, 40 + Math.sin(S.t * 1.15) * 210); S.shipVel = V(0, 0); }
   S.elapsed += dt; const B = S.B, r = S.r, before = { ...B.pos }; S.override = null;
