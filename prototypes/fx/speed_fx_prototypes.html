@@ -8569,7 +8569,7 @@ function dTailPose(S, offset) { const r = S.r, bow = orth(fromA(S.axis)), points
 function dTailCurve(S, tip) { const back = mul(fromA(S.axis), -1), side = orth(back), c1 = add(S.origin, mul(back, DP.body_length * 0.7)), c2 = add(add(tip, mul(back, 220)), mul(side, DP.body_length * 0.35)); return dFit(Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(mul(S.origin, (1 - t) ** 3), mul(c1, 3 * (1 - t) ** 2 * t)), add(mul(c2, 3 * (1 - t) * t * t), mul(tip, t ** 3))); }), S.base, true); }
 function dSetup(S, id) {
   S.tech = id; S.r = bossRule('draco', id); S.B = bossActor('draco', ['breath', 'meteor'].includes(id) ? V(-140, -90) : V(470, -80)); S.B.r = DRACO.def.radius * DP.head_scale; S.ship = shipState(V(720, 90), Math.PI / 2, 25); S.shipVel = V(0, 25); S.age = -0.5; S.elapsed = 0; S.origin = { ...S.B.pos }; S.axis = 0; S.direction = V(1, 0); S.points = dNeutral(S.B.pos, 0, 0); S.base = S.points; S.trail = S.points; S.tell = []; S.shots = []; S.rocks = []; S.impacts = []; S.rifts = []; S.effects = []; S.projectiles = []; S.units = []; S.shot = 0; S.target = dPredict(S, S.r.warn || 0);
-  if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
+  if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: id === 'inhale' ? -1 : S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
   else { S.axis = id === 'tail_sweep' ? 0 : angOf(sub(S.ship.pos, S.B.pos)); S.B.facing = S.axis; S.direction = fromA(S.axis); S.base = dNeutral(S.B.pos, S.axis, S.t); S.trail = S.base; S.points = S.base; }
   if (id === 'bite') { S.target = dPredict(S, S.r.warn + S.r.active * 0.55, S.r.lead_cap); S.direction = norm(sub(S.target, S.origin)); S.axis = angOf(S.direction); S.B.facing = S.axis; S.base = dNeutral(S.origin, S.axis, S.t); S.retracted = sub(S.origin, mul(S.direction, S.r.retract)); S.destination = add(S.origin, mul(S.direction, S.r.reach)); }
   if (['breath', 'meteor'].includes(id)) { S.mouth = dMouth(S); const r = S.r; for (let i = 0; i < r.rocks; i++) { const to = add(add(S.mouth, mul(S.direction, r.rock_distance)), mul(orth(S.direction), (i - (r.rocks - 1) * 0.5) * r.rock_spacing)); S.rocks.push({ from: S.mouth, to, pos: S.mouth, radius: r.rock_radius, seed: i }); } }
@@ -8726,8 +8726,12 @@ function dRecover(S) {
   else if (id === 'inhale') S.override = S.inhaleBody;
   else if (id === 'spiral') { const sp = S.spiral, speed = (sp.extent * 2 + r.spiral_length) / sp.shrink; if (sp.coilPoints) dSpiralPull(S, (S.r.active - sp.coil - sp.pause + S.elapsed) * speed); }
 }
+function dExhaleShake(S) { // 吐いた瞬間に大きく揺れ、吐いている間は小さく震え続ける
+  S.camBase ||= { x: cam.x, y: cam.y }; const e = S.exhale, age = e && S.B.mode === 'active' ? S.t - e.t - S.r.beam_warn : -1, power = age < 0 ? 0 : (14 + 26 * Math.exp(-age / 0.25)) * (1 - smooth(S.r.active - 0.45, S.r.active, S.elapsed));
+  cam.x = S.camBase.x + (Math.sin(S.t * 61) + Math.sin(S.t * 37 + 1)) * 0.5 * power; cam.y = S.camBase.y + (Math.sin(S.t * 53 + 2) + Math.sin(S.t * 41)) * 0.5 * power;
+}
 function dStep(S, dt) {
-  S.age += dt; if (S.age < 0) return;
+  S.age += dt; if (S.age < 0) return; if (S.tech === 'inhale') dExhaleShake(S);
   if (S.tech !== 'inhale' && !(S.tech === 'spiral' && S.B.mode === 'active' && S.elapsed < S.spiral.coil)) { S.ship.pos.y = 90 + Math.sin(S.t * 0.5) * 50; S.shipVel = V(0, Math.cos(S.t * 0.5) * 25); }
   S.elapsed += dt; const B = S.B, r = S.r, before = { ...B.pos }; S.override = null;
   if (B.mode === 'windup') { dWindup(S, dt); if (S.elapsed >= r.warn) { B.mode = 'active'; S.elapsed = 0; S.tell = []; } }
@@ -8897,11 +8901,30 @@ function dInhaleFx(S, R) {
     if (i % 9 === 0) dStar(R, toL(head), 1 + ph * 2, S.t * 4 + i, k * ph, pal); }
   const m = toL(mouth); R.front.glow(m.x, m.y, 8 * R.P.size, pal[3], 0.5 * k * R.P.intensity);
 }
-// 吐き出し：口から光線。予告は口へ光が集まって照準の光（白くしない）
+// 吐き出し：溜めた星を一気に吐く太い光の奔流。縁はまっすぐで、白い芯から紫へなめらかに冷え、外側へ広い光がにじむ。中を星屑が走り、口元で炎が暴れる
+function dExhaleLife(S) { // 0：吐いていない、1：全力。吐き始めの瞬間は1を超える
+  const e = S.exhale; if (!e || S.B.mode !== 'active') return 0; const r = S.r, age = S.t - e.t - r.beam_warn; if (age < 0) return 0; return smooth(0, 0.08, age) * (1 - smooth(r.active - 0.45, r.active, S.elapsed)) * (1 + 0.5 * Math.exp(-age / 0.16));
+}
 function dExhaleFx(S, R) {
-  if (!S.exhale || S.B.mode !== 'active') return; const r = S.r, e = S.exhale, age = S.t - e.t, end = add(e.at, mul(fromA(e.a), r.reach));
-  if (age < r.beam_warn) { const k = clamp(age / r.beam_warn); bossGather(R, e.at, 150, k, S.t, 21); FX.warnRail(R.front, toL(e.at), toL(end), { color: R.P.color, k, time: S.t, seed: 5, maxLv: 2, intensity: R.P.intensity }); }
-  else { const f = clamp((age - r.beam_warn) / r.beam_extend), A = toL(e.at); FX.beam(R.front, A, toL(end), { w: r.width * 0.5 * WL * R.P.size, source: false, color: R.P.color, time: S.t, from: 0, to: f, taper: 8, alpha: 1, intensity: R.P.intensity }); FX.flare(R.front, A, 1.8 * R.P.size, R.P.color, S.t, 0.55, 4); }
+  if (!S.exhale || S.B.mode !== 'active') return; const r = S.r, e = S.exhale, age = S.t - e.t, s = R.P.size;
+  if (age < r.beam_warn) { const k = clamp(age / r.beam_warn), end = add(e.at, mul(fromA(e.a), r.reach)); bossGather(R, e.at, 150, k, S.t, 21); FX.warnRail(R.front, toL(e.at), toL(end), { color: R.P.color, k, time: S.t, seed: 5, maxLv: 2, intensity: R.P.intensity }); return; }
+  const life = dExhaleLife(S); if (life <= 0) return; const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_FLAME, t = S.t, a0 = e.a, ux = Math.cos(a0), uy = Math.sin(a0), O = toL(e.at), L = r.reach * WL * s * dBurst((age - r.beam_warn) / r.beam_extend), hw = r.width * 0.5 * WL * s * life * (1 + 0.07 * Math.sin(t * 17) + 0.05 * Math.sin(t * 29)), halo = hw * 3.4;
+  const X = [O.x - ux * 8, O.x + ux * L], Y = [O.y - uy * 8, O.y + uy * L], pad = halo + 4, ramp = v => { const q = clamp(v) * 4, i = Math.min(3, Math.floor(q)); return PX.mix(H[6 - i * 2], H[Math.max(0, 4 - i * 2)], q - i); };
+  p.each(Math.min(...X) - pad, Math.min(...Y) - pad, Math.max(...X) + pad, Math.max(...Y) + pad, (x, y, sx, sy) => {
+    const dx = x - O.x, dy = y - O.y, along = dx * ux + dy * uy, lat = Math.abs(dy * ux - dx * uy); if (lat > halo || along < -8 || along > L + 6) return;
+    const mouth = lerp(0.5, 1, smooth(-4, 30, along)), w = hw * mouth, tip = 1 - smooth(L - 10, L + 6, along), q = lat / w, base = smooth(-8, 3, along) * tip;
+    if (q > 1) { const g = 1 - (lat - w) / (halo - w); p.blendPx(sx, sy, H[lat < w * 1.6 ? 5 : 6], g * g * 0.42 * base); return; }
+    const flow = 0.5 + 0.5 * PX.tileFbm(along * 0.018 - t * 6.5, q * 2.4, 0, 0, 41, 2), heat = clamp((1 - q * q) * (0.95 + 0.35 * flow)); p.blendPx(sx, sy, ramp(heat), Math.min(1, (0.72 + 0.28 * (1 - q)) * base));
+    if (q < 0.5) p.blendPx(sx, sy, H[0], (1 - q / 0.5) * base); });
+  for (let i = 0; i < 26; i++) { const ph = (t * (1.4 + hash(i) * 1.4) + hash(i * 3.3)) % 1, along = ph * L, off = (hash(i * 5.1) * 2 - 1) * hw * 2.3, len = (10 + 26 * hash(i * 7.7)) * s, on = Math.sin(Math.PI * ph) * clamp(life); for (let d = 0; d < len; d += 0.5) { const u = d / len; p.blend(O.x + ux * (along - d) - uy * off, O.y + uy * (along - d) + ux * off, H[hash(i) > 0.5 ? 2 : 3], (1 - u) * (1 - u) * on * 0.85); } }
+  const NL = fire.noiseFor(1.5), N = (rate, seed = 0, off = 0) => NL(age, rate, seed, off), roar = Math.min(1.25, life) * (0.9 + 0.15 * N(5, 3));
+  for (let i = 0; i < 3; i++) { const off = (i - 1) * 0.1, len = (46 - i * 4) * s * roar; fire.flameBlade(p, O.x, O.y, Math.cos(a0 + off), Math.sin(a0 + off), len, 9 * s, N(3, i + 3) * 2, N, 50 + i * 17, H, fire.LAYERS, 0.5, 1.2); }
+  p.glow(O.x, O.y, 16 * s, H[3], 0.8 * clamp(life) * R.P.intensity); p.glow(O.x, O.y, 7 * s, H[0], 0.9 * clamp(life) * R.P.intensity);
+}
+// 吐いている間は画面を暗くして光を際立たせ、吐いた瞬間だけ強く光る
+function dExhaleDim(S) {
+  const life = dExhaleLife(S), e = S.exhale; if (!e || S.B.mode !== 'active') return; const r = S.r, age = S.t - e.t, dim = age < r.beam_warn ? 0.55 * smooth(0.1, r.beam_warn, age) : 0.62 * clamp(life) + 0.0, flash = age >= r.beam_warn ? Math.exp(-(age - r.beam_warn) / 0.07) : 0;
+  g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.fillStyle = `rgba(4,2,12,${dim})`; g.fillRect(0, 0, W, H); if (flash > 0.01) { g.fillStyle = `rgba(190,170,255,${flash * 0.3})`; g.fillRect(0, 0, W, H); } g.restore();
 }
 // 突進・飛びかかり：体の縁から空気がはがれて細く尾を引き、踏み切った所に土ぼこりが立つ
 function dRushFx(S, R, pose) {
@@ -8951,16 +8974,24 @@ function dCloneFx(S, R) {
     if (u.mode === 'bite_thrust') dFangs(S, RP, add(u.pos, mul(fromA(u.angle), 120 * DP.head_scale)), u.angle, e - r.normal_lunge, r.bite_radius, u.index * 13);
   }
 }
+// 彗星弾：丸く光る頭から、細くなりながら冷えていく炎の尾が伸びる
+function dCometShot(R, q, age, u) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_FLAME, s = R.P.size, on = smooth(0, 0.12, age), head = toL(q.pos), rad = q.radius * WL * 1.5 * s * on, L = Math.min(age * q.speed, 240) * WL * s, ux = u.x, uy = u.y, nx = -uy, ny = ux;
+  for (let d = 0; d < L; d += 0.5) { const f = d / L, w = rad * Math.pow(1 - f, 1.3); for (let o = -w; o <= w; o += 0.5) { const e = Math.abs(o) / Math.max(0.5, w), heat = clamp((1 - f) * (1.1 - e * 0.7)), c = H[Math.min(7, Math.round(lerp(7, 2, heat)))]; p.blend(head.x - ux * d + nx * o, head.y - uy * d + ny * o, c, Math.min(0.9, (1 - f) * (1 - e * e) * 1.1 * on)); } }
+  fire.soft(p, head.x, head.y, rad * 2, H[5], 0.3 * on); fire.solid(p, head.x, head.y, rad, H[3]); fire.solid(p, head.x, head.y, rad * 0.6, H[0]); p.glow(head.x, head.y, rad * 3, H[4], 0.5 * on * R.P.intensity);
+}
 function dShotsFx(S, R) {
   const pal = dRamp(R);
   for (const q of S.shots) { const age = S.t - q.t, u = fromA(q.a);
     if (q.kind === 'arrow') { drawArrow(q.pos, q.a, q.radius); for (let d = 0; d < 60; d += 2) { const w = toL(sub(q.pos, mul(u, d))); R.front.light(w.x, w.y, pal[2], (1 - d / 60) * 0.3 * R.P.intensity); } continue; }
-    const big = q.kind === 'comet', tl = big ? 140 : 70; // 星弾：回る星と、後ろへ冷えていくまたたきの尾
+    if (q.kind === 'comet') { dCometShot(R, q, age, u); continue; }
+    const big = false, tl = 70; // 星弾：回る星と、後ろへ冷えていくまたたきの尾
     for (let d = 2; d < Math.min(tl, age * q.speed); d += 0.5 / WL) { const w = toL(add(sub(q.pos, mul(u, d)), mul(orth(u), Math.sin(d * 0.03 - age * 14) * 5 * (d / tl)))), f = 1 - d / tl; R.front.blend(w.x, w.y, pal[f > 0.6 ? 4 : f > 0.3 ? 3 : 2], f * f * 0.9); R.front.light(w.x, w.y, pal[2], f * 0.2 * R.P.intensity); }
     dStar(R, toL(q.pos), (big ? 4 : 2.5) * R.P.size, age * 8, 1, pal); }
 }
 function dDraw(S, R) {
   R = bossView(R, '#ab9cff');
+  if (R.proto) dExhaleDim(S);
   const r = S.r, B = S.B, P = R.P, id = S.tech, t = S.t, pose = R.proto ? dOrganic(S, R, dPresentation(S)) : null; dTellDraw(S, R, pose);
   if (!R.proto) {
     if (S.fan && B.mode === 'active') { D2.poly(S.fan, rgba('#5775ff', 0.5)); D2.polyline(S.fan, '#addbff', 4); }
@@ -9008,6 +9039,7 @@ function dSwimAmount(S) {
 }
 function dSpitKick(S) { if (!S.rocks.length || S.B.mode !== 'windup') return 0; let kick = 0; S.rocks.forEach((q, i) => { const t = dRockAge(S, i); if (t >= -0.16) kick += t < 0 ? -0.6 * smooth(-0.16, 0, t) : Math.exp(-t / 0.1) * (1 - Math.exp(-t / 0.02)) - 0.6 * Math.exp(-t / 0.02); }); return kick; }
 function dBodyAlive(S, R, pose) {
+  const roar = dExhaleLife(S); if (roar > 0) { const fw = fromA(pose.facing), sd = orth(fw), back = 26 * Math.min(1.4, roar), rattle = Math.sin(S.t * 74) * 4 * roar; pose = { ...pose, points: pose.points.map((p, i) => { const w = 1 - smooth(0, 0.35, i / (pose.points.length - 1)); return add(p, add(mul(fw, -back * w), mul(sd, rattle * w))); }) }; }
   const kick = dSpitKick(S); if (kick) { const fw = fromA(pose.facing); pose = { ...pose, points: pose.points.map((p, i) => add(p, mul(fw, 46 * kick * (1 - smooth(0, 0.3, i / (pose.points.length - 1)))))) }; }
   const k = R.P.alive ?? 1, tail = ['tail_sweep', 'tail_slam'].includes(S.tech), swim = dSwimAmount(S) * k * (tail ? 0.3 : 1), points = dSwimPoints(pose.points, S.t, swim, 0, tail ? 0 : k), B = S.B;
   if (B.mode === 'windup' && (!S.staging || S.staging.phase === 'ready')) { const q = smooth(0.72, 1, S.elapsed / Math.max(0.01, S.r.warn)), shake = mul(orth(fromA(pose.facing)), Math.sin(S.t * 90) * 3 * q * k); if (q > 0) for (let i = 0; i <= 6; i++) points[i] = add(points[i], mul(shake, 1 - i / 7)); }

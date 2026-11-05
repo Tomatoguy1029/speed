@@ -107,7 +107,7 @@ function dTailPose(S, offset) { const r = S.r, bow = orth(fromA(S.axis)), points
 function dTailCurve(S, tip) { const back = mul(fromA(S.axis), -1), side = orth(back), c1 = add(S.origin, mul(back, DP.body_length * 0.7)), c2 = add(add(tip, mul(back, 220)), mul(side, DP.body_length * 0.35)); return dFit(Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(mul(S.origin, (1 - t) ** 3), mul(c1, 3 * (1 - t) ** 2 * t)), add(mul(c2, 3 * (1 - t) * t * t), mul(tip, t ** 3))); }), S.base, true); }
 function dSetup(S, id) {
   S.tech = id; S.r = bossRule('draco', id); S.B = bossActor('draco', ['breath', 'meteor'].includes(id) ? V(-140, -90) : V(470, -80)); S.B.r = DRACO.def.radius * DP.head_scale; S.ship = shipState(V(720, 90), Math.PI / 2, 25); S.shipVel = V(0, 25); S.age = -0.5; S.elapsed = 0; S.origin = { ...S.B.pos }; S.axis = 0; S.direction = V(1, 0); S.points = dNeutral(S.B.pos, 0, 0); S.base = S.points; S.trail = S.points; S.tell = []; S.shots = []; S.rocks = []; S.impacts = []; S.rifts = []; S.effects = []; S.projectiles = []; S.units = []; S.shot = 0; S.target = dPredict(S, S.r.warn || 0);
-  if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
+  if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: id === 'inhale' ? -1 : S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
   else { S.axis = id === 'tail_sweep' ? 0 : angOf(sub(S.ship.pos, S.B.pos)); S.B.facing = S.axis; S.direction = fromA(S.axis); S.base = dNeutral(S.B.pos, S.axis, S.t); S.trail = S.base; S.points = S.base; }
   if (id === 'bite') { S.target = dPredict(S, S.r.warn + S.r.active * 0.55, S.r.lead_cap); S.direction = norm(sub(S.target, S.origin)); S.axis = angOf(S.direction); S.B.facing = S.axis; S.base = dNeutral(S.origin, S.axis, S.t); S.retracted = sub(S.origin, mul(S.direction, S.r.retract)); S.destination = add(S.origin, mul(S.direction, S.r.reach)); }
   if (['breath', 'meteor'].includes(id)) { S.mouth = dMouth(S); const r = S.r; for (let i = 0; i < r.rocks; i++) { const to = add(add(S.mouth, mul(S.direction, r.rock_distance)), mul(orth(S.direction), (i - (r.rocks - 1) * 0.5) * r.rock_spacing)); S.rocks.push({ from: S.mouth, to, pos: S.mouth, radius: r.rock_radius, seed: i }); } }
@@ -264,8 +264,12 @@ function dRecover(S) {
   else if (id === 'inhale') S.override = S.inhaleBody;
   else if (id === 'spiral') { const sp = S.spiral, speed = (sp.extent * 2 + r.spiral_length) / sp.shrink; if (sp.coilPoints) dSpiralPull(S, (S.r.active - sp.coil - sp.pause + S.elapsed) * speed); }
 }
+function dExhaleShake(S) { // 吐いた瞬間に大きく揺れ、吐いている間は小さく震え続ける
+  S.camBase ||= { x: cam.x, y: cam.y }; const e = S.exhale, age = e && S.B.mode === 'active' ? S.t - e.t - S.r.beam_warn : -1, power = age < 0 ? 0 : (14 + 26 * Math.exp(-age / 0.25)) * (1 - smooth(S.r.active - 0.45, S.r.active, S.elapsed));
+  cam.x = S.camBase.x + (Math.sin(S.t * 61) + Math.sin(S.t * 37 + 1)) * 0.5 * power; cam.y = S.camBase.y + (Math.sin(S.t * 53 + 2) + Math.sin(S.t * 41)) * 0.5 * power;
+}
 function dStep(S, dt) {
-  S.age += dt; if (S.age < 0) return;
+  S.age += dt; if (S.age < 0) return; if (S.tech === 'inhale') dExhaleShake(S);
   if (S.tech !== 'inhale' && !(S.tech === 'spiral' && S.B.mode === 'active' && S.elapsed < S.spiral.coil)) { S.ship.pos.y = 90 + Math.sin(S.t * 0.5) * 50; S.shipVel = V(0, Math.cos(S.t * 0.5) * 25); }
   S.elapsed += dt; const B = S.B, r = S.r, before = { ...B.pos }; S.override = null;
   if (B.mode === 'windup') { dWindup(S, dt); if (S.elapsed >= r.warn) { B.mode = 'active'; S.elapsed = 0; S.tell = []; } }
