@@ -457,14 +457,14 @@ function hBeam(S, R, n, pose) {
     const dir = fromA(pose.rel < 0 ? n.angle : n.sweep), B = toL(add(M, mul(dir, r.beam_len)));
     if (pose.rel < 0 && S.age >= 0) { const u = clamp(S.age / T.warn); FX.warnRail(R.front, A, B, { color: R.P.color, k: u, time: S.t, seed: 3, maxLv: 2, intensity: R.P.intensity }); bossGather(R, M, 46, u, S.t, 5); }
     if (pose.rel >= 0) { const e = pose.rel; if (e > T.active + 0.25) return;
-      if (e <= T.active) { const to = clamp(e / 0.07), from = clamp((e - (T.active - 0.1)) / 0.1); FX.beam(R.front, A, B, { w: r.beam_width * WL * R.P.size, color: R.P.color, time: S.t, from, to, taper: 6, alpha: 1, intensity: R.P.intensity }); FX.flare(R.front, A, 3 * R.P.size, R.P.color, S.t, 0.55 * (1 - from), 4);
+      if (e <= T.active) { const to = clamp(e / 0.07), from = clamp((e - (T.active - 0.1)) / 0.1); FX.beam(R.front, A, B, { w: r.beam_width * 0.5 * WL * R.P.size, source: false, color: R.P.color, time: S.t, from, to, taper: 6, alpha: 1, intensity: R.P.intensity }); FX.flare(R.front, A, 1.4 * R.P.size, R.P.color, S.t, 0.55 * (1 - from), 4);
         for (let i = 0; i < 18; i++) { const ph = (e * (2 + hash(i)) + hash(i * 3)) % 1, s = ph * Math.min(1, to) * r.beam_len * 0.6, side = (hash(i * 5) > 0.5 ? 1 : -1), q = toL(add(add(M, mul(dir, s)), mul(orth(dir), side * (r.beam_width * 0.5 + ph * 40)))); R.front.dot(q.x, q.y, pal[ph < 0.3 ? 3 : 2], (1 - ph) * 0.8); } }
       else { const k = 1 - (e - T.active) / 0.25; R.front.glow(A.x, A.y, 6 * R.P.size, pal[2], 0.4 * k * R.P.intensity); }
     }
   }
   if (S.tech === 'beam_bolt') {
     if (pose.rel < 0 && S.age >= 0) bossGather(R, M, 40, clamp(S.age / T.warn), S.t, 9);
-    if (pose.rel >= 0 && pose.rel < 0.12) FX.flare(R.front, toL(add(n.from, mul(fromA(n.angle), hMouthDist(n)))), 6 * R.P.size, R.P.color, S.t, 1 - pose.rel / 0.12, 4);
+    if (pose.rel >= 0 && pose.rel < 0.12) FX.flare(R.front, toL(add(n.from, mul(fromA(n.angle), hMouthDist(n)))), 2.5 * R.P.size, R.P.color, S.t, 1 - pose.rel / 0.12, 4);
     for (const b of S.shots) { if (b.kind !== 'bolt') continue; const age = S.t - b.t, life = r.bolt_life; if (age > life) continue;
       const dir = fromA(b.angle), P0 = add(add(b.from, mul(dir, hMouthDist(n))), mul(dir, r.bolt_speed * age)), P1 = add(P0, mul(dir, r.bolt_length)), fade = clamp((life - age) / 0.3);
       for (let k = 1; k < 26; k++) { const q = toL(sub(P0, mul(dir, k * 6))), f = (1 - k / 26) * fade; if (age * r.bolt_speed < k * 6) break; R.front.light(q.x + (hash(k + Math.floor(S.t * 20)) - 0.5) * 2, q.y + (hash(k * 3 + Math.floor(S.t * 20)) - 0.5) * 2, pal[2], f * 0.35 * R.P.intensity); if (hash(k * 7 + Math.floor(S.t * 30)) < f * 0.5) { const q2 = toL(sub(P0, mul(dir, k * 6))); R.front.dot(q2.x, q2.y, pal[3], f); } }
