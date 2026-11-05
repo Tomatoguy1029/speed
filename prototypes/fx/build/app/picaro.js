@@ -8,7 +8,7 @@ const mixC = (a, b, k) => ({ r: a.r + (b.r - a.r) * k, g: a.g + (b.g - a.g) * k,
 function pcNoise(x, y) { const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi, sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy), h = (a, b) => hash(a * 57.3 + b * 131.7);
   return lerp(lerp(h(xi, yi), h(xi + 1, yi), sx), lerp(h(xi, yi + 1), h(xi + 1, yi + 1), sx), sy); }
 function pcBase(type) { // 絵の画素と縁の画素（種類ごとに一度だけ作る）
-  if (PC_BASE[type]) return PC_BASE[type]; const im = IMG['enemy/' + type]; if (!im) return null;
+  if (PC_BASE[type]) return PC_BASE[type]; const im = IMG[type.includes('/') ? type : 'enemy/' + type]; if (!im) return null;
   const c = document.createElement('canvas'); c.width = im.width; c.height = im.height; const x = c.getContext('2d'); x.drawImage(im, 0, 0);
   const d = x.getImageData(0, 0, im.width, im.height), w = im.width, h = im.height, a = (i, j) => (i < 0 || j < 0 || i >= w || j >= h) ? 0 : d.data[(j * w + i) * 4 + 3];
   const edge = []; for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) if (a(i, j) > 100 && (a(i - 1, j) < 100 || a(i + 1, j) < 100 || a(i, j - 1) < 100 || a(i, j + 1) < 100)) edge.push([i, j]);
