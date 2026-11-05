@@ -3,10 +3,12 @@ extends UiScreen
 
 const CLEARED := preload("res://assets/ui/results/stage_cleared.png")
 const FAILED := preload("res://assets/ui/results/game_over_screen.png")
+const RESULT_FONT := preload("res://assets/ui/aseprite_font.tres")
 const DESIGN_SIZE := Vector2(640, 360)
 
 func _ready() -> void:
 	can_go_back = false
+	%Modules.add_theme_font_override("font", RESULT_FONT)
 	var result := GameManager.last_result
 	var cleared: bool = result.get("cleared", false)
 	%Heading.text = tr("result.cleared") if cleared else tr("result.failed")
@@ -33,6 +35,7 @@ func _fit_canvas() -> void:
 func _value(value: String, rect: Rect2) -> void:
 	var label := Label.new()
 	label.text = value
+	label.add_theme_font_override("font", RESULT_FONT)
 	label.position = rect.position
 	label.size = rect.size
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT

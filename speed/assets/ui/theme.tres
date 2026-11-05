@@ -1,7 +1,4 @@
-[gd_resource type="Theme" load_steps=2 format=3 uid="uid://4y8mx1isye2v"]
-
-[ext_resource type="Font" path="res://assets/ui/aseprite_font.tres" id="1"]
+[gd_resource type="Theme" format=3 uid="uid://4y8mx1isye2v"]
 
 [resource]
-default_font = ExtResource("1")
 default_font_size = 22
