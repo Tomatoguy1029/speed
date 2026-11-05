@@ -9,11 +9,12 @@ function dTellDraw(S, R, pose) {
   if (!R.proto) { for (const path of S.tell) D2.polyline(path, rgba('#f8b05b', 0.42 + k * 0.4), 3); if (S.tech === 'tail_slam' && S.B.mode === 'windup' && S.target) D2.arc(S.target, S.r.radius, 0, TAU, '#f8b05b', 3); if (S.tech === 'star_fan' && S.B.mode === 'windup') for (const q of S.starPositions || []) D2.circle(q.pos, 8 + k * 4, '#ffca7a'); return; }
   if (S.tech === 'spiral') { dSpiralCountdown(S, R, pose); return; }
   dEyesTell(S, R, pose, k);
-  if (S.tech !== 'bite') S.tell.forEach((path, i) => { if (path.length > 2) { for (let m = 0; m < path.length; m += 4) dGroundTremble(S, R, path[m], 40, k, 500 + m); } else FX.warnRail(R.back, toL(path[0]), toL(path[1]), { color: R.P.color, k: 0.3 + 0.7 * k, time: S.t, seed: 300 + i, maxLv: 2, intensity: R.P.intensity }); });
+  if (!['bite', 'leap'].includes(S.tech)) S.tell.forEach((path, i) => { if (path.length > 2) { for (let m = 0; m < path.length; m += 4) dGroundTremble(S, R, path[m], 40, k, 500 + m); } else FX.warnRail(R.back, toL(path[0]), toL(path[1]), { color: R.P.color, k: 0.3 + 0.7 * k, time: S.t, seed: 300 + i, maxLv: 2, intensity: R.P.intensity }); });
   if (S.B.mode !== 'windup' || (S.staging && S.staging.phase !== 'ready')) return;
   const id = S.tech;
   if (id === 'rifts') for (let i = 0; i < 2; i++) { bossGather(R, pose.claws[i], 66, k, S.t, 191 + i); dSupply(R, pose.chest, pose.claws[i], k, S.t, 211 + i, i ? 32 : -32); }
   else if (['tail_sweep', 'tail_slam'].includes(id)) { const end = pose.points[pose.points.length - 1]; bossGather(R, end, 100, k, S.t, 193); dSupply(R, pathAt(pose.points, pathLength(pose.points) * 0.72).pos, end, k, S.t, 213); }
+  else if (id === 'picaro_wall') dDarkGather(S, R, pose.mouth, k);
   else if (!['charge', 'leap', 'bite', 'spiral', 'clones'].includes(id)) { bossGather(R, pose.mouth, 85, k, S.t, 191); dSupply(R, pose.chest, pose.mouth, k, S.t, 215, 30); }
   if (id === 'tail_slam' && S.target) dGroundTremble(S, R, S.target, S.r.radius, k, 121);
   if (id === 'star_fan') (S.starPositions || []).forEach((q, i) => { dSupply(R, pose.mouth, q.pos, smooth(0.15, 0.8, k), S.t, 230 + i, (i - S.starPositions.length * 0.5) * 7); dStar(R, toL(q.pos), 1 + 2.5 * k, S.t * 3 + i, k, dRamp(R)); });
@@ -35,6 +36,37 @@ function dGroundTremble(S, R, at, radius, k, seed) {
   const c = toL(at), rr = radius * WL * R.P.size, pal = dRamp(R);
   for (let i = 0; i < 26; i++) { const a = hash(seed + i * 3.1) * TAU, d = rr * Math.sqrt(hash(seed + i * 7.7)), j = Math.sin(S.t * 50 + i) * k * 0.8; if (hash(seed + i * 2.3) > 0.3 + 0.7 * k) continue; R.back.px(c.x + Math.cos(a) * d + j, c.y + Math.sin(a) * d - k * 1.5 * hash(i), H_STONE[k > 0.6 ? 4 : 3]); }
   R.back.glow(c.x, c.y, rr * 0.5, pal[2], 0.3 * k * R.P.intensity);
+}
+// 闇の矢：黒い槍の形に紫の縁が走り、闇の煙を引く。放つと口で闇が弾け、落ちる前に地面へ闇が広がって縮み、闇の爆発になる
+const D_DARK = ['#f4e2ff', '#d39bff', '#9a4cf0', '#6a24c4', '#3e1484', '#220b50', '#110630', '#070214'].map(hexc);
+function dDarkGather(S, R, mouth, k) {
+  const p = R.front, c = toL(mouth), H = D_DARK, s = R.P.size, fire = PIXELFX.fx['src/fx/fire/_lib.js'];
+  for (let i = 0; i < 34; i++) { const ph = (S.t * (0.7 + 0.8 * hash(i)) + hash(i * 3.1)) % 1, a = hash(i * 7.7) * TAU + (1 - ph) * 1.6, d = (46 * (1 - ph) ** 1.4 + 4) * s, len = (6 + 12 * ph) * s; for (let m = 0; m < len; m += 0.5) p.blend(c.x + Math.cos(a + m * 0.04) * (d + m), c.y + Math.sin(a + m * 0.04) * (d + m), H[ph > 0.6 ? 2 : 3], (1 - m / len) * ph * k); }
+  fire.soft(p, c.x, c.y, (3 + 11 * k) * s, H[3], 0.35 * k); fire.solid(p, c.x, c.y, (1 + 6 * k) * s, H[7]); p.glow(c.x, c.y, (8 + 12 * k) * s, H[2], 0.5 * k * R.P.intensity);
+}
+function dDarkShot(R, q, age, u) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_DARK, s = R.P.size, tip = toL(q.pos), L = 58 * s, W = 11 * s, nx = -u.y, ny = u.x, seed = q.t * 13;
+  for (let i = 0; i < 14; i++) { const d = L * 0.6 + (i * 13 + age * 900 * ((i % 3) * 0.1 + 0.2) % 13) * s, off = (hash(i * 3.3 + seed) - 0.5) * (6 + i * 1.1) * s, f = i / 14; fire.soft(p, tip.x - u.x * d + nx * off, tip.y - u.y * d + ny * off, (7 - f * 3) * s, H[i % 3 ? 5 : 4], 0.5 * (1 - f)); }
+  for (let d = 0; d < L; d += 0.5) { const f = d / L, w = (f < 0.3 ? f / 0.3 : Math.pow(1 - (f - 0.3) / 0.7, 0.7)) * W * (1 + 0.16 * Math.sin(d * 0.9 + age * 40 + seed) * f); for (let o = -w; o <= w; o += 0.5) { const e = Math.abs(o) / Math.max(0.5, w); p.blend(tip.x - u.x * d + nx * o, tip.y - u.y * d + ny * o, e > 0.8 ? H[2] : e > 0.55 ? H[4] : H[7], e > 0.8 ? 1 : 0.97); } p.blend(tip.x - u.x * d + nx * w, tip.y - u.y * d + ny * w, H[1], 1 - f * 0.5); p.blend(tip.x - u.x * d - nx * w, tip.y - u.y * d - ny * w, H[1], 1 - f * 0.5); }
+  p.glow(tip.x - u.x * L * 0.4, tip.y - u.y * L * 0.4, 20 * s, H[2], 0.55 * R.P.intensity);
+}
+function dDarkMuzzle(S, R, pose) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_DARK, s = R.P.size, c = toL(pose.mouth), fw = fromA(pose.facing), NL = fire.noiseFor(1.5);
+  for (const at of S.shotTimes || []) { const age = S.t - at; if (age < 0 || age > 0.42) continue; const k = 1 - age / 0.42, N = (rate, seed = 0, off = 0) => NL(age, rate, seed, off);
+    for (let i = 0; i < 4; i++) { const off = (i - 1.5) * 0.3; fire.flameBlade(p, c.x, c.y, Math.cos(pose.facing + off), Math.sin(pose.facing + off), (70 - Math.abs(off) * 50) * s * k, 11 * s * k, N(3, i) * 3, N, 70 + i * 13, H, fire.LAYERS, 0.5, 1.4); }
+    for (let i = 0; i < 12; i++) { const a = hash(i * 3.7) * TAU, d = (10 + 44 * hash(i * 1.3)) * (1 - Math.exp(-age / 0.1)) * s; fire.smokePuff(p, c.x + Math.cos(a) * d - fw.x * d * 0.3, c.y + Math.sin(a) * d - fw.y * d * 0.3, k, 8 * s, H[5], true, 0.9); }
+    p.glow(c.x, c.y, 26 * s, H[2], 0.8 * k * R.P.intensity); fire.solid(p, c.x, c.y, 7 * s * k, H[0]); }
+}
+function dDarkFall(S, R, q) { // 着弾点：闇の染みが広がってから縮む。縮みきる直前に矢が真上から刺さる
+  const age = S.t - q.t - q.wait, warn = q.warn, k = clamp(age / warn), p = R.back, H = D_DARK, c = toL(q.at), s = R.P.size, rr = S.r.radius * WL * s * lerp(1.8, 0.8, smooth(0, 1, k)), t = S.t, on = smooth(0, 0.14, age);
+  p.each(c.x - rr * 1.3, c.y - rr * 1.3, c.x + rr * 1.3, c.y + rr * 1.3, (x, y, sx, sy) => { const dx = x - c.x, dy = y - c.y, d = Math.hypot(dx, dy) / rr; if (d > 1.3) return; const edge = 1 + 0.2 * PX.tileFbm(Math.atan2(dy, dx) * 2 + 7, t * 2.4, 0, 0, 17, 2), e = d / edge; if (e > 1.06) return; if (e > 0.93) p.blendPx(sx, sy, H[2], 0.9 * on * (1.06 - e) / 0.13); else p.blendPx(sx, sy, H[e < 0.6 ? 7 : 6], (0.62 + 0.3 * k) * on); });
+  const drop = clamp((age - (warn - 0.14)) / 0.14); if (drop > 0) dDarkShot(R, { pos: add(q.at, V(0, -900 * (1 - drop))), t: q.t }, age, V(0, 1));
+}
+function dDarkBlast(S, R, at, age, radius, seed) {
+  if (age < 0 || age > 1) return; const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, H = D_DARK, c = toL(at), rr = radius * WL * R.P.size * 1.3, flash = 1 - smooth(0, 0.14, age);
+  if (flash > 0) { p.glow(c.x, c.y, rr * 2, H[2], 0.9 * flash * R.P.intensity); fire.solid(p, c.x, c.y, rr * (0.3 + 0.5 * smooth(0, 0.1, age)) * flash, H[0]); }
+  for (let i = 0; i < 28; i++) { const rnd = k => hash(i * 5.3 + k * 2.1 + seed), life = lerp(0.35, 0.75, rnd(1)); if (age > life) continue; const a = rnd(2) * TAU, d = rr * lerp(0.5, 1.25, rnd(3)) * (1 - Math.exp(-age / 0.13)), x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d, k = 1 - age / life; fire.firePuff(p, x, y, k, rr * lerp(0.18, 0.36, rnd(4)), rnd(5), H, 0.06, Math.cos(a) * 0.7, Math.sin(a) * 0.7); }
+  for (let i = 0; i < 14; i++) { const rnd = k => hash(i * 9.1 + k * 3.7 + seed), life = lerp(0.6, 1, rnd(1)); if (age > life) continue; const a = rnd(2) * TAU, d = rr * 1.2 * (1 - Math.exp(-age / 0.22)); fire.smokePuff(p, c.x + Math.cos(a) * d, c.y + Math.sin(a) * d, 1 - age / life, rr * 0.4, H[5], true, 0.8); }
 }
 // 星：白い芯と4本の光条。回りながらまたたく
 function dStar(R, c, size, spin, a, pal) {
@@ -182,6 +214,7 @@ function dShotsFx(S, R) {
   for (const q of S.shots) { const age = S.t - q.t, u = fromA(q.a);
     if (q.kind === 'arrow') { drawArrow(q.pos, q.a, q.radius); for (let d = 0; d < 60; d += 2) { const w = toL(sub(q.pos, mul(u, d))); R.front.light(w.x, w.y, pal[2], (1 - d / 60) * 0.3 * R.P.intensity); } continue; }
     if (q.kind === 'comet') { dCometShot(R, q, age, u); continue; }
+    if (q.kind === 'dark') { dDarkShot(R, q, age, u); continue; }
     const big = false, tl = 70; // 星弾：回る星と、後ろへ冷えていくまたたきの尾
     for (let d = 2; d < Math.min(tl, age * q.speed); d += 0.5 / WL) { const w = toL(add(sub(q.pos, mul(u, d)), mul(orth(u), Math.sin(d * 0.03 - age * 14) * 5 * (d / tl)))), f = 1 - d / tl; R.front.blend(w.x, w.y, pal[f > 0.6 ? 4 : f > 0.3 ? 3 : 2], f * f * 0.9); R.front.light(w.x, w.y, pal[2], f * 0.2 * R.P.intensity); }
     dStar(R, toL(q.pos), (big ? 4 : 2.5) * R.P.size, age * 8, 1, pal); }
@@ -196,8 +229,9 @@ function dDraw(S, R) {
     for (const q of S.rifts) if (q) D2.line(q.a, q.b, '#34224d', r.width);
   } else { dBreathFx(S, R); dRiftFx(S, R); dInhaleFx(S, R); dExhaleFx(S, R); dRushFx(S, R, pose); dCloneFx(S, R);
     if (id === 'bite') dBiteTear(S, R, pose);
-    for (const impact of S.impacts) dImpactFx(S, R, impact.at, t - impact.t, impact.radius, 83 + Math.floor(impact.t * 10));
-    for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dGroundTremble(S, R, q.at, r.radius, clamp((t - q.t - q.wait) / q.warn), 171);
+    for (const impact of S.impacts) (impact.dark ? dDarkBlast : dImpactFx)(S, R, impact.at, t - impact.t, impact.radius, 83 + Math.floor(impact.t * 10));
+    for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dDarkFall(S, R, q);
+    if (id === 'picaro_wall') dDarkMuzzle(S, R, pose);
   }
   if (R.proto) for (const q of S.projectiles) if (q.vel && q.t != null) { const sp = len(q.vel), dir = norm(q.vel), age = t - q.t; hRockComet(R, { from: sub(q.pos, mul(q.vel, age)), speed: sp, radius: q.radius, seed: q.seed || 1 }, age, dir); }
   if (R.proto) S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / DR_FLIGHT; if (age < DR_FLIGHT + 0.3) hRockComet(R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, { stop: DR_FLIGHT }); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
@@ -211,7 +245,7 @@ function dDraw(S, R) {
   if (S.picaro) for (const q of S.picaro) drawEnemy(q, { white: clamp(1 - S.age) * 0.6 });
   const chest = toL(R.proto ? pose.chest : sub(B.pos, mul(fromA(B.facing), 110 * DP.head_scale))); R.front.glow(chest.x, chest.y, 10, hexc('#8dbdff'), 0.35 + (R.proto ? Math.max(0, pose.charge) * 0.25 : 0));
   if (R.proto) dShotsFx(S, R);
-  else { for (const q of S.shots) { if (q.kind === 'arrow') drawArrow(q.pos, q.a, q.radius); else { const u = fromA(q.a), side = orth(u); D2.poly([add(q.pos, mul(u, q.radius * 1.5)), add(q.pos, mul(side, q.radius)), sub(q.pos, mul(u, q.radius * 1.5)), sub(q.pos, mul(side, q.radius))], '#d4bbff'); } }
+  else { for (const q of S.shots) { if (q.kind === 'arrow' || q.kind === 'dark') drawArrow(q.pos, q.a, q.radius); else { const u = fromA(q.a), side = orth(u); D2.poly([add(q.pos, mul(u, q.radius * 1.5)), add(q.pos, mul(side, q.radius)), sub(q.pos, mul(u, q.radius * 1.5)), sub(q.pos, mul(side, q.radius))], '#d4bbff'); } }
     for (const impact of S.arrowImpacts || []) if (impact.at && !impact.hit) D2.arc(impact.at, r.radius, 0, TAU, '#b7a3ff', 3);
     for (const impact of S.impacts) { const age = t - impact.t; if (age < 0.65) D2.arc(impact.at, impact.radius * (0.35 + age / 0.65 * 1.4), 0, TAU, rgba('#9fbaff', 1 - age / 0.65), 6); } }
   drawShip(S.ship);
@@ -234,7 +268,7 @@ function dSwimAmount(S) {
   if (B.mode === 'active') return ['charge', 'leap'].includes(S.tech) ? 1 : ['breath', 'meteor', 'star_fan', 'inhale'].includes(S.tech) ? 0.25 : 0.35;
   if (B.mode === 'recovery') return 0.7 * smooth(0, 1, e / Math.max(0.01, r.recover)); return 0.7;
 }
-function dSpitKick(S) { if (!S.rocks.length || S.B.mode !== 'windup') return 0; let kick = 0; S.rocks.forEach((q, i) => { const t = dRockAge(S, i); if (t >= -0.16) kick += t < 0 ? -0.6 * smooth(-0.16, 0, t) : Math.exp(-t / 0.1) * (1 - Math.exp(-t / 0.02)) - 0.6 * Math.exp(-t / 0.02); }); return kick; }
+function dSpitKick(S) { if (S.tech === 'picaro_wall') { let kick = 0; for (const at of S.shotTimes || []) { const t = S.t - at; if (t >= 0) kick -= 1.1 * Math.exp(-t / 0.12) * (1 - Math.exp(-t / 0.015)); } return kick; } if (!S.rocks.length || S.B.mode !== 'windup') return 0; let kick = 0; S.rocks.forEach((q, i) => { const t = dRockAge(S, i); if (t >= -0.16) kick += t < 0 ? -0.6 * smooth(-0.16, 0, t) : Math.exp(-t / 0.1) * (1 - Math.exp(-t / 0.02)) - 0.6 * Math.exp(-t / 0.02); }); return kick; }
 function dBodyAlive(S, R, pose) {
   const roar = dExhaleLife(S); if (roar > 0) { const fw = fromA(pose.facing), sd = orth(fw), back = 26 * Math.min(1.4, roar), rattle = Math.sin(S.t * 74) * 4 * roar; pose = { ...pose, points: pose.points.map((p, i) => { const w = 1 - smooth(0, 0.35, i / (pose.points.length - 1)); return add(p, add(mul(fw, -back * w), mul(sd, rattle * w))); }) }; }
   const kick = dSpitKick(S); if (kick) { const fw = fromA(pose.facing); pose = { ...pose, points: pose.points.map((p, i) => add(p, mul(fw, 46 * kick * (1 - smooth(0, 0.3, i / (pose.points.length - 1)))))) }; }

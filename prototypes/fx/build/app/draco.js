@@ -37,6 +37,7 @@ function dSettle(S, from, to, k) {
 }
 // 隕石：頭を突き出して1個ずつ吐き、速いまま飛んで、着いた所で勢いが止まる（なめらかに滑らせない）
 const DB_WARN = 1.6, DB_ACTIVE = 3.9; // 試作の値：ブレスの予兆と吐く長さ
+const DA_SPEED = 1500; // 試作の値：闇の矢の速さ
 const DR_FLIGHT = 0.24, DR_ORDER = [1, 0, 2];
 function dRockAge(S, i) { if (S.B.mode !== 'windup') return S.r.warn + S.elapsed; return S.elapsed - S.r.warn * (0.2 + 0.24 * DR_ORDER[i % 3]); }
 let dPicaroBody = null; // 全身複製を描く間だけ { t, seed } を入れ、部位の絵をピカロの見た目に塗り直す
@@ -70,7 +71,7 @@ function dPresentation(S) {
   if (S.staging && ready && windup) { const entryFacing = S.staging.side < 0 ? 0 : Math.PI; facing = entryFacing + angDiff(B.facing, entryFacing) * smooth(0, r.warn * 0.6, S.elapsed); }
   if (S.tech === 'breath' && windup) facing = S.axis - r.sweep * smooth(r.warn * 0.35, r.warn * 0.9, S.elapsed);
   if (S.tech === 'breath' && active && !S.fan) facing = S.axis - r.sweep;
-  const still = ['breath', 'meteor', 'star_fan'].includes(S.tech);
+  const still = ['breath', 'meteor', 'star_fan', 'picaro_wall'].includes(S.tech);
   if (still) points = S.base.map(p => add(p, sub(B.pos, S.base[0])));
   if (ready && !['spiral', 'clones'].includes(S.tech)) {
     const head = points[0], originalAngle = angOf(sub(head, points[1])), turn = angDiff(facing, originalAngle), u = fromA(facing), side = orth(u), bodyWeight = ['bite', 'tail_sweep', 'tail_slam'].includes(S.tech) ? 0.3 : 1;
@@ -106,12 +107,12 @@ function dPredict(S, seconds, cap = DP.aim_lead_cap) { const lead = mul(S.shipVe
 function dTailPose(S, offset) { const r = S.r, bow = orth(fromA(S.axis)), points = Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(S.origin, mul(fromA(S.axis + Math.PI + offset * t * t), r.reach * t)), mul(bow, 240 * Math.sin(Math.PI * t))); }); return dFit(points, S.base, true); } // 胴の余りを同じ側へ逃がし、振りの途中で折れ方が裏返らないようにする
 function dTailCurve(S, tip) { const back = mul(fromA(S.axis), -1), side = orth(back), c1 = add(S.origin, mul(back, DP.body_length * 0.7)), c2 = add(add(tip, mul(back, 220)), mul(side, DP.body_length * 0.35)); return dFit(Array.from({ length: DCOUNT + 1 }, (_, i) => { const t = i / DCOUNT; return add(add(mul(S.origin, (1 - t) ** 3), mul(c1, 3 * (1 - t) ** 2 * t)), add(mul(c2, 3 * (1 - t) * t * t), mul(tip, t ** 3))); }), S.base, true); }
 function dSetup(S, id) {
-  S.tech = id; S.r = bossRule('draco', id); S.B = bossActor('draco', ['breath', 'meteor'].includes(id) ? V(-140, -90) : V(470, -80)); S.B.r = DRACO.def.radius * DP.head_scale; S.ship = shipState(V(720, 90), Math.PI / 2, 25); S.shipVel = V(0, 25); S.age = -0.5; S.elapsed = 0; S.origin = { ...S.B.pos }; S.axis = 0; S.direction = V(1, 0); S.points = dNeutral(S.B.pos, 0, 0); S.base = S.points; S.trail = S.points; S.tell = []; S.shots = []; S.rocks = []; S.impacts = []; S.rifts = []; S.effects = []; S.projectiles = []; S.units = []; S.shot = 0; S.target = dPredict(S, S.r.warn || 0);
+  S.tech = id; S.r = bossRule('draco', id); S.B = bossActor('draco', ['breath', 'meteor'].includes(id) ? V(-140, -90) : id === 'picaro_wall' ? V(-560, 110) : V(470, -80)); S.B.r = DRACO.def.radius * DP.head_scale; S.ship = shipState(V(720, 90), Math.PI / 2, 25); S.shipVel = V(0, 25); S.age = -0.5; S.elapsed = 0; S.origin = { ...S.B.pos }; S.axis = 0; S.direction = V(1, 0); S.points = dNeutral(S.B.pos, 0, 0); S.base = S.points; S.trail = S.points; S.tell = []; S.shots = []; S.rocks = []; S.impacts = []; S.rifts = []; S.effects = []; S.projectiles = []; S.units = []; S.shot = 0; S.target = dPredict(S, S.r.warn || 0);
   if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: id === 'inhale' ? -1 : S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
   else { S.axis = id === 'tail_sweep' ? 0 : angOf(sub(S.ship.pos, S.B.pos)); S.B.facing = S.axis; S.direction = fromA(S.axis); S.base = dNeutral(S.B.pos, S.axis, S.t); S.trail = S.base; S.points = S.base; }
   if (id === 'bite') { S.target = dPredict(S, S.r.warn + S.r.active * 0.55, S.r.lead_cap); S.direction = norm(sub(S.target, S.origin)); S.axis = angOf(S.direction); S.B.facing = S.axis; S.base = dNeutral(S.origin, S.axis, S.t); S.retracted = sub(S.origin, mul(S.direction, S.r.retract)); S.destination = add(S.origin, mul(S.direction, S.r.reach)); }
   if (['breath', 'meteor'].includes(id)) { S.mouth = dMouth(S); const r = S.r; for (let i = 0; i < r.rocks; i++) { const to = add(add(S.mouth, mul(S.direction, r.rock_distance)), mul(orth(S.direction), (i - (r.rocks - 1) * 0.5) * r.rock_spacing)); S.rocks.push({ from: S.mouth, to, pos: S.mouth, radius: r.rock_radius, seed: i }); } }
-  if (id === 'picaro_wall') { const r = S.r, center = lerpV(S.B.pos, S.ship.pos, 0.45); S.picaro = Array.from({ length: r.count }, (_, i) => mkE(r.wall_candidates[i % r.wall_candidates.length], add(center, mul(orth(S.direction), (i - (r.count - 1) * 0.5) * 180)), S.axis)); }
+  if (id === 'picaro_wall') { const r = S.r, center = lerpV(S.B.pos, S.ship.pos, 0.5); S.shotTimes = []; S.picaro = Array.from({ length: r.count }, (_, i) => mkE(r.wall_candidates[i % r.wall_candidates.length], add(center, mul(orth(S.direction), (i - (r.count - 1) * 0.5) * 300)), S.axis)); }
   if (id === 'clones') { const choices = ['bite_thrust', 'wind_band', 'rubble_fan', 'beam_fixed', 'thunder_drop']; for (let i = choices.length - 1; i > 0; i--) { const j = Math.floor(S.rng() * (i + 1)); [choices[i], choices[j]] = [choices[j], choices[i]]; }
     S.center = { ...S.ship.pos }; for (let i = 0; i < 3; i++) { const pos = i === 0 ? { ...S.B.pos } : add(S.center, mul(fromA(i * TAU / 3), 650)), angle = angOf(sub(S.center, pos)); S.units.push({ pos, origin: { ...pos }, angle, face: angle, mode: choices[i], t: 0, index: i, target: { ...S.center }, glow: 0, locked: false, length: 100, step: 0, points: dNeutral(pos, angle, 0), turn: i % 2 ? 1 : -1 }); }
   }
@@ -150,6 +151,7 @@ function dWindup(S, dt) {
   else if (id === 'tail_slam') { if (!S.locked) { S.target = dPredict(S, Math.max(0, r.warn - S.elapsed) + r.active * 0.65, r.lead_cap); if (dist(S.target, S.origin) > r.reach) S.target = add(S.origin, mul(norm(sub(S.target, S.origin)), r.reach)); S.lifted = dTailCurve(S, add(S.target, V(0, -180))); S.locked = S.elapsed >= Math.min(0.25, r.warn * 0.35); } dBlend(S, S.base, S.lifted, S.elapsed / r.warn); }
   else if (['breath', 'meteor'].includes(id)) S.rocks.forEach((q, i) => { q.pos = lerpV(q.from, q.to, clamp(dRockAge(S, i) / DR_FLIGHT)); });
   else if (id === 'star_fan') { if (!S.locked) { let predicted = S.ship.pos; for (let i = 0; i < 8; i++) predicted = dPredict(S, Math.max(0, r.warn - S.elapsed) + Math.max(0, dist(B.pos, predicted) - r.radius) / r.speed, r.lead_cap); S.direction = norm(sub(predicted, B.pos)); B.facing = angOf(S.direction); S.starPositions = []; for (let i = 0; i < r.count; i++) { const a = B.facing + lerp(-r.arc, r.arc, i / Math.max(1, r.count - 1)); S.starPositions.push({ pos: add(B.pos, mul(fromA(a), r.radius)), a }); } S.locked = S.elapsed >= Math.min(0.25, r.warn * 0.35); } }
+  else if (id === 'picaro_wall') { B.facing = S.axis + angDiff(-Math.PI / 2, S.axis) * smooth(0.05, 0.8, S.elapsed / r.warn); }
   else if (id === 'spiral') dSpiralWindup(S, dt);
 }
 function dActive(S, dt) {
@@ -168,8 +170,8 @@ function dActive(S, dt) {
   else if (id === 'inhale') dInhale(S, dt);
   else if (id === 'clones') dClones(S, dt);
   else if (id === 'picaro_wall') {
-    if (S.shot < r.arrows && t >= S.shot * r.interval) { const from = add(B.pos, mul(fromA(B.facing), 100 * DP.head_scale)), leave = Math.max(0, from.y - (cam.y - H / Z / 2) + 80) / 900; S.shots.push({ pos: from, a: -Math.PI / 2, speed: 900, t: S.t, radius: 12, life: 3, kind: 'arrow' }); S.arrowImpacts ||= []; S.arrowImpacts.push({ t: S.t, wait: Math.max(r.flight, leave + 0.15), warn: r.impact_warn }); S.shot++; }
-    for (const q of S.arrowImpacts || []) { const age = S.t - q.t; if (!q.at && age >= q.wait) q.at = { ...S.ship.pos }; if (!q.hit && age >= q.wait + q.warn) { q.hit = true; S.impacts.push({ at: q.at, t: S.t, radius: r.radius }); } }
+    if (S.shot < r.arrows && t >= S.shot * r.interval) { const from = add(B.pos, mul(fromA(B.facing), 100 * DP.head_scale)), leave = Math.max(0, from.y - (cam.y - H / Z / 2) + 80) / DA_SPEED; S.shotTimes.push(S.t); S.shots.push({ pos: from, a: -Math.PI / 2, speed: DA_SPEED, t: S.t, radius: 12, life: 3, kind: 'dark' }); S.arrowImpacts ||= []; S.arrowImpacts.push({ t: S.t, wait: Math.max(r.flight, leave + 0.15), warn: r.impact_warn }); S.shot++; }
+    for (const q of S.arrowImpacts || []) { const age = S.t - q.t; if (!q.at && age >= q.wait) q.at = { ...S.ship.pos }; if (!q.hit && age >= q.wait + q.warn) { q.hit = true; S.impacts.push({ at: q.at, t: S.t, radius: r.radius, dark: true }); } }
   } else if (id === 'spiral') dSpiralActive(S, dt);
 }
 function dInhale(S, dt) {
@@ -262,14 +264,16 @@ function dRecover(S) {
   else if (id === 'leap') S.B.pos = add(S.settled, mul(S.direction, 30 * smooth(0, 1, k)));
   else if (id === 'breath') { S.B.facing = lerp(S.axis + r.sweep, S.axis, smooth(0, 1, k)); dSettle(S, S.landedPoints, dNeutral(S.B.pos, S.axis, S.t), k); }
   else if (id === 'inhale') S.override = S.inhaleBody;
+  else if (id === 'picaro_wall') S.B.facing = -Math.PI / 2 + angDiff(S.axis, -Math.PI / 2) * smooth(0.1, 1, k);
   else if (id === 'spiral') { const sp = S.spiral, speed = (sp.extent * 2 + r.spiral_length) / sp.shrink; if (sp.coilPoints) dSpiralPull(S, (S.r.active - sp.coil - sp.pause + S.elapsed) * speed); }
 }
 function dExhaleShake(S) { // 吐いた瞬間に大きく揺れ、吐いている間は小さく震え続ける
-  S.camBase ||= { x: cam.x, y: cam.y }; const e = S.exhale, age = e && S.B.mode === 'active' ? S.t - e.t - S.r.beam_warn : -1, power = age < 0 ? 0 : (14 + 26 * Math.exp(-age / 0.25)) * (1 - smooth(S.r.active - 0.45, S.r.active, S.elapsed));
+  S.camBase ||= { x: cam.x, y: cam.y }; const e = S.exhale, age = e && S.B.mode === 'active' ? S.t - e.t - S.r.beam_warn : -1, power = age < 0 ? 0 : (14 + 26 * Math.exp(-age / 0.25)) * (1 - smooth(S.r.active - 0.45, S.r.active, S.elapsed)) + 0;
+  if (S.tech === 'picaro_wall') { let hit = 0; for (const at of S.shotTimes) hit += 12 * Math.exp(-Math.max(0, S.t - at) / 0.1) * (S.t >= at ? 1 : 0); for (const q of S.impacts) hit += 20 * Math.exp(-Math.max(0, S.t - q.t) / 0.14); cam.x = S.camBase.x + Math.sin(S.t * 61) * hit; cam.y = S.camBase.y + Math.sin(S.t * 53 + 2) * hit; return; }
   cam.x = S.camBase.x + (Math.sin(S.t * 61) + Math.sin(S.t * 37 + 1)) * 0.5 * power; cam.y = S.camBase.y + (Math.sin(S.t * 53 + 2) + Math.sin(S.t * 41)) * 0.5 * power;
 }
 function dStep(S, dt) {
-  S.age += dt; if (S.age < 0) return; if (S.tech === 'inhale') dExhaleShake(S);
+  S.age += dt; if (S.age < 0) return; if (['inhale', 'picaro_wall'].includes(S.tech)) dExhaleShake(S);
   if (S.tech !== 'inhale' && !(S.tech === 'spiral' && S.B.mode === 'active' && S.elapsed < S.spiral.coil)) { S.ship.pos.y = 90 + Math.sin(S.t * 0.5) * 50; S.shipVel = V(0, Math.cos(S.t * 0.5) * 25); }
   S.elapsed += dt; const B = S.B, r = S.r, before = { ...B.pos }; S.override = null;
   if (B.mode === 'windup') { dWindup(S, dt); if (S.elapsed >= r.warn) { B.mode = 'active'; S.elapsed = 0; S.tell = []; } }
