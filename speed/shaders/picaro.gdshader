@@ -32,10 +32,6 @@ void vertex() {
 	modulate = COLOR;
 }
 
-float alpha_at(vec2 pixel, vec2 texel) {
-	return texture(TEXTURE, (pixel + 0.5) * texel).a;
-}
-
 // 形ができたピカロの色（p：絵の画素の位置）
 vec3 formed_color(vec2 p, vec2 texel, float t, vec3 base, bool rim) {
 	float lum = dot(base, vec3(0.3, 0.59, 0.11));
@@ -64,7 +60,10 @@ void fragment() {
 	float t = preview_clock >= 0.0 ? preview_clock : TIME;
 	vec4 base = texture(TEXTURE, (p + 0.5) * texel);
 	bool inside = base.a > 0.4;
-	bool rim = inside && (alpha_at(p + vec2(-1.0, 0.0), texel) < 0.4 || alpha_at(p + vec2(1.0, 0.0), texel) < 0.4 || alpha_at(p + vec2(0.0, -1.0), texel) < 0.4 || alpha_at(p + vec2(0.0, 1.0), texel) < 0.4);
+	bool rim = inside && (texture(TEXTURE, (p + vec2(-0.5, 0.5)) * texel).a < 0.4
+		|| texture(TEXTURE, (p + vec2(1.5, 0.5)) * texel).a < 0.4
+		|| texture(TEXTURE, (p + vec2(0.5, -0.5)) * texel).a < 0.4
+		|| texture(TEXTURE, (p + vec2(0.5, 1.5)) * texel).a < 0.4);
 	vec3 color;
 	if (!morphing) {
 		if (!inside) discard;

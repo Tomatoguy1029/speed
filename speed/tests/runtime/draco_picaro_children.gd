@@ -83,18 +83,18 @@ func native_picaro() -> void:
 	view.setup(scope,entries,cfg.character_scale)
 	var packet: Dictionary = bridge.read_render(Rect2(-3000,-2000,6000,4000)).value
 	check(view.apply_frame(packet) and view._picaro_sprites.size()==4,"本体と子を既存のコズミックshaderで表示する")
-	check(view._picaro_sprites[member].modulate.a<0.71 and view._picaro_sprites[member].get_parent().z_index==8,"形成の透明度と敵の描画順を保つ")
+	check(view._picaro_sprites[member].modulate.a==1.0 and view._picaro_sprites[member].get_parent().z_index==8,"形成中は不透明で敵の描画順を保つ")
 	await get_tree().process_frame
 	var held: Dictionary = bridge.checkpoint()
 	check(held.ok,"形成中の所有者・子・保護を保持する")
-	bridge._core.step(1.1)
+	bridge._core.step(2.6)
 	var after: Array = bridge.command("dev_boss_body_state").value[0].picaro
 	check(bridge.restore(held.value).ok,"形成中の値状態を復帰する")
-	bridge._core.step(1.1)
+	bridge._core.step(2.6)
 	check(bridge.command("dev_boss_body_state").value[0].picaro==after,"復帰後も同じ時刻に子を解放する")
 	bridge.release_checkpoint(held.value)
 	tri = bridge.command("dev_boss_body_state").value[0].picaro.filter(func(m):return m.id==member)[0]
-	check(not tri.held and tri.guard==0.0,"1秒後に戦闘半径を変えず保護を解く")
+	check(not tri.held and tri.guard==0.0,"形成が終わると戦闘半径を変えず保護を解く")
 	bridge._core.remove_enemy(member)
 	bridge._core.step(0.02)
 	body = bridge.command("dev_boss_body_state").value[0]
