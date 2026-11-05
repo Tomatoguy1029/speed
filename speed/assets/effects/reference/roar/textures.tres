@@ -2,6 +2,6 @@
 
 [resource]
 metadata/bake_version = 1
-metadata/inputs = {"res://assets/effects/reference/roar/lumps.png.import": "b59892b8471b1281633abae0fd8f59de65098cbc795b9d176c60047c4145c55d", "res://assets/effects/reference/roar/streaks.png.import": "dcad186e4af146e5de2e404e95af40c55d47e8a03b29304d85c17aa3ba5ce246", "res://tools/art/bake_roar_textures.py": "645973728adda934c5b309e6909c447055708329a129dd20d732fb2670c23a2c"}
+metadata/inputs = {"res://assets/effects/reference/roar/lumps.png.import": "c34b4aa869b18ea6eb5275947a320cb5b4e95e6f02477e6dec2498862769d96b", "res://assets/effects/reference/roar/streaks.png.import": "9a23b06714bc201a6ba0fdbce791a77e90566dfb1dd40cd0c958086efaa3bd71", "res://tools/art/bake_roar_textures.py": "645973728adda934c5b309e6909c447055708329a129dd20d732fb2670c23a2c"}
 metadata/outputs = {"res://assets/effects/reference/roar/lumps.png": "4dfd4ac9856f83a3047f481323dc8206e5bcfc6d8d58c56d279244c407893286", "res://assets/effects/reference/roar/streaks.png": "c3eae3871446e901e48f9b16de7649d53bd851328a1565a65d0441932bd6afd0"}
 metadata/canvas_engine = "Google Chrome 156.0.8078.80"

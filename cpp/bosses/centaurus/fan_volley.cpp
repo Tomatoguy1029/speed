@@ -4,6 +4,9 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -19,17 +22,17 @@ void CentaurusFan::step(RunRuntime &r,TechniqueState &t,double dt) {
     const auto target=p.track_during_warn?r.state.enemy_aim:t.aim;const auto &d=r.content->bosses[p.boss-1];
     if (!tracking.locked()) e.facing+=std::clamp(angle_difference((target-e.pos).angle()-e.facing),-d.turn*dt,d.turn*dt);
     const double elapsed=PhaseController::find(r,t.actor)->clock-t.started_at;if (elapsed<p.warn) return;
-    const auto &v=rule(*r.content,t);auto &fired=std::get<CentaurusVolleyState>(t.detail).released;t.stage=TechniqueStage::Active;
+    const auto &v=rule(*r.content,t);auto &fired=t.detail.get<CentaurusVolleyState>().released;t.stage=TechniqueStage::Active;
     const auto body=std::find_if(r.content->boss_bodies.begin(),r.content->boss_bodies.end(),[&](const auto &b){return b.boss==p.boss;});
     const auto &b=*std::find_if(r.content->centaurus_bodies.begin(),r.content->centaurus_bodies.end(),[&](const auto &b){return b.body==body->id;});
     while (fired<v.shots && elapsed>=p.warn+fired*v.interval) {
         const auto mouth=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*b.bow_reach;const double angle=tracking.locked()?e.facing:(r.state.enemy_aim-mouth).angle();
-        for (uint32_t k=0;k<v.count;++k) {LightArrowParams shot;shot.position=mouth;shot.angle=angle+(v.count>1?(double(k)/double(v.count-1)-0.5)*v.spread:0);shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.length=v.length;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses.handles.at(uint32_t(&t-r.state.bosses.techniques.data()));LightArrowSystem::emit(r,shot);}
+        for (uint32_t k=0;k<v.count;++k) {LightArrowParams shot;shot.position=mouth;shot.angle=angle+(v.count>1?(double(k)/double(v.count-1)-0.5)*v.spread:0);shot.speed=p.speed;shot.radius=v.radius;shot.travel=v.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.length=v.length;shot.owner=t.actor;shot.definition=v.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));LightArrowSystem::emit(r,shot);}
         ++fired;cue(r,t,"fan_released");
     }
     if (fired>=v.shots) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;cue(r,t,"recovery_started");}
 }
-bool CentaurusFan::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=std::get_if<CentaurusVolleyState>(&t.detail);return v && v->released<=rule(c,t).shots;}
-godot::Dictionary CentaurusFan::snapshot(const RunRuntime &r,const TechniqueState &t) {const auto &p=rule(*r.content,t);godot::Dictionary out;out["released"]=std::get<CentaurusVolleyState>(t.detail).released;out["interval"]=p.interval;
+bool CentaurusFan::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=t.detail.get_if<CentaurusVolleyState>();return v && v->released<=rule(c,t).shots;}
+godot::Dictionary CentaurusFan::snapshot(const RunRuntime &r,const TechniqueState &t) {const auto &p=rule(*r.content,t);godot::Dictionary out;out["released"]=t.detail.get<CentaurusVolleyState>().released;out["interval"]=p.interval;
     if (r.state.enemy_handles.contains(t.actor)) {const auto &e=r.state.enemies[t.actor.slot];const auto *body=PhaseController::find(r,t.actor);const auto &b=*std::find_if(r.content->centaurus_bodies.begin(),r.content->centaurus_bodies.end(),[&](const auto &v){return v.body==body->definition;});out["bow_mouth"]=e.pos+godot::Vector2::from_angle(e.facing)*e.radius*b.bow_reach;}return out;}
 }

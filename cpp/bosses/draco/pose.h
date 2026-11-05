@@ -1,5 +1,6 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
 namespace speed {class DracoPose {public:
     static void follow(std::vector<godot::Vector2> &,std::vector<godot::Vector2> &,godot::Vector2,double,uint32_t);
     static std::vector<godot::Vector2> samples(const std::vector<godot::Vector2> &,uint32_t);

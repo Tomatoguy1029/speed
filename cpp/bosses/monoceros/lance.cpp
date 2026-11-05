@@ -5,6 +5,9 @@
 #include "../../systems/tracking_policy.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -18,9 +21,9 @@ void cue(RunRuntime &r,const TechniqueState &t,const char *name) {godot::Diction
 }
 bool MonocerosLance::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {if (!r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead || !definition || definition>r.content->boss_techniques.size()) return false;TechniqueState t;t.actor=actor;t.definition=definition;return r.state.enemies[actor.slot].pos.distance_to(r.state.ship_pos)<=rule(r,t).distance+length(r,t)+rule(r,t).head_length;}
 void MonocerosLance::begin(RunRuntime &r,TechniqueState &t) {auto &e=r.state.enemies[t.actor.slot];e.vel={};t.aim=r.state.ship_pos;t.direction=godot::Vector2::from_angle(e.facing);t.previous_ship=r.state.ship_pos;t.detail=MonocerosLanceState{};}
-godot::PackedVector2Array MonocerosLance::horn(const RunRuntime &r,const TechniqueState &t) {const auto &e=r.state.enemies[t.actor.slot];const auto u=godot::Vector2::from_angle(e.facing);godot::PackedVector2Array out;out.push_back(e.pos+u*e.radius*0.65);out.push_back(e.pos+u*(length(r,t)+rule(r,t).head_length*std::get<MonocerosLanceState>(t.detail).form));return out;}
+godot::PackedVector2Array MonocerosLance::horn(const RunRuntime &r,const TechniqueState &t) {const auto &e=r.state.enemies[t.actor.slot];const auto u=godot::Vector2::from_angle(e.facing);godot::PackedVector2Array out;out.push_back(e.pos+u*e.radius*0.65);out.push_back(e.pos+u*(length(r,t)+rule(r,t).head_length*t.detail.get<MonocerosLanceState>().form));return out;}
 void MonocerosLance::step(RunRuntime &r,TechniqueState &t,double dt) {
-    auto &e=r.state.enemies[t.actor.slot];const auto &p=rule(r,t);const auto &b=boss(r,t);auto &v=std::get<MonocerosLanceState>(t.detail);using Stage=MonocerosLanceState::Stage;
+    auto &e=r.state.enemies[t.actor.slot];const auto &p=rule(r,t);const auto &b=boss(r,t);auto &v=t.detail.get<MonocerosLanceState>();using Stage=MonocerosLanceState::Stage;
     if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     const auto prior=horn(r,t);v.elapsed+=dt;
     switch (v.stage) {
@@ -36,14 +39,14 @@ void MonocerosLance::step(RunRuntime &r,TechniqueState &t,double dt) {
     case Stage::Run: {
         v.form=1;const auto from=e.pos,step=t.direction*std::min(p.speed*dt,std::max(0.0,p.distance-v.traveled));const auto hit=FieldSystem::first_body_hit(r,from,from+step,e.radius);e.pos=hit?from.lerp(from+step,hit->t):from+step;e.vel=step/dt;MonocerosStrike::damage(r,t,prior,horn(r,t),p.width);
         if (hit) {v.speed=p.speed;enter(v,Stage::Stop);break;}
-        v.traveled+=step.length();v.boom_time+=dt;while (v.boom_time>=std::max(p.boom_interval,0.001)) {v.boom_time-=std::max(p.boom_interval,0.001);if (auto *body=PhaseController::find(r,t.actor)) {MonocerosBreathVisual visual;visual.position=e.pos+t.direction*p.boom_ahead;visual.started=body->clock;visual.lifetime=0.7*r.content->config.fx_monoceros_lance_timing;visual.spread=0.7;visual.reach=200;visual.seed=83;visual.preset=1;body->monoceros_breaths.push_back(visual);}cue(r,t,"sonic_boom");}
+        v.traveled+=step.length();v.boom_time+=dt;while (v.boom_time>=std::max(p.boom_interval,0.001)) {v.boom_time-=std::max(p.boom_interval,0.001);if (auto *body=PhaseController::find(r,t.actor)) {MonocerosBreathVisual visual;visual.position=e.pos+t.direction*p.boom_ahead;visual.started=body->clock;visual.lifetime=0.7*r.content->config.fx_monoceros_lance_timing;visual.spread=0.7;visual.reach=200;visual.seed=83;visual.preset=1;body->monoceros->breaths.push_back(visual);}cue(r,t,"sonic_boom");}
         if (v.traveled>=p.distance) {v.speed=p.speed;enter(v,Stage::Stop);}break;
     }
     case Stage::Stop:
         v.speed*=std::exp(-p.stop_decay*dt);move(r,t,t.direction*v.speed*dt,dt);
-        if (!v.shattered && v.elapsed>=p.shatter_time) {if (auto *body=PhaseController::find(r,t.actor)) body->monoceros_shatters.push_back({e.pos+godot::Vector2::from_angle(e.facing)*length(r,t),body->clock,0.84*r.content->config.fx_monoceros_lance_timing});cue(r,t,"lance_shatter");v.shattered=true;v.form=0;v.glow=0;}
+        if (!v.shattered && v.elapsed>=p.shatter_time) {if (auto *body=PhaseController::find(r,t.actor)) body->monoceros->shatters.push_back({e.pos+godot::Vector2::from_angle(e.facing)*length(r,t),body->clock,0.84*r.content->config.fx_monoceros_lance_timing});cue(r,t,"lance_shatter");v.shattered=true;v.form=0;v.glow=0;}
         if (v.elapsed>=p.stop_time) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;e.vel={};}break;
     }
 }
-bool MonocerosLance::validate(const TechniqueState &t) {if (!std::holds_alternative<MonocerosLanceState>(t.detail)) return false;const auto &v=std::get<MonocerosLanceState>(t.detail);for (double x:{v.elapsed,v.form,v.glow,v.traveled,v.boom_time,v.speed}) if (!std::isfinite(x) || x<0) return false;return v.stage<=MonocerosLanceState::Stage::Stop && v.form<=1 && v.glow<=1;}
+bool MonocerosLance::validate(const TechniqueState &t) {if (!t.detail.holds<MonocerosLanceState>()) return false;const auto &v=t.detail.get<MonocerosLanceState>();for (double x:{v.elapsed,v.form,v.glow,v.traveled,v.boom_time,v.speed}) if (!std::isfinite(x) || x<0) return false;return v.stage<=MonocerosLanceState::Stage::Stop && v.form<=1 && v.glow<=1;}
 }

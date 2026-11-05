@@ -2,6 +2,8 @@
 #include "../attack_system.h"
 #include "../combat_resolver.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -17,7 +19,7 @@ AttackHandle LightArrowSystem::emit(RunRuntime &run,const LightArrowParams &p) {
     shot.arrow={uint32_t(found-run.content->light_arrows.begin()+1),float(std::max(0.0,p.length))};shot.pos=p.position;
     shot.vel=godot::Vector2::from_angle(p.angle)*p.speed;shot.speed=p.speed;shot.radius=p.radius;shot.life=p.travel/p.speed;shot.damage=p.damage;
     if (!std::isfinite(shot.life)) return {};
-    AttackSpec spec;spec.cause=Cause::Arrow;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
+    AttackSpec spec;spec.cause=Cause::Arrow;spec.technique=p.technique;if (run.state.bosses->handles.contains(p.technique)) spec.source_technique=run.state.bosses->techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.budget=p.budget;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (!AttackSystem::configure_contact(*run.content,found->contact,spec)) return {};
     const auto handle=AttackSystem::emit_hostile(run.state,shot,spec);
     if (AttackSystem::get(run.state,handle)) {godot::Dictionary event;event["pos"]=p.position;event["kind"]=godot::StringName("arrow");FrameBuilder::append(run,"shoot",event);}return handle;

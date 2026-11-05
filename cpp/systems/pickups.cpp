@@ -2,6 +2,8 @@
 #include "progression.h"
 #include "pickup_system.h"
 #include "../behaviors/enemies/crow.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -65,7 +67,7 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
         Dictionary row; row["pos"] = coin.pos; row["pulled"] = coin.pulled; visible_coins.append(row);
     }
     Array capsules;for (const auto &capsule:runtime.state.pickups.capsules) {Dictionary row;row["kind"]=int(capsule.kind);row["pos"]=capsule.pos;row["age"]=capsule.age;row["weapon"]=capsule.weapon;row["drop"]=capsule.drop;capsules.push_back(row);}
-    Array pending;for (auto weapon:runtime.state.loadout.pending_comet_weapons) pending.push_back(String::utf8(runtime.content->equipment[weapon-1].external_id.c_str()));
+    Array pending;for (auto weapon:runtime.state.loadout->pending_comet_weapons) pending.push_back(String::utf8(runtime.content->equipment[weapon-1].external_id.c_str()));
     Dictionary out;out["pending_comet_weapons"]=pending;out["capsules"]=capsules;out["gems"] = visible_gems; out["coins"] = visible_coins; out["xp_dropped"] = runtime.state.pickups.xp_dropped;
     if (runtime.state.pickup_config.fixed_rewards) {
         const auto totals=[](const std::array<speed::CrystalTotal,3> &source) {
@@ -89,7 +91,7 @@ Dictionary SpeedRunCore::pickups_snapshot() const {
 
 void SpeedRunCore::collect_pickup(StringName kind, double value) {
     // 共通回収は倍率を一度適用して最終XPを渡す。旧比較入口は撤去まで分ける。
-    if (runtime.state.loadout.ready && kind == StringName("gem")) speed::ProgressionSystem::add_experience(*this,value*runtime.state.pickup_config.xp_mult*runtime.state.loadout.xp_gain_mult);
+    if (runtime.state.loadout->ready && kind == StringName("gem")) speed::ProgressionSystem::add_experience(*this,value*runtime.state.pickup_config.xp_mult*runtime.state.loadout->xp_gain_mult);
     else if (runtime.state.legacy_progression.ready && kind == StringName("gem")) add_xp(value);
     else { Dictionary item; item["kind"] = kind; item["value"] = value; runtime.state.collections.append(item); }
     if (runtime.api_configured && kind==StringName("coin")) ++runtime.state.lifecycle.coins;

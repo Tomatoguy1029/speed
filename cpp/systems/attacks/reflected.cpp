@@ -2,6 +2,7 @@
 #include "../attack_system.h"
 #include "../../output/frame_builder.h"
 #include "../../output/event_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void ReflectedSystem::reflect(RunRuntime &run,EnemyHandle source,godot::Vector2 impact,godot::Vector2 velocity,double radius) {

@@ -5,6 +5,9 @@
 #include "../../systems/motion_math.h"
 #include "../../systems/tracking_policy.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -23,10 +26,10 @@ bool CentaurusRain::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definit
 void CentaurusRain::begin(RunRuntime &r,TechniqueState &t) {t.detail=CentaurusRainState{};t.aim=r.state.enemy_aim;t.previous_ship=r.state.ship_pos;r.state.enemies[t.actor.slot].vel={};cue(r,t,"telegraph");}
 void CentaurusRain::command(RunRuntime &r,TechniqueState &t,TechniqueCommand command) {
     if (command!=TechniqueCommand::BeginRain || t.stage!=TechniqueStage::Windup) return;
-    auto &v=std::get<CentaurusRainState>(t.detail);v.left=rule(*r.content,t).traces;v.next_at=PhaseController::find(r,t.actor)->clock;t.stage=TechniqueStage::Active;cue(r,t,"rain_started");
+    auto &v=t.detail.get<CentaurusRainState>();v.left=rule(*r.content,t).traces;v.next_at=PhaseController::find(r,t.actor)->clock;t.stage=TechniqueStage::Active;cue(r,t,"rain_started");
 }
 void CentaurusRain::step(RunRuntime &r,TechniqueState &t,double dt) {
-    const auto &p=rule(*r.content,t);const auto &base=r.content->boss_techniques[t.definition-1];auto &v=std::get<CentaurusRainState>(t.detail);auto &e=r.state.enemies[t.actor.slot];auto *body=PhaseController::find(r,t.actor);const double now=body->clock;
+    const auto &p=rule(*r.content,t);const auto &base=r.content->boss_techniques[t.definition-1];auto &v=t.detail.get<CentaurusRainState>();auto &e=r.state.enemies[t.actor.slot];auto *body=PhaseController::find(r,t.actor);const double now=body->clock;
     if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     if (t.stage==TechniqueStage::Windup) {e.vel={};const auto aim=base.track_during_warn?r.state.enemy_aim:t.aim;const auto &boss=r.content->bosses[base.boss-1];if (!TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) e.facing+=std::clamp(angle_difference((aim-e.pos).angle()-e.facing),-boss.turn*dt,boss.turn*dt);return;}
     CentaurusBody::position_tick(r,*body,dt);
@@ -51,13 +54,13 @@ void CentaurusRain::step(RunRuntime &r,TechniqueState &t,double dt) {
     if (!v.left && all_landed && now>v.expire_at) {v.traces.clear();t.stage=TechniqueStage::Recovery;t.remaining=base.recover;cue(r,t,"recovery_started");}
 }
 bool CentaurusRain::validate(const TechniqueState &t,const ContentBundle &c) {
-    const auto *v=std::get_if<CentaurusRainState>(&t.detail);if (!v) return false;const auto &p=rule(c,t);
+    const auto *v=t.detail.get_if<CentaurusRainState>();if (!v) return false;const auto &p=rule(c,t);
     if (v->left>p.traces || v->traces.size()>p.traces || !std::isfinite(v->next_at) || !std::isfinite(v->expire_at) || v->next_at<0 || v->expire_at<0) return false;
     for (const auto &trace:v->traces) if (!trace.start.is_finite() || !trace.direction.is_finite() || !std::isfinite(trace.started) || !std::isfinite(trace.next_drop) || !std::isfinite(trace.landed) || trace.started<0 || trace.next_drop<0 || trace.landed<0 || trace.landed>p.trace_length || (trace.turn!=1 && trace.turn!=-1)) return false;
     return true;
 }
 godot::Dictionary CentaurusRain::snapshot(const RunRuntime &r,const TechniqueState &t) {
-    const auto &p=rule(*r.content,t);const auto &v=std::get<CentaurusRainState>(t.detail);godot::Dictionary out;godot::Array traces;
+    const auto &p=rule(*r.content,t);const auto &v=t.detail.get<CentaurusRainState>();godot::Dictionary out;godot::Array traces;
     for (const auto &trace:v.traces) {godot::Dictionary row;row["start"]=trace.start;row["direction"]=trace.direction;row["turn"]=trace.turn;row["started"]=trace.started;row["landed"]=trace.landed;row["next_drop"]=trace.next_drop;row["hit"]=trace.hit;traces.push_back(row);}
     out["traces"]=traces;out["left"]=v.left;out["next_at"]=v.next_at;out["expire_at"]=v.expire_at;
     out["trace_length"]=p.trace_length;out["trace_speed"]=std::max(1.0,p.trace_speed);out["trace_bend"]=p.trace_bend;out["circle_radius"]=p.circle_radius;out["drop_delay"]=p.drop_delay;out["fall"]=p.fall;out["linger"]=p.linger;out["drop_height"]=p.drop_height;out["fade"]=p.fade;out["arrow_gap"]=std::max(1.0,p.arrow_gap);out["arrows_per_step"]=p.arrows_per_step;

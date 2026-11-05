@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../systems/heroes.h"
 #include "../runtime/run_runner.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 using namespace godot;
 namespace {

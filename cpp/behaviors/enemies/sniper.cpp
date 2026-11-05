@@ -7,6 +7,7 @@
 #include "../../systems/attacks/beam.h"
 #include "../../systems/motion_math.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 #include <algorithm>
 namespace speed {

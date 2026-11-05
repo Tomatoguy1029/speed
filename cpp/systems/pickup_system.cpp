@@ -3,6 +3,8 @@
 #include "../api/run_core.h"
 #include "../runtime/run_runtime.h"
 #include "../output/event_builder.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -103,7 +105,7 @@ bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval rea
 }
 double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<size_t> &rows,CrystalCollectMethod method) {
     auto &run=core.runtime;auto &p=run.state.pickups;
-    const double multiplier=run.state.pickup_config.xp_mult*run.state.loadout.xp_profile_factor*run.state.loadout.xp_gain_mult;
+    const double multiplier=run.state.pickup_config.xp_mult*run.state.loadout->xp_profile_factor*run.state.loadout->xp_gain_mult;
     std::vector<CrystalCollection> details;double base=0;
     for (size_t row:rows) {
         if (row>=p.gems.size() || !p.gems[row].alive) continue;
@@ -134,7 +136,7 @@ void PickupSystem::step_capsules(godot::SpeedRunCore &core,double dt) {
             if (collected.kind==CapsuleKind::Heal) {
                 const double before=state.ship.hp;state.ship.hp=std::min(state.ship_config.max_hp,state.ship.hp+state.ship_config.max_hp*state.pickup_config.repair_fraction);applied=state.ship.hp-before;
             } else if (collected.kind==CapsuleKind::Magnet) applied=collect_all(core);
-            else state.loadout.pending_comet_weapons.push_back(collected.weapon);
+            else state.loadout->pending_comet_weapons.push_back(collected.weapon);
             EventBuilder::capsule_collected(run,collected,applied);continue;
         }
         if (capsule.drop && capsule.age>state.pickup_config.pickup_life) {capsules.erase(capsules.begin()+i);continue;}

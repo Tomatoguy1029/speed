@@ -3,6 +3,7 @@
 #include "../bosses/flow/phase_controller.h"
 #include "../runtime/run_runtime.h"
 #include "../output/frame_builder.h"
+#include "../state/boss_states.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>

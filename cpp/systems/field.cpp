@@ -1,6 +1,8 @@
 #include "field.h"
 #include "collision_query.h"
 #include "../output/frame_builder.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 #include <algorithm>
 #include <limits>
@@ -209,7 +211,7 @@ RockHandle FieldSystem::spawn_comet(RunRuntime &r,bool rare) {
         FieldRock rock;rock.kind=RockKind::Comet;rock.position=from;rock.velocity=u*p.speed;rock.born=s.world_time;rock.gone=s.world_time+lead*2.0/p.speed;rock.size=s.control.rng.randf_range(35.0,55.0);rock.facing=u.angle();
         if (rare) {
             std::vector<uint32_t> choices;
-            for (const auto &d:r.content->equipment) if (d.kind==0 && d.comet_only && std::none_of(s.loadout.weapons.begin(),s.loadout.weapons.end(),[&](const auto &owned){return owned.definition==d.id;})) choices.push_back(d.id);
+            for (const auto &d:r.content->equipment) if (d.kind==0 && d.comet_only && std::none_of(s.loadout->weapons.begin(),s.loadout->weapons.end(),[&](const auto &owned){return owned.definition==d.id;})) choices.push_back(d.id);
             if (!choices.empty()) rock.rare_weapon=choices[s.control.rng.randi_range(0,int64_t(choices.size()-1)).value()];
         }
         return add_rock(r,rock);

@@ -1,5 +1,8 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 namespace speed {class CanisPounce {public:
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static double cooldown(const RunRuntime &,EnemyHandle,uint32_t);

@@ -1,5 +1,6 @@
 #include "frame_builder.h"
 #include "../runtime/run_runtime.h"
+#include "../content/content_bundle.h"
 #include <climits>
 #include <cmath>
 using namespace godot;

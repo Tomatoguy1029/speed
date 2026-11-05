@@ -3,6 +3,8 @@
 #include "../../systems/heroes.h"
 #include "../../systems/combat_resolver.h"
 #include "../../output/frame_builder.h"
+#include "../../state/loadout_state.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 bool GeminiBehavior::capture_first(RunRuntime &r) {
@@ -26,7 +28,7 @@ void sweep(RunRuntime &r,godot::Vector2 from,godot::Vector2 to) {
         const auto id=s.enemy_handles.entity_id(target);if (t.inside.count(id) || CollisionQuery::segment_circle_t(from,to,e.pos,e.radius+radius)<0) continue;t.inside.insert(id);
         DamageRequest request;request.struck=s.enemy_handles.at(row);request.amount=power;request.cause=Cause::Ram;request.direction=direction;request.impact=to;request.has_impact=true;
         if (e.stone>0) CombatResolver::kill_enemy(r,request);
-        else if (CombatResolver::gate(r,request.struck,request)==GateResult::Allow && (s.loadout.effects.ignore_armor || HeroesSystem::trace_width(r)>1 || power>=e.armor)) {request.impact=e.pos;CombatResolver::damage_enemy(r,request);}
+        else if (CombatResolver::gate(r,request.struck,request)==GateResult::Allow && (s.loadout->effects.ignore_armor || HeroesSystem::trace_width(r)>1 || power>=e.armor)) {request.impact=e.pos;CombatResolver::damage_enemy(r,request);}
         if (s.phase!=godot::RunState::Phase::Play) return;
     }
 }

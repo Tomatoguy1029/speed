@@ -2,6 +2,7 @@
 #include "../systems/attack_system.h"
 #include "../systems/attack_budget.h"
 #include "../output/event_builder.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 using namespace godot;
 namespace {

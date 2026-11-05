@@ -196,7 +196,7 @@ func check_incremental() -> void:
 	FileAccess.open(source_path,FileAccess.WRITE).store_string(original_stage)
 	check(builder.build_all()==OK and builder.is_current(),"確認用の入力を元に戻して生成物をそろえる")
 
-## 通常のロード画面からタイトルまでを測り、出撃と保存は行わない。
+## 通常起動から裏の資源準備の完了までを測り、出撃と保存は行わない。
 func _startup_only() -> void:
 	RenderingServer.frame_post_draw.connect(func(): print("[startup_first_draw] engine_ms=",Time.get_ticks_msec()),CONNECT_ONE_SHOT)
 	var app: Node = load("res://scenes/app/main.tscn").instantiate()

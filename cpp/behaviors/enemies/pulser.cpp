@@ -4,6 +4,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/attacks/wave.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 double PulserBehavior::ring_radius(const RunRuntime &r,uint32_t row) {

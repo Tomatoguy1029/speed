@@ -4,6 +4,7 @@
 #include "../../behaviors/traits/duplicator.h"
 #include "../../output/event_builder.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>

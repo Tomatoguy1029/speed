@@ -2,6 +2,7 @@
 #include "bullet.h"
 #include "../attack_system.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 namespace speed {
 AttackHandle LumpSystem::emit(RunRuntime &run,const LumpParams &p) {

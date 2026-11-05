@@ -1,5 +1,6 @@
 #include "content_bundle.h"
 #include "../bosses/flow/flow_runner.h"
+#include "generated/run_schema_read.h"
 #include <godot_cpp/classes/hashing_context.hpp>
 #include <algorithm>
 #include <cstring>

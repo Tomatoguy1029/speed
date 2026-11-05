@@ -2,6 +2,8 @@
 @tool
 extends RefCounted
 const VERSION := 1
+const PROGRESS_ARGUMENT := "--progress"
+const PROGRESS_PREFIX := "SPEED_CONTENT_BUILD_PROGRESS:"
 var entries: Dictionary = {}
 var report: Array[Dictionary] = []
 var _hashes: Dictionary = {}
@@ -58,6 +60,7 @@ func run(key: String, inputs: PackedStringArray, build: Callable, force := false
 	if current:
 		report.append({"unit":key,"rebuilt":false,"ms":(Time.get_ticks_usec()-started)/1000.0})
 		return OK
+	if PROGRESS_ARGUMENT in OS.get_cmdline_user_args(): print(PROGRESS_PREFIX+key)
 	var result: Dictionary = build.call()
 	if result.error != OK:
 		report.append({"unit":key,"rebuilt":false,"error":result.error,"ms":(Time.get_ticks_usec()-started)/1000.0})

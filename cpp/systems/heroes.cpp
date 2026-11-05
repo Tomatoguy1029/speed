@@ -7,6 +7,7 @@
 #include "population_system.h"
 #include "collision_query.h"
 #include "../output/frame_builder.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

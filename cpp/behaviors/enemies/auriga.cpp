@@ -4,6 +4,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/attacks/wall.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void AurigaBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     auto &s=r.state;auto &e=s.enemies[row];const auto &d=r.content->definitions[e.definition];const auto &p=r.content->aurigas[d.auriga_definition-1];

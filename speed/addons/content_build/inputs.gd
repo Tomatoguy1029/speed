@@ -3,7 +3,7 @@
 extends RefCounted
 
 static func affects_output(path: String) -> bool:
-	return not path.begins_with("res://addons/content_build/") and path != "res://tools/content/build_all.gd"
+	return not path.begins_with("res://addons/content_build/") and not path.begins_with("res://addons/runtime_library/") and path != "res://tools/content/build_all.gd"
 
 ## 音と図鑑の専用生成器は、ステージの変換では実行しない。
 static func affects_stage(path: String) -> bool:

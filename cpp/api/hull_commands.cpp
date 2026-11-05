@@ -1,6 +1,7 @@
 #include "run_core.h"
 #include "../systems/attacks/friend_hull.h"
 #include "../systems/attack_system.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 using namespace godot;
 Dictionary SpeedRunCore::development_hull_command(const String &kind,const Dictionary &p) {

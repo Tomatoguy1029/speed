@@ -1,4 +1,7 @@
 #include "nova_field.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <array>
 #include <cmath>
@@ -88,7 +91,7 @@ bool CanisNovaField::update(RunRuntime &r,BossBodyState &body,CanisNovaState &fi
     const godot::Vector2 origin=camera.camera_center-godot::Vector2(width*cell,height*cell)*0.5;
     const auto &fx=r.content->canis_nova_fx.front();const double dimension=std::max(fx.source_width,fx.source_height);
     std::vector<Polygon> shapes;
-    for (const auto &m:body.canis.led) {
+    for (const auto &m:body.canis->led) {
         if (!r.state.enemy_handles.contains(m.actor)) continue;
         const auto &e=r.state.enemies[m.actor.slot];if (e.dead) continue;
         const auto &definition=r.content->definitions[e.definition];

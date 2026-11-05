@@ -6,6 +6,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attacks/slash.h"
 #include "../../systems/attack_system.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

@@ -1,6 +1,9 @@
 #include "fire_visual.h"
 #include "image_pose.h"
 #include "../../systems/attack_system.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_int64_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
@@ -14,7 +17,7 @@ const CanisFireFxDefinition *config(const ContentBundle &content,uint32_t techni
     return it==content.canis_fire_fx.end()?nullptr:&*it;
 }
 int64_t action(const RunRuntime &r,const BossBodyState &body,uint32_t technique) {
-    for (const auto &t:r.state.bosses.techniques) if (same_handle(t.actor,body.actor) && t.definition==technique && t.stage<TechniqueStage::Finished) return t.id;
+    for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,body.actor) && t.definition==technique && t.stage<TechniqueStage::Finished) return t.id;
     return 0;
 }
 }
@@ -24,14 +27,14 @@ void CanisFireVisualSystem::begin_continuous(RunRuntime &r,BossBodyState &body,c
     CanisFireVisual visual;visual.id=-t.id;visual.action=t.id;visual.technique=t.definition;visual.started=body.clock;visual.duration=duration;visual.continuous=true;visual.has_footprint=true;
     const auto &enemy=r.state.enemies[body.actor.slot];visual.origin=enemy.pos+godot::Vector2::from_angle(enemy.facing)*enemy.radius*.84;
     visual.history.origin=visual.origin;visual.history.angle=enemy.facing;visual.history.started=visual.started;
-    body.canis.fire_visual.jets.push_back(std::move(visual));
+    body.canis->fire_visual.jets.push_back(std::move(visual));
 }
 void CanisFireVisualSystem::begin(RunRuntime &r,BossBodyState &body,AttackHandle handle,uint32_t technique,EnemyHandle hound) {
     const auto *fx=config(*r.content,technique);const auto *attack=AttackSystem::get(r.state,handle);
     if (!fx || !attack || attack->row>=r.state.hazards.size()) return;
     const auto &hazard=r.state.hazards[attack->row];const auto *source=std::get_if<CanisFlameHazard>(&hazard.shape);
     if (!source || source->kind!=CanisFlameHazard::Kind::Jet || !source->definition || source->definition>r.content->canis_flames.size()) return;
-    const auto &def=r.content->canis_flames[source->definition-1];auto &state=body.canis.fire_visual;
+    const auto &def=r.content->canis_flames[source->definition-1];auto &state=body.canis->fire_visual;
     const int64_t owner=action(r,body,technique);
     if (state.action!=owner) {state.action=owner;state.next_ordinal=0;}
     CanisFireVisual visual;visual.id=attack->id;visual.action=owner;visual.technique=technique;visual.profile=source->definition;visual.ordinal=state.next_ordinal++;
@@ -45,7 +48,7 @@ void CanisFireVisualSystem::begin(RunRuntime &r,BossBodyState &body,AttackHandle
     state.jets.push_back(std::move(visual));
 }
 void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
-    auto &jets=body.canis.fire_visual.jets;const auto &camera=r.state.control;
+    auto &jets=body.canis->fire_visual.jets;const auto &camera=r.state.control;
     if (!(camera.logical_size.x>0 && camera.logical_size.y>0 && camera.camera_zoom>0)) return;
     constexpr int height=225;const int width=std::max(1,int(std::lround(camera.logical_size.x/camera.logical_size.y*height)));
     const double scale=camera.camera_zoom*height/camera.logical_size.y,cell=1.0/scale;
@@ -58,7 +61,7 @@ void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
         if (sampled) jet.sample_age=body.clock-jet.started;
         const double age=jet.sample_age;
         if (sampled && jet.continuous && age<jet.duration) {
-            const bool active=std::any_of(r.state.bosses.techniques.begin(),r.state.bosses.techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
+            const bool active=std::any_of(r.state.bosses->techniques.begin(),r.state.bosses->techniques.end(),[&](const auto &t){return t.id==jet.action && same_handle(t.actor,body.actor) && t.stage==TechniqueStage::Active;});
             if (!active) jet.duration=std::max(0.0,age);
         }
         if (sampled && !jet.continuous && age<jet.duration) {
@@ -101,7 +104,7 @@ void CanisFireVisualSystem::tick(RunRuntime &r,BossBodyState &body) {
 }
 godot::Array CanisFireVisualSystem::snapshot(const RunRuntime &r,const BossBodyState &body) {
     godot::Array out;
-    for (const auto &jet:body.canis.fire_visual.jets) {
+    for (const auto &jet:body.canis->fire_visual.jets) {
         const auto *fx=config(*r.content,jet.technique);if (!fx) continue;
         godot::Dictionary q;q["id"]=jet.id;q["trail_id"]=jet.trail_id;q["technique"]=jet.technique;q["continuous"]=jet.continuous;q["settings"]=godot::String::utf8(fx->external_id.c_str());q["started"]=jet.started;q["duration"]=jet.duration;q["speed"]=jet.speed;
         q["field_origin"]=jet.field_origin;q["cell"]=jet.cell;q["history_cell"]=jet.history.cell;
@@ -113,9 +116,9 @@ godot::Array CanisFireVisualSystem::snapshot(const RunRuntime &r,const BossBodyS
     }
     return out;
 }
-void CanisFireVisualSystem::clear(BossBodyState &body) {body.canis.fire_visual={};}
+void CanisFireVisualSystem::clear(BossBodyState &body) {body.canis->fire_visual={};}
 bool CanisFireVisualSystem::validate(const BossBodyState &body,const ContentBundle &content) {
-    for (const auto &v:body.canis.fire_visual.jets) {
+    for (const auto &v:body.canis->fire_visual.jets) {
         if (!v.id || !config(content,v.technique) || !v.origin.is_finite() || !v.field_origin.is_finite() || !v.release_origin.is_finite() || v.length<0 || v.width<0 || v.duration<0 || v.speed<=0) return false;
         for (double x:{v.angle,v.length,v.width,v.started,v.duration,v.speed,v.cell,v.history.cell,v.release_angle,v.release_length,v.sample_age}) if (!std::isfinite(x)) return false;
         for (const auto &d:v.history.deposits) {if (!d.position.is_finite() || !std::isfinite(d.updated)) return false;for (auto p:d.pixels) if (!p.is_finite()) return false;}

@@ -1,5 +1,6 @@
 #include "../api/run_core.h"
 #include "timing.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

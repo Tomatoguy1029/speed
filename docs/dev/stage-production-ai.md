@@ -319,7 +319,7 @@ Dolphin                         EnemyFormation：編成の根
 | `cpp/bosses/hydra/body.cpp`・`normal_attack.cpp`・技別ファイル | 海蛇の本体・首・技・候補・完了・欠員処理 |
 | `cpp/bosses/hydra/grid.cpp`・`swim.cpp`・`squad.cpp`・`squad_tactics.cpp` | 格子配置、移動、視線、分離後の戦術・陣形・迎撃 |
 | `cpp/bosses/monoceros/`・`centaurus/`・`canis_major/`・`draco/` | 各ボスの体、移動、技、命中先、形態、決着 |
-| `cpp/state/boss_states.h`・`enemy_states.h`・`attack_state.h` | 技・部位・攻撃の値状態と世代付きHandle |
+| `cpp/state/boss_states.h`・`cpp/bosses/<ボス>/state.h`・`enemy_states.h`・`attack_state.h` | 技・部位・攻撃の値状態と世代付きHandle |
 | `speed/scripts/data_types/boss_technique.gd`・`speed/scripts/bosses/<ボス>/techniques/` | 公開値・型・範囲・説明。技の編集元と生成入力 |
 | `speed/tools/editor/boss_flow/editor.gd`・`range_preview.gd` | 編集欄・保存・試遊と範囲図 |
 | `speed/tools/content/build_boss_program.gd`・`build_run_content.gd` | 編集元検証・実効値の解決・C++用の型付きレコード生成 |

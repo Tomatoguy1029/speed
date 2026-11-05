@@ -1,5 +1,7 @@
 #pragma once
 #include "technique.h"
+#include "../../state/boss_states.h"
+#include "state.h"
 namespace speed {class DracoInhale {public:
     static void begin(RunRuntime &,TechniqueState &);
     static void windup(RunRuntime &,TechniqueState &);

@@ -9,6 +9,7 @@
 #include "wall.h"
 #include "friend_debris.h"
 #include "../../behaviors/weapons/knockback.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>

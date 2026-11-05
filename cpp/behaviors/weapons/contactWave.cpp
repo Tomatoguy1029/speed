@@ -5,18 +5,20 @@
 #include "../../systems/collision_query.h"
 #include "../../output/frame_builder.h"
 #include "../../output/event_builder.h"
+#include "../../state/loadout_state.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 void ContactWaveBehavior::contact(RunRuntime &run,godot::Vector2 pos) {
-    auto &w=run.state.loadout.contact_wave;if (!w.ready) return;
+    auto &w=run.state.loadout->contact_wave;if (!w.ready) return;
     ContactWaveInstance wave;wave.id=w.next_id++;wave.pos=pos;
-    wave.radius=w.radius*run.state.loadout.effects.area*(1+w.area_increment*double(run.state.loadout.post_area_stacks));
+    wave.radius=w.radius*run.state.loadout->effects.area*(1+w.area_increment*double(run.state.loadout->post_area_stacks));
     wave.damage=CombatResolver::attack_power(run)*EquipmentSystem::weapon_damage_factor(run,w.definition)*w.damage;
     w.waves.push_back(wave);w.ripples.push_back({pos,wave.radius,0});if (w.ripples.size()>8) w.ripples.erase(w.ripples.begin());godot::Dictionary event;event["pos"]=pos;event["radius"]=wave.radius;event["life"]=0.58;FrameBuilder::append(run,"space_quake",event);
 }
 void ContactWaveBehavior::step(RunRuntime &run,double dt) {
-    auto &s=run.state;auto &w=s.loadout.contact_wave;if (!w.ready || dt<=0) return;
+    auto &s=run.state;auto &w=s.loadout->contact_wave;if (!w.ready || dt<=0) return;
     for (auto &wave:w.waves) {
         wave.age+=dt;if (wave.age<0.08) continue;
         const double progress=std::min(1.0,(wave.age-0.08)/0.5),radius=wave.radius*(1-std::pow(1-progress,3));
@@ -32,7 +34,7 @@ void ContactWaveBehavior::step(RunRuntime &run,double dt) {
             if (scale>0) e.pos+=direction*150.0*1.82*run.content->config.character_scale*dt*scale;
             if (held.age>=0.16 || progress>=1) {
                 wave.done.insert(held.id);held.id=0;DamageRequest request;request.struck=held.target;request.amount=wave.damage;request.cause=Cause::ContactWave;
-                request.direction=direction;request.knock=w.knock*(1+w.knockback_increment*double(s.loadout.post_knockback_stacks));CombatResolver::damage_enemy(run,request);
+                request.direction=direction;request.knock=w.knock*(1+w.knockback_increment*double(s.loadout->post_knockback_stacks));CombatResolver::damage_enemy(run,request);
             }
         }
         wave.caught.erase(std::remove_if(wave.caught.begin(),wave.caught.end(),[](const auto &h){return !h.id;}),wave.caught.end());
