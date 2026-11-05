@@ -7376,7 +7376,12 @@ function hChain(S, n, dt) {
   const length = Math.max(distance, HP.neck_rest * Math.max(1, HP.neck_slack)), seg = length / count, initial = !n.points || n.points.length !== count + 1, shift = initial ? V(0, 0) : sub(root, n.points[0]);
   if (initial) n.points = Array.from({ length: count + 1 }, () => V(0, 0));
   const points = n.points;
-  if (length - distance < 0.001) { for (let i = 0; i <= count; i++) points[i] = lerpV(root, tip, i / count); return; }
+  if (length - distance < 0.001) {
+    // 横薙ぎの首は、弓なりから一直線へ急に切り替えず、頭に遅れて伸びる
+    const follow = !initial && n === S.actor && S.tech === 'bite_sweep' ? 1 - Math.exp(-HP.neck_response * dt) : 1;
+    for (let i = 0; i <= count; i++) points[i] = lerpV(add(points[i], shift), lerpV(root, tip, i / count), i === 0 || i === count ? 1 : follow);
+    return;
+  }
   const phase = n.baseAngle * 2.4, bend = Math.sqrt(Math.max(0, length * length - distance * distance)) * 0.45, sign = Math.sin(phase) >= 0 ? 1 : -1, amp = Math.min(HP.neck_wave_amplitude, bend * 0.6), weight = initial ? 1 : 1 - Math.exp(-HP.neck_response * dt);
   points[0] = root; points[count] = tip;
   for (let i = 1; i < count; i++) { const f = i / count, wave = Math.sin(S.t * HP.neck_wave_speed + phase + f * HP.neck_wave_frequency * TAU) * amp, guide = add(lerpV(root, tip, f), mul(side, Math.sin(f * Math.PI) * (bend * sign + wave))); points[i] = initial ? guide : lerpV(add(points[i], shift), guide, weight); }
@@ -7426,10 +7431,12 @@ function hAttack(S, n, dt) {
     if (S.tech !== 'thunder_drop' || time < T.warn * 0.75) n.target = hShipAim(S);
     if (S.tech !== 'thunder_drop') hAim(n, angOf(sub(n.target, d.aimBase ? base : n.pos)) + (d.aimOff ? d.aimOff(r) : 0), dt);
     if (d.retract) n.length += clamp(HP.neck_rest * 0.4 - n.length, -HP.neck_rest * dt * 2, HP.neck_rest * dt * 2);
+    // 横薙ぎは発動の位置まで予兆のうちに首を伸ばして振りかぶる（発動で頭が飛ばないように）
+    if (S.tech === 'bite_sweep') { n.windFrom ??= n.length; n.length = n.windFrom + (r.sweep_reach - n.windFrom) * smooth(0.1, 0.85, time / T.warn); }
     n.pos = add(base, mul(fromA(n.angle), n.length)); n.glow = time / T.warn; return;
   }
   const e = time - T.warn;
-  if (!n.locked) { n.locked = true; n.from = { ...n.pos }; n.sweep = S.tech === 'bite_sweep' ? angOf(sub(n.target, base)) : S.tech === 'wind_blades' ? angOf(sub(n.target, n.pos)) : n.angle; hFire(S, n); }
+  if (!n.locked) { n.locked = true; n.from = { ...n.pos }; n.fireAngle = n.angle; n.sweep = S.tech === 'bite_sweep' ? angOf(sub(n.target, base)) : S.tech === 'wind_blades' ? angOf(sub(n.target, n.pos)) : n.angle; hFire(S, n); }
   if (time >= T.warn + T.active + T.hold) {
     if (!n.done) { n.done = true; n.angle = angOf(sub(n.pos, base)); n.length = dist(n.pos, base); }
     hIdle(S, n, dt); return;
@@ -7499,7 +7506,8 @@ function hSweepVis(S, n, rel, R) {
   const r = S.r, T = hTiming(S), base = hBase(S, n), live = R?.P?.alive ?? 1, f = clamp(rel / T.active), after = Math.max(0, rel - T.active);
   const fe = f < 0.5 ? 4 * f * f * f : 1 - Math.pow(-2 * f + 2, 3) / 2, on = smooth(0, 0.06, rel) * (1 - smooth(T.active + 0.2, T.active + 0.45, rel));
   const over = after > 0 ? Math.sin(Math.min(1, after / 0.1) * Math.PI) * Math.exp(-after / 0.16) : 0, swing = Math.sin(Math.PI * fe);
-  const real = n.sweep + r.sweep_arc * (f - 0.5), a = real + ((n.sweep + r.sweep_arc * (fe - 0.5) + r.sweep_arc * 0.13 * over) - real) * on * live;
+  const real = n.sweep + r.sweep_arc * (f - 0.5), a = real + ((n.sweep + r.sweep_arc * (fe - 0.5) + r.sweep_arc * 0.13 * over) - real) * on * live
+    + angDiff(n.fireAngle, n.sweep - r.sweep_arc * 0.5) * (1 - smooth(0, 0.14, rel)); // 予兆で向き切れなかった分を振り出しでなじませる
   const reach = r.sweep_reach + (70 * swing - 18 * (1 - swing)) * on * live;
   return { pos: add(base, mul(fromA(a), reach)), face: a + (0.5 * swing + 0.25 * over) * on * live };
 }
@@ -7527,7 +7535,7 @@ function hPose(S, n, R) {
       out.angle = n.angle + sign * 0.16 * Math.exp(-since / 0.06) * Math.sin(Math.min(1, since / 0.03) * Math.PI * 0.5) * (rel < T.active + S.r.blade_interval ? 1 : 0);
     }
   }
-  if (S.tech === 'bite_sweep' && rel >= 0 && rel < T.active + 0.5) { const v = hSweepVis(S, n, rel, R); out.head = v.pos; out.angle = v.face; }
+  if (S.tech === 'bite_sweep' && rel >= 0 && rel < T.active + 0.5) { const v = hSweepVis(S, n, rel, R); out.head = add(v.pos, mul(fromA(v.face), -6 * out.coil * R.P.coil)); out.angle = v.face; }
   if (out.freeze > 0 && rel < 0) out.head = add(out.head, mul(orth(fw), Math.sin(S.t * 95) * 1.6 * out.freeze));
   return out;
 }
@@ -7541,7 +7549,7 @@ function hVisualNeck(S, n, pose, R) {
     if (pose.freeze > 0 && pose.rel < 0) o += Math.sin(S.t * 95 + i * 1.7) * 1.3 * pose.freeze * Math.sin(u * Math.PI);
     if (pose.rel >= 0) {
       if (S.tech === 'bite_sweep' && pose.rel < pose.T.active + 0.25) { // 頭に遅れて首がしなる
-        const w = pose.rel < pose.T.active ? 1 : Math.exp(-(pose.rel - pose.T.active) / 0.08); o += -Math.sin(u * Math.PI) * (1 - u * 0.3) * 26 * w * R.P.coil;
+        const w = pose.rel < pose.T.active ? 1 : Math.exp(-(pose.rel - pose.T.active) / 0.08); o += -Math.sin(u * Math.PI) * (1 - u * 0.3) * 26 * w * (1 - pose.coil) * R.P.coil;
       }
       // 発動の衝撃の波：頭から根元へ抜けて消える
       const after = pose.rel - (type === 'lunge' ? pose.T.active : 0), s = 1 - u, amp = type === 'lunge' ? 13 : type === 'spit' ? 10 : type === 'sweep' ? 6 : 4;
