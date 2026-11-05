@@ -84,9 +84,9 @@ func _show_state(state: STATE.State) -> void:
 	elif state == STATE.State.CURRENT:
 		_label.text = "C++: 最新" if _loaded_at_start else "C++: 再起動で反映"
 	elif state == STATE.State.MISSING:
-		_label.text = "C++: なし"
+		_label.text = "C++: ビルドが必要"
 	elif state == STATE.State.STALE:
-		_label.text = "C++: 古い"
+		_label.text = "C++: ビルドが必要"
 	else:
 		_label.text = "C++: ソースなし"
 
