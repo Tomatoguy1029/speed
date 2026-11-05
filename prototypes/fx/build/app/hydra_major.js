@@ -262,7 +262,7 @@ function hmNorthDraw(S, R) {
   const r = S.r, fire = 0, flight = r.north_flight, col = HM_COLORS.bite, poses = new Map(S.parts.map(n => [n, hmLungePose(S, n, fire, flight)]));
   if (R.proto && S.age >= 0) S.parts.forEach((n, i) => {
     const p = poses.get(n), u = clamp(S.age / r.warning_time);
-    if (S.mt < 0) { hmEyes(S, R, n, p, u, col); const M = hmMouth(n, p); FX.warnRail(R.back, toL(M), toL(n.target), { color: col, k: S.nlocked ? 0.6 + 0.4 * u : 0.3 * u, time: S.t, seed: 9 + i, maxLv: 2, intensity: R.P.intensity }); hmMarkFx(S, R, n, n.target, angOf(sub(n.target, M)), u, S.nlocked, col, i * 13); }
+    if (S.mt < 0) { hmEyes(S, R, n, p, u, col); const M = hmMouth(n, p); FX.warnRail(R.back, toL(M), toL(n.target), { color: col, k: S.nlocked ? 0.6 + 0.4 * u : 0.3 * u, time: S.t, seed: 9 + i, maxLv: 2, intensity: R.P.intensity }); }
     hmBiteFx(S, R, n, n.from, n.target, fire, flight, col, i * 17);
   });
   R.blitBack();
@@ -329,7 +329,7 @@ function hmCurveDraw(S, R) {
   drawShip(S.ship);
 }
 hmRegister('north', ['H16'], { kinds: null, color: HM_COLORS.bite, ship: V(430, 60), facing: 0, front: 3 }, hmNorthTick, hmNorthDraw,
-  '予兆：本体を回して前の3本が機体を向き、首を縮めてS字にためる。目が赤く強まり、頭から着地点へ照準の光、着地点に牙の形の光がちらつく（円なし）。狙いが決まると止まって強まる → 3本が同時に伸び、空気の筋と、着地点で牙の鉤・閃光・土ぼこり → 頭は伸びた位置で止まる');
+  '予兆：本体を回して前の3本が機体を向き、首を縮めてS字にためる。目が赤く強まり、頭から着地点へ照準の光。狙いが決まると止まって強まる → 3本が同時に伸び、空気の筋と、着地点で牙の鉤・閃光・土ぼこり → 頭は伸びた位置で止まる');
 hmRegister('sequence', ['H17'], { kinds: null, color: HM_COLORS.bite, ship: V(430, 60), facing: 0, front: 3 }, hmSeqTick, hmSeqDraw,
   '予兆：前の3本が順に目を光らせ、自分の番の直前に照準の光を出してS字にためて止まる → 0.55秒ずつずれて1本ずつ伸びて噛む（空気の筋・牙・閃光）→ 噛み終えた頭はその場で止まる');
 hmRegister('curve', ['H18'], { kinds: null, color: HM_COLORS.beam, ship: V(500, 60), facing: 0 }, hmCurveTick, hmCurveDraw,
