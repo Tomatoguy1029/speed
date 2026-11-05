@@ -231,7 +231,7 @@ func _input(event: InputEvent) -> void:
 			_close()
 		elif _hud.show_menu_overlay(self):
 			show()
-			if cpp_session!=null: _editor()
+			# 編集用の写しは全ファイルの署名とステージの再変換を伴うので、スライダーを動かしたときに作る。
 			_refresh_sliders()
 			_refresh_meta_levels()
 			for button in find_children("*", "Button", true, false):
@@ -287,8 +287,10 @@ func _on_slider(value: float, key: String) -> void:
 		_refresh_sliders()
 		return
 func _refresh_sliders() -> void:
+	var config: GameConfig = ContentManager.base
+	if _content_edit!=null and _content_edit.config!=null: config = _content_edit.config
+	elif cpp_session!=null and cpp_session.cpp_edit_source.get("config") is GameConfig: config = cpp_session.cpp_edit_source.config
 	for key in _sliders:
-		var config: GameConfig = _content_edit.config if _content_edit!=null and _content_edit.config!=null else ContentManager.base
 		var v = config.get(key)
 		_sliders[key][0].set_value_no_signal(float(v))
 		_sliders[key][1].text = "%s %s" % [_sliders[key][2], str(snappedf(float(v), 0.01))]
