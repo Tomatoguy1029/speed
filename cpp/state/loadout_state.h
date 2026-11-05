@@ -2,6 +2,8 @@
 #include "../content/generated/combat_ids.h"
 #include "../systems/timing.h"
 #include "entity_store.h"
+#include "forward_weapon_state.h"
+#include "equipment_level.h"
 #include <cstdint>
 #include <vector>
 #include <unordered_set>
@@ -9,13 +11,6 @@
 #include <godot_cpp/variant/vector2.hpp>
 #include <godot_cpp/variant/color.hpp>
 namespace speed {
-struct ForwardWeaponState {
-    bool ready = false;
-    IntervalTimer fire;
-    double recoil = 0;
-    double base_interval = 0, interval = 0, damage = 0, life = 0, spread = 0, knock = 0, character_scale = 0;
-    int64_t pierce = 0;
-};
 struct RearWeaponState : ForwardWeaponState {
     uint32_t definition=0,color=0;
     double mount_x=0,mount_y=0,muzzle_distance=0;
@@ -157,7 +152,6 @@ struct DuplicatorState {
     double chance=0,damage=1,angle_min=0,angle_max=0;
     uint32_t maximum=0;
 };
-struct EquipmentLevel {uint32_t definition=0,level=0;};
 struct CardCandidate {int64_t id=0;CardKind kind=CardKind::Weapon;uint32_t definition=0,level=0;};
 // 数値特性は取得の境界で畳み、武器の更新中には定義を探索しない。
 struct EquipmentEffects {

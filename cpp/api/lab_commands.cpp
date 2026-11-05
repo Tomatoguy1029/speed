@@ -21,6 +21,8 @@
 #include "../output/frame_builder.h"
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/hydra/body.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 #include <algorithm>
 using namespace godot;
@@ -44,9 +46,9 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty","enemy_ai","terrain","rocks"})) return reply(false);
         for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty","enemy_ai","terrain","rocks"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
         Vector2 at=s.ship.pos;if (p.has("position") && !point(p,"position",at)) return reply(false);
-        double gauge,time,level;if (!scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0 || !scalar(p,"time",s.time,time) || time<0 || !scalar(p,"level",s.loadout.level,level) || level<1 || level>1000) return reply(false);
+        double gauge,time,level;if (!scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0 || !scalar(p,"time",s.time,time) || time<0 || !scalar(p,"level",s.loadout->level,level) || level<1 || level>1000) return reply(false);
         c.lab_mode=p.get("lab_mode",true);c.lab_enemy_ai=p.get("enemy_ai",true);s.population.frame_enabled=p.get("auto_spawn",false);s.world.boss_spawned=!bool(p.get("auto_boss",false));s.invincible=p.get("invincible",true);
-        s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;s.draw.gauge=gauge;s.time=time;s.loadout.level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
+        s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;s.draw.gauge=gauge;s.time=time;s.loadout->level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
         if (bool(p.get("empty",false))) {s.field.bodies.clear();s.field.rocks.clear();s.field.rock_handles={};s.field.wells.clear();s.field.warp_gone=-1;}
         if (!bool(p.get("terrain",true))) s.field.bodies.clear();
         if (!bool(p.get("rocks",true))) {s.field.rocks.clear();s.field.rock_handles={};}
@@ -111,7 +113,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         if (!c.lab_mode || s.phase!=RunState::Phase::Play || p.get("id",Variant()).get_type()!=Variant::STRING) return reply(false);
         const String id=p["id"];const speed::LoadoutDefinition *definition=nullptr;
         for (const auto &d:runtime.content->equipment) if (String::utf8(d.external_id.c_str())==id) definition=&d;
-        if (!definition) return reply(false);const auto &owned=definition->kind==0?s.loadout.weapons:s.loadout.traits;
+        if (!definition) return reply(false);const auto &owned=definition->kind==0?s.loadout->weapons:s.loadout->traits;
         if (std::none_of(owned.begin(),owned.end(),[&](const auto &v){return v.definition==definition->id;})) return reply(false);
         const auto matches=[&](const auto &levels){return std::any_of(levels.begin(),levels.end(),[&](const auto &v){return v.equipment==definition->id;});};
         const auto weapon_matches=[&](const auto &levels){return std::any_of(levels.begin(),levels.end(),[&](const auto &v){return v.weapon==definition->id;});};
@@ -126,9 +128,9 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         for (const auto entity:ids) {const auto row=s.rows_by_id.find(entity);if (row==s.rows_by_id.end() || s.enemies[row->second].dead) return reply(false);targets.push_back(s.enemy_handles.at(row->second));}
         if (targets.empty()) return reply(false);heading=heading.normalized();s.ship.heading=heading;s.draw.gauge=s.draw_config.capacity;
         if (weapon_matches(runtime.content->flash_slash_levels) || duplicator) for (auto target:targets) s.enemies[target.slot].hp=s.enemies[target.slot].max_hp=100.0;
-        if (weapon_matches(runtime.content->knockback_levels)) {s.loadout.knockback.chance=1;speed::DamageRequest hit;hit.struck=targets.front();hit.amount=100;hit.cause=speed::Cause::Shot;hit.direction=heading;speed::CombatResolver::damage_enemy(runtime,hit);}
+        if (weapon_matches(runtime.content->knockback_levels)) {s.loadout->knockback.chance=1;speed::DamageRequest hit;hit.struck=targets.front();hit.amount=100;hit.cause=speed::Cause::Shot;hit.direction=heading;speed::CombatResolver::damage_enemy(runtime,hit);}
         if (weapon_matches(runtime.content->interceptor_levels)) speed::InterceptorBehavior::step(runtime,1.0);
-        if (duplicator) {s.loadout.duplicator.chance=1;if (s.forward.ready) speed::ForwardBehavior::step(runtime,0.5);}
+        if (duplicator) {s.loadout->duplicator.chance=1;if (s.forward.ready) speed::ForwardBehavior::step(runtime,0.5);}
         if (weapon_matches(runtime.content->barrier_levels)) {speed::ShipDamageRequest hit;hit.amount=1;hit.has_impact=true;hit.impact=s.ship.pos+heading*100;speed::BarrierBehavior::block(runtime,hit,1);}
         if (matches(runtime.content->crit_beam_levels)) {speed::DamageRequest hit;hit.has_impact=true;hit.impact=s.ship.pos;speed::DamageResult result;speed::CritBeamBehavior::critical(runtime,hit,result);}
         if (matches(runtime.content->full_charge_levels)) {s.draw.gauge=0.99;speed::FullBurstBehavior::step(runtime);s.draw.gauge=s.draw_config.capacity;speed::FullBurstBehavior::step(runtime);}
@@ -139,7 +141,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         const PackedInt32Array levels=p["levels"];if (levels.size()!=8) return reply(false);for (auto level:levels) if (level<0 || level>100) return reply(false);
         speed::RunRuntime next;next.content=runtime.content;next.state=speed::clone_state(s);
         const Dictionary applied=speed::DevCommands::set_profile(next,p["profile"]);if (!bool(applied["ok"])) return applied;
-        next.state.loadout.meta_levels.assign(levels.ptr(),levels.ptr()+levels.size());runtime.state=std::move(next.state);return reply(true);
+        next.state.loadout->meta_levels.assign(levels.ptr(),levels.ptr()+levels.size());runtime.state=std::move(next.state);return reply(true);
     }
     if (kind=="camera") {
         Vector2 center,size;double zoom,bars;
@@ -201,7 +203,7 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
     }
     if (kind=="time" || kind=="level") {
         double value;if (p.size()!=1 || !scalar(p,"value",0,value) || value<(kind=="level"?1:0) || (kind=="level" && value>1000)) return reply(false);
-        if (kind=="time") s.time=value;else {s.loadout.level=int64_t(value);speed::EquipmentSystem::refresh_effects(runtime);}return reply(true);
+        if (kind=="time") s.time=value;else {s.loadout->level=int64_t(value);speed::EquipmentSystem::refresh_effects(runtime);}return reply(true);
     }
     if (kind=="move") {
         Vector2 at;double angle;
@@ -252,7 +254,7 @@ Dictionary SpeedRunCore::lab_state_run() const {
     for (const auto &e:s.enemies) if (e.alive) {
         Dictionary row;row["id"]=e.id;row["type"]=runtime.content->definitions[e.definition].source_id();row["pos"]=e.pos;row["vel"]=e.vel;row["hp"]=e.hp;row["max_hp"]=e.max_hp;row["armor"]=e.armor;row["speed"]=e.speed;row["r"]=e.radius;row["facing"]=e.facing;row["dead"]=e.dead;row["elite"]=e.elite;row["gate"]=int(runtime.content->definitions[e.definition].gate);row["is_boss"]=e.is_boss;row["meteor_index"]=s.field.rock_handles.contains(e.rock)?int64_t(e.rock.slot):-1;row["mode"]=int(e.mode);row["charge"]=e.charge;row["parent"]=s.enemy_handles.contains(e.parent)?s.enemy_handles.entity_id(e.parent):-1;enemies.push_back(row);
     }
-    value["draw_time_scale"]=s.draw_config.time_scale;value["max_hp"]=s.ship_config.max_hp;value["xp_profile_factor"]=s.loadout.xp_profile_factor;value["hero"]=speed::HeroesSystem::snapshot(runtime);PackedInt32Array meta;for (auto level:s.loadout.meta_levels) meta.push_back(level);value["meta_levels"]=meta;
+    value["draw_time_scale"]=s.draw_config.time_scale;value["max_hp"]=s.ship_config.max_hp;value["xp_profile_factor"]=s.loadout->xp_profile_factor;value["hero"]=speed::HeroesSystem::snapshot(runtime);PackedInt32Array meta;for (auto level:s.loadout->meta_levels) meta.push_back(level);value["meta_levels"]=meta;
     PackedStringArray definitions;for (const auto &d:runtime.content->definitions) definitions.push_back(d.id);value["definition_ids"]=definitions;
     godot::Array final_modules;for (const auto &id:s.control.final_modules) final_modules.push_back(godot::String(id.c_str()));value["final_modules"]=final_modules;value["draco_finish_done"]=s.control.draco_finish_done;value["lab_mode"]=s.control.lab_mode;value["cinematic_bars"]=s.control.cinematic_bars;value["camera_zoom"]=s.control.camera_zoom;value["view_half"]=s.view_half;value["view_center"]=s.view_center;value["capacity"]=s.draw_config.capacity;value["max_speed"]=s.ship_config.max_speed;value["length_mult"]=s.draw_config.length_mult;value["enemies"]=enemies;Array bodies;for (const auto &b:s.field.bodies) {Dictionary row;row["pos"]=b.position;row["r"]=b.radius;bodies.push_back(row);}value["bodies"]=bodies;value["hazards"]=hazards_snapshot();value["hostiles"]=hostiles_snapshot();return reply(true,value);
 }

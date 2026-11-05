@@ -7,15 +7,18 @@
 #include "../../systems/attacks/bullet.h"
 #include "../../systems/collision_query.h"
 #include "../../systems/tracking_policy.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 namespace speed {
 void HydraTechnique::debris_shatter(RunRuntime &r,TechniqueState &t,double) {
-    auto *b=PhaseController::find(r,t.actor);auto &v=std::get<HydraTechniqueState>(t.detail);auto &move=std::get<HydraShatterState>(v.move);
+    auto *b=PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();auto &move=std::get<HydraShatterState>(v.move);
     const auto &p=*std::find_if(r.content->hydra_shatters.begin(),r.content->hydra_shatters.end(),[&](const auto &p){return p.technique==t.definition;});
     auto &debris=*HydraNormalAttack::neck(*b,v.participants[0]);auto &beam=*HydraNormalAttack::neck(*b,v.participants[1]);
     if (!move.initialized) {
         move.initialized=true;const auto &body=r.state.enemies[b->actor.slot];const TrackingPolicy tracking{r.state.draw.tracing,body.held,r.state.enemy_handles.contains(body.pump_owner)};
-        move.aim=(tracking.target(beam.strike_pos,b->hydra.separated?beam.look_angle:beam.angle,r.state.ship_pos)-beam.strike_pos).angle();
+        move.aim=(tracking.target(beam.strike_pos,b->hydra->separated?beam.look_angle:beam.angle,r.state.ship_pos)-beam.strike_pos).angle();
         for (uint32_t j=0;j<p.count;++j) {
             const double offset=(double(j)/std::max(1.0,double(p.count)-1)-0.5)*1.4;const auto to=beam.strike_pos+godot::Vector2::from_angle(move.aim+offset)*420;
             EnemySpawn spawn;spawn.position=debris.strike_pos;spawn.origin=SpawnOrigin::BossPart;spawn.has_velocity=true;

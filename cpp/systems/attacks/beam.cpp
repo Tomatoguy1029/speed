@@ -1,5 +1,7 @@
 #include "beam.h"
 #include "../attack_system.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -11,7 +13,7 @@ AttackHandle BeamSystem::emit(RunRuntime &run,const BeamParams &p) {
     for (float channel:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(channel)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.delay=p.delay;hazard.duration=p.active;hazard.damage=p.damage;hazard.color=p.color;
     hazard.shape=BeamHazard{float(p.angle),float(p.length),float(p.half_width),float(p.arc),p.definition?p.definition:1,uint32_t(p.style)};
-    AttackSpec spec;spec.cause=Cause::Beam;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0 && p.attached;spec.owner.budget=p.budget;
+    AttackSpec spec;spec.cause=Cause::Beam;spec.technique=p.technique;if (run.state.bosses->handles.contains(p.technique)) spec.source_technique=run.state.bosses->techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.owner.generation>0 && p.attached;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (p.owner.generation && p.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
     if (!AttackSystem::configure_contact(*run.content,run.content->beams[p.definition?p.definition-1:0].contact,spec)) return {};
@@ -41,6 +43,10 @@ void BeamSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const double zoom=std::max(0.01,run.state.control.camera_zoom);const bool charging=hazard.time<hazard.delay;
     if (!charging && !view.grow(beam->length).has_point(hazard.pos)) return;
     Dictionary shape;shape["kind"]=int32_t(charging?RenderShapeKind::Circle:RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    const auto source=record->spec.owner.source_definition;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Beamer) shape["reference_beamer"]=true;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Cross) shape["reference_cross"]=true;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Sniper && beam->style==uint32_t(BeamStyle::Telescope)) shape["reference_telescope"]=true;
     if (charging && beam->style==uint32_t(BeamStyle::Guide) && view.grow(beam->length).has_point(hazard.pos)) {
         const double k=std::clamp(double(hazard.time)/std::max(0.001,double(hazard.delay)),0.0,1.0);
         Dictionary guide=shape.duplicate();guide["kind"]=int32_t(RenderShapeKind::Polyline);guide["behind_parent"]=true;

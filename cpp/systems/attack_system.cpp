@@ -3,6 +3,8 @@
 #include "../runtime/run_runtime.h"
 #include "attack_budget.h"
 #include "../content/content_bundle.h"
+#include "../state/boss_states.h"
+#include "../bosses/canis_major/state.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
@@ -42,8 +44,8 @@ AttackHandle register_attack(State &state,AttackPool pool,uint32_t row,AttackSpe
         }
     }
     if (!state.observations.recording || !state.observations.detail_level) spec.observation_id=0;
-    else if (!spec.observation_id && state.bosses.handles.contains(spec.technique)) spec.observation_id=state.bosses.techniques[spec.technique.slot].observation_id;
-    if (state.observations.recording && state.observations.detail_level && !spec.observation_id && spec.source_technique) for (const auto &t:state.bosses.techniques)
+    else if (!spec.observation_id && state.bosses->handles.contains(spec.technique)) spec.observation_id=state.bosses->techniques[spec.technique.slot].observation_id;
+    if (state.observations.recording && state.observations.detail_level && !spec.observation_id && spec.source_technique) for (const auto &t:state.bosses->techniques)
         if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && state.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {spec.observation_id=t.observation_id;break;}
     while (!all.free_records.empty() && !all.handles.reusable(all.free_records.back())) all.free_records.pop_back();
     if (all.free_records.empty() && all.records.size()>=UINT32_MAX) return {};
@@ -147,6 +149,7 @@ bool AttackSystem::end(State &state,AttackHandle handle,AttackEndReason reason) 
         auto &value=state.hazards[record.row];pos=value.pos;zone_definition=value.zone_definition;circle=std::holds_alternative<CircleHazard>(value.shape) && std::get<CircleHazard>(value.shape).kind!=CircleHazardKind::Blast;
         if (const auto *beam=std::get_if<BeamHazard>(&value.shape);beam && beam->style==uint32_t(BeamStyle::Flood) && value.time>=value.delay) {
             flood.ready=true;flood.row=record.row;flood.pos=value.pos;flood.angle=beam->angle;flood.length=beam->length;flood.width=beam->half_width*2.0;flood.spread=beam->arc;
+            flood.reference_aquarius=beam->flood_reference;flood.index=beam->flood_index;
             flood.age=reason==AttackEndReason::Lifetime?std::max(0.0,double(value.time)-value.delay-value.duration):0.0;
         }
         if (value.alive && same_handle(value.attack,handle)) {value.alive=false;state.free_hazards.push_back(record.row);}break;
@@ -180,7 +183,7 @@ void AttackSystem::source_ended(State &state,EnemyHandle source,AttackEndReason 
 }
 void AttackSystem::end_technique(State &state,TechniqueHandle technique,bool cancelled) {
     if (!technique.generation) return;
-    if (state.bosses.handles.contains(technique)) state.observations.finish(state.bosses.techniques[technique.slot].observation_id);
+    if (state.bosses->handles.contains(technique)) state.observations.finish(state.bosses->techniques[technique.slot].observation_id);
     filter_end(state,indexed(state.attacks.by_technique,handle_key(technique)),policy(EndPolicy::EndWithTechnique)|(cancelled?policy(EndPolicy::CancelWithTechnique):0),cancelled?AttackEndReason::TechniqueCancel:AttackEndReason::TechniqueEnd);
 }
 void AttackSystem::end_participant(State &state,ParticipantHandle participant) {
@@ -229,7 +232,7 @@ void AttackSystem::sync_observation_positions(State &state) {
         case AttackPool::Friendly: break;
         }
     }
-    for (const auto &b:state.bosses.bodies) for (const auto &v:b.canis.burning)
+    for (const auto &b:state.bosses->bodies) for (const auto &v:b.canis->burning)
         if (state.enemy_handles.contains(v.actor)) o.effect_position(v.effect_id,state.enemies[v.actor.slot].pos);
 }
 bool AttackSystem::rebuild(State &state) {

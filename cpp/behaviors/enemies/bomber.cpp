@@ -5,6 +5,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attacks/zone.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void BomberBehavior::step(RunRuntime &r,uint32_t row,double dt) {

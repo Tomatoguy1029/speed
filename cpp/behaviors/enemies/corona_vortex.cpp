@@ -4,6 +4,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/field.h"
 #include "../../systems/motion_math.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -47,7 +48,7 @@ void orbit(RunRuntime &r,EnemyHandle h,CoronaMember &a,CoronaState &o,const Coro
         if (e0*e1<=0 && std::abs(e1-e0)<PI) {double lo=0,hi=1;for (int k=0;k<10;++k) {const double mid=(lo+hi)*0.5,err=error(center0.lerp(center1,mid),center_v,angle0+(angle1-angle0)*mid,radius1,p.spin,s.ship_pos);if (err*e0>0) lo=mid;else hi=mid;}f=(lo+hi)*0.5;}else if (std::abs(e0)<=p.align_angle) f=0;
         if (f>=0) {
             const double angle=angle0+(angle1-angle0)*f;const auto at=center0.lerp(center1,f)+godot::Vector2::from_angle(angle)*radius1,direction=velocity(center_v,angle,radius1,p.spin).normalized();
-            if (direction!=godot::Vector2() && direction.dot((s.ship_pos-at).normalized())>0) {unstock(r,h,a);a.thrown=true;const auto owner_key=AttackBudgetSystem::owner(s,owner.id,owner.attack_group);a.attack_token=AttackBudgetSystem::token(s,owner_key);if (a.attack_token) AttackBudgetSystem(r).external(a.attack_token,key(h,e),true);a.life=p.throw_life;if (const auto *type=ammo(r,owner,a.definition)) a.damage=type->damage;a.from=at;a.release_fraction=f;e.vel=direction*p.throw_speed;e.pos=at+e.vel*dt*(1.0-f);e.facing=direction.angle();cancel(r,a.owner,o);owner.fire_t=r.content->definitions[owner.definition].fire_interval;return;}
+            if (direction!=godot::Vector2() && direction.dot((s.ship_pos-at).normalized())>0) {unstock(r,h,a);a.thrown=true;a.slot=owner.definition;a.angle=angle;const auto owner_key=AttackBudgetSystem::owner(s,owner.id,owner.attack_group);a.attack_token=AttackBudgetSystem::token(s,owner_key);if (a.attack_token) AttackBudgetSystem(r).external(a.attack_token,key(h,e),true);a.life=p.throw_life;if (const auto *type=ammo(r,owner,a.definition)) a.damage=type->damage;a.from=at;a.release_fraction=f;e.vel=direction*p.throw_speed;e.pos=at+e.vel*dt*(1.0-f);e.facing=direction.angle();cancel(r,a.owner,o);owner.fire_t=r.content->definitions[owner.definition].fire_interval;return;}
         }
     }
     a.angle=angle1;a.radius=radius1;a.settled=godot::Math::is_equal_approx(radius1,p.ring);e.pos=finish;e.vel=(finish-start)/dt;e.facing=e.vel.angle();
@@ -55,7 +56,13 @@ void orbit(RunRuntime &r,EnemyHandle h,CoronaMember &a,CoronaState &o,const Coro
 }
 void CoronaVortex::release(RunRuntime &r,EnemyHandle h) {
     if (!r.state.enemy_handles.contains(h)) return;auto *o=std::get_if<CoronaState>(&r.state.enemies[h.slot].behavior_state);
-    if (o) {const auto refs=r.state.corona_members;for (const auto &ref:refs) if (current(r,ref) && same_handle(r.state.enemies[ref.target.slot].corona->owner,h)) detach(r,ref.target);*o={};}
+    if (o) {const auto refs=r.state.corona_members;for (const auto &ref:refs) if (current(r,ref) && same_handle(r.state.enemies[ref.target.slot].corona->owner,h)) {
+        auto &member=*r.state.enemies[ref.target.slot].corona;
+        if (!member.thrown) {detach(r,ref.target);continue;}
+        member.slot=r.state.enemies[h.slot].definition;
+        if (member.attack_token) AttackBudgetSystem(r).external(member.attack_token,key(ref.target,r.state.enemies[ref.target.slot]),false);
+        member.attack_token=0;member.owner={};
+    }*o={};}
     detach(r,h);
 }
 void CoronaVortex::death_marked(RunRuntime &r,const DeathContext &death) {release(r,death.target);}
@@ -78,10 +85,19 @@ void CoronaVortex::tick(RunRuntime &r,double dt,const std::vector<EnemyHandle> &
     }
     const auto members=s.corona_members;
     for (const auto &ref:members) {
-        if (!current(r,ref)) continue;auto &e=s.enemies[ref.target.slot];auto &a=*e.corona;if (!live(r,ref.target) || !live(r,a.owner) || e.stone>0 || e.shove_time>0 || e.knock_t>0) {detach(r,ref.target);continue;}
-        e.age+=dt;e.hit_cd=std::max(0.0,e.hit_cd-dt);e.guard=std::max(0.0,e.guard-dt);e.flash=std::max(0.0,e.flash-dt);auto &owner=s.enemies[a.owner.slot];auto &o=std::get<CoronaState>(owner.behavior_state);const auto &p=r.content->coronas[r.content->definitions[owner.definition].corona_definition-1];a.from=e.pos;a.ship_from=s.ship_pos;a.release_fraction=0;
-        if (a.thrown) {a.life-=dt;if (a.life<=0) {detach(r,ref.target);continue;}e.pos+=e.vel*dt;}else if (owner.stone<=0) orbit(r,ref.target,a,o,p,dt);else e.vel={};
-        if (current(r,ref) && FieldSystem::first_body_hit(r,a.from,e.pos,e.radius)) {FieldSystem::collide_enemy(r,ref.target.slot,a.from,dt);detach(r,ref.target);}
+        if (!current(r,ref)) continue;auto &e=s.enemies[ref.target.slot];auto &a=*e.corona;
+        if (!live(r,ref.target) || (!a.thrown && (!live(r,a.owner) || e.stone>0 || e.shove_time>0 || e.knock_t>0))) {detach(r,ref.target);continue;}
+        e.age+=dt;e.hit_cd=std::max(0.0,e.hit_cd-dt);e.guard=std::max(0.0,e.guard-dt);e.flash=std::max(0.0,e.flash-dt);a.from=e.pos;a.ship_from=s.ship_pos;a.release_fraction=0;
+        if (a.thrown) {
+            const auto owner_definition=s.enemy_handles.contains(a.owner)?s.enemies[a.owner.slot].definition:a.slot;
+            const auto &p=r.content->coronas[r.content->definitions[owner_definition].corona_definition-1];
+            e.vel=godot::Vector2::from_angle(e.facing)*p.throw_speed;
+            const double travel=std::min(dt,std::max(0.0,a.life));a.life-=travel;e.pos+=e.vel*travel;
+        } else {
+            auto &owner=s.enemies[a.owner.slot];auto &o=std::get<CoronaState>(owner.behavior_state);const auto &p=r.content->coronas[r.content->definitions[owner.definition].corona_definition-1];
+            if (owner.stone<=0) orbit(r,ref.target,a,o,p,dt);else e.vel={};
+            if (current(r,ref) && !a.thrown && FieldSystem::first_body_hit(r,a.from,e.pos,e.radius)) {FieldSystem::collide_enemy(r,ref.target.slot,a.from,dt);detach(r,ref.target);}
+        }
     }
     for (auto h:owners) if (live(r,h)) std::get<CoronaState>(s.enemies[h.slot].behavior_state).center=s.enemies[h.slot].pos;
     s.corona_members.erase(std::remove_if(s.corona_members.begin(),s.corona_members.end(),[&](const auto &ref){return !current(r,ref);}),s.corona_members.end());
@@ -90,7 +106,16 @@ bool CoronaVortex::hit_thrown(RunRuntime &r) {
     auto &s=r.state;const auto refs=s.corona_members;
     for (const auto &ref:refs) {
         if (!current(r,ref) || !live(r,ref.target)) continue;const auto e=s.enemies[ref.target.slot];const auto a=*e.corona;if (!a.thrown) continue;const double reach=e.radius*a.effect+s.ship_config.ship_radius;const auto ship_from=a.ship_from.lerp(s.ship.pos,a.release_fraction);
-        if (CollisionQuery::segment_circle_t(a.from-ship_from,e.pos-s.ship.pos,{},reach)<0) continue;uint32_t source=0;if (s.enemy_handles.contains(a.owner)) source=uint32_t(s.enemies[a.owner.slot].definition+1);detach(r,ref.target);ShipDamageRequest request;request.amount=a.damage;request.cause=Cause::CoronaThrow;request.source=source;CombatResolver::ship_damage(r,request);if (s.phase!=godot::RunState::Phase::Play) return false;
+        const double hit=CollisionQuery::segment_circle_t(a.from-ship_from,e.pos-s.ship.pos,{},reach);
+        // 同じ移動区間に機体と天体があるときは、先に触れた方で消える。
+        if (const auto body=FieldSystem::first_body_hit(r,a.from,e.pos,e.radius);body && (hit<0 || body->t<=hit)) {
+            s.enemies[ref.target.slot].pos=body->point;
+            EnemySystem::retire(r,ref.target,RetireReason::CoronaThrowEnd);continue;
+        }
+        if (hit<0) {if (a.life<=0) EnemySystem::retire(r,ref.target,RetireReason::CoronaThrowEnd);continue;}
+        const uint32_t source=uint32_t((s.enemy_handles.contains(a.owner)?s.enemies[a.owner.slot].definition:a.slot)+1);
+        s.enemies[ref.target.slot].pos=a.from.lerp(e.pos,hit);
+        EnemySystem::retire(r,ref.target,RetireReason::CoronaThrowEnd);ShipDamageRequest request;request.amount=a.damage;request.cause=Cause::CoronaThrow;request.source=source;CombatResolver::ship_damage(r,request);if (s.phase!=godot::RunState::Phase::Play) return false;
     }return true;
 }
 }

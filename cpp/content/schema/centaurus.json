@@ -733,6 +733,32 @@
           "min": 0
         }
       ]
+    },
+    {
+      "name": "CentaurusReferenceFxDefinition",
+      "section": 451,
+      "fields": [
+        {
+          "name": "id",
+          "type": "u32",
+          "min": 1
+        },
+        {
+          "name": "release_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "landing_life",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "stomp_life",
+          "type": "f64",
+          "min": 0
+        }
+      ]
     }
   ],
   "enums": {}

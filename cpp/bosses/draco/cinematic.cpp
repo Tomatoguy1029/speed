@@ -1,4 +1,6 @@
 #include "cinematic.h"
+#include "../../state/boss_states.h"
+#include "state.h"
 #include <algorithm>
 namespace speed {
 void DracoCinematic::capture(RunRuntime &r,DracoCinematicState &v) {

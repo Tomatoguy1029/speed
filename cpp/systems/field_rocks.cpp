@@ -3,6 +3,7 @@
 #include "attack_system.h"
 #include "attacks/friend_hull.h"
 #include "../api/run_core.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <godot_cpp/core/math.hpp>

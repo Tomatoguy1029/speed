@@ -1,5 +1,6 @@
 #include "enemy_motion.h"
 #include "motion_math.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void EnemyMotion::steer(godot::RunState::Enemy &enemy,godot::Vector2 target,double speed,double accel,double dt,const TrackingPolicy &policy) {

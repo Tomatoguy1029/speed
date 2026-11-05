@@ -9,6 +9,8 @@
 #include "../systems/attack_system.h"
 #include "../systems/group_system.h"
 #include "../systems/field.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <cmath>
 #include <limits>
 #include <unordered_set>
@@ -47,43 +49,47 @@ godot::RunState clone_state(const godot::RunState &source) {
 }
 bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) {
     if (!HeroesSystem::validate(state,content)) return false;
-    if (state.loadout.scatter.ready && (!std::isfinite(state.loadout.scatter.elapsed) || state.loadout.scatter.elapsed<0)) return false;
+    if (state.loadout->scatter.ready && (!std::isfinite(state.loadout->scatter.elapsed) || state.loadout->scatter.elapsed<0)) return false;
     if (state.ship.shield_source_definition>content.definitions.size()) return false;
     if (!state.started || state.closed || state.next_id<=0 ||
         !std::isfinite(state.time) || !std::isfinite(state.world_time) || !std::isfinite(state.sim_time) ||
         !std::isfinite(state.grid.cell) || state.grid.cell<=0 || state.enemies.size()>=UINT32_MAX ||
         state.behavior_kinds.size()!=state.behavior_rows.size()) return false;
+    const auto &ram=state.control.boss_ram;
+    if (!std::isfinite(state.control.boss_ram_hitstop) || state.control.boss_ram_hitstop<0 || state.control.next_boss_ram_serial<1 ||
+        !std::isfinite(ram.remaining) || ram.remaining<0 || !std::isfinite(ram.started_at) || !std::isfinite(ram.released_at) || ram.started_at< -1 || ram.released_at< -1 || !ram.entry.is_finite() || !ram.exit.is_finite() || !ram.direction.is_finite()) return false;
+    if (ram.pending && (!ram.target.generation || ram.target_id<=0 || ram.serial<=0 || ram.serial>=state.control.next_boss_ram_serial)) return false;
     if (!std::isfinite(state.control.boss_at) || state.control.boss_at<-1 || !std::isfinite(state.control.world_real_accum) || !std::isfinite(state.control.world_dt_accum) ||
         state.control.world_real_accum<0 || state.control.world_dt_accum<0 || state.control.world_tick_div<1 ||
         state.control.world_steps<0 || state.control.world_steps>=state.control.world_tick_div) return false;
-    for (const auto &v:state.loadout.kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
-    auto &slash=state.loadout.flash_slash;if (!std::isfinite(slash.clock) || slash.clock<0 || !std::isfinite(slash.released)) return false;slash.marked_ids.clear();
+    for (const auto &v:state.loadout->kill_sonic.waves) if (!v.pos.is_finite() || !std::isfinite(v.age) || v.age<0 || !std::isfinite(v.born) || !std::isfinite(v.life) || v.life<=0) return false;
+    auto &slash=state.loadout->flash_slash;if (!std::isfinite(slash.clock) || slash.clock<0 || !std::isfinite(slash.released)) return false;slash.marked_ids.clear();
     for (const auto &m:slash.marks) {if (m.id<=0 || !m.total || !m.left || m.left>m.total || !std::isfinite(m.time) || !std::isfinite(m.delay) || m.delay<0 || !std::isfinite(m.age) || m.age<0 || !std::isfinite(m.damage) || m.damage<0 || !std::isfinite(m.distance) || m.distance<0 || (state.enemy_handles.contains(m.target) && state.enemy_handles.entity_id(m.target)!=m.id) || !slash.marked_ids[m.dash].insert(m.id).second) return false;}
-    const auto &afterimage=state.loadout.afterimage;if (!std::isfinite(afterimage.clock) || afterimage.clock<0 || afterimage.echoes.size()>8) return false;
+    const auto &afterimage=state.loadout->afterimage;if (!std::isfinite(afterimage.clock) || afterimage.clock<0 || afterimage.echoes.size()>8) return false;
     bool current_found=afterimage.current==0;
     for (const auto &echo:afterimage.echoes) {if (!echo.id || echo.id>=afterimage.next_id || !std::isfinite(echo.start) || !std::isfinite(echo.until) || !std::isfinite(echo.share) || echo.share<0 || echo.legs.size()>2048 || echo.copies.empty() || echo.copies.size()>8) return false;if (echo.id==afterimage.current) {if (echo.ended) return false;current_found=true;}
         for (const auto &leg:echo.legs) if (!leg.a.is_finite() || !leg.b.is_finite() || !std::isfinite(leg.start) || !std::isfinite(leg.finish) || leg.finish<leg.start || !std::isfinite(leg.power) || !std::isfinite(leg.radius) || leg.radius<0) return false;
         for (const auto &copy:echo.copies) if (!copy.pos.is_finite() || !copy.dir.is_finite() || !std::isfinite(copy.delay) || copy.delay<=0 || !std::isfinite(copy.progress) || copy.progress<0 || copy.progress>1 || !std::isfinite(copy.alpha) || copy.alpha<0 || copy.alpha>1 || copy.cursor>echo.legs.size()) return false;
     }
     if (!current_found) return false;
-    const auto &escort=state.loadout.escort;if (!std::isfinite(escort.distance) || escort.distance<0) return false;
+    const auto &escort=state.loadout->escort;if (!std::isfinite(escort.distance) || escort.distance<0) return false;
     for (const auto &v:escort.normals) if (!v.is_finite()) return false;
     for (const auto &v:escort.drones) {if (!v.pos.is_finite() || !v.dir.is_finite() || v.trail.size()>96) return false;for (const auto &p:v.trail) if (!p.pos.is_finite() || !std::isfinite(p.life) || p.life<0) return false;}
-    const auto &interceptor=state.loadout.interceptor;if (!std::isfinite(interceptor.clock) || interceptor.clock<0) return false;
+    const auto &interceptor=state.loadout->interceptor;if (!std::isfinite(interceptor.clock) || interceptor.clock<0) return false;
     for (const auto &[id,deadline]:interceptor.target_after) if (id<=0 || !std::isfinite(deadline)) return false;
     for (const auto &v:interceptor.drones) if (!v.pos.is_finite() || !std::isfinite(v.angle) || !std::isfinite(v.flash) || !std::isfinite(v.kick) || !std::isfinite(v.next) || v.flash<0 || v.kick<0 || (state.enemy_handles.contains(v.target) && state.enemy_handles.entity_id(v.target)!=v.target_id)) return false;
-    const auto &bipolar=state.loadout.bipolar;if (!bipolar.origin.is_finite() || !std::isfinite(bipolar.started)) return false;
+    const auto &bipolar=state.loadout->bipolar;if (!bipolar.origin.is_finite() || !std::isfinite(bipolar.started)) return false;
     for (const auto &v:bipolar.pending) if (!v.from.is_finite() || !v.to.is_finite() || !std::isfinite(v.delay) || v.delay<=0 || !v.id || v.id>=bipolar.next_id) return false;
     for (const auto &v:bipolar.beams) if (!v.from.is_finite() || !v.to.is_finite() || !std::isfinite(v.age) || v.age<0 || !v.id || v.id>=bipolar.next_id || !std::isfinite(v.width_scale) || v.width_scale<=0) return false;
-    if (!std::isfinite(state.loadout.mass_tow.fire.remaining)) return false;
-    for (const auto &c:state.loadout.mass_tow.cargo) if (!c.pos.is_finite() || !c.relative.is_finite() || !std::isfinite(c.angle) || c.radius<=0 || !std::isfinite(c.radius) || c.source_id<=0 || !c.definition || c.definition>content.definitions.size()) return false;
-    if (!std::isfinite(state.loadout.contact_arc.ready_at)) return false;
-    for (const auto &v:state.loadout.contact_arc.visuals) {if (!std::isfinite(v.age) || v.age<0 || v.segments.size()%2) return false;for (auto p:v.segments) if (!p.is_finite()) return false;}
-    for (const auto &f:state.loadout.sonic.frames) if (!f.pos.is_finite() || !std::isfinite(f.age) || f.age<0) return false;
-    for (const auto &h:state.loadout.sonic.pending) if (!h.velocity.is_finite() || !std::isfinite(h.age) || !std::isfinite(h.damage) || h.id<=0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
-    if (state.loadout.contact_wave.ripples.size()>8) return false;
-    for (const auto &v:state.loadout.contact_wave.ripples) if (!v.pos.is_finite() || !std::isfinite(v.age) || !std::isfinite(v.radius) || v.age<0 || v.radius<0) return false;
-    for (const auto &w:state.loadout.contact_wave.waves) {
+    if (!std::isfinite(state.loadout->mass_tow.fire.remaining)) return false;
+    for (const auto &c:state.loadout->mass_tow.cargo) if (!c.pos.is_finite() || !c.relative.is_finite() || !std::isfinite(c.angle) || c.radius<=0 || !std::isfinite(c.radius) || c.source_id<=0 || !c.definition || c.definition>content.definitions.size()) return false;
+    if (!std::isfinite(state.loadout->contact_arc.ready_at)) return false;
+    for (const auto &v:state.loadout->contact_arc.visuals) {if (!std::isfinite(v.age) || v.age<0 || v.segments.size()%2) return false;for (auto p:v.segments) if (!p.is_finite()) return false;}
+    for (const auto &f:state.loadout->sonic.frames) if (!f.pos.is_finite() || !std::isfinite(f.age) || f.age<0) return false;
+    for (const auto &h:state.loadout->sonic.pending) if (!h.velocity.is_finite() || !std::isfinite(h.age) || !std::isfinite(h.damage) || h.id<=0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
+    if (state.loadout->contact_wave.ripples.size()>8) return false;
+    for (const auto &v:state.loadout->contact_wave.ripples) if (!v.pos.is_finite() || !std::isfinite(v.age) || !std::isfinite(v.radius) || v.age<0 || v.radius<0) return false;
+    for (const auto &w:state.loadout->contact_wave.waves) {
         if (!w.pos.is_finite() || !std::isfinite(w.age) || !std::isfinite(w.visual_age) || w.visual_age<0 || !std::isfinite(w.radius) || !std::isfinite(w.damage) || w.age<0 || w.radius<0 || w.damage<0) return false;
         for (const auto &h:w.caught) if (h.id<=0 || !std::isfinite(h.age) || h.age<0 || (state.enemy_handles.contains(h.target) && state.enemy_handles.entity_id(h.target)!=h.id)) return false;
     }
@@ -143,11 +149,11 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Soldier)!=(soldier!=nullptr)) return false;
         if (soldier && (!soldier->formation.anchor.is_finite() || soldier->formation.tier<1 || soldier->formation.tier>3 || (state.enemy_handles.contains(soldier->king) && state.enemy_handles.entity_id(soldier->king)!=soldier->king_id))) return false;
         const auto *lynx=std::get_if<LynxState>(&enemy.behavior_state);
-        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr)) return false;
+        if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Lynx)!=(lynx!=nullptr) || (lynx && (!std::isfinite(lynx->last_fire) || (lynx->last_side!=1 && lynx->last_side!=-1)))) return false;
         const auto *corona=std::get_if<CoronaState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Corona)!=(corona!=nullptr)) return false;
         if (corona) {if (!std::isfinite(corona->wait) || !std::isfinite(corona->capture_t) || !corona->center.is_finite()) return false;uint32_t count=0;for (const auto &bucket:corona->types) {if (bucket.definition>=content.definitions.size() || bucket.items.empty()) return false;for (uint32_t slot=0;slot<bucket.items.size();++slot) {const auto h=bucket.items[slot];if (!state.enemy_handles.contains(h)) return false;const auto &member=state.enemies[h.slot].corona;if (!member || member->thrown || member->slot!=slot || member->definition!=bucket.definition || !same_handle(member->owner,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;++count;}}if (count!=corona->count) return false;}
-        if (enemy.corona) {const auto &c=*enemy.corona;if (!enemy.held || !c.serial || c.serial>state.corona_serial || !state.enemy_handles.contains(c.owner) || !std::holds_alternative<CoronaState>(state.enemies[c.owner.slot].behavior_state) || c.definition!=enemy.definition || !c.from.is_finite() || !c.ship_from.is_finite()) return false;for (double x:{c.angle,c.radius,c.life,c.release_fraction,c.damage,c.effect}) if (!std::isfinite(x)) return false;if (c.radius<0 || c.release_fraction<0 || c.release_fraction>1 || c.damage<0 || c.effect<0 || c.attack_token<0) return false;}
+        if (enemy.corona) {const auto &c=*enemy.corona;if (!enemy.held || !c.serial || c.serial>state.corona_serial || c.definition!=enemy.definition || !c.from.is_finite() || !c.ship_from.is_finite()) return false;if (state.enemy_handles.contains(c.owner)) {if (!std::holds_alternative<CoronaState>(state.enemies[c.owner.slot].behavior_state)) return false;} else if (!c.thrown || c.slot>=content.definitions.size() || content.definitions[c.slot].kind!=EnemyDefinition::Kind::Corona) return false;for (double x:{c.angle,c.radius,c.life,c.release_fraction,c.damage,c.effect}) if (!std::isfinite(x)) return false;if (c.radius<0 || c.release_fraction<0 || c.release_fraction>1 || c.damage<0 || c.effect<0 || c.attack_token<0) return false;}
         const auto *pump=std::get_if<PumpState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Pump)!=(pump!=nullptr)) return false;
         if (pump) {if (!std::isfinite(pump->bud_t) || pump->contents.size()>content.pumps[content.definitions[enemy.definition].pump_definition-1].store_max) return false;for (auto id:pump->contents) if (!id || id>content.definitions.size()) return false;}
@@ -156,6 +162,7 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (crab) if (const auto *record=AttackSystem::get(state,crab->sweep)) if (!record->spec.owner.attached || !same_handle(record->spec.owner.live_source,state.enemy_handles.at(uint32_t(state.rows_by_id.at(enemy.id))))) return false;
         const auto *aquila=std::get_if<AquilaState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Aquila)!=(aquila!=nullptr) || (aquila && (!aquila->anchor.is_finite() || !std::isfinite(aquila->bud_t)))) return false;
+        if (aquila) for (const auto &point:aquila->trace) if (!point.pos.is_finite() || !std::isfinite(point.time)) return false;
         const auto *phoenix=std::get_if<PhoenixState>(&enemy.behavior_state);
         if ((content.definitions[enemy.definition].kind==EnemyDefinition::Kind::Phoenix)!=(phoenix!=nullptr) || (phoenix && !phoenix->anchor.is_finite())) return false;
         const auto *marlin=std::get_if<MarlinState>(&enemy.behavior_state);
@@ -196,7 +203,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
         if (shot.kind==int64_t(HostileKind::Slash)) {
             if (shot.slash.definition!=1 || content.slashes.empty() || (shot.slash.side!=1 && shot.slash.side!=-1) ||
                 !shot.pos.is_finite() || !shot.vel.is_finite() || !std::isfinite(shot.radius) || shot.radius<=0 ||
-                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0) return false;
+                !std::isfinite(shot.speed) || shot.speed<0 || !std::isfinite(shot.life) || !std::isfinite(shot.damage) || shot.damage<0 ||
+                shot.slash.lynx_definition>content.lynxes.size() || !std::isfinite(shot.slash.initial_life) || shot.slash.initial_life<0 || !std::isfinite(shot.slash.age) || shot.slash.age<0 || !shot.slash.paw_offset.is_finite()) return false;
         } else if (shot.slash.definition) return false;
         if (shot.kind==int64_t(HostileKind::Bolt)) {
             if (!shot.bolt.definition || shot.bolt.definition>content.bolts.size() || !shot.pos.is_finite() || !shot.vel.is_finite() ||
@@ -230,11 +238,12 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
                 !std::isfinite(beam->half_width) || beam->half_width<0 || !std::isfinite(beam->arc)) return false;
         }
         if (const auto *wall=std::get_if<WallHazard>(&hazard.shape)) {
+            if (wall->trail_visual_owner<0 || (wall->trail_visual_owner==0 && wall->trail_visual_side!=0) || (wall->trail_visual_owner>0 && wall->trail_visual_side!=1 && wall->trail_visual_side!=-1)) return false;
             if (!wall->definition || wall->definition>content.walls.size() || wall->style>=uint32_t(WallStyle::Count) ||
                 !std::isfinite(wall->angle) || !std::isfinite(wall->length) || wall->length<0 || !std::isfinite(wall->half_width) || wall->half_width<0) return false;
         }
         if (const auto *wave=std::get_if<MonocerosWaveHazard>(&hazard.shape)) {
-            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width}) if (!std::isfinite(value) || value<0) return false;
+            for (double value:{wave->radius,wave->maximum,wave->speed,wave->half_angle,wave->width,wave->reference_time,wave->visual_age}) if (!std::isfinite(value) || value<0) return false;
             if (!std::isfinite(wave->angle)) return false;
         }
         if (const auto *wave=std::get_if<WaveHazard>(&hazard.shape)) {
@@ -264,8 +273,8 @@ bool rebuild_state_indexes(godot::RunState &state,const ContentBundle &content) 
     pickups.gem_absorber=-1;pickups.gem_absorber_id=0;
     pickups.rebuild_gem_index();
     for (const auto &pending:state.pending_enemies) if (!pending.definition || pending.definition>content.definitions.size() || !pending.position.is_finite() || !pending.velocity.is_finite() || !std::isfinite(pending.facing) || !std::isfinite(pending.hit_cd) || pending.hit_cd<0 || !std::isfinite(pending.guard) || pending.guard<0 || !std::isfinite(pending.knock) || pending.knock<0 || !std::isfinite(pending.priority)) return false;
-    if (state.loadout.comet_weapon && (state.loadout.comet_weapon>content.equipment.size() || !content.equipment[state.loadout.comet_weapon-1].comet_only || state.loadout.candidates.empty())) return false;
-    for (auto weapon:state.loadout.pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;
+    if (state.loadout->comet_weapon && (state.loadout->comet_weapon>content.equipment.size() || !content.equipment[state.loadout->comet_weapon-1].comet_only || state.loadout->candidates.empty())) return false;
+    for (auto weapon:state.loadout->pending_comet_weapons) if (!weapon || weapon>content.equipment.size() || !content.equipment[weapon-1].comet_only) return false;
     for (const auto &capsule:pickups.capsules) if (!capsule.pos.is_finite() || !std::isfinite(capsule.age) || capsule.age<0 || (capsule.kind==CapsuleKind::CometWeapon && (!capsule.weapon || capsule.weapon>content.equipment.size() || !content.equipment[capsule.weapon-1].comet_only))) return false;
     for (const auto &a:state.attacks.records) if (a.alive && (a.spec.damage_source>content.definitions.size() || a.spec.damage_technique>content.boss_techniques.size())) return false;
     if (!BossFinish::validate(state) || !TechniqueRunner::validate(state,content) || !FlowRunner::validate(state,content) || !PhaseController::validate(state,content)) return false;

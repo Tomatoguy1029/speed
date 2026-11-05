@@ -5,6 +5,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attacks/cross.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

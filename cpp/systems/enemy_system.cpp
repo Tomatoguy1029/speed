@@ -17,6 +17,7 @@
 #include "../output/frame_builder.h"
 #include "../output/event_builder.h"
 #include "../output/recording_builder.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

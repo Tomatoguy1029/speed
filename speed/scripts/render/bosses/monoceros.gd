@@ -1,6 +1,17 @@
 ## 世界時間で頭から胴体・尾へ旋回を伝え、攻撃の向きは戦闘方向へ同期する。
 extends Node2D
 const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
+const REFERENCE_SETTINGS := preload("res://data/visuals/fx_reference.tres")
+const REFERENCE_BOOST := preload("res://scripts/render/bosses/monoceros_boost.gd")
+const REFERENCE_SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
+const REFERENCE_SWEEP := preload("res://scripts/render/bosses/monoceros_sweep_slash.gd")
+const REFERENCE_LANCE := preload("res://scripts/render/bosses/monoceros_lance.gd")
+const REFERENCE_WAVE := preload("res://scripts/render/bosses/monoceros_wave.gd")
+const REFERENCE_BURN := preload("res://scripts/render/bosses/monoceros_burn.gd")
+const REFERENCE_SPARKS := preload("res://scripts/render/bosses/monoceros_sparks.gd")
+const REFERENCE_BREATH := preload("res://scripts/render/bosses/monoceros_breath.gd")
+const HORN_LIGHT_SHADER := preload("res://shaders/monoceros_horn_light.gdshader")
+const REFERENCE_WHITE_SHADER := preload("res://shaders/fx_reference_white.gdshader")
 @export var pixel_size := 3.0
 @export var booster_length_scale := 1.0
 @export var booster_core_color := Color("#e0fbff")
@@ -36,16 +47,102 @@ var _flame_facing := 0.0
 var _horn_source_seconds := 0.0
 var _horn_durations: PackedFloat32Array
 var _horn_lengths: PackedFloat32Array
+var _reference_canvas
+var _reference_boost
+var _reference_lance
+var _reference_id := "I-charge"
+var _horn_visual := 0.0
+var _horn_overlay: Sprite2D
+var _armor_overlay: Sprite2D
+var _image_nodes: Array[Node2D] = []
+var _image_sprites: Array[Sprite2D] = []
+var _ram_white := 0.0
+var _ram_white_material: ShaderMaterial
+var _ram_white_sprites: Array[Dictionary] = []
 @onready var parts: PartsVisual = $Parts
 @onready var horn: Sprite2D = $Parts/Head/Lower/Horn
 
 func _ready() -> void:
+	_collect_image_nodes(self)
+	_create_ram_white()
 	EFFECT_SETTINGS.apply_key(self, "boss/body/monoceros")
 	z_index = 8
+	_reference_lance = REFERENCE_LANCE.new()
+	_reference_lance.z_index = 1
+	add_child(_reference_lance)
+	_reference_boost = REFERENCE_BOOST.new()
+	_reference_boost.z_index = -1
+	add_child(_reference_boost)
+	_horn_overlay = _make_light_overlay(horn)
+	(_horn_overlay.material as ShaderMaterial).shader = preload("res://shaders/monoceros_horn_only_light.gdshader")
+	_armor_overlay = _make_light_overlay(parts.get_node("Head/Lower/Sprite/head_gold_armor") as Sprite2D)
 	material = preload("res://scripts/bosses/boss_hit_feedback.gd").new().make_material()
 
+## 生成時と同じ深さ優先順を、演出用子Spriteの追加前に記録する。
+func _collect_image_nodes(parent: Node) -> void:
+	for child in parent.get_children():
+		if child is Node2D:
+			_image_nodes.append(child)
+			if child is Sprite2D: _image_sprites.append(child)
+		_collect_image_nodes(child)
+
+## G10の白は、法線付き本体画像のalphaにだけ元の強さで加算する。
+func _create_ram_white() -> void:
+	_ram_white_material = ShaderMaterial.new()
+	_ram_white_material.shader = REFERENCE_WHITE_SHADER
+	for source: Sprite2D in _image_sprites:
+		var overlay := Sprite2D.new()
+		overlay.material = _ram_white_material
+		overlay.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		source.add_child(overlay)
+		_ram_white_sprites.append({"source":source,"overlay":overlay})
+	_sync_ram_white()
+
+func set_reference_hit(white: float) -> void:
+	_ram_white = clampf(white,0.0,1.0)
+	_sync_ram_white()
+
+func _sync_ram_white() -> void:
+	if _ram_white_material == null: return
+	_ram_white_material.set_shader_parameter("strength",_ram_white)
+	for entry: Dictionary in _ram_white_sprites:
+		var source: Sprite2D = entry.source
+		var overlay: Sprite2D = entry.overlay
+		overlay.visible = _ram_white>0.0 and source.texture!=null
+		if not overlay.visible: continue
+		overlay.texture = source.texture
+		overlay.centered = source.centered
+		overlay.offset = source.offset
+		overlay.flip_h = source.flip_h
+		overlay.flip_v = source.flip_v
+		overlay.hframes = source.hframes
+		overlay.vframes = source.vframes
+		overlay.frame = source.frame
+		overlay.region_enabled = source.region_enabled
+		overlay.region_rect = source.region_rect
+		overlay.self_modulate.a = source.self_modulate.a
+
+func _make_light_overlay(source: Sprite2D) -> Sprite2D:
+	var light := Sprite2D.new()
+	light.texture = source.texture
+	light.centered = source.centered
+	light.offset = source.offset
+	light.flip_h = source.flip_h
+	light.flip_v = source.flip_v
+	light.hframes = source.hframes
+	light.vframes = source.vframes
+	light.frame = source.frame
+	light.region_enabled = source.region_enabled
+	light.region_rect = source.region_rect
+	var shader := ShaderMaterial.new()
+	shader.shader = HORN_LIGHT_SHADER
+	light.material = shader
+	light.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	source.add_child(light)
+	return light
+
 func frame_event(event: Dictionary) -> void:
-	if event.get("type",&"")==&"combat_damage":
+	if event.get("type",&"")==&"combat_damage" and event.get("cause",&"")!=&"ram":
 		hit = 0.18
 		_sync_parts(0.0)
 		queue_redraw()
@@ -59,8 +156,11 @@ func apply_frame(body: Dictionary, attack: Dictionary = {}, colors: Dictionary =
 		_head_facing = _body_facing
 		_tail_facing = _body_facing
 		_flame_facing = _body_facing
+		_horn_visual = 0.0
 	state = body
 	technique = attack
+	var move := String(attack.get("technique", ""))
+	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
 	appearance = colors
 	_world_clock = float(body.clock)
 	position = body.position
@@ -94,14 +194,17 @@ func _sync_parts(dt: float) -> void:
 	parts.apply_appearance(appearance)
 	# 角を使う全技で同じ光を絵に乗せ、首の振りと外観の位置補正へ追従させる。
 	var horn_glow := _horn_glow()
-	var horn_light := 1.0 + horn_glow * 3.0
-	var horn_tint := Color(horn_light, horn_light, horn_light)
-	parts.get_node("Head/Lower/Sprite/head_gold_armor").self_modulate = horn_tint
+	_horn_visual = horn_glow if horn_glow > _horn_visual else maxf(horn_glow, _horn_visual-dt/0.22)
+	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
+	var brightness := _horn_visual * (float(values.hornBright) if int(state.phase) > 1 else 1.0) * 0.65
+	(_horn_overlay.material as ShaderMaterial).set_shader_parameter("strength", brightness)
+	(_armor_overlay.material as ShaderMaterial).set_shader_parameter("strength", brightness)
 	_update_turn(dt)
 	# 胴体中心を固定して見た目だけ遅らせる。移動・判定・予告線は役者の方向を使う。
 	parts.rotation = -PI * 0.5 + angle_difference(float(state.facing), _body_facing)
 	var reaction := {"white":0.0,"angle":0.0,"offset":Vector2.ZERO}
-	if hit_feedback!=null: reaction = hit_feedback.sample(int(state.actor))
+	if state.has("image_feedback"): reaction = state.image_feedback
+	elif hit_feedback!=null: reaction = hit_feedback.sample(int(state.actor))
 	material.set_shader_parameter("boss_hit_white",reaction.white)
 	parts.rotation += reaction.angle
 	parts.position = -Vector2(0, -37).rotated(parts.rotation) * k + reaction.offset
@@ -123,7 +226,52 @@ func _sync_parts(dt: float) -> void:
 		if not _leg_rest.has(path): _leg_rest[path] = foot.position.y
 		foot.position.y = float(_leg_rest[path])
 	_kick_pose()
-	_sync_horn(dt, k, horn_tint)
+	_charge_pose()
+	_sync_horn(dt, k)
+	_apply_image_pose(state.get("image_node_poses",[]),state.get("image_parts",[]),reaction)
+	_sync_ram_white()
+	_sync_lance()
+
+## 本番が画像境界に使った全関節を、そのまま表示とFXの基点にも使う。
+func _apply_image_pose(node_poses: Array, sprites: Array, reaction: Dictionary) -> void:
+	if node_poses.is_empty(): return
+	for entry: Dictionary in node_poses:
+		var index := int(entry.node)-1
+		if index < 0 or index >= _image_nodes.size(): continue
+		_image_nodes[index].global_transform = entry.transform
+		_image_nodes[index].visible = bool(entry.visible)
+	for entry: Dictionary in sprites:
+		var index := int(entry.part)-1
+		if index < 0 or index >= _image_sprites.size(): continue
+		var sprite := _image_sprites[index]
+		var region := Rect2(entry.region)
+		if sprite == horn:
+			var frame_width := horn.texture.get_width()/float(horn.hframes)
+			horn.frame = clampi(floori(region.position.x/frame_width),0,horn.hframes-1)
+			_horn_overlay.frame = horn.frame
+		elif sprite.get_parent().name == &"Sprite" and sprite.get_parent().get_parent().name == &"Foot":
+			var animation := &"armor" if sprite.name == &"Armor" else &"run"
+			for frame in parts.gait.get_frame_count(animation):
+				var texture := parts.gait.get_frame_texture(animation,frame)
+				if texture is AtlasTexture and texture.region == region:
+					sprite.texture = texture
+					break
+	_tail_facing = (parts.get_node("TailBooster") as Node2D).global_rotation + PI*0.5 - float(reaction.angle)
+
+## 突進の構えと発進は本体と足の見た目だけを動かす。
+func _charge_pose() -> void:
+	var move := String(technique.get("technique", ""))
+	var aimed := move in ["charge", "return_charge", "horn_dance"]
+	var prepare := smoothstep(0.0, 0.62, float(technique.get("windup_progress", 0.0))) if aimed and _mode() == &"windup" and int(technique.get("sequence_stage", 0)) == 0 else 0.0
+	var elapsed := float(technique.get("fx_boost_elapsed", 0.0))
+	var release := 1.0 - smoothstep(0.035, 0.14, elapsed) if aimed and String(technique.get("fx_boost_stage", "")) == "run" else 0.0
+	var head := parts.get_node("Head") as Node2D
+	var body := parts.get_node("Body") as Node2D
+	head.position = parts.rest_position("Head") + Vector2(0, -prepare*5.0 + release*3.0)
+	body.position = parts.rest_position("Body") + Vector2(0, -prepare*2.0 + release*2.0)
+	for path: String in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
+		var foot := parts.get_node(path) as Node2D
+		foot.position += Vector2(0, -prepare*7.0 + release*3.0)
 
 ## 後脚は表示専用。C++の進行値から同じ姿勢を組み直せる。
 func _kick_pose() -> void:
@@ -150,7 +298,7 @@ func _kick_pose() -> void:
 			foot.position.y = lerpf(lerpf(KICK_FOLD,rest,extend),rest,back)
 			leg.scale.y = lerpf(lerpf(1.0,maxf(1.0,toward.length()/natural),extend),1.0,back)
 
-func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
+func _sync_horn(_dt: float, body_scale: float) -> void:
 	var progress: float = state.phase_progress
 	horn.frame = 0
 	if state.phase>=2:
@@ -162,9 +310,19 @@ func _sync_horn(_dt: float, body_scale: float, tint: Color) -> void:
 	var root := to_local(horn.global_position)
 	var axis := (to_local(horn.to_global(Vector2.DOWN))-root).normalized()
 	horn.scale.y = maxf(1.0,float(state.horn_length)-root.dot(axis))/(body_scale*_horn_lengths[horn.frame])
-	horn.self_modulate = tint
+	_horn_overlay.texture = horn.texture
+	_horn_overlay.hframes = horn.hframes
+	_horn_overlay.vframes = horn.vframes
+	_horn_overlay.frame = horn.frame
 	var source := parts.get_node("Head/Lower/Sprite/head_gold_armor").material as ShaderMaterial
 	for key in ["painted","paint"]: (horn.material as ShaderMaterial).set_shader_parameter(key,source.get_shader_parameter(key))
+
+func _sync_lance() -> void:
+	var form := float(technique.get("form",0.0)) if technique.get("technique","")=="lance" else 0.0
+	var root := to_local(horn.global_position)
+	var axis := (to_local(horn.to_global(Vector2.DOWN))-root).normalized()
+	var tip := root+axis*maxf(1.0,float(state.horn_length)-root.dot(axis))
+	_reference_lance.apply_reference(root,tip,axis,form,float(technique.get("head_length",0.0)))
 
 func _horn_glow() -> float:
 	if technique.get("technique","") in ["lance","return_charge","horn_wave","horn_dance","sword_flash"]: return float(technique.get("glow",0.0)) if _mode() in [&"windup",&"active"] else 0.0
@@ -210,31 +368,75 @@ func booster_strength() -> float:
 	if technique.has("booster"): return float(technique.booster)
 	return 2.5 if _mode() == &"active" and StringName(technique.get("technique","")) in [&"charge", &"return_charge"] else 0.55
 
-func _booster() -> void:
-	var strength := booster_strength()
-	if strength <= 0.0: return
-	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
-	var anchor := to_local(nozzle.to_global(Vector2(37, 0))) / (float(state.radius) / 96.0)
-	var length := (50.0 + sin(float(state.clock) * 27.0) * 9.0) * strength * booster_length_scale
-	var root_angle := _tail_facing - float(state.facing) + PI
-	var tip_angle := _flame_facing - float(state.facing) + PI
-	for layer in 3:
-		var factor := 1.0 - float(layer) * 0.24
-		var center := anchor
-		for j in 12:
-			var t := float(j) / 12.0
-			var height := maxf(pixel_size, (24.0 - t * 22.0) * factor)
-			var direction := Vector2.from_angle(lerp_angle(root_angle, tip_angle, t * t))
-			var next := center + direction * length * factor / 12.0
-			var side := direction.orthogonal()
-			var wobble := side * sin(float(state.clock) * 20.0 - t * 8.0) * 7.0 * t * factor
-			var thickness := side.abs() * height
-			var at := (center.min(next) + wobble - thickness * 0.5).snapped(Vector2.ONE * pixel_size)
-			var size := ((next - center).abs() + thickness).snapped(Vector2.ONE * pixel_size).max(Vector2.ONE * pixel_size)
-			draw_rect(Rect2(at, size), [Color("#245c96"), Color("#61c9ff"), booster_core_color][layer])
-			center = next
+## 共通ホストから画素変換を受け取り、技の値と本体の姿勢を同じフレームで描く。
+func set_reference_canvas(canvas) -> void:
+	_reference_canvas = canvas
 
-func _draw() -> void:
-	if state.is_empty(): return
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE * (float(state.radius) / 96.0))
-	_booster()
+func draw_reference(canvas, _real_dt: float) -> void:
+	if state.is_empty() or not is_instance_valid(_reference_boost): return
+	var move := String(technique.get("technique", ""))
+	if not move.is_empty() and not REFERENCE_SETTINGS.for_id("I-" + move).is_empty(): _reference_id = "I-" + move
+	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
+	_draw_charge_tell(canvas, move)
+	var burn_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_dance")
+	for burn: Dictionary in state.get("monoceros_burns",[]):
+		REFERENCE_BURN.draw(canvas,burn.position,float(state.clock)-float(burn.started),burn_values)
+	# 前面の重なり順も元の monoDraw に合わせる。
+	var wave_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_wave")
+	for wave: Dictionary in state.get("horn_waves",[]): REFERENCE_WAVE.draw(canvas,wave,wave_values)
+	var slash_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sword_flash")
+	for slash: Dictionary in state.get("sword_slashes",[]):
+		REFERENCE_SLASH.draw(canvas,slash.from,slash.to,float(slash.width),float(state.clock)-float(slash.started),0.6,float(slash.seed),slash_values)
+	var lance_values: Dictionary = REFERENCE_SETTINGS.for_id("I-lance")
+	for breath: Dictionary in state.get("monoceros_breaths",[]):
+		if int(breath.preset)==1:
+			REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),lance_values)
+	var sweep_values: Dictionary = REFERENCE_SETTINGS.for_id("I-sweep")
+	for sweep: Dictionary in state.get("sweep_visuals",[]):
+		REFERENCE_SWEEP.draw(canvas,sweep.points,float(state.clock)-float(sweep.started),float(sweep.duration),sweep_values,sweep.motes)
+	for shatter: Dictionary in state.get("monoceros_shatters",[]):
+		REFERENCE_SPARKS.draw(canvas,shatter.position,float(state.clock)-float(shatter.started),lance_values)
+	var kick_values: Dictionary = REFERENCE_SETTINGS.for_id("I-kick")
+	for breath: Dictionary in state.get("monoceros_breaths",[]):
+		if int(breath.preset)==0:
+			REFERENCE_BREATH.draw(canvas,breath.position,float(breath.direction),float(state.clock)-float(breath.started),float(breath.seed),float(breath.spread),float(breath.reach),kick_values)
+	var nozzle := parts.get_node("TailBooster/Sprite/booster") as Node2D
+	var overlap := Vector2.from_angle(_tail_facing) * (24.0 * float(state.radius) / 96.0)
+	var anchor := to_local(nozzle.to_global(Vector2(37, 0)) + overlap)
+	_reference_boost.apply_reference_frame(float(state.clock), float(state.radius), move,
+		String(technique.get("fx_boost_stage", "other")), state.velocity,
+		float(technique.get("fx_boost_travel", 0.0)), float(technique.get("fx_boost_run_speed", 0.0)),
+		float(technique.get("fx_boost_approach_speed_max", 0.0)), values, float(canvas.world_scale),
+		anchor, _tail_facing - float(state.facing))
+
+## 試作のmulberry32を、足ごと・時刻ごとの同じ種で使う。
+func _charge_random(state0: int) -> Array:
+	var a := (state0 + 0x6d2b79f5) & 0xffffffff
+	var t := ((a ^ (a >> 15)) * (a | 1)) & 0xffffffff
+	t = (t ^ (t + (((t ^ (t >> 7)) * (t | 61)) & 0xffffffff))) & 0xffffffff
+	return [a, float((t ^ (t >> 14)) & 0xffffffff) / 4294967296.0]
+
+func _draw_charge_tell(canvas, move: String) -> void:
+	if move not in ["charge", "return_charge", "horn_dance"] or _mode() != &"windup" or int(technique.get("sequence_stage", 0)) != 0: return
+	var charge := smoothstep(0.0, 0.62, float(technique.get("windup_progress", 0.0)))
+	var clock := float(state.clock)
+	var back := -Vector2.from_angle(float(state.facing))
+	for path: String in ["FrontLeftLeg/Foot", "FrontRightLeg/Foot"]:
+		var foot := parts.get_node(path) as Node2D
+		var at: Vector2 = canvas.to_logical(foot.global_position)
+		canvas.back.glow(at.x, at.y, 3.0, Color("#f2a03a"), charge*0.35)
+		for j in 5:
+			var seed := floori(clock*12.0)*13+j+path.length()*7
+			var first := _charge_random(seed if seed != 0 else 1)
+			var second := _charge_random(first[0])
+			var age := fposmod(clock*12.0,1.0)/12.0+j*0.02
+			var distance := lerpf(4.0,14.0,first[1])*charge
+			var angle := back.angle()+lerpf(-0.6,0.6,second[1])
+			var direction := Vector2.from_angle(angle)
+			var point := at+direction*distance
+			if charge > 0.15:
+				canvas.back.line(point.x-direction.x*2.0,point.y-direction.y*2.0,point.x,point.y,func(u: float): return Color("#fff3c0") if u > 0.5 else Color("#f2a03a"),charge*(1.0-age*4.0))
+	var tail: Vector2 = canvas.to_logical(state.position - Vector2.from_angle(float(state.facing))*float(state.radius)*0.95)
+	var pulse := 0.6 + 0.4*sin(clock*(12.0+20.0*charge))
+	canvas.front.glow(tail.x,tail.y,5.0+9.0*charge*pulse,Color("#6fc4ff"),(0.3+0.5*charge)*pulse)
+	canvas.front.glow(tail.x,tail.y,2.0+3.0*charge,Color("#e4f6ff"),0.6*charge)

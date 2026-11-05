@@ -7,6 +7,7 @@ extends EditorPlugin
 
 const Request := preload("res://addons/stage_launcher/launch_request.gd")
 const FireInspector := preload("res://addons/stage_launcher/fire_inspector.gd")
+const GATE := preload("res://addons/runtime_library/run_gate.gd")
 const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 const MENU_SEPARATORS := ["試遊", "表示制作", "計測"]
 const SEPARATOR_IDS := [0x535001, 0x535002, 0x535003]
@@ -97,7 +98,7 @@ func _on_menu_separator() -> void:
 
 func _add_scene(label: String, key: String) -> void:
 	if ResourceLoader.exists(SCENES[key]):
-		_add_menu_item(label, EditorInterface.play_custom_scene.bind(SCENES[key]))
+		_add_menu_item(label, GATE.play_scene.bind(SCENES[key]))
 
 func _add_menu_item(label: String, action: Callable) -> void:
 	add_tool_menu_item(label, action)
@@ -149,7 +150,7 @@ func _on_pressed() -> void:
 
 func _on_lab_pressed() -> void:
 	print("[Stage Launcher] 実験場を起動します")
-	EditorInterface.play_custom_scene(LAB_SCENE)
+	GATE.play_scene(LAB_SCENE)
 
 func _on_visual_pressed() -> void:
 	var path: String = SCENES.visual
@@ -158,7 +159,7 @@ func _on_visual_pressed() -> void:
 		return
 	print("[Stage Launcher] ビジュアル編集を起動します")
 	OS.set_environment("SPEED_VISUAL_EDITOR_SCREEN", str(DisplayServer.window_get_current_screen()))
-	EditorInterface.play_custom_scene(path)
+	GATE.play_scene(path)
 	await get_tree().process_frame
 	if not is_inside_tree(): return
 	if EditorInterface.get_playing_scene() != path:

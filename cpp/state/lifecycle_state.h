@@ -1,5 +1,6 @@
 #pragma once
-#include "loadout_state.h"
+#include "equipment_level.h"
+#include <vector>
 #include "combat_types.h"
 #include <optional>
 namespace speed {

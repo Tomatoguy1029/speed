@@ -4,6 +4,7 @@
 #include "../behaviors/enemies/defender.h"
 #include "../behaviors/enemies/crow.h"
 #include "attack_system.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

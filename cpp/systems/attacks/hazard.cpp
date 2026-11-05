@@ -6,6 +6,9 @@
 #include "wave.h"
 #include "wall.h"
 #include "zone.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "../../bosses/hydra/state.h"
 #include <cmath>
 #include <algorithm>
 namespace speed {
@@ -26,7 +29,7 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         static const char *shape_names[]={"circle","beam","wave","wall","monoceros_wave","canis_flame","hound_lunge","hydra_shape"};
         MetricsDetailTimer measured(run.frame_workspace.metrics,"hazards.",shape_names[hazard.shape.index()]);
         auto *hydra=std::get_if<HydraShapeHazard>(&hazard.shape);
-        if (hydra && state.bosses.body_handles.contains(record->spec.boss)) {const auto &b=state.bosses.bodies[record->spec.boss.slot];if (run.content->bosses[run.content->boss_bodies[b.definition-1].boss-1].kind==3 && !b.hydra.attack_field_advance) continue;}
+        if (hydra && state.bosses->body_handles.contains(record->spec.boss)) {const auto &b=state.bosses->bodies[record->spec.boss.slot];if (run.content->bosses[run.content->boss_bodies[b.definition-1].boss-1].kind==3 && !b.hydra->attack_field_advance) continue;}
         const double time=hydra?(hydra->age+=dt):double(hazard.time)+dt,delay=hydra?hydra->delay:hazard.delay,life=hydra?hydra->life:hazard.duration;hazard.time=time;
         const auto owner=record->spec.owner.live_source;
         const bool owner_ended=record->spec.owner.attached && (!state.enemy_handles.contains(owner) || state.enemies[owner.slot].dead || state.enemy_handles.contains(state.enemies[owner.slot].pump_owner));

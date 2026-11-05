@@ -1,0 +1,15 @@
+{
+  "records": [{
+    "name": "CanisImagePartDefinition", "section": 363,
+    "fields": [
+      {"name":"id","type":"u32","min":1},
+      {"name":"name","type":"string"},
+      {"name":"mask","type":"u32","min":1},
+      {"name":"x","type":"f64"}, {"name":"y","type":"f64"},
+      {"name":"sprite_x","type":"f64"}, {"name":"sprite_y","type":"f64"},
+      {"name":"width","type":"u32","min":1}, {"name":"height","type":"u32","min":1},
+      {"name":"flip_h","type":"bool"}, {"name":"visible","type":"bool"}
+    ]
+  }],
+  "enums": {}
+}

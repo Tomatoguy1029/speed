@@ -2,6 +2,7 @@ extends Control
 
 signal back_requested
 signal rotation_changed(radians: float)
+signal scroll_changed(offset: float)
 
 const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
@@ -9,6 +10,11 @@ const SYMBOL_ORBIT := Vector2(112, 84)
 const SYMBOL_OFFSET := Vector2(-1, -0.5)
 const SELECTION_RECT := Rect2(141, 207, 112, 59)
 const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
+const DRAGON_INDEX := 4
+const DRAGON_ORIGIN := Vector2(77, 270)
+const DRAGON_RECT := Rect2(95, 130, 45, 152)
+const DRAGON_ART := preload("res://assets/ui/map/dragon_dragon.png")
+const DRAGON_SCROLL := 280.0
 const DRAG_THRESHOLD := 4.0
 const REVEAL_SETTINGS := preload("res://data/map_reveal_settings.tres")
 const STAR_PHASES := [
@@ -48,10 +54,18 @@ var _status: Label
 var _launch: Button
 var _back: Button
 var _final_stage: Button
+var _map_content: Control
+var _page_button: Button
+var _page_arrow: TextureRect
+var _dragon_page: Control
+var _dragon_frame: TextureRect
+var _dragon_preview: TextureRect
+var _scroll: Tween
 var _launch_requested := false
 ## 制作プレビューでは選択と演出だけを使う。
 var navigation_enabled := true
 var _selected := 0
+var _last_orbit_selection := 0
 var _angle := 0.0
 var _turn: Tween
 var _projection: Node2D
@@ -86,11 +100,14 @@ func _ready() -> void:
 		layer.modulate.a = 0.4
 		_star_phases.append(layer)
 	_update_star_phases()
+	_map_content = Control.new()
+	_map_content.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_map_content)
 	var projection := Node2D.new()
 	_projection = projection
 	projection.position = ORIGIN
 	projection.scale = Vector2(1, 0.5)
-	add_child(projection)
+	_map_content.add_child(projection)
 	_inner1 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle1.png"))
 	_inner1.offset = Vector2(48, 1)
 	_inner2 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle2.png"))
@@ -104,7 +121,7 @@ func _ready() -> void:
 		star.tooltip_text = tr("stage.%d.name" % (i + 1))
 		star.pressed.connect(select_constellation.bind(i))
 		star.focus_entered.connect(_on_stage_focus.bind(i))
-		add_child(star)
+		_map_content.add_child(star)
 		_stars.append(star)
 	_selection_frame = TextureRect.new()
 	_selection_frame.texture = preload("res://assets/ui/map/selection_highlight.png")
@@ -113,7 +130,7 @@ func _ready() -> void:
 	_selection_frame.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_selection_frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_selection_frame.z_index = 15
-	add_child(_selection_frame)
+	_map_content.add_child(_selection_frame)
 	var back_fill := Polygon2D.new()
 	back_fill.polygon = PackedVector2Array([Vector2(9, 9), Vector2(46, 9), Vector2(74, 34), Vector2(9, 34)])
 	back_fill.color = Color("1f323d")
@@ -156,14 +173,8 @@ func _ready() -> void:
 			_refresh_stage_visibility()
 			_reveal_details()
 		)
-	if ContentManager.stage_count() > 4:
-		var final_stage := _button(tr("stage.5.name"), Vector2(224, 333), Vector2(150, 16))
-		_final_stage = final_stage
-		final_stage.add_theme_font_size_override("font_size", 11)
-		_transparent_button(final_stage)
-		final_stage.size = Vector2(150, 16)
-		final_stage.pressed.connect(select_constellation.bind(4))
-		final_stage.focus_entered.connect(_on_stage_focus.bind(4))
+	if ContentManager.stage_count() > DRAGON_INDEX:
+		_build_dragon_page()
 	get_window().focus_exited.connect(func():
 		if _dragging:
 			select_constellation(_nearest_visible_star(_angle))
@@ -185,6 +196,44 @@ func _ready() -> void:
 			_cancel_drag()
 			_hide_details()
 	)
+
+func _build_dragon_page() -> void:
+	_dragon_page = Control.new()
+	_dragon_page.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_map_content.add_child(_dragon_page)
+	var wormhole := _artwork(preload("res://assets/ui/map/dragon_wormhole.png"), _dragon_page)
+	var dragon := _artwork(DRAGON_ART, _dragon_page)
+	_dragon_frame = _artwork(preload("res://assets/ui/map/dragon_select_box.png"), _dragon_page)
+	for art: TextureRect in [wormhole, dragon, _dragon_frame]:
+		art.size = art.texture.get_size()
+		art.position = DRAGON_ORIGIN
+	_final_stage = _button("", DRAGON_ORIGIN + DRAGON_RECT.position, DRAGON_RECT.size)
+	_final_stage.reparent(_map_content)
+	_final_stage.tooltip_text = tr("stage.5.name")
+	_transparent_button(_final_stage)
+	_final_stage.pressed.connect(select_constellation.bind(DRAGON_INDEX))
+	var portrait := AtlasTexture.new()
+	portrait.atlas = DRAGON_ART
+	portrait.region = DRAGON_RECT
+	_dragon_preview = _artwork(portrait, _details)
+	_dragon_preview.position = Vector2(447, 83)
+	_dragon_preview.size = Vector2(143, 92)
+	_dragon_preview.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	var arrow_texture := AtlasTexture.new()
+	arrow_texture.atlas = preload("res://assets/ui/map/selection_screen_ui_down_buttons.png")
+	arrow_texture.region = Rect2(186, 304, 25, 26)
+	_page_arrow = _artwork(arrow_texture, self)
+	_page_arrow.position = Vector2(186, 304)
+	_page_arrow.size = arrow_texture.get_size()
+	_page_button = _button("", _page_arrow.position, _page_arrow.size)
+	_transparent_button(_page_button)
+	_page_button.pressed.connect(func():
+		select_constellation(_last_orbit_selection if _selected == DRAGON_INDEX else DRAGON_INDEX)
+	)
+
+func _set_scroll(offset: float) -> void:
+	_map_content.position.y = -roundf(offset)
+	scroll_changed.emit(-_map_content.position.y)
 
 func _artwork(texture: Texture2D, parent: Control) -> TextureRect:
 	var art := TextureRect.new()
@@ -262,12 +311,20 @@ func _label(at: Vector2, dimensions: Vector2, font_size: int) -> Label:
 func select_constellation(index: int) -> void:
 	if index < 0 or index >= _visible_stage_count():
 		return
+	if _selected < DRAGON_INDEX and index == DRAGON_INDEX:
+		_last_orbit_selection = _selected
 	if index != _selected:
 		AudioManager.play(&"stage_select_click", -10.0)
 	if _turn != null:
 		_turn.kill()
 	_hide_details()
 	_select(index)
+	var target_scroll := DRAGON_SCROLL if index == DRAGON_INDEX else 0.0
+	if _scroll != null:
+		_scroll.kill()
+	if target_scroll != -_map_content.position.y:
+		_scroll = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+		_scroll.tween_method(_set_scroll, -_map_content.position.y, target_scroll, 0.55)
 	_focus_selected()
 	if index >= SYMBOL_TEXTURES.size():
 		_reveal_details()
@@ -281,21 +338,17 @@ func _on_stage_focus(index: int) -> void:
 	if not _pointer_down and index != _selected:
 		select_constellation(index)
 
-## 回転中の星座と、円の外の最終ステージを実際の左右位置でたどる。
+## 回転中の星座を実際の左右位置でたどる。
 func _horizontal_neighbor(direction: int) -> int:
-	var buttons: Array[Control] = []
-	buttons.assign(_stars)
-	if _final_stage != null:
-		buttons.append(_final_stage)
-	var from_x := buttons[_selected].get_global_rect().get_center().x
+	var from_x := _stars[_selected].get_global_rect().get_center().x
 	var nearest := _selected
 	var nearest_distance := INF
 	var wrapped := _selected
 	var wrap_edge := INF
-	for i in buttons.size():
-		if i == _selected or not buttons[i].visible:
+	for i in _stars.size():
+		if i == _selected or not _stars[i].visible:
 			continue
-		var x := buttons[i].get_global_rect().get_center().x
+		var x := _stars[i].get_global_rect().get_center().x
 		var distance := (x - from_x) * direction
 		# 同じ縦軸の星座を、浮動小数の誤差で左右の隣と見なさない。
 		if distance > 0.5 and distance < nearest_distance:
@@ -318,16 +371,19 @@ func _input(event: InputEvent) -> void:
 		if event.is_pressed() and not event.is_echo():
 			_cancel_drag()
 			if event.is_action(&"ui_left") or event.is_action(&"ui_right"):
-				select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
+				if _selected != DRAGON_INDEX:
+					select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
 			else:
 				var step := -1 if event.is_action(&"ui_up") else 1
 				select_constellation(posmod(_selected + step, _visible_stage_count()))
 		return
 	# 戻るにフォーカスがあるときは標準の決定を使い、それ以外は選択中の出撃。
-	if event.is_action(&"ui_accept") and focus != _back and (focus == null or focus != _debug_unlock):
+	if event.is_action(&"ui_accept") and focus != _back and (focus == null or focus != _page_button) and (focus == null or focus != _debug_unlock):
 		get_viewport().set_input_as_handled()
 		if event.is_pressed() and not event.is_echo():
 			_start()
+		return
+	if _selected == DRAGON_INDEX or (_scroll != null and _scroll.is_running()):
 		return
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT:
 		var point: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
@@ -394,6 +450,15 @@ func _select(index: int) -> void:
 	_preview.texture = PREVIEW_ART[index] if index < PREVIEW_ART.size() else null
 	_preview_stars.texture = PREVIEW_STARS[index] if index < PREVIEW_STARS.size() else null
 	_selection_frame.visible = index < SYMBOL_TEXTURES.size()
+	if _final_stage != null:
+		var dragon_selected := index == DRAGON_INDEX
+		_dragon_preview.visible = dragon_selected
+		_dragon_frame.visible = dragon_selected
+		_final_stage.focus_mode = Control.FOCUS_ALL if dragon_selected else Control.FOCUS_NONE
+		_page_arrow.flip_v = dragon_selected
+		_page_button.tooltip_text = "星図に戻る" if dragon_selected else tr("stage.5.name")
+		for star in _stars:
+			star.focus_mode = Control.FOCUS_NONE if dragon_selected else Control.FOCUS_ALL
 	_launch.disabled = not navigation_enabled
 	_status.text = tr("stage_select.debug") if _debug_unlock != null and _debug_unlock.button_pressed else tr("stage_select.available")
 	_apply_rotation(_angle)
@@ -415,8 +480,6 @@ func _apply_rotation(degrees: float) -> void:
 		star.position = _origin + SYMBOL_OFFSET + Vector2(cos(angle), depth * _flatten) * SYMBOL_ORBIT - SYMBOL_TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
-	if _final_stage != null:
-		_final_stage.add_theme_color_override("font_color", CYAN if _selected == 4 else Color.WHITE)
 
 func set_transition(progress: float) -> void:
 	_transition_progress = progress
@@ -446,7 +509,10 @@ func _refresh_stage_visibility() -> void:
 	for i in _stars.size():
 		_stars[i].visible = i < count
 	if _final_stage != null:
-		_final_stage.visible = count > _stars.size()
+		_final_stage.visible = count > DRAGON_INDEX
+		_page_button.visible = _final_stage.visible
+		_page_arrow.visible = _final_stage.visible
+		_dragon_page.visible = _final_stage.visible
 	if _selected >= count:
 		select_constellation(0)
 	else:
@@ -476,7 +542,7 @@ func _focus_selected() -> void:
 		_final_stage.grab_focus()
 
 func _start() -> void:
-	if not navigation_enabled or _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()):
+	if not navigation_enabled or _launch_requested or GameManager.screen_transition_active or (_turn != null and _turn.is_running()) or (_scroll != null and _scroll.is_running()):
 		return
 	if _selected < _visible_stage_count():
 		_launch_requested = true

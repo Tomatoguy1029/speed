@@ -13,6 +13,7 @@ var batches: Dictionary = {}
 var parts: Dictionary = {}
 var enemy_frames: Dictionary = {}
 var _layers: Dictionary = {}
+var _ship_layer_parent: Node2D
 var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
 var _wave_displays: Dictionary = {}
@@ -88,6 +89,12 @@ var _picaro_material: ShaderMaterial
 const BOSS_FINAL_BEAM := preload("res://scenes/render/boss_final_beam.tscn")
 var _boss_final_beams := {}
 var _boss_body_displays := {}
+var _reference_layer: RefCounted
+var _enemy_reference = preload("res://scripts/render/enemies/enemy_reference.gd").new()
+var _hound_warning_displays := {}
+var _reference_render_frame: Dictionary = {}
+var _reference_events: Array = []
+var _ram_reference := preload("res://scripts/render/fx/boss_ram_reference.gd").new()
 var _boss_technique_visual: Node2D
 var _boss_lance_visual: Node2D
 var _boss_wave_visual: Node2D
@@ -158,6 +165,7 @@ var _shield_transfers: Array[Dictionary] = []
 var _shield_holder: Node2D
 var _shield_transfer_canvas: DrawLayer
 var _shield_layer := 2
+var _ship_white_material: ShaderMaterial
 var _ship_visible := true
 var _ship_visual_position := Vector2.INF
 var _zoom := 1.0
@@ -181,6 +189,8 @@ var elite_crackle: Node2D
 var _mark_clock := 0.0
 
 func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_scale: float) -> void:
+	_ship_white_material = ShaderMaterial.new()
+	_ship_white_material.shader = preload("res://shaders/ship_contact_white.gdshader")
 	metrics_record = perf.open(&"metrics")
 	_scope = scope
 	_pixel = 1.82*character_scale
@@ -218,18 +228,21 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_layer(2).add_child(_hero_aura)
 
 	_barrier_armor = Sprite2D.new()
+	_barrier_armor.material = _ship_white_material
 	_barrier_armor.texture = _scope.resources.get("res://assets/pixel/airship_armor.png")
 	_barrier_armor.offset = Vector2(0.0,_barrier_armor.texture.get_height()*0.5-30.0) if _barrier_armor.texture!=null else Vector2.ZERO
 	_barrier_armor.scale = Vector2.ONE*character_scale
 	_barrier_armor.hide()
 	_layer(18).add_child(_barrier_armor)
 	_mines_overlay = Sprite2D.new()
+	_mines_overlay.material = _ship_white_material
 	_mines_overlay.texture = _scope.resources.get("res://assets/pixel/airship_mine.png")
 	_mines_overlay.offset = Vector2(0.0,_mines_overlay.texture.get_height()*0.5-30.0) if _mines_overlay.texture!=null else Vector2.ZERO
 	_mines_overlay.scale = Vector2.ONE*character_scale
 	_mines_overlay.hide()
 	_layer(18).add_child(_mines_overlay)
 	_rear_canvas = DrawLayer.new()
+	_rear_canvas.material = _ship_white_material
 	_layer(18).add_child(_rear_canvas)
 	_rear_canvas.draw_fn = func(canvas: CanvasItem):
 		if _rear_frame.is_empty() or not _rear_frame.rear.ready or not _ship_visible: return
@@ -243,6 +256,10 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	add_child(marlin_layer)
 	var marlin_parent := Node2D.new()
 	marlin_layer.add_child(marlin_parent)
+	# 本体を描いた後、自機を描き、最後に前面FXを重ねる。
+	_ship_layer_parent = marlin_parent
+	for id: int in [17,18]:
+		if _layers.has(id): _layers[id].reparent(_ship_layer_parent)
 	_boss_technique_visual = preload("res://scripts/bosses/monoceros/technique_visual.gd").new()
 	marlin_parent.add_child(_boss_technique_visual)
 	_boss_lance_visual = preload("res://scripts/bosses/monoceros/lance_visual.gd").new()
@@ -256,6 +273,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_phoenix_visual = preload("res://scripts/render/enemies/phoenix.gd").new()
 	_phoenix_visual.setup_frame(marlin_parent)
 	_pulser_parent = marlin_parent
+	_reference_layer = preload("res://scripts/render/fx/fx_reference_layer.gd").new()
+	_reference_layer.setup(marlin_parent, self)
+	_enemy_reference.setup(marlin_parent, _scope, visuals, _reference_layer.shadows)
 	_pulser_visual = preload("res://scripts/render/enemies/pulser.gd").new()
 	_shield_holder = Node2D.new()
 	_layer(18).add_child(_shield_holder)
@@ -375,7 +395,10 @@ func _layer(layer: int) -> Node2D:
 	if not _layers.has(layer):
 		var node := Node2D.new()
 		node.z_index = layer
-		add_child(node)
+		if layer in [17,18] and _ship_layer_parent != null:
+			_ship_layer_parent.add_child(node)
+		else:
+			add_child(node)
 		_layers[layer] = node
 	return _layers[layer]
 
@@ -695,10 +718,15 @@ func _update_marks(frame: Dictionary) -> void:
 			if (marks[i]&2)!=0: elite_crackle.add_body(body)
 	elite_crackle.end()
 
+func prepare_reference_view(size: Vector2, center: Vector2, zoom: float) -> void:
+	if _reference_layer != null: _reference_layer.begin_frame(size, center, zoom)
+
 func apply_frame(frame: Dictionary) -> bool:
 	if authoring_frame.is_valid(): frame = authoring_frame.call(frame)
 	var begin := Time.get_ticks_usec()
 	if not _valid(frame): return false
+	_reference_render_frame = frame
+	frame = _enemy_reference.strip_legacy(frame)
 	_hero_power_visual.petrified = frame.get("petrified_enemies",PackedFloat32Array())
 	_hero_power_visual.queue_redraw()
 	_update_marks(frame)
@@ -986,7 +1014,11 @@ func apply_frame(frame: Dictionary) -> bool:
 			if scene==null: continue
 			var display = scene.instantiate()
 			display.set_script([preload("res://scripts/render/bosses/monoceros.gd"),preload("res://scripts/render/bosses/centaurus.gd"),preload("res://scripts/render/bosses/canis_major.gd"),preload("res://scripts/render/bosses/hydra.gd"),preload("res://scripts/render/bosses/draco.gd")][body.kind])
-			_pulser_parent.add_child(display)
+			if body.kind in [0,1,2]:
+				# 試作はボス本体→猟犬などの通常敵→自機の順で描く。
+				add_child(display)
+			else:
+				_pulser_parent.add_child(display)
 			if body.kind==2: display.setup_flames(_scope,visuals)
 			if body.kind in [3,4]: display.setup_effects(_scope,visuals)
 			if body.kind in [0,4]: display.hit_feedback = boss_hit_feedback
@@ -996,10 +1028,23 @@ func apply_frame(frame: Dictionary) -> bool:
 			if value.actor==body.actor and value.stage<5: attack = value; break
 		var display: Node2D = _boss_body_displays[body.id]
 		var move := String(attack.get("technique",""))
-		if display.get_meta("visual_move", "")!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
+		if not display.has_meta("visual_move") or display.get_meta("visual_move")!=move or display.get_meta("visual_revision",-1)!=EFFECT_SETTINGS.preview_revision:
 			EFFECT_SETTINGS.apply_body(display,["monoceros","centaurus","canis_major","hydra","draco"][body.kind],move)
 			display.set_meta("visual_move",move)
 			display.set_meta("visual_revision",EFFECT_SETTINGS.preview_revision)
+		if display.has_method("set_reference_hit"):
+			var ram: Dictionary = frame.get("boss_ram",{})
+			display.set_reference_hit(_ram_reference.white(ram) if int(ram.get("body_id",0))==int(body.id) else 0.0)
+		if display.has_method("set_reference_canvas"):
+			display.set_reference_canvas(_reference_layer.canvas)
+		if display.has_method("setup_reference_overlay"):
+			display.setup_reference_overlay(_reference_layer.overlay)
+		if display.has_method("setup_reference_shadows"):
+			display.setup_reference_shadows(_reference_layer.shadows)
+		if display.has_method("setup_reference_front"):
+			display.setup_reference_front(_reference_layer.foreground)
+		if display.has_method("setup_reference_underlay"):
+			display.setup_reference_underlay(_reference_layer.under_actors)
 		display.apply_frame(body,attack,entry.get("appearance",{}))
 	for id in _boss_body_displays.keys():
 		if not body_seen.has(id):
@@ -1035,6 +1080,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			var sprite := Sprite2D.new()
 			sprite.texture = _scope.resources.get(visuals[row.part_key].path)
 			sprite.offset = Vector2(0.0,sprite.texture.get_height()*0.5-30.0)
+			sprite.material = _ship_white_material
 			_layer(17 if visuals[row.part_key].role==5 else 18).add_child(sprite)
 			parts[key] = sprite
 		var sprite: Sprite2D = parts[key]
@@ -1043,6 +1089,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			_ship_visible = row.visible
 		sprite.transform = row.transform
 		sprite.visible = row.visible
+		_ship_white_material.set_shader_parameter("strength",1.0 if row.visual_state & 4 else 0.0)
 		sprite.modulate = Color("#ff6b5a") if row.visual_state & 1 else Color.WHITE
 		if row.visual_state & 2: sprite.modulate.a = 0.5
 	submit_us = Time.get_ticks_usec()-begin
@@ -1058,6 +1105,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		boss_hit_feedback.clear()
 		ruler_shake=0.0
 		_queued_events.clear()
+		_reference_events.clear()
 		_elite_deaths.clear()
 		for display in _boss_body_displays.values():
 			if display.has_method("clear_flames"): display.clear_flames()
@@ -1160,7 +1208,39 @@ func receive_frame(frame: Dictionary) -> bool:
 			boss_hit_feedback.pulse(int(payload.target_id))
 		payload["type"] = event.type
 		_queued_events.append(payload)
+		_reference_events.append(event.duplicate(true))
 	return true
+
+func update_reference_effects(frame: Dictionary, real_dt: float) -> void:
+	if _reference_layer == null: return
+	_update_hound_warnings(_reference_render_frame.get("hound_warning",[]),float(frame.ui.get("world_time",0.0)))
+	_enemy_reference.render(_reference_render_frame, _reference_events, _reference_layer.canvas, real_dt, float(frame.ui.get("world_time",0.0)))
+	for display: Node2D in _boss_body_displays.values():
+		if display.visible and display.has_method("draw_reference"):
+			display.draw_reference(_reference_layer.canvas, 0.0 if authoring_paused else real_dt)
+	var ram: Dictionary = _reference_render_frame.get("boss_ram",{})
+	var ram_body: Node2D = _boss_body_displays.get(int(ram.get("body_id",0)))
+	_ram_reference.render(ram,ram_body,_reference_layer.canvas,int(_reference_render_frame.get("epoch",0)))
+	_reference_layer.end_frame()
+	_reference_events.clear()
+
+func _update_hound_warnings(rows: Array, world_time: float) -> void:
+	var groups := {}
+	for row: Dictionary in rows:
+		var id := int(row.visual_id)
+		if not groups.has(id): groups[id] = []
+		groups[id].append(row)
+		if not _hound_warning_displays.has(id):
+			var layer := CanvasLayer.new()
+			layer.layer = id-5
+			layer.follow_viewport_enabled = true
+			add_child(layer)
+			var display := preload("res://scripts/render/bosses/canis_hound_warning.gd").new()
+			layer.add_child(display)
+			display.setup(preload("res://assets/pixel/hound/base.png"),preload("res://assets/pixel/hound/armor.png"))
+			_hound_warning_displays[id] = display
+	for id in _hound_warning_displays:
+		_hound_warning_displays[id].apply_frame(groups.get(id,[]),world_time)
 
 func update_effects(frame: Dictionary, dt: float) -> void:
 	if authoring_clock >= 0.0:
@@ -1424,7 +1504,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})
 		if event.type==&"shield_block":
 			_rings.append({"pos":event.pos,"radius":float(frame.ui.ship_radius)*3.0,"color":Color("#bcefff"),"life":0.18,"max":0.18})
-		if (event.type==&"kill" and event.get("enemy_type")==&"meteor" and event.get("cause",&"")!=&"vortex") or event.type==&"rock_break":
+		var reference_rock_break: bool = event.type==&"rock_break" and _reference_render_frame.has("reticle_fx")
+		if (event.type==&"kill" and event.get("enemy_type")==&"meteor" and event.get("cause",&"")!=&"vortex") or (event.type==&"rock_break" and not reference_rock_break):
 			var frames: SpriteFrames = _scope.resources.get("res://.content/meteor_pieces.res")
 			if frames!=null:
 				var animation := StringName("meteor_%d" % (posmod(int(event.meteor_index),2)+1))
@@ -1433,20 +1514,21 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 					var offset: Vector2 = (texture.get_meta("offset") as Vector2).rotated(event.facing)
 					_meteor_shards.append({"texture":texture,"pos":event.pos+offset*0.35,"vel":offset.normalized()*100.0+event.dir*60.0,
 						"angle":event.facing,"spin":-1.5 if i%2==0 else 1.5,"life":0.65})
-		if event.type==&"rock_break":
+		if event.type==&"rock_break" and not reference_rock_break:
 			_burst(event.pos,event.color,10,300.0,event.dir)
 			_rings.append({"pos":event.pos,"radius":event.r*1.2,"color":Color(1.0,0.95,0.6),"life":0.2,"max":0.2})
 		if event.type==&"ruler_split":
 			ruler_shake=maxf(ruler_shake,4.0)
 			_rings.append({"pos":event.pos,"radius":46.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
 			_burst(event.pos,event.color,10,260.0)
-		if event.type==&"cepheus_summon":
+		if event.type==&"cepheus_summon" and not (_reference_render_frame.has("cepheus_fx") and _reference_render_frame.has("cepheus_actors")):
 			_rings.append({"pos":event.pos,"radius":70.0,"color":(event.color as Color).lightened(0.4),"life":0.3,"max":0.3})
-		if event.type==&"beam" and event.get("visual_key","")!="weapon/bipolar":
+		if event.type==&"beam" and event.get("visual_key","")!="weapon/bipolar" and not (event.get("visual_key","")=="enemy/reticle" and _reference_render_frame.has("reticle_fx")):
 			var life: float = event.get("life",0.4)*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_mutiny_beams.append({"from":event.from,"to":event.to,"width":event.width,"life":life,"max":life,"color":event.get("color",Color(1,0.95,0.6))})
-		if event.type==&"telescope_charge": _rings.append({"pos":event.pos,"radius":30.0,"color":Color(1.0,0.4,0.3),"life":0.2,"max":0.2})
-		if event.type==&"telescope_fire":
+		var reference_telescope: bool = _reference_render_frame.has("telescope_actors") and _reference_render_frame.has("telescope_beams")
+		if event.type==&"telescope_charge" and not reference_telescope: _rings.append({"pos":event.pos,"radius":30.0,"color":Color(1.0,0.4,0.3),"life":0.2,"max":0.2})
+		if event.type==&"telescope_fire" and not reference_telescope:
 			var direction := Vector2.from_angle(event.angle)
 			_telescope_beams.append({"from":event.pos,"to":event.pos+direction*event.length,"width":event.width*1.6,"life":0.28,"max":0.28})
 			_rings.append({"pos":event.pos,"radius":40.0,"color":Color(1.0,0.75,0.6),"life":0.22,"max":0.22})
@@ -1459,7 +1541,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				_layer(11).add_child(_critical_lances)
 			if event.type==&"critical_lance": _critical_lances.fire(event)
 			preload("res://scripts/render/equipment/critBeam.gd").frame_event(_lance_flashes,_lance_hits,event,_pixel)
-		if event.type==&"flood_end":
+		if event.type==&"flood_end" and not event.get("reference_aquarius",false):
 			var tail: Dictionary = preload("res://scripts/render/attacks/flood.gd").frame_create(_scope)
 			_layer(11).add_child(tail.node)
 			if pipeline!=null and not pipeline.rich: tail.node.visibility_layer = 1 | RenderPipeline.GLOW_LAYER

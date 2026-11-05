@@ -2,6 +2,7 @@
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attack_system.h"
 #include "../../output/frame_builder.h"
+#include "../../state/loadout_state.h"
 namespace speed {
 FriendlyBirthScope::FriendlyBirthScope(RunRuntime &owner,bool enabled):run(owner),active(enabled) {if (active) run.workspace.friend_birth_batches.emplace_back();}
 FriendlyBirthScope::~FriendlyBirthScope() {finish();}
@@ -11,7 +12,7 @@ void FriendlyBirthScope::finish() {
     for (auto source:originals) DuplicatorBehavior::duplicate(run,source);
 }
 std::vector<godot::Vector2> DuplicatorBehavior::vectors(RunRuntime &run,godot::Vector2 velocity) {
-    const auto &d=run.state.loadout.duplicator;const auto &legacy=run.state.projectile_config;
+    const auto &d=run.state.loadout->duplicator;const auto &legacy=run.state.projectile_config;
     if (!d.ready && (run.api_configured || !legacy.split)) return {};
     const uint64_t maximum=d.ready?d.maximum:uint64_t(legacy.maximum),count=AttackSystem::flying_count(run.state);
     if (count>maximum || maximum-count<2) return {};
@@ -23,7 +24,7 @@ std::vector<godot::Vector2> DuplicatorBehavior::vectors(RunRuntime &run,godot::V
     }
     return out;
 }
-double DuplicatorBehavior::damage_factor(const RunRuntime &run) {return run.state.loadout.duplicator.ready?run.state.loadout.duplicator.damage:run.state.projectile_config.damage;}
+double DuplicatorBehavior::damage_factor(const RunRuntime &run) {return run.state.loadout->duplicator.ready?run.state.loadout->duplicator.damage:run.state.projectile_config.damage;}
 void DuplicatorBehavior::duplicate(RunRuntime &run,AttackHandle source) {
     const auto *record=AttackSystem::get(run.state,source);
     if (!record || record->pool!=AttackPool::Friendly) return;

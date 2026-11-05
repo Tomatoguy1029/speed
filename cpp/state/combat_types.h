@@ -14,14 +14,14 @@ struct ShipContactPolicy {
     HitPolicy hit_policy=HitPolicy::MarkAfter;
     bool add_ship_radius=true,ship_sweep=false;
 };
-enum class RetireReason { Outside, Relocate, Regenerate, BonusClear, Development, DeathCleanup };
+enum class RetireReason { Outside, Relocate, Regenerate, BonusClear, Development, DeathCleanup, CoronaThrowEnd };
 struct DamageRequest {
     EnemyHandle struck;
     double amount=0, knock=160;
     Cause cause=Cause::None;
     WeaponId weapon_id=0;
     godot::Vector2 direction, impact;
-    bool has_impact=false, crit=false, no_crit=false;
+    bool has_impact=false, crit=false, no_crit=false, boss_ram_visual=false;
     int32_t shatter_depth=0;
 };
 struct DamageResult {
@@ -64,7 +64,7 @@ enum class AttackPool : uint8_t;
 enum class CombatEventKind { AttackRetired, EnemyDamage, Hit, CriticalHit, Kill, ShieldBlock, ShipDamage, Hurt, Retire };
 // 表示と観測は値を待ち列へ写す。死亡後の行の再利用に依存させない。
 struct FloodTailState {
-    bool ready=false;uint32_t row=0;godot::Vector2 pos;
+    bool ready=false,reference_aquarius=false;uint32_t row=0,index=0;godot::Vector2 pos;
     double angle=0,length=0,width=0,spread=0,age=0;
 };
 struct DeathVisual {
