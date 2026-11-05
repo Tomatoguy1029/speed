@@ -50,8 +50,7 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 		if not _clones.has(clone.id):
 			var parts: Node2D=preload("res://scripts/bosses/draco_parts.gd").new()
 			add_child(parts);parts.top_level=true
-			parts.material=ShaderMaterial.new();parts.material.shader=preload("res://shaders/picaro.gdshader")
-			var noise: Texture2D=preload("res://scripts/render/picaro_look.gd").noise_texture();parts.material.set_shader_parameter("noise_smooth",noise);parts.material.set_shader_parameter("noise_dots",noise)
+			parts.use_picaro(float(clone.id)*0.37)
 			_clones[clone.id]=parts
 		var parts: Node2D=_clones[clone.id]
 		var clone_feedback := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}

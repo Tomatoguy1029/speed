@@ -4,6 +4,8 @@ const FORM = preload("res://scripts/bosses/draco_form.gd")
 const ARM_ROOT := Vector2(11, 5)
 const ARM_WRIST := Vector2(27, 33)
 const SHADER = preload("res://shaders/draco_part.gdshader")
+const PICARO_SHADER = preload("res://shaders/picaro.gdshader")
+const PICARO_LOOK = preload("res://scripts/render/picaro_look.gd")
 const TEXTURES = {
 	&"head": [preload("res://assets/pixel/draco/head.png"), preload("res://assets/pixel/draco/head_normal.png")],
 	&"arm": [preload("res://assets/pixel/draco/arm.png"), preload("res://assets/pixel/draco/arm_normal.png")],
@@ -40,6 +42,17 @@ func _ready() -> void:
 		claw.centered = false
 		claw.offset = -Vector2(13, 16)
 		_claws.append(claw)
+
+## 全身複製はピカロの一種なので、全部の部位を敵のピカロと同じシェーダーで描く。
+func use_picaro(seed: float) -> void:
+	var noise: Texture2D = PICARO_LOOK.noise_texture()
+	_lighting = ShaderMaterial.new()
+	_lighting.shader = PICARO_SHADER
+	_lighting.set_shader_parameter("noise_smooth", noise)
+	_lighting.set_shader_parameter("noise_dots", noise)
+	_lighting.set_shader_parameter("seed", seed)
+	for child in get_children():
+		if child is Sprite2D: child.material = _lighting
 
 func _sprite(part: StringName) -> Sprite2D:
 	var sprite := Sprite2D.new()
