@@ -7405,7 +7405,7 @@ const H_TECH = {
   bite_thrust: { kind: 'bite', type: 'lunge', title: '突き噛み', color: '#ff5470', ship: V(250, 70), active: r => r.normal_lunge, aimBase: true, retract: true },
   bite_sweep: { kind: 'bite', type: 'sweep', title: '横薙ぎ', color: '#ff5470', ship: V(110, 130), active: r => r.sweep_time, aimBase: true, aimOff: r => -r.sweep_arc * 0.5 },
   wind_band: { kind: 'vortex', type: 'breath', title: '風の帯', color: '#5fd27a', ship: V(300, 50), active: r => r.wind_time },
-  wind_blades: { kind: 'vortex', type: 'sweep', title: '三日月の風刃', color: '#7fdc5c', ship: V(640, 80), active: r => 2 * r.blade_interval, aimOff: r => -r.blade_spread * 0.5 },
+  wind_blades: { kind: 'vortex', type: 'sweep', title: '三日月の風刃', color: '#5fd27a', ship: V(640, 80), active: r => 2 * r.blade_interval, aimOff: r => -r.blade_spread * 0.5 },
   rubble_lump: { kind: 'debris', type: 'spit', title: '塊投げ', color: '#a9bccd', ship: V(620, 40), active: () => 0 },
   rubble_fan: { kind: 'debris', type: 'spit', title: '散らし吐き', color: '#a9bccd', ship: V(460, 40), active: () => 0 },
   beam_fixed: { kind: 'beam', type: 'breath', title: '固定照射', color: '#ff6fb4', ship: V(640, 70), active: r => r.beam_time },
@@ -7738,29 +7738,39 @@ function hWindBand(S, R, n, pose) {
   hCycle(e, T.active, 14, 0.5, 0.7, 23, (age, life, rnd) => { const s0 = age * lerp(380, 520, rnd(1)); if (s0 > L) return; const th = rnd(2) * TAU + s0 * 0.042 - e * 15, depth = 0.5 + 0.5 * Math.sin(th), q = W(s0, rad(s0) * 0.85 * Math.cos(th)), spin = age * 18 + rnd(3) * 6, f = fadeS(s0);
     if (f < 0.2) return; p.px(q.x, q.y, depth > 0.5 ? C[5] : C[3]); p.px(q.x + Math.round(Math.cos(spin)), q.y + Math.round(Math.sin(spin)), depth > 0.5 ? C[6] : C[4]); });
 }
-// 三日月の風刃：細長い筆の線を3本ずらして重ねた刃。芯は明るい黄緑、外へ緑から濃い緑、ふちに細かい切れ込み、両端はとがる。
-// 後ろに小さなひし形のかけらと細い筋を引き、寿命の終わりに両端から欠けて消える
-const H_LEAF = ['#0f3b22', '#1f6b35', '#3fa548', '#7fdc5c', '#c8f58a', '#f4ffd8'].map(hexc);
+// 三日月の風刃：風の帯の竜巻を三日月の形に曲げたもの。背骨（判定と同じ半楕円）のまわりを、ねじれた風の筋がらせんに回り、
+// 手前を回る所は明るく太く、奥は暗く細い。輪の弧が中央から両端へ流れ、後ろへ風の尾がうねってほどける。葉がらせんに乗る。寿命の終わりは虫食いで散る。
 function hBlades(S, R) {
-  const r = S.r, C = H_LEAF;
+  const r = S.r, p = R.front, C = H_WIND, tubeR = (R.P.bladeR ?? 20) * R.P.size;
   for (const b of S.shots) {
     if (b.kind !== 'blade') continue; const age = S.t - b.t, life = r.blade_life; if (age > life) continue;
-    const dir = fromA(b.angle), c = add(b.from, mul(dir, r.blade_speed * age)), g0 = lerp(0.35, 1, smooth(0, 0.07, age)) * R.P.size, endK = clamp((age - (life - 0.6)) / 0.6), seed = Math.floor(b.t * 97);
-    // 3本の筆の線：[半径の倍率, 前後のずれ, 弧の始まり, 弧の終わり, 太さ]
-    for (const [sc, back, u0, u1, th] of [[1, 0, 0, 1, 1], [0.84, -14, 0.08, 0.8, 0.7], [1.1, 8, 0.3, 0.97, 0.55]]) {
-      const len0 = r.blade_size * 2.4 * WL * g0 * (u1 - u0), steps = Math.ceil(len0 * 2);
-      for (let m = 0; m <= steps; m++) { const t0 = m / steps, u = u0 + (u1 - u0) * t0; if (Math.abs(u - 0.5) * 2 > 1 - endK) continue;
-        const arc = -Math.PI / 2 + Math.PI * u, P = add(add(c, mul(dir, back)), rotateV(V(Math.cos(arc) * r.blade_size * 0.6 * g0 * sc, Math.sin(arc) * r.blade_size * g0 * sc), b.angle)), nr = rotateV(norm(V(Math.cos(arc) / 0.6, Math.sin(arc))), b.angle), q = toL(P);
-        // 太さ：両端がとがり、前寄りが太い。ふちは切れ込みで欠ける
-        const taper = Math.pow(Math.sin(Math.PI * t0), 0.8) * (0.75 + 0.25 * Math.sin(Math.PI * t0 * 0.8)), notch = 1 - 0.38 * ((t0 * 11 + hash(seed + sc * 7)) % 1), w = Math.max(0.5, r.blade_width * 0.5 * WL * g0 * th * taper);
-        for (let o = -w * 0.6; o <= w * notch; o += 0.5) { if (endK > 0 && hash(m * 7 + Math.floor(o * 2) * 13 + seed) < endK * 0.8) continue; const ee = o / w;
-          const col = ee > 0.75 ? C[1] : ee > 0.45 ? C[2] : ee > 0.12 ? C[3] : ee > -0.2 ? C[4] : ee > -0.45 ? C[3] : C[2]; R.front.px(q.x + nr.x * o, q.y + nr.y * o, th < 0.8 && ee < -0.2 ? C[2] : col); }
-        if (th === 1 && m % 3 === 0) { R.front.px(q.x - nr.x * 0.5, q.y - nr.y * 0.5, C[5]); R.front.light(q.x, q.y, C[3], 0.25 * (1 - endK) * R.P.intensity); } } }
-    // 後ろのひし形のかけらと細い筋
-    for (let k = 0; k < 7; k++) { const u = 0.15 + 0.7 * hash(seed + k * 3.3), arc = -Math.PI / 2 + Math.PI * u, back = (20 + 50 * hash(seed + k * 5.1)) * (0.6 + 0.4 * Math.sin(age * 7 + k)), P = sub(add(c, rotateV(V(Math.cos(arc) * r.blade_size * 0.5 * g0, Math.sin(arc) * r.blade_size * 0.9 * g0), b.angle)), mul(dir, back)), q = toL(P), f = (1 - endK) * (0.5 + 0.5 * Math.sin(age * 9 + k * 2));
-      if (f < 0.25) continue; const sz = k % 3 === 0 ? 2 : 1; R.front.px(q.x, q.y, C[4]); if (sz > 1) { R.front.px(q.x - dir.x, q.y - dir.y, C[3]); R.front.px(q.x + dir.x, q.y + dir.y, C[3]); } }
-    for (let k = 0; k < 4; k++) { const lat = (hash(seed + k * 7.7) - 0.5) * 1.6 * r.blade_size * g0, l = (30 + 40 * hash(seed + k)) * g0, s0 = 30 + 20 * hash(seed + k * 2.2);
-      for (let d = 0; d < l; d += 0.5 / WL) { const q = toL(add(sub(c, mul(dir, s0 + d)), mul(orth(dir), lat))), f = (1 - d / l) * (1 - endK); if (f > 0.5) R.front.px(q.x, q.y, C[3]); else if (f > 0.25) R.front.dot(q.x, q.y, C[2], f * 1.5); } }
+    const dir = fromA(b.angle), c = add(b.from, mul(dir, r.blade_speed * age)), g0 = lerp(0.35, 1, smooth(0, 0.07, age)), size = r.blade_size * g0 * R.P.size, endK = clamp((age - (life - 0.6)) / 0.6), seed = Math.floor(b.t * 97) % 89, fr = 1 - endK;
+    const arcOf = (u) => -Math.PI / 2 + Math.PI * u, spine = (u, off = 0) => { const a = arcOf(u); return add(add(c, mul(dir, off)), rotateV(V(Math.cos(a) * size * 0.6, Math.sin(a) * size), b.angle)); };
+    const normal = (u) => { const a = arcOf(u); return rotateV(norm(V(Math.cos(a) / 0.6, Math.sin(a))), b.angle); }, tangent = (u) => orth(normal(u));
+    const tube = (u) => tubeR * g0 * Math.pow(Math.sin(Math.PI * u), 0.75), fadeU = (u) => smooth(0, 0.1, u) * smooth(0, 0.1, 1 - u) * fr, LEN = size * 2.5;
+    // 背骨の光の芯
+    for (let m = 0; m < 14; m++) { const u0 = m / 14, u1 = (m + 1) / 14, A = toL(spine(u0)), B = toL(spine(u1)), k = Math.sin(Math.PI * (u0 + u1) * 0.5); p.glowLine(A.x, A.y, B.x, B.y, 5 * g0 * R.P.size, C[4], 0.16 * k * fr * R.P.intensity); }
+    // ねじれた風の筋（らせん）
+    const steps = Math.ceil(LEN * WL * 2);
+    for (let k = 0; k < 4; k++) { const ph = k * TAU / 4 + hash(k * 3.3 + seed) * 0.6;
+      for (let m = 0; m <= steps; m++) { const u = m / steps, sd = u * LEN, th = sd * 0.075 - age * (15 + 4 * hash(k + seed)) + ph + Math.sin(sd * 0.02 + k * 2.1 - age * 3) * 0.5, depth = 0.5 + 0.5 * Math.sin(th);
+        const f = fadeU(u) * clamp(0.55 + 0.9 * PX.tileFbm(sd * 0.03 - age * 6, k * 3.1 + seed, 0, 0, 31, 2)); if (f <= 0.04) continue; // 筋ごとに濃さのむら
+        if (fr < 0.97 && hash(k * 31 + m * 7 + Math.floor(age * 24)) > fr * 1.15) continue; // 終わりは虫食いで散る
+        const nr = normal(u), q = toL(add(spine(u), mul(nr, tube(u) * (1 + 0.14 * Math.sin(sd * 0.03 + k * 2 - age * 5)) * Math.cos(th)))), tall = Math.sin(Math.PI * u), w = (0.3 + 1.3 * depth) * (0.4 + 0.6 * tall) * g0 * R.P.size, br = f * (0.3 + 0.7 * depth);
+        for (let o = -w; o <= w; o += 0.5) { const x = q.x + nr.x * o, y = q.y + nr.y * o, ee = Math.abs(o) / Math.max(0.5, w);
+          if (depth > 0.55 && br > 0.5) p.px(x, y, C[ee < 0.4 && depth > 0.8 ? 7 : 6]); else p.blend(x, y, depth > 0.5 ? C[5] : C[3], Math.min(0.85, br * (1 - ee * 0.5))); }
+        if (depth > 0.5) p.light(q.x, q.y, C[5], 0.16 * br * R.P.intensity); } }
+    // 輪のような風の弧：回りながら中央から両端へ流れる
+    hCycle(age, life, 12, 0.22, 0.34, 41 + seed, (a2, l2, rnd) => { const k = a2 / l2, side = rnd(6) > 0.5 ? 1 : -1, u = 0.5 + side * (0.05 + 0.42 * k), rr = tube(u) * lerp(1, 1.25, rnd(3)), rx = rr * 0.3, phi0 = rnd(4) * TAU - age * 14, span = lerp(3.4, 4.4, rnd(5)), fa = Math.sin(Math.PI * k) * fadeU(u), tn = tangent(u), nr = normal(u), cn = spine(u);
+      for (let m = 0; m <= 26; m++) { const v = m / 26, phi = phi0 + span * v, depth = 0.5 + 0.5 * Math.sin(phi), q = toL(add(add(cn, mul(tn, rx * Math.sin(phi))), mul(nr, rr * Math.cos(phi)))), br = fa * Math.sin(Math.PI * v) * (0.35 + 0.65 * depth);
+        if (br < 0.12) continue; if (br > 0.5 && depth > 0.5) p.px(q.x, q.y, C[6]); else p.blend(q.x, q.y, C[depth > 0.5 ? 5 : 4], Math.min(0.8, br)); } });
+    // 後ろへほどける風の尾：うねりながら細く薄くなる
+    for (let k = 0; k < 7; k++) { const u = 0.14 + 0.72 * (k + hash(k * 3.1 + seed) * 0.8) / 7, l = (70 + 80 * hash(k * 5.3 + seed)) * g0 * Math.min(1, age * 6) * R.P.size, ph = hash(k * 7.7 + seed) * TAU, nr = normal(u);
+      for (let d = 0; d < l; d += 0.5 / WL) { const t = d / l, lat = Math.sin(d * 0.045 - age * 11 + ph) * (4 + 16 * t) * g0, q = toL(add(sub(spine(u), mul(dir, d + tube(u) * 0.5)), mul(orth(dir), lat))), f = (1 - t) * (1 - t) * fr * clamp(0.5 + 0.9 * PX.tileFbm(d * 0.04 - age * 7, k * 2.3 + seed, 0, 0, 31, 2));
+        if (f > 0.04) p.blend(q.x, q.y, C[f > 0.45 ? 5 : f > 0.2 ? 4 : 3], Math.min(0.7, f)); } }
+    // らせんに乗って運ばれる葉
+    hCycle(age, life, 8, 0.4, 0.6, 67 + seed, (a2, l2, rnd) => { const k = a2 / l2, u = 0.12 + 0.76 * rnd(1), th = rnd(2) * TAU + age * 15, depth = 0.5 + 0.5 * Math.sin(th), q = toL(sub(add(spine(u), mul(normal(u), tube(u) * 1.1 * Math.cos(th))), mul(dir, k * 60))), spin = a2 * 18 + rnd(3) * 6;
+      if (fadeU(u) < 0.2) return; p.px(q.x, q.y, depth > 0.5 ? C[5] : C[3]); p.px(q.x + Math.round(Math.cos(spin)), q.y + Math.round(Math.sin(spin)), depth > 0.5 ? C[6] : C[4]); });
   }
 }
 // 瓦礫：予兆は首の瓦礫が口へ送られて噛み砕かれ、吐くと土煙と砂利の扇。岩は回りながら飛び、砂ぼこりの尾を引く
@@ -7770,9 +7780,22 @@ function hRubbleWarn(S, R, n, pose, pts) {
   const m = toL(M), lump = S.tech === 'rubble_lump', rr = (lump ? 1 + 3 * u : 2.5) * R.P.size;
   for (let k = 0; k < (lump ? 24 : 16); k++) { const an = hash(k * 2.3) * TAU + S.age * (lump ? 2 : 9) * (hash(k) - 0.5), d = rr * Math.sqrt(hash(k * 5.9)), jit = Math.sin(S.age * 60 + k) * 0.6 * u; R.front.px(m.x + Math.cos(an) * d + jit, m.y + Math.sin(an) * d, H_STONE[d > rr * 0.6 ? 2 : 3]); }
 }
+// 塊投げの土煙：pixelFX nature/boulder の DUST の作り。岩が飛びながら落とす土ぼこりの玉が、その場で速度を失ってふくらみ、ふわっと薄れる。
+// 暖かい灰色の2色をやわらかい円で本当の半透明に重ね、ときどき小石がこぼれる。
+const H_DUST = ['#9a8f86', '#7a7068', '#b9aea2'].map(hexc);
+function hLumpDust(S, R, b, age, dir) {
+  const p = R.back, RATE = 34 * R.P.dust, side = orth(dir), scale = b.radius / 26 * R.P.size, timing = R.P.timing;
+  for (let i = Math.max(0, Math.floor((age - 0.75 * timing) * RATE)); i / RATE <= age; i++) { const born = i / RATE, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.35, 0.75, rnd(1)) * timing, a = age - born, k = 1 - a / life; if (k <= 0) continue;
+    const drift = 1 - Math.exp(-a * 7), at = add(add(b.from, mul(dir, b.speed * born - (b.radius * 0.6) + lerp(40, 110, rnd(2)) * drift)), mul(side, (rnd(3) - 0.5) * b.radius * 1.1 + (rnd(4) - 0.5) * 34 * drift * scale)), q = toL(at);
+    const size = lerp(2.2, 4.2, rnd(5)) * scale, rr = size * (0.6 + (1 - k) * 0.9) * 1.25, col = H_DUST[rnd(6) < 0.15 ? 2 : rnd(6) < 0.6 ? 0 : 1];
+    p.disc(q.x, q.y, rr, col, (d) => Math.pow(k, 1.3) * 0.62 * (1 - d * d)); }
+  for (let i = Math.max(0, Math.floor((age - 0.9) * 13)); i / 13 <= age; i++) { const born = i / 13, rnd = (k) => hash(i * 4.13 + k * 5.71 + b.seed + 9), a = age - born, life = lerp(0.5, 0.9, rnd(1)); if (a > life) continue;
+    const q = toL(add(add(b.from, mul(dir, b.speed * born + b.speed * 0.3 * (1 - Math.exp(-a * 4)) * 0.4)), mul(side, (rnd(2) - 0.5) * b.radius * 1.2 + (rnd(3) - 0.5) * 60 * a))); p.dot(q.x, q.y, H_STONE[rnd(4) > 0.5 ? 3 : 2], 1 - a / life); }
+}
 function hRocks(S, R, back) {
   for (const b of S.shots) {
     if (b.kind !== 'rock') continue; const age = S.t - b.t; if (age > 6) continue; const dir = fromA(b.angle), pos = add(b.from, mul(dir, b.speed * age));
+    if (back && R.proto && S.tech === 'rubble_lump') { hLumpDust(S, R, b, age, dir); continue; }
     if (back && R.proto) { for (let k = 1; k < 16; k++) { const tk = age - k * 0.03; if (tk < 0) break; const a = k * 0.03 / R.P.timing, p = add(b.from, mul(dir, b.speed * tk)), q = toL(p), rr = (1 + a * 7) * (b.radius / 26) * R.P.size * R.P.dust;
         for (let y = -rr; y <= rr; y++) for (let x = -rr; x <= rr; x++) { if (x * x + y * y > rr * rr || hash(b.seed * 31 + k * 7 + x * 3 + y * 11) < a * 1.9) continue; R.back.dot(q.x + x, q.y + y, H_STONE[a < 0.15 ? 3 : 2], (1 - a / 0.5) * 0.5); } } continue; }
     if (back) continue;
@@ -7882,7 +7905,7 @@ const H_DESC = {
   bite_thrust: '予兆：首をS字にためて頭を引き、目が赤く強まり、最後は震えて止まる → 一気に伸びて頭の形の光と両脇の空気の筋、目の光が通り道に残る → 上下の牙の鉤が口先へ寄り、前へ長い閃光と欠片・土ぼこり → 衝撃の波が首を根元へ抜ける',
   bite_sweep: '予兆：振りかぶる側へ首を弓なりにため、目が赤く強まって止まる → ゆっくり振り出し、真ん中で一気に速くなって頭が外へ突き出し、振る先を向いて噛みにいく。三日月の帯（先が白く後ろへ冷えて細る）と外へ削られる小石 → 振り切って少し行き過ぎて戻り、帯は後ろから崩れて消える。緩急と踏み込みは見た目だけで、判定は現行の円のまま',
   wind_band: '予兆：前から空気の筋が口へ吸い込まれ、頭がふくらんで止まる → 横倒しの竜巻を上から見た形：口から先へ広がる円錐の中を、ねじれた風の筋がらせんに回り（手前は明るく太く、奥は暗く細い）、輪のような風の弧が回りながら先へ流れ、軸に光の芯、葉がらせんに乗って運ばれる → 止むと根元から離れて流れ去る。本番との違い：本番の判定は幅180の一定の帯。円錐の太さ（つまみ）に判定を合わせるなら本番の変更が要る',
-  wind_blades: '予兆：口のまわりで空気が渦を巻いて縮む → 0.18秒ごとに首を振り抜いて、風の刃を3枚。刃は細長い筆の線を3本ずらして重ねた三日月で、芯は明るい黄緑、外へ緑から濃い緑、ふちに細かい切れ込み、両端はとがる。後ろに小さなひし形のかけらと細い筋 → 寿命の終わりに両端から欠けて消える',
+  wind_blades: '予兆：口のまわりで空気が渦を巻いて縮む → 0.18秒ごとに首を振り抜いて、風の刃を3枚。刃は風の帯の竜巻を三日月に曲げた形で、ねじれた風の筋がらせんに回り、手前は明るく奥は暗い。輪の弧が中央から両端へ流れ、後ろへ風の尾がうねってほどける → 寿命の終わりに虫食いで散って消える',
   rubble_lump: '予兆：首の瓦礫が口へ送られ、口先で塊になる。頭を大きく引いて止まる → 頭を突き出して吐き、土煙と砂利。岩は回りながら飛んで砂ぼこりの尾を引く',
   rubble_fan: '予兆：首の瓦礫が口へ送られ、口で小石が暴れる → 頭を突き出して扇に吐き、広い土煙と砂利。小岩はそれぞれ砂ぼこりの尾',
   beam_fixed: '予兆：口から射線いっぱいへ流れる照準の光（白くしない）と口へ集まる光。頭がふくらんで止まる → 先が伸びる光線、口の閃光、縁からこぼれる光。頭は反動で押されて震える → 根元から消え、口に光が残って消える',
@@ -7895,6 +7918,7 @@ const H_PARAMS = [
   { k: 'windLen', label: '風の帯（竜巻）の長さ（見た目、判定は340）', type: 'range', min: 200, max: 600, step: 10, def: 340 },
   { k: 'windR0', label: '風の帯（竜巻）の口元の太さ（半径）', type: 'range', min: 10, max: 90, step: 1, def: 32 },
   { k: 'windR1', label: '風の帯（竜巻）の先の太さ（半径）', type: 'range', min: 60, max: 200, step: 1, def: 115 },
+  { k: 'bladeR', label: '三日月の風刃の太さ（半径、見た目）', type: 'range', min: 8, max: 45, step: 1, def: 20 },
   { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'coil', label: 'ための首の曲がり', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'snap', label: '発動の勢い（反動・衝撃）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
@@ -7906,7 +7930,6 @@ for (const id of Object.keys(H_TECH)) {
   DEMOS.push({ id: 'H-' + id, ids: H_LEDGER[id], cat: 'うみへび座（H）', group: 'うみへび座', title: d.title, duration: T + (['wind_blades', 'rubble_lump', 'beam_bolt'].includes(id) ? 2.2 : 1.4), color: d.color,
     params: H_PARAMS, status: { ...H_STATUS, '作り': H_DESC[id] }, refs: H_REFS, setup(S) { hSetup(S, id); }, step: hStep, draw: hDraw, phase: hPhase });
 }
-
 // ===== うみへび：コンボと大技（作り直し）=====
 // 時刻・参加者・軌道は main の cpp/bosses/hydra/technique.cpp と各技（tornado・debris_shatter・beam_pincer・north・sequence・curve・grid・swarm）を写す。
 // 参加する首は発動の瞬間の頭の位置（strike_pos）で止まり、向きだけを技が決める。試作の表示は見た目だけを重ねる。
