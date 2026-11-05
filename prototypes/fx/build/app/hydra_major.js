@@ -21,9 +21,11 @@ function hmOpenHeads(S) {
 }
 function hmHoldBystanders(S, dt) { for (const n of S.necks) { if (n.major || n.gone) continue; const home = n.baseAngle + S.B.facing, off = angDiff(n.angle, home), lim = 0.22; if (Math.abs(off) > lim) { n.angle -= Math.sign(off) * Math.min(Math.abs(off) - lim, 2.4 * dt); n.pos = add(hBase(S, n), mul(fromA(n.angle), dist(n.pos, hBase(S, n)))); } } }
 // 噛みついた首の戻り：首ごとに時間をずらし、ゆっくり引き始めて途中で一気に戻り、少し行き過ぎて落ち着く。頭は左右に振れ、首に蛇のうねりが走る（見た目だけ）
-function hmStartRecover(S) { S.parts.forEach((n, i) => { const b = hBase(S, n), L0 = dist(n.pos, b); if (L0 > HP.neck_rest * 1.3) n.rec = { start: S.age + i * 0.14 + hash(i * 3.3) * 0.08, T: 0.85 + 0.25 * hash(i * 5.1), L0, a0: angOf(sub(n.pos, b)), ph: hash(i * 7.7) * TAU, side: hash(i * 2.9) < 0.5 ? -1 : 1 }; }); }
+function hmStartRecover(S) { if (S.tech === 'curve') { for (const n of S.parts) { const b = hBase(S, n); n.rec = { calm: true, start: S.age, T: 0.55, L0: dist(n.pos, b), a0: angOf(sub(n.pos, b)), tilt0: n.tilt || 0, bend0: n.bend || 0 }; } return; } // 全部の首が一緒になめらかに戻る
+  S.parts.forEach((n, i) => { const b = hBase(S, n), L0 = dist(n.pos, b); if (L0 > HP.neck_rest * 1.3) n.rec = { start: S.age + i * 0.14 + hash(i * 3.3) * 0.08, T: 0.85 + 0.25 * hash(i * 5.1), L0, a0: angOf(sub(n.pos, b)), ph: hash(i * 7.7) * TAU, side: hash(i * 2.9) < 0.5 ? -1 : 1 }; }); }
 function hmRecover(S, n) {
-  const q = n.rec, b = hBase(S, n), tau = S.age - q.start, k = clamp(tau / q.T); if (tau >= q.T) { n.length = HP.neck_rest; n.aimV = 0; n.rec = null; return; }
+  const q = n.rec, b = hBase(S, n), tau = S.age - q.start, k = clamp(tau / q.T); if (tau >= q.T) { n.length = HP.neck_rest; n.aimV = 0; n.tilt = 0; n.bend = 0; n.rec = null; return; }
+  if (q.calm) { const e = k * k * (3 - 2 * k); n.tilt = q.tilt0 * (1 - e); n.bend = q.bend0 * (1 - e); n.angle = q.a0 + angDiff(n.baseAngle + S.B.facing, q.a0) * e; n.length = lerp(q.L0, HP.neck_rest, e); n.pos = add(b, mul(fromA(n.angle), n.length)); return; }
   const home = n.baseAngle + S.B.facing, pull = k * k * (3 - 2 * k), over = Math.sin(k * Math.PI) * Math.pow(k, 3) * 0.16, tug = tau < 0 ? 0 : Math.sin(Math.min(1, tau / 0.14) * Math.PI) * 0.035; // 最初に小さく引いてから戻る
   n.angle = q.a0 + angDiff(home, q.a0) * pull + Math.sin(Math.max(0, tau) * 8 + q.ph) * 0.13 * (1 - k) * smooth(0, 0.2, tau) * q.side; n.length = lerp(q.L0, HP.neck_rest, pull + over - tug); n.pos = add(b, mul(fromA(n.angle), n.length));
 }
@@ -46,8 +48,9 @@ function hmPose(S, n, at = 0) {
   return out;
 }
 function hmVisNeck(S, n, pose) { // 頭の見た目の位置まで首の先をなめらかに寄せる
-  const pts = n.points, N = pts.length - 1, d = sub(pose.head, n.pos); if (len(d) < 0.01) return pts;
-  return pts.map((p, i) => add(p, mul(d, (i / N) ** 2)));
+  const pts = n.points, N = pts.length - 1, d = sub(pose.head, n.pos), bend = n.bend || 0; if (len(d) < 0.01 && !bend) return pts;
+  const side = orth(norm(sub(pts[N], pts[0]))), ph = n.baseAngle * 3;
+  return pts.map((p, i) => { const u = i / N, o = bend ? Math.sin(u * Math.PI) * (bend + Math.sin(u * 5 - S.t * 3 + ph) * bend * 0.12) : 0; return add(add(p, mul(side, o)), mul(d, u * u)); });
 }
 function hmDrawBody(S, R, poses) {
   S.necks.forEach((n, i) => { if (!n.gone) hDrawNeck(S, n, R.proto && poses.has(n) ? hmVisNeck(S, n, poses.get(n)) : n.points, i); });
@@ -304,11 +307,11 @@ function hmSeqDraw(S, R) {
 
 // ---------- 回転するビーム（curve.cpp を元に見た目を変更）：首を伸ばし、頭だけ傾けて直線のビームを撃つ。本体の回転で風車のように回る
 function hmCurvePoints(S, n) { const r = S.r, pts = [add(hBase(S, n), mul(fromA(n.angle), HP.neck_rest))]; for (let j = 1; j <= 24; j++) pts.push(add(pts[pts.length - 1], mul(fromA(n.angle - j / 24 * r.curve_lag), r.beam_len / 24))); return pts; }
-const HM_CURVE_TILT = 15 * Math.PI / 180;
+const HM_CURVE_TILT = 35 * Math.PI / 180;
 function hmCurveTick(S, dt) {
   const r = S.r; if (S.mt >= 0) S.B.facing += r.curve_turn * dt;
-  // 首を伸ばして、頭だけ左へ傾ける（首は放射状のまま、ビームだけ斜めになる）
-  const ext = smooth(0, 1, clamp(S.age / r.warning_time)); for (const n of S.parts) { n.moving = true; n.angle = n.baseAngle + S.B.facing; n.tilt = -HM_CURVE_TILT * ext; n.pos = add(hBase(S, n), mul(fromA(n.angle), HP.neck_rest * (1 + 0.45 * ext))); }
+  // 首は伸ばしきらず弓なりに曲げ、先が頭の向きへつながる。長さはゆるく呼吸する
+  const ext = smooth(0, 1, clamp(S.age / r.warning_time)); for (const n of S.parts) { n.moving = true; n.angle = n.baseAngle + S.B.facing; n.tilt = -HM_CURVE_TILT * ext; const L = HP.neck_rest * (1 + (0.3 + 0.035 * Math.sin(S.t * 2.6 + n.baseAngle * 3)) * ext); n.bend = L * 0.2 * ext; n.pos = add(hBase(S, n), mul(fromA(n.angle), L)); }
 }
 function hmPolyBeam(S, R, pts, w, color, a0, a1, k) { // 折れ線に沿う光の帯。芯が白く、縁へ冷え、流れる明るさの山が先へ走る。先ほど細い
   const pal = FX.ramp(color), L = pts.map(toL); let total = 0; const seg = []; for (let i = 1; i < L.length; i++) { const l = dist(L[i - 1], L[i]); seg.push(l); total += l; }
@@ -336,7 +339,7 @@ hmRegister('north', ['H16'], { kinds: null, color: HM_COLORS.bite, ship: V(430, 
 hmRegister('sequence', ['H17'], { kinds: null, color: HM_COLORS.bite, ship: V(430, 60), facing: 0, front: 3 }, hmSeqTick, hmSeqDraw,
   '予兆：前の3本が順に目を光らせ、自分の番の直前に照準の光を出してS字にためて止まる → 0.55秒ずつずれて1本ずつ伸びて噛む（空気の筋・牙・閃光）→ 噛み終えた頭はその場で止まる');
 hmRegister('curve', ['H18'], { kinds: null, color: HM_COLORS.beam, ship: V(500, 60), facing: 0 }, hmCurveTick, hmCurveDraw,
-  '予兆：全部の首を伸ばし、頭だけ左へ15度傾ける。目が光り、口に光が集まる → まっすぐのビームを全部の首から撃つ。首は放射状のままビームだけ斜めになり、本体の回転で風車のように回る → 終わると首が順に戻る');
+  '予兆：全部の首を弓なりに曲げて、頭を左へ35度傾ける。目が光り、口に光が集まる → まっすぐのビームを全部の首から撃つ。本体の回転で風車のように回り、首はゆるく呼吸する → 終わると全部の首が一緒になめらかに戻る');
 
 // ---------- 分離後の蛇（swim.cpp：steer と follow を写す）
 function hsSteer(S, n, target, dt, scale = 1) {
