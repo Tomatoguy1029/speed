@@ -11,6 +11,7 @@ uniform float spectrum_correlation : hint_range(0.0, 1.0) = 0.18;
 uniform float spectrum_peak_frequency = 0.08;
 uniform float spectrum_peak_strength : hint_range(0.0, 1.0) = 0.95;
 uniform float orbit_speed = 0.025;
+uniform vec2 selection_corner = vec2(141.5, 207.5);
 varying vec4 tint;
 
 void vertex() {
@@ -68,6 +69,26 @@ float orbit_glint(vec2 p, vec2 center, float radius, float angle) {
 void fragment() {
 	vec4 art = texture(TEXTURE, UV);
 	vec2 p = UV * vec2(640.0, 360.0);
+	// 選択位置は黄色い枠で示す。元絵の灰色の四隅は重ねない。
+	if (p.x >= 141.0 && p.x < 253.0 && p.y >= 207.0 && p.y < 266.0) {
+		art.a = 0.0;
+	}
+	// 丸の右の水平線を残し、他の引出線と同じく選択枠の手前に隙間を空ける。
+	if (p.x >= 114.0 && p.x < 130.0 && p.y >= 99.0 && p.y < 115.0) {
+		art.a = 0.0;
+	}
+	vec2 pixel = floor(p) + vec2(0.5);
+	vec2 leader_start = vec2(113.5, 99.5);
+	vec2 leader_end = selection_corner - normalize(selection_corner - leader_start) * 6.0;
+	vec2 leader_delta = leader_end - leader_start;
+	float leader_length = length(leader_delta);
+	float leader_progress = abs(leader_delta.x) > abs(leader_delta.y)
+		? (pixel.x - leader_start.x) / leader_delta.x : (pixel.y - leader_start.y) / leader_delta.y;
+	vec2 leader_pixel = floor(mix(leader_start, leader_end, leader_progress)) + vec2(0.5);
+	bool leader = leader_progress >= 0.0 && leader_progress <= 1.0 && distance(pixel, leader_pixel) < 0.1;
+	if (leader) {
+		art = texture(TEXTURE, vec2(120.5, 106.5) / vec2(640.0, 360.0));
+	}
 	float position = -1.0;
 	if (p.x >= 237.0 && p.y >= 105.0 && p.y < 204.0) {
 		position = along_leader(p, vec2(237.5, 202.0), vec2(285.0, 106.5), vec2(385.0, 106.5));
@@ -75,8 +96,11 @@ void fragment() {
 		position = along_leader(p, vec2(141.5, 271.0), vec2(111.5, 330.0), vec2(27.0, 330.0));
 	} else if (p.x >= 251.0 && p.y >= 270.0) {
 		position = along_leader(p, vec2(252.0, 271.0), vec2(296.0, 317.0), vec2(378.0, 317.0));
-	} else if (p.x >= 89.0 && p.x <= 130.0 && p.y >= 98.0 && p.y <= 115.0) {
-		position = along_leader(p, vec2(128.5, 114.0), vec2(113.5, 99.0), vec2(89.5, 99.0));
+	} else if (p.x >= 89.0 && p.x < 114.0 && p.y >= 98.0 && p.y < 100.0) {
+		// カーソル側から丸へ向かって現す。
+		position = 1.0 - along_segment(p, vec2(89.5, 99.5), leader_start) * 24.0 / (24.0 + leader_length);
+	} else if (leader) {
+		position = 1.0 - (24.0 + leader_progress * leader_length) / (24.0 + leader_length);
 	}
 	if (p.x >= 32.0 && p.x < 96.0 && p.y >= 290.0 && p.y < 328.5) {
 		float band = floor((p.x - 32.0) / 4.0);
