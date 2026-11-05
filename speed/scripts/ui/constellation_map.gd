@@ -11,10 +11,12 @@ const SYMBOL_OFFSET := Vector2(-1, -0.5)
 const INNER_ORBIT_RATE := -2.0
 const INNER_LARGE_ORBIT_RATE := -1.0
 const INNER_TURN_SPEED := 60.0
+const SELECTION_TURN_DURATION := 0.65
+# 外周の内側の縁（半径149px）と小円（半径45.5px）の両方に内接する寸法。
+const INNER_ORBIT_RADIUS := (149.0 - 45.5) * 0.5
 # 大円の公転半径と揃え、オオイヌ選択時に小円の中心を星図の中心へ合わせる。
-const INNER_ORBIT_OFFSET := Vector2(0, -48)
-# 半径45.5pxの小円が、公転半径48pxで内接する大円のサイズ。
-const INNER_LARGE_RING_SCALE := 93.5 / 101.0
+const INNER_ORBIT_OFFSET := Vector2(0, -INNER_ORBIT_RADIUS)
+const INNER_LARGE_RING_SCALE := (149.0 - INNER_ORBIT_RADIUS) / 101.0
 const SELECTION_RECT := Rect2(141, 207, 112, 59)
 const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAGON_INDEX := 4
@@ -76,6 +78,7 @@ var _selected := 0
 var _last_orbit_selection := 0
 var _angle := 0.0
 var _ring_angle := 0.0
+var _ring_turn: Tween
 var _turn: Tween
 var _projection: Node2D
 var _origin := ORIGIN
@@ -272,15 +275,21 @@ func _hide_details() -> void:
 	_set_detail_line(0.0)
 	_set_detail_light(0.0)
 
-func _reveal_details() -> void:
+func _reveal_details(sync_rings: bool = false) -> void:
 	if _transition_progress < 1.0 or not is_visible_in_tree():
 		return
 	_hide_details()
 	_apply_reveal_settings()
-	_detail_fade = create_tween()
+	if sync_rings and _ring_turn != null:
+		_ring_turn.kill()
+	_detail_fade = create_tween().set_parallel(true)
 	_detail_fade.tween_method(_set_detail_line, 0.0, 1.0, reveal_settings.line_duration)
-	_detail_fade.tween_interval(reveal_settings.information_delay)
-	_detail_fade.tween_method(_set_detail_light, 0.0, 1.0, reveal_settings.fade_duration)
+	_detail_fade.tween_method(_set_detail_light, 0.0, 1.0, reveal_settings.fade_duration).set_delay(reveal_settings.line_duration + reveal_settings.information_delay)
+	if sync_rings:
+		# 情報の点灯と同じTweenで終え、直接移動でも完了フレームを揃える。
+		_ring_turn = _detail_fade
+		var duration: float = reveal_settings.line_duration + reveal_settings.information_delay + reveal_settings.fade_duration
+		_ring_turn.tween_method(_apply_ring_rotation, _ring_angle, _angle, duration)
 
 func _apply_reveal_settings() -> void:
 	for parameter: String in ["spectrum_speed", "spectrum_base_height", "spectrum_motion", "spectrum_correlation", "spectrum_peak_frequency", "spectrum_peak_strength", "orbit_speed"]:
@@ -346,9 +355,14 @@ func select_constellation(index: int) -> void:
 		_reveal_details()
 		return
 	var target := _angle + wrapf(90.0 - SYMBOL_ANGLES[index] - _angle, -180.0, 180.0)
+	if _ring_turn != null:
+		_ring_turn.kill()
+	var ring_duration: float = SELECTION_TURN_DURATION + reveal_settings.line_duration + reveal_settings.information_delay + reveal_settings.fade_duration
+	_ring_turn = create_tween()
+	_ring_turn.tween_method(_apply_ring_rotation, _ring_angle, target, ring_duration)
 	_turn = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_turn.tween_method(_apply_rotation, _angle, target, 0.65)
-	_turn.tween_callback(_reveal_details)
+	_turn.tween_method(_apply_rotation, _angle, target, SELECTION_TURN_DURATION)
+	_turn.tween_callback(_reveal_details.bind(true))
 
 func _on_stage_focus(index: int) -> void:
 	if not _pointer_down and index != _selected:
@@ -436,6 +450,8 @@ func _input(event: InputEvent) -> void:
 			_dragging = true
 			if _turn != null:
 				_turn.kill()
+			if _ring_turn != null:
+				_ring_turn.kill()
 			_hide_details()
 		if _dragging:
 			var offset := (point - _origin) / Vector2(1.0, _flatten)
@@ -504,15 +520,15 @@ func _apply_rotation(degrees: float) -> void:
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
 
 func _process(delta: float) -> void:
-	# 星座の選択速度は変えず、円だけをゆっくり追従させる。
-	if _ring_angle != _angle:
+	# 選択中は情報表示と同期し、ドラッグ中だけ角度へ追従させる。
+	if (_ring_turn == null or not _ring_turn.is_running()) and _ring_angle != _angle:
 		_apply_ring_rotation(move_toward(_ring_angle, _angle, INNER_TURN_SPEED * delta))
 
 func _apply_ring_rotation(degrees: float) -> void:
 	_ring_angle = degrees
 	var radians := deg_to_rad(degrees)
 	# 大円は星図中心に対して、1段階ごとに12時→9時→6時→3時へ進む。
-	_inner1.position = Vector2(0, -48).rotated(radians * INNER_LARGE_ORBIT_RATE)
+	_inner1.position = INNER_ORBIT_OFFSET.rotated(radians * INNER_LARGE_ORBIT_RATE)
 	_inner1.rotation = -radians * 5.0
 	# 小円は大円の内側を半周し、ステージ1・3で12時、2・4で6時に来る。
 	_inner2.position = _inner1.position + INNER_ORBIT_OFFSET.rotated(radians * INNER_ORBIT_RATE)
