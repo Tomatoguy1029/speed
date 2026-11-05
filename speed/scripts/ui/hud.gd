@@ -28,6 +28,9 @@ const MINIMAP_R := 43.0
 const MINIMAP_CENTER := Vector2(584, 55)
 const ART_SIZE := Vector2(640, 360)
 const CYAN := Color("#5bc8db")
+## ボーナスステージの残り時間の文字と縁取り
+const BONUS_GOLD := Color("#ffd86b")
+const BONUS_OUTLINE := Color("#2a1206")
 const ART := "res://assets/ui/combat/"
 const RADAR := preload(ART + "combat_ui_radar.png")
 const HEALTH := preload(ART + "combat_ui_health_bar.png")
@@ -753,7 +756,11 @@ func _draw_cpp() -> void:
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
-		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
+		# 明るいボーナス背景の上でも読めるよう、暗い縁取りの上に金色で太く描く。
+		var bonus_text: String = tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))})
+		draw_string_outline(_font,Vector2(230,38),bonus_text,HORIZONTAL_ALIGNMENT_CENTER,180,11,4,BONUS_OUTLINE)
+		draw_string_outline(_font,Vector2(230,38),bonus_text,HORIZONTAL_ALIGNMENT_CENTER,180,11,1,BONUS_GOLD)
+		draw_string(_font,Vector2(230,38),bonus_text,HORIZONTAL_ALIGNMENT_CENTER,180,11,BONUS_GOLD)
 	var loadout_region := LOADOUT_REGION
 	if StringName(hero.get("power", &"")) == &"":
 		loadout_region.size.x = LOADOUT_HERO.x - LOADOUT_REGION.position.x
