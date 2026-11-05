@@ -7779,7 +7779,7 @@ const H_DUST = ['#9a8f86', '#7a7068', '#c9bfb2'].map(hexc);
 // stop：止まる時刻（そのあと尾が薄れる）。curved：曲がって飛ぶ岩（まっすぐの切れ端と速度線を出さず、尾を短くする）
 function hRockGhosts(pos, dir, speed, spin, size) { for (let k = 4; k >= 1; k--) drawImg('meteor_0', sub(pos, mul(dir, speed * 0.016 * k)), spin - k * 0.08, size, 0.26 - k * 0.05); } // 速さでぶれる残像
 function hRockComet(R, b, age, dir, { stop = Infinity, curved = false } = {}) {
-  const p = R.back, pos = add(b.from, mul(dir, b.speed * Math.min(age, stop))), head = toL(pos), rad = b.radius * WL * 1.1 * R.P.size, on = smooth(0, 0.06, age) * (1 - smooth(stop, stop + 0.2, age)), full = b.speed * (curved ? 0.14 : 0.42) * WL * R.P.dust, L = Math.min(b.speed * age * WL, full), ux = dir.x, uy = dir.y, TONGUES = 6;
+  const p = R.back, pos = add(b.from, mul(dir, b.speed * Math.min(age, stop))), head = toL(pos), rad = b.radius * WL * 1.1 * R.P.size, on = smooth(0, 0.06, age) * (stop === Infinity ? 1 : 1 - smooth(stop, stop + 0.2, age)), full = b.speed * (curved ? 0.14 : 0.42) * WL * R.P.dust, L = Math.min(b.speed * age * WL, full), ux = dir.x, uy = dir.y, TONGUES = 6;
   if (L > 2) { const tongue = (i) => ({ off: (i / (TONGUES - 1) - 0.5) * 1.5, len: lerp(0.55, 1, hash(i * 3.1 + 2)), ph: hash(i * 5.7) * TAU, wid: lerp(0.32, 0.55, hash(i * 2.3 + 7)) }), T = Array.from({ length: TONGUES }, (_, i) => tongue(i));
     p.each(Math.min(head.x, head.x - ux * L) - rad * 1.6, Math.min(head.y, head.y - uy * L) - rad * 1.6, Math.max(head.x, head.x - ux * L) + rad * 1.6, Math.max(head.y, head.y - uy * L) + rad * 1.6, (x, y, sx, sy) => {
       const dx = x - head.x, dy = y - head.y, along = -(dx * ux + dy * uy), lat = dx * -uy + dy * ux, k0 = along / L; if (k0 < -0.04 || k0 > 1) return; let a = 0, k1 = 0;
