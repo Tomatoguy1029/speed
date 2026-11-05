@@ -217,6 +217,7 @@ var _resource_jobs: Dictionary = {}
 var _composite_scopes: Array[WeakRef] = []
 var _prepared_resources: Dictionary = {}
 var _startup_resources: ContentResourceScope
+var _bundle_reader: Thread
 var _fast_loads := 0
 var _vsync_mode := DisplayServer.VSYNC_ENABLED
 
@@ -236,14 +237,15 @@ func end_fast_loading() -> void:
 ## 全ステージと装備の生成済み一覧を起動時に準備し、終了まで保持する。
 func prepare_startup_resources() -> ContentResourceScope:
 	if _startup_resources != null: return _startup_resources
+	# 依存の検査と索引の読込は画面の更新を止めるので、別スレッドで進める。
+	_bundle_reader = Thread.new()
+	_bundle_reader.start(_read_stage_bundles.bind(stage_count()))
+	while _bundle_reader.is_alive(): await get_tree().process_frame
+	var bundles: Array = _bundle_reader.wait_to_finish()
+	_bundle_reader = null
 	var paths := PackedStringArray()
 	var signatures := {}
-	for index in range(1, stage_count()+1):
-		var path := "res://.content/run/stage_%d.json" % index
-		var header = JSON.parse_string(FileAccess.get_file_as_string(path))
-		var bundle := {}
-		if header is Dictionary:
-			bundle = preload("res://scripts/runtime/run_content_loader.gd").read_bundle(path,str(header.get("input_sha256","")))
+	for bundle: Dictionary in bundles:
 		if bundle.is_empty():
 			_startup_resources = ContentResourceScope.new()
 			_startup_resources.failed = true
@@ -256,9 +258,19 @@ func prepare_startup_resources() -> ContentResourceScope:
 				return _startup_resources
 			if not signatures.has(resource_path): paths.append(resource_path)
 			signatures[resource_path] = signature
-		await get_tree().process_frame
 	_startup_resources = prepare_resources(paths,true,signatures)
 	return _startup_resources
+
+func _read_stage_bundles(count: int) -> Array:
+	var bundles := []
+	for index in range(1, count+1):
+		var path := "res://.content/run/stage_%d.json" % index
+		var header = JSON.parse_string(FileAccess.get_file_as_string(path))
+		var bundle := {}
+		if header is Dictionary:
+			bundle = preload("res://scripts/runtime/run_content_loader.gd").read_bundle(path,str(header.get("input_sha256","")))
+		bundles.append({"resources":bundle.resources} if not bundle.is_empty() else {})
+	return bundles
 
 func _startup_covers(paths: PackedStringArray, signatures: Dictionary) -> bool:
 	if _startup_resources == null or _startup_resources.cancelled or _startup_resources.failed or not _startup_resources.warmup_complete: return false
@@ -276,7 +288,7 @@ func prepare_resources(paths: PackedStringArray, threaded := true, signatures :=
 		scope.warm_materials = _startup_resources.warm_materials.duplicate()
 	for path in paths:
 		if scope.resources.has(path) or path in scope.pending: continue
-		if path.get_extension() not in ["png","svg","jpg","jpeg","webp","wav","ogg","mp3","gdshader","glsl"]:
+		if path.get_extension() not in ["png","svg","jpg","jpeg","webp","wav","ogg","mp3","gdshader","glsl"] and not (threaded and _plain_data(path)):
 			scope.composites.append(path)
 			scope.pending.append(path)
 		elif not threaded:
@@ -296,6 +308,14 @@ func prepare_resources(paths: PackedStringArray, threaded := true, signatures :=
 			_resource_jobs[key].waiters.append(weakref(scope))
 	if not _finish_composites(scope,4000 if threaded else 0): _composite_scopes.append(weakref(scope))
 	return scope
+
+## ScriptもSceneも依存に含まないデータは、preloadに関わらないので画像と同じく別スレッドで読める。
+func _plain_data(path: String) -> bool:
+	if path.get_extension() not in ["tres","res"]: return false
+	for dependency in ResourceLoader.get_dependencies(path):
+		var target: String = dependency.split("::")[-1]
+		if target.get_extension() in ["gd","tscn","scn"] or (target.get_extension() in ["tres","res"] and not _plain_data(target)): return false
+	return true
 
 func _finish_composites(scope: ContentResourceScope, budget_us := 4000) -> bool:
 	if scope.cancelled: return true
@@ -346,6 +366,7 @@ func _process(_delta: float) -> void:
 		if scope==null or _finish_composites(scope): _composite_scopes.erase(reference)
 
 func _exit_tree() -> void:
+	if _bundle_reader != null: _bundle_reader.wait_to_finish()
 	if _startup_resources != null: _startup_resources.cancel()
 	for job: ResourceJob in _resource_jobs.values(): job.finish()
 	_resource_jobs.clear()

@@ -2,14 +2,19 @@
 extends RefCounted
 const ResourceList = preload("res://scripts/data_types/run_resources.gd")
 static var _hashes := {}
+static var _hash_lock := Mutex.new()
 
 ## 全ステージが同じ依存を持つので、更新時刻が同じファイルは計算し直さない。
 static func _sha256(path: String) -> String:
 	var modified := FileAccess.get_modified_time(path)
+	_hash_lock.lock()
 	var known: Array = _hashes.get(path,[])
+	_hash_lock.unlock()
 	if not known.is_empty() and known[0]==modified: return known[1]
 	var value := FileAccess.get_sha256(path)
+	_hash_lock.lock()
 	_hashes[path] = [modified,value]
+	_hash_lock.unlock()
 	return value
 
 static func read_bundle(index_path: String, expected_input: String) -> Dictionary:

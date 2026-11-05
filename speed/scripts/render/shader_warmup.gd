@@ -1,11 +1,14 @@
 ## 利用するmaterialを専用の小さなViewportで描き、戦闘の前に描画パイプラインを準備する。
 extends SubViewport
+const COLLECT_BUDGET_US := 4000
 var _scope: ContentResourceScope
 var _frames := 0
 var _material_index := 0
 var _layers: Array[CanvasLayer] = []
 var _texture: Texture2D
 var _lit_texture: CanvasTexture
+var _sources: Array = []
+var _source_index := 0
 func prepare(scope: ContentResourceScope) -> void:
 	_scope = scope
 	scope.warming = true
@@ -34,13 +37,8 @@ func prepare(scope: ContentResourceScope) -> void:
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	materials.append(unshaded)
-	for resource in scope.resources.values():
-		if resource is Shader and resource.get_mode() == Shader.MODE_CANVAS_ITEM:
-			var material := ShaderMaterial.new()
-			material.shader = resource
-			materials.append(material)
-		elif resource is ShaderMaterial: materials.append(resource)
 	scope.warm_materials = materials
+	_sources = scope.resources.values()
 	for lit in [false, true]:
 		var layer := CanvasLayer.new()
 		layer.layer = 1 if lit else 0
@@ -107,12 +105,27 @@ func _geometry(parent: Node, material: Material, texture: Texture2D) -> void:
 		batch.add(Vector2(8, 8), 0.0, 4.0, Color.WHITE)
 		batch.end()
 		parent.add_child(batch)
+## materialの作成も主スレッドを止めるので、1フレーム分ずつ進める。
+func _collect_materials() -> void:
+	var began := Time.get_ticks_usec()
+	while _source_index < _sources.size() and Time.get_ticks_usec()-began < COLLECT_BUDGET_US:
+		var resource: Variant = _sources[_source_index]
+		_source_index += 1
+		if resource is Shader and resource.get_mode() == Shader.MODE_CANVAS_ITEM:
+			var material := ShaderMaterial.new()
+			material.shader = resource
+			_scope.warm_materials.append(material)
+		elif resource is ShaderMaterial: _scope.warm_materials.append(resource)
+
 func _process(_dt: float) -> void:
 	if _scope == null: return
 	if _scope.cancelled:
 		_scope.warming = false
 		_scope = null
 		queue_free()
+		return
+	if _source_index < _sources.size():
+		_collect_materials()
 		return
 	# 一度に全materialを投入すると、最初の描画だけでロード表示まで止まる。
 	# 同じ幾何と照明の組をmaterialごとに描き、各組の描画を終えてから次へ進む。
