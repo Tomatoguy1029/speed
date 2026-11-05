@@ -470,7 +470,7 @@ func _select(index: int) -> void:
 		_dragon_frame.visible = dragon_selected
 		_final_stage.focus_mode = Control.FOCUS_ALL if dragon_selected else Control.FOCUS_NONE
 		_page_arrow.flip_v = dragon_selected
-		_page_arrow.position.y = 30.0 if dragon_selected else 304.0
+		_page_arrow.position.y = 84.0 if dragon_selected else 304.0
 		_page_button.position = _page_arrow.position
 		_page_button.tooltip_text = "星図に戻る" if dragon_selected else tr("stage.5.name")
 		for star in _stars:
