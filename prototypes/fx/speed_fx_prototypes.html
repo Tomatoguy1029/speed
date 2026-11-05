@@ -8363,22 +8363,69 @@ function hsBody(S, R, poses) {
   for (const n of [...S.necks, S.bearer]) { const p = R.proto && poses.get(n); if (p) hDrawHead(n, p.head, p.angle, p.sx, p.sy); else hDrawHead(n, n.pos, n.angle); }
 }
 
-// ---------- 格子ビーム（grid.cpp、仮の1配置）
-function hmGridPlan() { const L = HP.grid_layouts.provisional, o = V(-210, 0); return { path: L.path.map(p => add(p, o)), slots: L.slots.map(s => ({ from: add(s.from, o), to: add(s.to, o) })), bearer: add(L.path[L.path.length - 1], o) }; }
-function hmGridTick(S, dt) {
-  if (S.mt < 0) return; S.necks.forEach((n, i) => { n.angle = angOf(sub(n.end, n.strike)); });
+// ---------- 格子ビーム（試作：泳ぐ蛇が順番に止まって機体を狙い、撃ったビームが残る）
+const HM_GRID = { start: 1.4, gap: 0.7, stop: 0.75, lock: 0.4, dodge: 0.22, leave: 1, hold: 1.9, reach: 380, routeSpeed: 2200 };
+function hmGridSlots() { return Array.from({ length: 8 }, (_, i) => { const a = i * Math.PI / 4 + 0.3 + (hash(i * 2.3) - 0.5) * 0.5, r = 430 + hash(i * 4.1) * 130; return V(Math.cos(a) * r * 1.25, Math.sin(a) * r * 0.82); }); }
+function hmGridSetup(S) {
+  S.positioning = false; S.age = 0; S.mt = 0; S.fired = 0; S.move = null; S.route = null; S.struck = null;
+  S.gridEnd = HM_GRID.start + (S.necks.length - 1) * HM_GRID.gap + HM_GRID.hold;
+  S.necks.forEach((n, i) => { const side = i % 2 ? 1 : -1; n.pos = { ...n.slot }; n.angle = angOf(n.pos) + Math.PI / 2 * side; n.orbit = { a: angOf(n.pos), r: len(n.pos), w: side * (0.16 + hash(i * 6.7) * 0.1) }; n.trail = null; hsFollow(S, n, 1 / 60); });
+  S.bearer.pos = { ...S.bearer.slot }; S.bearer.trail = null; hsFollow(S, S.bearer, 1 / 60);
 }
+function hmGridPick(S) { // 機体から見て、これまでに撃った蛇と離れた方向にいる蛇を次に選ぶ
+  const bearing = n => angOf(sub(n.pos, S.ship.pos)), used = S.necks.filter(n => n.fireAt != null).map(bearing);
+  const score = n => used.length ? Math.min(...used.map(a => Math.abs(angDiff(bearing(n), a)))) : -dist(n.pos, S.ship.pos);
+  return S.necks.filter(n => n.fireAt == null).reduce((best, n) => score(n) > score(best) ? n : best);
+}
+function hmGridBeamDist(p, n) { const d = sub(n.end, n.pos), u = clamp(((p.x - n.pos.x) * d.x + (p.y - n.pos.y) * d.y) / (d.x * d.x + d.y * d.y)); return dist(p, add(n.pos, mul(d, u))); }
+function hmGridClearance(S, p, skip) { return Math.min(Infinity, ...S.necks.filter(n => n.end && n !== skip).map(n => hmGridBeamDist(p, n))); }
+function hmGridDodge(S, n) { // 実演の機体：狙われたら横へよける。残ったビームをまたがず、不死の蛇へ近づく向きを選ぶ
+  const from = S.ship.pos, base = n.angle + Math.PI / 2, options = [];
+  for (const sign of [0, Math.PI]) for (const lean of [0, 0.6, -0.6]) for (const step of [130, 170, 240, 310]) options.push(add(from, mul(fromA(base + sign + lean), step)));
+  const score = p => (hmGridClear(S, from, p, n) ? 4000 : 0) + (Math.abs(p.x) < 620 && Math.abs(p.y) < 400 ? 2000 : 0) + Math.min(hmGridClearance(S, p), 150) * 2 - dist(p, S.bearer.pos) * 0.5, to = options.reduce((best, p) => score(p) > score(best) ? p : best);
+  S.move = { from: { ...S.ship.pos }, to, at: S.age, time: 0.2 };
+}
+function hmGridClear(S, a, b, skip) { const L = dist(a, b); for (let d = 0; d <= L; d += 20) if (hmGridClearance(S, lerpV(a, b, d / Math.max(L, 1)), skip) < 38) return false; return true; }
+function hmGridRoute(S) { // 実演の機体：隙間をたどって不死の蛇へ向かう。格子を幅優先で探し、まっすぐ通れる所は1本にまとめる
+  const from = { ...S.ship.pos }, to = add(S.bearer.pos, mul(norm(sub(from, S.bearer.pos)), 110)), cell = 40, key = (x, y) => x + ',' + y, cellOf = p => [Math.round(p.x / cell), Math.round(p.y / cell)], [sx, sy] = cellOf(from), [gx, gy] = cellOf(to), back = new Map([[key(sx, sy), null]]), open = [[sx, sy]];
+  while (open.length && !back.has(key(gx, gy))) { const [x, y] = open.shift(); for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]]) { const nx = x + dx, ny = y + dy, id = key(nx, ny); if (back.has(id) || Math.abs(nx) > 24 || Math.abs(ny) > 14 || hmGridClearance(S, V(nx * cell, ny * cell)) < 40) continue; back.set(id, [x, y]); open.push([nx, ny]); } }
+  if (!back.has(key(gx, gy))) return [from, to];
+  const cells = []; for (let at = [gx, gy]; at; at = back.get(key(at[0], at[1]))) cells.unshift(V(at[0] * cell, at[1] * cell)); cells[0] = from; cells[cells.length - 1] = to;
+  const route = [from]; for (let i = 0; i < cells.length - 1;) { let j = cells.length - 1; while (j > i + 1 && !hmGridClear(S, cells[i], cells[j])) j -= 1; route.push(cells[j]); i = j; }
+  return route;
+}
+function hmGridShip(S) {
+  const ship = S.ship; let aim = null;
+  if (S.move) { const m = S.move, u = clamp((S.age - m.at) / m.time); aim = sub(m.to, m.from); ship.pos = lerpV(m.from, m.to, smooth(0, 1, u)); if (u >= 1) S.move = null; }
+  else if (S.routeAt != null && S.age >= S.routeAt && !S.struck) { let left = (S.age - S.routeAt) * HM_GRID.routeSpeed, at = S.route[0]; S.struck = S.age; for (let i = 1; i < S.route.length; i++) { const l = dist(S.route[i - 1], S.route[i]); aim = sub(S.route[i], S.route[i - 1]); if (left < l) { at = lerpV(S.route[i - 1], S.route[i], left / l); S.struck = null; break; } left -= l; at = S.route[i]; } ship.pos = at; }
+  ship.speed = aim ? 300 : 0; if (aim) ship.heading = angOf(aim); else ship.heading += angDiff(angOf(sub(S.bearer.pos, ship.pos)), ship.heading) * 0.04;
+}
+function hmGridTick(S, dt) {
+  const G = HM_GRID, total = S.necks.length, last = G.start + (total - 1) * G.gap;
+  while (S.fired < total && S.age >= G.start + S.fired * G.gap - G.stop) { const n = hmGridPick(S); n.fireAt = G.start + S.fired * G.gap; n.major = true; n.moving = false; S.fired += 1; }
+  for (const n of S.necks) {
+    if (n.fireAt == null) { n.orbit.a += n.orbit.w * dt; n.moving = true; hsSteer(S, n, V(Math.cos(n.orbit.a) * n.orbit.r * 1.25 + S.ship.pos.x * 0.3, Math.sin(n.orbit.a) * n.orbit.r * 0.82 + S.ship.pos.y * 0.3), dt, 0.9); continue; }
+    if (S.age < n.fireAt - G.lock) n.angle += angDiff(angOf(sub(S.ship.pos, n.pos)), n.angle) * Math.min(1, dt * 10);
+    else if (!n.end) { const d = norm(sub(S.ship.pos, n.pos)); n.angle = angOf(d); n.end = add(S.ship.pos, mul(d, G.reach)); }
+    if (n.end && !n.dodged && S.age >= n.fireAt - G.dodge) { n.dodged = true; hmGridDodge(S, n); }
+  }
+  if (!S.route && !S.move && S.age >= last + G.leave - 0.5) { S.route = hmGridRoute(S); S.routeAt = last + G.leave; }
+  hmGridShip(S);
+}
+function hmGridPose(S, n) { if (n.fireAt == null) return { head: n.pos, angle: n.angle, sx: 1, sy: 1 }; const rel = S.age - n.fireAt; return hmPose({ age: HM_GRID.stop + rel, mt: rel, t: S.t, P: S.P, r: { warning_time: HM_GRID.stop } }, n, 0); }
+function hmGridPhase(S) { const G = HM_GRID, last = G.start + (S.necks.length - 1) * G.gap; return S.age < last ? '蛇が泳ぎ、順番に止まって撃つ' : S.age < S.gridEnd ? 'ビームが残り、隙間を抜ける' : '全体の硬直（攻めどき）'; }
 function hmGridDraw(S, R) {
-  const r = S.r, col = HM_COLORS.beam, poses = new Map(S.necks.map(n => [n, S.positioning ? { head: n.pos, angle: n.angle, sx: 1, sy: 1 } : hmPose(S, n, r.normal_charge)]));
-  const delay = r.normal_charge;
-  if (R.proto && !S.positioning) S.necks.forEach((n, i) => {
-    const p = poses.get(n), M = hmMouth(n, p), A = toL(M), B = toL(n.end), e = S.mt - delay;
-    if (e < 0) { const k = clamp((S.age + 0.2) / (r.warning_time + delay + 0.2)); hmEyes(S, R, n, p, k, col); hmGather(S, R, M, k, col, 40 + i); if (S.mt >= 0) FX.warnRail(R.front, A, B, { color: col, k, time: S.t, seed: 50 + i, maxLv: 2, intensity: R.P.intensity }); }
-    else if (e < r.grid_time + 0.12) { const from = clamp((e - r.grid_time) / 0.12); hmPolyBeam(S, R, [M, n.end], r.beam_width * WL * R.P.size, col, from, clamp(e / 0.07), 1); R.front.glow(A.x, A.y, 4 * R.P.size, FX.ramp(col)[3], 0.4 * (1 - from) * R.P.intensity); hmEyes(S, R, n, p, 0.5, col); }
+  const G = HM_GRID, r = S.r, col = HM_COLORS.beam, poses = new Map(S.necks.map(n => [n, hmGridPose(S, n)]));
+  if (R.proto) S.necks.forEach((n, i) => {
+    if (n.fireAt == null) return; const p = poses.get(n), M = hmMouth(n, p), rel = S.age - n.fireAt;
+    if (rel < 0) { const k = clamp(1 + rel / G.stop), end = n.end || add(S.ship.pos, mul(fromA(p.angle), G.reach)); hmEyes(S, R, n, p, k, col); hmGather(S, R, M, k, col, 40 + i); FX.warnRail(R.front, toL(M), toL(end), { color: col, k: n.end ? 1 : 0.35, time: S.t, seed: 50 + i, maxLv: 2, intensity: R.P.intensity }); }
+    else if (S.age < S.gridEnd + 0.12) { const from = clamp((S.age - S.gridEnd) / 0.12), A = toL(M); hmPolyBeam(S, R, [M, n.end], r.beam_width * WL * R.P.size, col, from, clamp(rel / 0.07), 1); R.front.glow(A.x, A.y, 4 * R.P.size, FX.ramp(col)[3], 0.4 * (1 - from) * R.P.intensity); hmEyes(S, R, n, p, 0.5, col); }
   });
-  if (R.proto && !S.positioning && S.mt >= 0) { const k = 0.6 + 0.4 * Math.sin(S.t * 6); hmEyes(S, R, S.bearer, { head: S.bearer.pos, angle: S.bearer.angle, sx: 1, sy: 1 }, 0.4 * k, '#ffe69a'); }
+  if (R.proto) { const k = 0.6 + 0.4 * Math.sin(S.t * 6); hmEyes(S, R, S.bearer, { head: S.bearer.pos, angle: S.bearer.angle, sx: 1, sy: 1 }, 0.4 * k, '#ffe69a'); }
+  if (R.proto && S.struck != null) { const k = 1 - clamp((S.age - S.struck) / 0.5), A = toL(S.bearer.pos); if (k > 0) R.front.glow(A.x, A.y, 26 * R.P.size, '#ffffff', 0.7 * k * R.P.intensity); }
   R.blitBack(); hsBody(S, R, poses);
-  if (!R.proto && !S.positioning) S.necks.forEach(n => { const e = S.mt - delay; if (S.mt >= 0 && e < 0) D2.line(n.strike, n.end, rgba('#ff4066', 0.35), 3); else if (e >= 0 && e < r.grid_time) D2.roundBeam(n.strike, n.end, rgba('#ff4066', 0.85), r.beam_width); });
+  if (S.route && S.age < S.routeAt) for (let i = 1; i < S.route.length; i++) D2.line(S.route[i - 1], S.route[i], rgba('#ffffff', 0.4), 3);
+  if (!R.proto) S.necks.forEach(n => { if (n.fireAt == null) return; const end = n.end || add(S.ship.pos, mul(fromA(n.angle), G.reach)); if (S.age < n.fireAt) D2.line(n.pos, end, rgba('#ff4066', 0.35), 3); else if (S.age < S.gridEnd) D2.roundBeam(n.pos, end, rgba('#ff4066', 0.85), r.beam_width); });
   drawShip(S.ship);
 }
 
@@ -8405,11 +8452,11 @@ function hmSwarmDraw(S, R) {
 function hsRegister(id, ids, desc, slotsFn, bearerAt, tick, draw, extra) {
   const r = hRule(id);
   DEMOS.push({ id: 'H-' + id, ids, cat: 'うみへび座（H）', group: 'うみへび座', title: r.display_name, duration: 16, color: id === 'grid' ? HM_COLORS.beam : HM_COLORS.bite,
-    params: HM_PARAMS, status: { ...HM_STATUS, '作り': desc, '未決・保留': id === 'grid' ? '格子は現行の仮の1配置（正式な5配置は未決）。蛇の群れの陣形・回避は省略し、配置へ泳ぐ所から再生' : '群れの陣形・回避は省略し、配置へ泳ぐ所から再生' }, refs: ['cpp/bosses/hydra/' + id + '.cpp・swim.cpp（steer・follow）', 'data/bosses/hydra.tres（grid_layouts・swarm_*・snake_*）'],
-    setup(S) { const sl = slotsFn(); hsSetup(S, id, sl.map(s => s.from || s), bearerAt()); S.necks.forEach((n, i) => { n.end = sl[i].to; }); S.ship.pos = id === 'grid' ? V(-210, 0) : V(0, 0); S.P = P(); }, step(S, dt) { hsStep(S, dt, tick); }, draw(S, R) { S.P = R.P; draw(S, R); }, phase: hsPhase });
+    params: HM_PARAMS, status: { ...HM_STATUS, '作り': desc, '未決・保留': id === 'grid' ? '作り直しの案。蛇の数の下限、撃つ間隔、ビームの残る時間は試作の値。本番の grid.cpp・hydra.tres は5領域の配置のまま' : '群れの陣形・回避は省略し、配置へ泳ぐ所から再生' }, refs: ['cpp/bosses/hydra/' + id + '.cpp・swim.cpp（steer・follow）', 'data/bosses/hydra.tres（grid_layouts・swarm_*・snake_*）'],
+    setup(S) { const sl = slotsFn(); hsSetup(S, id, sl.map(s => s.from || s), bearerAt()); S.necks.forEach((n, i) => { n.end = sl[i].to; }); S.ship.pos = V(0, 0); S.P = P(); if (id === 'grid') hmGridSetup(S); }, step(S, dt) { hsStep(S, dt, tick); }, draw(S, R) { S.P = R.P; draw(S, R); }, phase: id === 'grid' ? hmGridPhase : hsPhase });
 }
-hsRegister('grid', ['H04', 'H10'], '配置へ泳いで止まり、目を光らせて口へ光を集める → 照準の光（白くしない）→ 長さの違う光線が格子を作り、間に一筆で縫える通り道が残る。奥で不死の蛇が羅針盤を抱えて待つ → 根元から消える',
-  () => hmGridPlan().slots.slice(0, 6), () => hmGridPlan().bearer, hmGridTick, hmGridDraw);
+hsRegister('grid', ['H04', 'H10'], '蛇はばらばらに泳ぎ、順番が来た蛇がその場で止まる。機体から見て前の蛇と離れた方向の蛇を選ぶ → 機体を狙い、撃つ直前に狙いを固定 → 撃ったビームはその場に残り、よけた跡が格子になる → 隙間を抜けて不死の蛇へ → 根元から消えて全体の硬直',
+  hmGridSlots, () => V(760, -380), hmGridTick, hmGridDraw);
 hsRegister('swarm', ['H19'], '画面のまわりの出発位置へ泳ぐ → 順番に目を光らせ、頭から突進の先まで照準の光、S字にためて止まる → 0.3秒ずつずれて一直線に飛びかかり、胴が道をたどってついてくる。頭の形の光と空気の筋、着いた所で牙の鉤と閃光',
   () => { const rx = (W / Z - 140) * 0.45, ry = (H / Z - 140) * 0.45; return Array.from({ length: 6 }, (_, i) => ({ from: V(Math.cos(TAU * i / 6) * rx, Math.sin(TAU * i / 6) * ry), to: null })); }, () => V(-560, 330), hmSwarmTick, hmSwarmDraw);
 
