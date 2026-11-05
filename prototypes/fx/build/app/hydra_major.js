@@ -52,20 +52,56 @@ function hmChew(S, R, n, pose, k) { // 瓦礫の首：首の瓦礫が口へ送�
   for (let j = 0; j < 8; j++) { const ph = (S.t * 1.6 + hash(j * 3.1)) % 1, f = ph * N, i = Math.min(N - 1, Math.floor(f)), at = lerpV(pts[i], pts[i + 1], f - i), q = toL(at); R.front.px(q.x, q.y, H_STONE[4]); R.front.px(q.x + 1, q.y, H_STONE[3]); }
   for (let j = 0; j < 14; j++) { const an = hash(j * 2.3) * TAU + S.t * 6 * (hash(j) - 0.5), d = 3 * Math.sqrt(hash(j * 5.9)) * k; R.front.px(M.x + Math.cos(an) * d, M.y + Math.sin(an) * d, H_STONE[3]); }
 }
-function hmRockTrail(S, R, pts, seed, scale = 1) { // 飛ぶ岩の砂ぼこり：過去の位置にふくらみながら崩れる
-  for (let k = 1; k < pts.length; k++) { const a = k * 0.03, q = toL(pts[k]), rr = (1 + a * 7) * scale * R.P.size * R.P.dust;
-    for (let y = -rr; y <= rr; y++) for (let x = -rr; x <= rr; x++) { if (x * x + y * y > rr * rr || hash(seed * 31 + k * 7 + x * 3 + y * 11) < a * 1.9) continue; R.back.dot(q.x + x, q.y + y, H_STONE[a < 0.15 ? 3 : 2], (1 - a / 0.5) * 0.5); } }
+// 竜巻の姿：pixelFX nature/tornado の作り（半透明の胴、巻きつく風の筋、広がった頭、足元の土ぼこり、手前と奥を回る瓦礫）を、風の帯と同じ緑で描く。
+// 形は判定の円の中に立つ。grow：育ち具合、lean：進む向きへの傾き、fade：終わりの薄れ。手前と奥を分けて描く。
+const HM_TOR_SY = 0.3, HM_TOR_ROCKS = [[0.25, 20, 0.3], [0.37, 27, 0.62], [0.49, 17, 0.84], [0.6, 23, 0.46], [0.7, 14, 0.16]];
+function hmTorGeo(S, R, c, grow, lean, fade) {
+  const top = S.r.tornado_width * 0.5 * WL * R.P.size, H0 = top * 3, L = toL(c), FH = Math.max(4, H0 * Math.pow(grow, 0.8)), foot = V(L.x, L.y + H0 * 0.5), ph = S.t * TAU / 1.1, g = lerp(0.3, 1, grow);
+  return { c, L, top, FH, foot, g, fade, grow, t: S.t, ax: (u) => top * 0.2 * Math.sin(ph - 2.6 * u) * (0.2 + 0.8 * u) + top * 0.07 * Math.sin(2 * ph + 1.3 - 4.5 * u) * u + lean * top * 0.6 * u, rad: (u) => top * g * (0.1 + 0.5 * Math.pow(u, 1.5) + 0.4 * Math.pow(smooth(0.78, 1, u), 2)) };
 }
-// 渦：らせんの腕で回る空気の筋と、中の暗い雲。輪にせず、腕ごとに長さと明るさを崩す
-function hmVortex(S, R, c, radius, k, color, rot, seed) {
-  const pal = FX.ramp(color), C = toL(c), Rr = radius * WL * R.P.size;
-  for (let i = 0; i < 90; i++) { const h = hash(seed + i * 1.7), s = Math.sqrt(hash(seed + i * 4.3)), an = h * TAU + rot * (1.6 - s) , rr = Rr * s; if (hash(seed + i * 9.1) > k * 1.3) continue;
-    const q = V(C.x + Math.cos(an) * rr, C.y + Math.sin(an) * rr * 0.92); R.back.dot(q.x, q.y, hexc('#10202a'), 0.55 * k * (1 - s * 0.6)); }
-  for (let a = 0; a < 12; a++) { const len0 = 0.4 + 0.6 * hash(seed + a * 3.3), b = 0.5 + 0.5 * hash(seed + a * 5.1), th = 0.5 + 1.3 * hash(seed + a * 8.7);
-    for (let s = 0.1; s < len0; s += 0.5 / Math.max(4, Rr)) { const an = rot * (1 + 0.25 * hash(seed + a)) + a * TAU / 12 + s * 3.2, f = (s / len0) * b * k; if (f < 0.08) continue;
-      for (let w = -th; w <= th; w += 0.5) { const rr = Rr * s + w, q = V(C.x + Math.cos(an) * rr, C.y + Math.sin(an) * rr), g = f * (1 - Math.abs(w) / (th + 0.5));
-        if (g > 0.45) R.front.px(q.x, q.y, pal[g > 0.75 ? 4 : 3]); else R.front.dot(q.x, q.y, pal[2], g * 1.6); } } }
-  R.front.light(C.x, C.y, pal[2], 0.25 * k * R.P.intensity);
+function hmTorBody(R, G) { // 胴：列ごとに回る速さが違い、風の筋がずれ合う。色は段をつけずになめらかに変える
+  const p = R.back, C = H_WIND, ramp = (v) => { const q = clamp((v + 0.6) / 1.4) * 4, i = Math.min(3, Math.floor(q)); return PX.mix(C[2 + i], C[3 + i], q - i); };
+  for (let y = -Math.ceil(G.FH) + 1; y <= 0; y++) { const u = -y / G.FH, cx = G.ax(u), r = G.rad(u), K = 3 + (hash(y * 3.1) < 0.35 ? 1.5 : 0), rot = TAU * K * G.t / 2, fade = Math.min(1, u * 8 + 0.25) * (1 - smooth(0.9, 1.02, u)) * G.fade;
+    for (let x = Math.floor(cx - r); x <= Math.ceil(cx + r); x++) { const e = (x + 0.5 - cx) / r; if (Math.abs(e) > 1) continue; const n = PX.tileNoise((Math.acos(e) + rot) * 6 / TAU, y * 0.34, 6, 0, 13), v = -e * 0.5 + 0.1 + (n - 0.2) * 0.7;
+      p.blend(G.foot.x + x, G.foot.y + y, u < 0.28 ? PX.mix(ramp(v), H_DUST[v > 0 ? 0 : 1], 0.65 * (1 - u / 0.28)) : ramp(v), (0.16 + 0.4 * Math.sqrt(1 - e * e)) * fade); } }
+}
+function hmTorBands(R, G, back) { // 胴に巻きつく風の筋：先が明るく尾へ薄れ、奥を回る所は暗い
+  const p = R.back, C = H_WIND;
+  for (let j = 0; j < 44; j++) { const rnd = (k) => hash(j * 5.3 + k * 2.1 + 7), u = (j + rnd(1)) / 44; if (u > 0.97) continue; const K = 2 + Math.floor(rnd(2) * 3), span = lerp(0.7, 2.1, rnd(3)), lvl = rnd(4), cx = G.ax(u), r = G.rad(u) * lerp(1, 1.12, rnd(5)), y0 = -u * G.FH, head = rnd(6) * TAU + TAU * K * G.t / 2;
+    for (let s = 0; s <= span; s += 0.5 / Math.max(2, r)) { const th = head - s, sn = Math.sin(th); if ((sn <= 0) !== back) continue; const k = s / span, x = cx + r * Math.cos(th), y = y0 + r * HM_TOR_SY * sn, lit = Math.cos(th) < 0.2;
+      let i = lvl < 0.18 ? 3 : k < 0.15 && lvl > 0.55 ? 7 : k < 0.45 ? (lit ? 6 : 5) : lit ? 5 : 4; if (back) i = Math.max(2, i - 2);
+      p.blend(G.foot.x + x, G.foot.y + y, C[i], (k < 0.5 ? 0.95 : 2 * (1 - k) * 0.95) * G.fade); } }
+}
+function hmTorCrown(R, G, back) { // 広がった頭：風の雲が平たい帯になって回る
+  const p = R.back, C = H_WIND, cx = G.ax(1), r = G.rad(1), y0 = -G.FH - 1;
+  if (back) p.disc(G.foot.x + cx, G.foot.y + y0 + 1, r * 0.8, C[1], (d) => (1 - d * d) * 0.55 * G.fade);
+  for (let j = 0; j < 14; j++) { const rnd = (k) => hash(j * 3.9 + k * 1.7 + 31), rr = r * lerp(0.4, 1.15, rnd(1)), K = 1 + Math.round(rnd(2)), span = lerp(1.4, 2.8, rnd(3)), head = rnd(4) * TAU + TAU * K * G.t / 2, lift = lerp(-2, 2, rnd(5)) - (1 - rr / (r * 1.15)) * 3, th0 = lerp(1.5, 3, rnd(6)) * G.g;
+    for (let s = 0; s <= span; s += 0.6 / Math.max(2, rr)) { const th = head - s, sn = Math.sin(th); if ((sn <= 0) !== back) continue; const k = s / span, x = cx + rr * Math.cos(th), y = y0 + lift + rr * HM_TOR_SY * sn, T = Math.max(1, Math.round(th0 * Math.sin(Math.PI * Math.pow(1 - k, 0.7)))), lit = Math.cos(th) < 0.3;
+      for (let i = 0; i < T; i++) p.blend(G.foot.x + x, G.foot.y + y - T / 2 + i, C[(i === 0 ? (lit ? 6 : 5) : i === T - 1 && T > 2 ? 2 : 4) - (back ? 1 : 0)], (0.55 + 0.35 * (1 - k)) * (back ? 0.75 : 1) * G.fade); } }
+}
+function hmTorSkirt(R, G, back) { // 足元：土ぼこりが回りながら外へ広がる
+  const p = R.back, cx = G.ax(0), t = G.t, top = G.top * G.g;
+  hCycle(t, 1e9, 26, 0.7, 1.3, 91, (age, life, rnd) => { const k = age / life, th = rnd(1) * TAU + lerp(5, 9, rnd(2)) * age, sn = Math.sin(th); if ((sn <= 0) !== back) return; const rr = top * (0.12 + k * lerp(0.4, 0.75, rnd(3))), x = G.foot.x + cx + rr * Math.cos(th), y = G.foot.y - k * top * 0.3 * rnd(4) + rr * 0.3 * sn, sz = lerp(1.6, 3, rnd(5)) * (0.6 + 0.8 * k), a = Math.min(1, k * 6) * (1 - k) * 0.55 * G.fade * G.grow; p.disc(x, y, sz, H_DUST[back ? 1 : 0], (d) => a * (1 - d * d)); });
+}
+function hmTorLitter(R, G, back) { // 砂利と葉：足元へ滑り込み、らせんに登って頭から放り出される
+  const p = R.back, C = H_WIND;
+  hCycle(G.t, 1e9, 26, 1.1, 1.7, 53, (age, life, rnd) => { const k = age / life, sk = lerp(0.15, 0.3, rnd(1)), q = clamp((k - sk) / (1 - sk)), u = lerp(0.03, 0.98, Math.pow(q, 0.85)), th = rnd(2) * TAU + lerp(2, 3.2, rnd(3)) * TAU * k, sn = Math.sin(th); if ((sn <= 0) !== back) return;
+    const fling = smooth(0.78, 1, q), inward = 1 - smooth(0, sk, k), rr = lerp(G.rad(u) * (1.12 + fling * 1.1), G.top * lerp(1.2, 2, rnd(4)), inward), x = G.foot.x + G.ax(u) + rr * Math.cos(th), y = G.foot.y - u * G.FH + rr * HM_TOR_SY * sn - fling * 4, a = Math.min(1, k * 8) * (1 - smooth(0.85, 1, k)) * G.fade * G.grow, spin = age * lerp(-14, 14, rnd(5)), leaf = rnd(6) < 0.45;
+    const col = leaf ? C[back ? 3 : 5] : H_STONE[back ? 2 : 3], col2 = leaf ? C[back ? 2 : 4] : H_STONE[back ? 1 : 2]; p.blend(x, y, col, a); p.blend(x + Math.round(Math.cos(spin)), y + Math.round(Math.sin(spin)), col2, a); });
+}
+function hmTorWake(R, G, T, r, a) { // 走った跡：足元の通った所に土ぼこりが残り、ふくらんで薄れる
+  const RATE = 40, footW = G.top * 1.5 / WL;
+  for (let i = Math.max(0, Math.floor((a - 0.55) * RATE)); i / RATE <= a; i++) { const born = i / RATE, rnd = (k) => hash(i * 6.1 + k * 2.9 + 17), age = a - born, life = lerp(0.3, 0.55, rnd(1)), k = 1 - age / life; if (k <= 0) continue;
+    const q = toL(add(add(T.center, mul(T.dir, r.tornado_speed * born)), V((rnd(2) - 0.5) * 70, footW + (rnd(3) - 0.5) * 30))), rr = lerp(2, 3.6, rnd(4)) * (0.8 + (1 - k) * 1.6) * R.P.size * R.P.dust, col = H_DUST[rnd(5) < 0.5 ? 0 : 1]; R.back.disc(q.x, q.y, rr, col, (d) => Math.pow(k, 1.3) * 0.5 * (1 - d * d) * G.fade); }
+}
+// 岩：瓦礫の首から吐かれ、渦に捕まって回りながら加速して吸い込まれ、そのまま竜巻のまわりを手前と奥に回る。終わりに外へ放り出される
+function hmTorRock(S, G, from, j, t) {
+  const [s0, size, u] = HM_TOR_ROCKS[j], ch = S.r.tornado_charge, start = s0 * ch, dur = 0.42 * ch, p = clamp((t - start) / dur), O = V(G.foot.x + G.ax(u), G.foot.y - u * G.FH), Fo = toL(from), d = sub(Fo, O), rr = G.rad(u) * 1.15 + 3, w = TAU * 0.9, th0 = Math.atan2(d.y, d.x), tau = Math.max(0, t - start - dur);
+  const th = th0 + w * Math.pow(p, 1.6) + 6 * tau + 3 * (1 - Math.exp(-3 * tau)), rho = lerp(len(d), rr, p * p * (3 - 2 * p)) * (1 + (1 - G.fade) * 2.2), sy = lerp(1, HM_TOR_SY, smooth(0.2, 1, p)), sn = Math.sin(th), q = V(O.x + Math.cos(th) * rho, O.y + sn * rho * sy);
+  return { p, sn, back: p > 0.55 && sn < 0, size: size * lerp(1, 1 + 0.16 * sn, p) * lerp(1, 0.8, p), world: V(G.c.x + (q.x - G.L.x) / WL, G.c.y + (q.y - G.L.y) / WL) };
+}
+function hmTorRocks(S, G, from, back) {
+  for (let j = 0; j < HM_TOR_ROCKS.length; j++) { const k = hmTorRock(S, G, from, j, S.mt); if (k.p <= 0 || k.back !== back) continue; drawImg('meteor_0', k.world, S.t * (5 + j), k.size, G.fade); }
 }
 
 // ---------- 瓦礫竜巻（tornado.cpp）
@@ -74,26 +110,23 @@ function hmTornadoTick(S) {
   if (!S.tor) { const dir = norm(sub(S.ship.pos, wind.strike)); S.tor = { dir, center: add(wind.strike, mul(dir, 120)), from: { ...debris.strike } }; wind.angle = angOf(dir); debris.angle = angOf(sub(S.tor.center, debris.strike)); }
   if (t >= r.tornado_charge && !S.tor.launched) S.tor.launched = S.t;
 }
-function hmTornadoRock(S, j) { const t = S.mt, T = S.tor, p = clamp((t - (0.25 + j * 0.12) * S.r.tornado_charge / 1.2) / (S.r.tornado_charge * 0.65 / 1.2)), side = orth(norm(sub(T.center, T.from))); return { pos: add(lerpV(T.from, T.center, p), mul(side, Math.sin(p * Math.PI) * (60 + 35 * j))), r: (26 + 6 * j) * (1 - p * 0.7), p }; }
 function hmTornadoDraw(S, R) {
-  const r = S.r, [wind, debris] = S.parts, poses = new Map(S.parts.map(n => [n, hmPose(S, n, 0)])), col = HM_COLORS.vortex;
+  const r = S.r, [wind, debris] = S.parts, poses = new Map(S.parts.map(n => [n, hmPose(S, n, 0)])), col = HM_COLORS.vortex, T = S.tor; let G = null;
   if (R.proto && S.age >= 0) {
     const u = clamp(S.age / r.warning_time);
     if (S.mt < 0) { hmEyes(S, R, wind, poses.get(wind), u, col); hmEyes(S, R, debris, poses.get(debris), u, HM_COLORS.debris); hmChew(S, R, debris, poses.get(debris), u); }
-    if (S.tor && !S.tor.launched) { const fill = clamp((S.mt - r.tornado_charge * 5 / 12) / (r.tornado_charge * 7 / 12)), k = 0.35 + 0.65 * smooth(0, r.tornado_charge, S.mt);
-      hmVortex(S, R, S.tor.center, r.tornado_width * 0.4 * (0.5 + 0.5 * k), k, col, S.t * 7, 5);
-      const M = hmMouth(wind, poses.get(wind)); for (let i = 0; i < 18; i++) { const ph = (S.t * 2.2 + hash(i * 3.7)) % 1, q = toL(add(lerpV(M, S.tor.center, ph), mul(orth(S.tor.dir), (hash(i) - 0.5) * 40 * Math.sin(ph * Math.PI)))); R.front.dot(q.x, q.y, FX.ramp(col)[3], 0.7 * (1 - ph)); }
-      for (let j = 0; j < 3; j++) { const k2 = hmTornadoRock(S, j); if (k2.p > 0 && k2.p < 1) { const save = S.mt; S.mt = Math.max(0, save - 0.03); const prev = hmTornadoRock(S, j).pos; S.mt = save; const step = sub(k2.pos, prev), sp = len(step) / 0.03; if (sp > 1) hRockComet(R, { from: sub(k2.pos, mul(norm(step), sp * 0.5)), speed: sp, radius: k2.r, seed: j * 3 + 1 }, 0.5, norm(step), { curved: true }); } } }
-    if (S.tor && S.tor.launched) { const a = S.t - S.tor.launched, life = r.tornado_life; if (a < life) { const c = add(S.tor.center, mul(S.tor.dir, r.tornado_speed * a)), fade = clamp((life - a) / 0.4);
-      hmVortex(S, R, c, r.tornado_width * 0.5, fade, col, S.t * 9, 7);
-      const tr = []; for (let m = 0; m < 14; m++) tr.push(add(S.tor.center, mul(S.tor.dir, r.tornado_speed * Math.max(0, a - m * 0.03)))); hmRockTrail(S, R, tr, 61, 2.2); } }
+    if (T) { const a = T.launched ? S.t - T.launched : 0, alive = a < r.tornado_life;
+      if (alive) { const c = T.launched ? add(T.center, mul(T.dir, r.tornado_speed * a)) : T.center, grow = T.launched ? 1 : smooth(0, r.tornado_charge, S.mt), lean = T.launched ? T.dir.x * smooth(0, 0.2, a) : 0, fade = clamp((r.tornado_life - a) / 0.4);
+        G = hmTorGeo(S, R, c, Math.max(0.04, grow), lean, fade);
+        if (T.launched) hmTorWake(R, G, T, r, a);
+        for (let j = 0; j < HM_TOR_ROCKS.length; j++) { const k = hmTorRock(S, G, T.from, j, S.mt), k0 = hmTorRock(S, G, T.from, j, S.mt - 0.03); if (k.p > 0 && k.p < 0.85) { const step = sub(k.world, k0.world), sp = len(step) / 0.03; if (sp > 1) hRockComet(R, { from: sub(k.world, mul(norm(step), sp * 0.5)), speed: sp, radius: k.size * 0.8, seed: j * 3 + 1 }, 0.5, norm(step), { curved: true }); } }
+        hmTorSkirt(R, G, true); hmTorCrown(R, G, true); hmTorBands(R, G, true); hmTorLitter(R, G, true); } }
   }
   R.blitBack(); hmDrawBody(S, R, poses);
-  // 岩：吐き込まれて渦へ入り、竜巻の中を前後に回る
-  if (S.tor) {
-    if (!S.tor.launched) for (let j = 0; j < 3; j++) { const k = hmTornadoRock(S, j); if (k.p >= 1) { const an = S.t * 6 + j * 2.1; drawImg('meteor_0', add(S.tor.center, V(Math.cos(an) * (24 + 10 * j), Math.sin(an) * (18 + 8 * j))), S.t * 4 + j, k.r * 1.2); } else if (S.mt >= 0) drawImg('meteor_0', k.pos, S.t * 5 + j, k.r * 1.2); }
-    else { const a = S.t - S.tor.launched; if (a < r.tornado_life) { const c = add(S.tor.center, mul(S.tor.dir, r.tornado_speed * a)); for (let j = 0; j < 3; j++) { const an = S.t * 7 + j * TAU / 3; drawImg('meteor_0', add(c, V(Math.cos(an) * (40 + 18 * j), Math.sin(an) * (34 + 14 * j))), S.t * 5 + j, (12 + 3 * j)); } } }
-  }
+  if (G) { hmTorRocks(S, G, T.from, true); hmTorBody(R, G); hmTorBands(R, G, false); hmTorCrown(R, G, false); hmTorSkirt(R, G, false); hmTorLitter(R, G, false);
+    if (!T.launched) { const M = hmMouth(wind, poses.get(wind)), to = V(G.c.x + G.ax(0.5) / WL, G.c.y), sd = orth(norm(sub(to, M))), C = H_WIND, N = 3; // 渦の首から竜巻へ流れ込む風
+      for (let k = 0; k < N; k++) { const bow = (k - 1) * 46, ph = k * 0.37; for (let f = 0; f <= 1; f += 0.008) { const q = toL(add(lerpV(M, to, f), mul(sd, Math.sin(f * Math.PI) * bow + Math.sin(f * 11 - S.t * 16 + k) * 5))), flow = 0.3 + 0.7 * Math.pow(0.5 + 0.5 * Math.sin((f - S.t * 2.4 + ph) * TAU), 2); R.back.blend(q.x, q.y, C[flow > 0.65 ? 6 : 5], Math.sin(f * Math.PI) * flow * 0.7 * smooth(0, 0.2, S.mt)); } } }
+    R.blitBack(); hmTorRocks(S, G, T.from, false); }
   if (!R.proto && S.tor) { if (!S.tor.launched) D2.circle(S.tor.center, r.tornado_width * 0.4, rgba('#4dd9b8', 0.25)); else { const a = S.t - S.tor.launched; if (a < r.tornado_life) { const c = add(S.tor.center, mul(S.tor.dir, r.tornado_speed * a)); D2.roundBeam(sub(c, mul(S.tor.dir, 45)), add(c, mul(S.tor.dir, 45)), rgba('#4dd9b8', 0.45), r.tornado_width); } } }
   drawShip(S.ship);
 }
@@ -161,7 +194,7 @@ function hmRegister(id, ids, o, tick, draw, desc) {
     setup(S) { hmSetup(S, id, o); S.P = P(); }, step(S, dt) { hmStep(S, dt, tick); }, draw(S, R) { S.P = R.P; draw(S, R); }, phase: hmPhase });
 }
 hmRegister('tornado', ['H04', 'H08', 'H13'], { kinds: ['vortex', 'debris'], color: HM_COLORS.vortex, ship: V(520, 60) }, hmTornadoTick, hmTornadoDraw,
-  '予兆：渦の首は目が光ってため、瓦礫の首は首の瓦礫を口へ送って噛み砕く → 渦の首の前に、らせんの腕で回る空気と暗い雲の渦が育ち、瓦礫の首が弧を描いて岩を3つ吐き込む（砂ぼこりの尾）。岩は渦の中を回る → 竜巻が機体の方向へ走り、岩が中で回り、砂ぼこりの帯を引いて、寿命の終わりに腕から崩れて消える');
+  '予兆：渦の首は目が光ってため、瓦礫の首は首の瓦礫を口へ送って噛み砕く → 渦の首の風が流れ込んで、足元から竜巻が立ち上がる。半透明の胴に風の筋が巻きつき、頭は広がり、足元に土ぼこり。瓦礫の首が吐いた岩は渦に捕まり、回りながら加速して吸い込まれ、竜巻のまわりを手前と奥に回る。砂利と葉がらせんに登る → 竜巻が機体の方向へ傾いて走り、足元の通った跡に土ぼこりが残る → 寿命の終わりに岩が外へ放り出され、竜巻が薄れて消える');
 hmRegister('debris_shatter', ['H04', 'H08', 'H14'], { kinds: ['debris', 'beam'], color: HM_COLORS.beam, ship: V(520, 60) }, hmShatterTick, hmShatterDraw,
   '予兆：瓦礫の首が瓦礫を噛み砕き、ビームの首は目が光って口に光を集める → 岩6つを扇に並べて投げる（砂ぼこりの尾）。ビームの首は振り始めの向きに照準の光（白くしない）→ 光線が弧を薙ぎ、当たった岩は閃光と欠片・土ぼこりを出して砕け、赤く熱い破片6つが尾を引いて飛び、冷えて石の色になる');
 hmRegister('beam_pincer', ['H04', 'H10', 'H15'], { kinds: ['beam', 'beam'], color: HM_COLORS.beam, ship: V(560, 0) }, hmPincerTick, hmPincerDraw,
