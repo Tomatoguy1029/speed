@@ -313,8 +313,6 @@ func select_constellation(index: int) -> void:
 		return
 	if _selected < DRAGON_INDEX and index == DRAGON_INDEX:
 		_last_orbit_selection = _selected
-	if index < 0 or index >= _visible_stage_count():
-		return
 	if index != _selected:
 		AudioManager.play(&"stage_select_click", -10.0)
 	if _turn != null:
@@ -328,7 +326,6 @@ func select_constellation(index: int) -> void:
 		_scroll = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 		_scroll.tween_method(_set_scroll, -_map_content.position.y, target_scroll, 0.55)
 	_focus_selected()
-
 	if index >= SYMBOL_TEXTURES.size():
 		_reveal_details()
 		return
