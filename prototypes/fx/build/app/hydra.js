@@ -432,8 +432,8 @@ function hRockComet(R, b, age, dir, { stop = Infinity, curved = false } = {}) {
   // 置き去りの土ぼこりの切れ端：進行方向に伸びたまま薄れる
   for (let i = Math.max(0, Math.floor((age - 0.45) * 26)); i / 26 <= Math.min(age, stop); i++) { const born = i / 26, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.2, 0.45, rnd(1)), a = age - born, k = 1 - a / life; if (k <= 0) continue;
     const q = toL(add(add(b.from, mul(dir, b.speed * born - b.radius)), mul(orth(dir), (rnd(3) - 0.5) * b.radius * 1.5))), len = lerp(5, 14, rnd(2)) * R.P.size; for (let t = 0; t < len; t += 0.5) { const n = t / len; p.blend(q.x - ux * t, q.y - uy * t, H_DUST[rnd(6) < 0.5 ? 0 : 1], k * k * (1 - n) * 0.6); } }
-  // 塊が通った幅の中を後ろへ抜ける速度線
-  for (let i = 0; i < 4; i++) { const life = 0.14, off = hash(i * 3.3 + b.seed) * life, c = Math.floor((age + off) / life), a = (age + off - c * life) / life, rnd = (k) => hash(i * 9.1 + c * 4.7 + k * 2.3), lat = (rnd(1) < 0.5 ? -1 : 1) * rad * lerp(0.25, 0.8, rnd(2)), start = rad * 0.7 + L * 0.8 * a, len = rad * lerp(3, 6, rnd(4)), fade = Math.sin(Math.PI * a) * on;
+  // 塊が通った幅の中を後ろへ抜ける速度線（通った長さより後ろへ出さない）
+  if (L > rad * 7) for (let i = 0; i < 4; i++) { const life = 0.14, off = hash(i * 3.3 + b.seed) * life, c = Math.floor((age + off) / life), a = (age + off - c * life) / life, rnd = (k) => hash(i * 9.1 + c * 4.7 + k * 2.3), lat = (rnd(1) < 0.5 ? -1 : 1) * rad * lerp(0.25, 0.8, rnd(2)), start = rad * 0.7 + L * 0.8 * a, len = rad * lerp(3, 6, rnd(4)), fade = Math.sin(Math.PI * a) * on;
     for (let d = 0; d < len; d += 0.5) { const t = d / len; p.blend(head.x - ux * (start + d) - uy * lat, head.y - uy * (start + d) + ux * lat, H_DUST[2], fade * Math.sin(Math.PI * t) * (1 - t * 0.6) * 0.5); } }
 }
 function hRocks(S, R, back) {
@@ -483,16 +483,26 @@ function hCrackle(S, R, at, rad, k, seed, C) { // 頭のまわりの短い放電
   for (let i = 0; i < Math.round(1 + 4 * k); i++) { const Rg = new PX.Rng((seed * 97 + f * 13 + i * 7) >>> 0 || 1), a0 = Rg.range(0, TAU), a1 = a0 + Rg.range(0.6, 1.6), r0 = rr * Rg.range(0.5, 1), r1 = rr * Rg.range(0.5, 1.1);
     voltInk(R.front, zigzag(Rg, c.x + Math.cos(a0) * r0, c.y + Math.sin(a0) * r0, c.x + Math.cos(a1) * r1, c.y + Math.sin(a1) * r1, 0.35, 0.15), k * Rg.range(0.5, 1), C, 1, true, 0.3); }
 }
-function hStrike(S, R, L, rr, a, seed, C, src) {
-  const fl = AQ_FLICK[Math.floor(a * 30 + 1e-4)] ?? 0, heat = Math.pow(clamp(1 - a / 1.2), 1.4);
-  if (heat > 0) for (const q of aqCracks(seed, rr)) for (let i = 0; i < q.pts.length; i++) { const [x, y] = q.pts[i], h = heat * (1 - 0.5 * i / q.pts.length) - hash(x * 7.1 + y * 3.3) * 0.25; R.back.px(L.x + x, L.y + y, h > 0.6 ? C[6] : h > 0.35 ? C[4] : h > 0.12 ? C[2] : hexc('#141020')); }
-  if (fl > 0) { const fr = Math.floor(a * 30), Rg = new PX.Rng((seed * 13 + fr) >>> 0 || 1), paths = [];
-    for (let j = 0; j < 6; j++) { const an = j * TAU / 6 + Rg.range(-0.35, 0.35), l = rr * Rg.range(0.7, 0.95); paths.push(...zigzag(Rg, L.x, L.y, L.x + Math.cos(an) * l, L.y + Math.sin(an) * l, 0.22, 0.6)); }
-    if (src && a < 0.1) paths.push(...zigzag(Rg, src.x, src.y, L.x, L.y, 0.28, 0.25)); // 頭から着弾点へ走る幹（その場に突然出さない）
-    voltInk(R.front, paths, fl, a < 1 / 30 ? C.map((c, i) => C[Math.min(7, i + 2)]) : C, 1.25, false, 0.8); }
-  if (a < 0.5) for (let j = 0; j < 16; j++) { const q = new PX.Rng(seed * 7 + j + 1), life = q.range(0.2, 0.45); if (a > life) continue; const an = q.range(0, TAU), d = q.range(25, 60) * a * (1 - a / life * 0.4), x = L.x + Math.cos(an) * d, y = L.y + Math.sin(an) * d, tl = 3 * (1 - a / life); R.front.line(x - Math.cos(an) * tl, y - Math.sin(an) * tl, x, y, C[a < 0.15 ? 7 : 5], 1 - a / life); }
-  if (a < 0.3) R.back.glow(L.x, L.y, rr * 1.2, C[4], 0.5 * (1 - a / 0.3) * R.P.intensity);
-  if (a < 0.08) { R.front.glow(L.x, L.y, rr * 1.1, C[6], (1 - a / 0.08) * 0.9 * R.P.intensity); R.front.glow(L.x, L.y, rr * 0.4, C[7], (1 - a / 0.08) * R.P.intensity); }
+// 先回り落雷の着弾：pixelFX lightning/lightning-strike の作り。太い稲妻が画面の上から叩きつけられ、同じ通り道を3回打ち直して点滅し、
+// 残った通り道は冷えて崩れる。足元は白い閃光、判定の半径まで広がる衝撃の輪、輪の上を走る放電、焦げ跡、飛び散る火花。
+const H_BOLT_STROKES = [[0, 1], [0.13, 0.8], [0.26, 0.55]], H_BOLT_FLICK = [1, 0.72, 0.3, 0.95, 0.5, 0.8, 0.22];
+function hBoltStrike(S, R, L, rr, a, seed, C, src) {
+  const Rb = new PX.Rng(seed * 3 + 1), x0 = L.x + Rb.range(10, 24) * (Rb.chance(0.5) ? 1 : -1), y0 = -10, main = zigzag(Rb, x0, y0, L.x, L.y, 0.13, 0.5), trunk = main[0].pts, I = R.P.intensity, W = PX.WHITE, f = Math.floor(a * 30 + 1e-4);
+  if (a < 0.1 && src) { const Rg = new PX.Rng((f * 31 + seed) >>> 0 || 1); voltInk(R.front, zigzag(Rg, src.x, src.y, x0 + Rg.range(-30, 30), y0, 0.22, 0.2), 0.8, C, 1, true, 0.35); } // 頭から空へ走る放電
+  // 冷えて崩れる通り道
+  for (let i = 0; i < trunk.length; i++) { const gone = 0.45 + 0.45 * hash(i * 2.7 + seed) + 0.1 * (1 - i / trunk.length); if (a > gone) continue; const k = Math.exp(-a / 0.28); R.front.px(trunk[i][0], trunk[i][1], k > 0.6 ? C[6] : k > 0.3 ? C[4] : C[2]); if (k > 0.2 && i % 5 === 0) R.front.glow(trunk[i][0], trunk[i][1], 5, C[4], 0.25 * k * I); }
+  // 打ち直す稲妻
+  H_BOLT_STROKES.forEach(([t0, k], i) => { const u = a - t0; if (u < 0) return; const lv = H_BOLT_FLICK[Math.floor(u * 30 + 1e-4)] ?? 0; if (lv <= 0) return; const dx = i * 2.5, paths = i === 0 ? main : [{ pts: trunk.map(([x, y]) => [x + dx * Math.sin(Math.PI * (y - y0) / (L.y - y0)), y]), w: 1 }]; voltInk(R.front, paths, lv * k, u < 1 / 30 ? C.map((c, q) => C[Math.min(7, q + 2)]) : C, 1.7, false, 0.7); });
+  // 焦げ跡
+  const burn = clamp(1 - (a - 0.15) / 0.75); if (burn > 0) { R.back.disc(L.x, L.y, rr * 0.34, hexc('#141020'), (d) => burn * 0.75 * (1 - d * d)); R.back.disc(L.x, L.y, rr * 0.16, C[5], (d) => Math.pow(burn, 2.5) * 0.8 * (1 - d * d)); }
+  // 衝撃の輪と、輪の上を走る放電
+  const k = a / 0.42; if (k < 1) { const r0 = rr * (1 - Math.pow(1 - k, 3)), w = 2.4 * (1 - k) + 0.6; R.front.each(L.x - r0 - 3, L.y - r0 - 3, L.x + r0 + 3, L.y + r0 + 3, (x, y, sx, sy) => { const e = Math.abs(Math.hypot(x - L.x, y - L.y) - r0) / w; if (e < 1) R.front.blendPx(sx, sy, PX.mix(W, C[5], k), (1 - k) * (1 - e * e) * 0.95); });
+    const Rg = new PX.Rng((Math.floor(a / 0.05) * 23 + seed) >>> 0 || 1); for (let i = 0; i < 7; i++) { const an = Rg.range(0, TAU), span = Rg.range(0.25, 0.6); voltInk(R.front, zigzag(Rg, L.x + Math.cos(an) * r0, L.y + Math.sin(an) * r0, L.x + Math.cos(an + span) * r0, L.y + Math.sin(an + span) * r0, 0.35, 0.1), (1 - k) * 0.9, C, 1, true, 0.25); } }
+  // 飛び散る火花
+  for (let j = 0; j < 18; j++) { const q = new PX.Rng(seed * 7 + j + 1), life = q.range(0.25, 0.5); if (a > life) continue; const an = q.range(0, TAU), sp = q.range(60, 130), d = sp * a * (1 - a / life * 0.45), x = L.x + Math.cos(an) * d, y = L.y + Math.sin(an) * d, tl = 3.5 * (1 - a / life); R.front.line(x - Math.cos(an) * tl, y - Math.sin(an) * tl, x, y, C[a < 0.15 ? 7 : 5], 1 - a / life); }
+  // 足元の閃光と、消えながら点滅する光
+  if (a < 0.07) { R.front.glow(L.x, L.y, rr * 0.5, W, (1 - a / 0.07) * 0.8 * I); R.front.disc(L.x, L.y, 4 * (1 - a / 0.07) + 1, W, 1); }
+  if (a < 0.6) R.back.glow(L.x, L.y, rr * 0.8, C[3], 0.42 * Math.exp(-a * 5) * (f % 2 ? 0.7 : 1) * I);
 }
 // 帯電頭突きの予兆：目が雷の色に変わって光り、目から細い放電が走る（pixelFX lightning/electrified の作り）
 function hEyeCharge(S, R, n, pose, C) {
@@ -532,7 +542,7 @@ function hThunder(S, R, n, pose) {
     const L = toL(n.target), M = toL(hMouthAt(n, pose));
     if (pose.rel < 0) { const k = clamp(S.age / T.warn); aqStatic(R.back, L, rr, Math.round(3 + 7 * k), rr * (0.2 + 0.25 * k), S.t, 23, C, 0.45 + 0.5 * k); R.back.glow(L.x, L.y, 6 + 10 * k, C[5], (0.2 + 0.6 * k) * R.P.intensity);
       const f = Math.floor(S.t / 0.12); if (hash(f * 3.1) < k) { const Rg = new PX.Rng(f * 11 + 5), mid = lerpV(M, L, Rg.range(0.25, 0.55)); voltInk(R.front, zigzag(Rg, M.x, M.y, mid.x + Rg.range(-6, 6), mid.y + Rg.range(-6, 6), 0.4, 0.2), 0.6 * k, C, 1, true, 0.3); } }
-    else hStrike(S, R, L, rr, pose.rel, 29, C, M);
+    else hBoltStrike(S, R, L, rr, pose.rel, 29, C, M);
   }
 }
 // ---------- 現行表示の近似（render/attacks/hydra_shape.gd：判定の形を種類の色で出す）
@@ -582,7 +592,7 @@ const H_DESC = {
   beam_fixed: '予兆：口から射線いっぱいへ流れる照準の光（白くしない）と口へ集まる光。頭がふくらんで止まる → 先が伸びる光線、口の閃光、縁からこぼれる光。頭は反動で押されて震える → 根元から消え、口に光が残って消える',
   beam_bolt: '予兆：口へ光が集まる → 頭を突き出して撃ち、口の閃光。両端のとがった短い光の棒が飛び、後ろにちらつく光の粒を引く → 寿命の終わりに薄れて消える',
   thunder_headbutt: '予兆：赤い目が雷の色に変わって強く光り、目から細い放電が走って目から目へ飛ぶ。首をS字にためて止まる → 伸びる通り道に稲妻が残る → 当たった点が細かい放電の塊になり、シダのように枝分かれする焼け跡が外へ広がって冷え、火花がジグザグに跳ね、オゾンの煙が上がる',
-  thunder_drop: '予兆：頭が帯電し、機体の進む先の範囲で放電が増え、頭から着弾点へ細い放電が伸びかける（円は描かない）→ 頭から着弾点へ幹が走り、中心から枝分かれ、最初の1コマは白、冷える割れ目',
+  thunder_drop: '予兆：頭が帯電し、機体の進む先の範囲で放電が増え、頭から着弾点へ細い放電が伸びかける（円は描かない）→ 頭から空へ放電が走り、太い稲妻が上から叩きつけられて3回打ち直す。足元に白い閃光、判定の半径まで広がる衝撃の輪、輪の上を走る放電、焦げ跡、飛び散る火花。通り道は冷えて崩れる',
 };
 const H_REFS = ['cpp/bosses/hydra/body.cpp（chain・待機の狙い）', 'cpp/bosses/hydra/ の各技（bite_thrust・bite_sweep・wind_band・wind_blades・rubble_lump・beam_fixed・beam_bolt・thunder_drop）', 'data/bosses/hydra.tres・hydra_moves/*.tres', 'scripts/render/attacks/hydra_shape.gd（現行表示の近似）', 'pixelFX の作り方を下敷き（impacts/hit-spark・melee/sword-slash・わしの稲妻 zigzag・voltInk）'];
 const H_PARAMS = [

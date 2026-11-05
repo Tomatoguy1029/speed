@@ -104,7 +104,7 @@ function dCloneFx(S, R) {
     if (e < 0) { bossGather(RP, mouth, 70, clamp(u.t / r.normal_charge), S.t, 400 + u.index); continue; }
     if (u.mode === 'beam_fixed' && e < r.beam_time) FX.beam(R.front, toL(mouth), toL(add(mouth, mul(fromA(u.angle), r.beam_len))), { w: r.beam_width * WL * R.P.size, color: col, time: S.t, from: clamp((e - r.beam_time + 0.1) / 0.1), to: clamp(e / 0.07), taper: 6, alpha: 1, intensity: R.P.intensity });
     if (u.mode === 'wind_band' && e < r.wind_time + 0.3) { const dir = fromA(u.angle), sd = orth(dir), on = e < r.wind_time ? 1 : 1 - (e - r.wind_time) / 0.3; for (let i = 0; i < 50; i++) { const lane = (hash(i * 1.37 + u.index) - 0.5) * 2, v = 900 + 500 * hash(i * 2.1), sl = 40 + 50 * hash(i * 3.9), head = ((e * v + hash(i * 5.3) * r.wind_length) % (r.wind_length * 1.2)); for (let s = Math.max(0, head - sl); s <= head; s += 0.6 / WL) { const q = toL(add(add(mouth, mul(dir, s)), mul(sd, lane * r.wind_width * 0.5 * (0.55 + 0.45 * clamp(s / r.wind_length))))), b = ((s - head + sl) / sl) * on; if (b > 0.5) R.front.px(q.x, q.y, pal[3]); else if (b > 0.06) R.front.dot(q.x, q.y, pal[2], b * 1.3); } } }
-    if (u.mode === 'thunder_drop') hStrike(S, RP, toL(u.target), r.thunder_radius * WL * R.P.size, e, 29 + u.index, voltRamp(col), toL(mouth));
+    if (u.mode === 'thunder_drop') hBoltStrike(S, RP, toL(u.target), r.thunder_radius * WL * R.P.size, e, 29 + u.index, voltRamp(col), toL(mouth));
     if (u.mode === 'bite_thrust') dFangs(S, RP, add(u.pos, mul(fromA(u.angle), 120 * DP.head_scale)), u.angle, e - r.normal_lunge, r.bite_radius, u.index * 13);
   }
 }
