@@ -416,18 +416,21 @@ function hRubbleWarn(S, R, n, pose, pts) {
   const m = toL(M), lump = S.tech === 'rubble_lump', rr = (lump ? 1 + 3 * u : 2.5) * R.P.size;
   for (let k = 0; k < (lump ? 24 : 16); k++) { const an = hash(k * 2.3) * TAU + S.age * (lump ? 2 : 9) * (hash(k) - 0.5), d = rr * Math.sqrt(hash(k * 5.9)), jit = Math.sin(S.age * 60 + k) * 0.6 * u; R.front.px(m.x + Math.cos(an) * d + jit, m.y + Math.sin(an) * d, H_STONE[d > rr * 0.6 ? 2 : 3]); }
 }
-// 塊投げの尾：pixelFX fire/meteor の彗星の作りを土煙で。岩の後ろから土煙の舌が何本も流れ、うねりが尾へ速く走り、先へ細く薄くなる。
+// 飛ぶ岩の尾（岩を飛ばす技すべてで共通）：pixelFX fire/meteor の彗星の作りを土煙で。岩の後ろから土煙の舌が何本も流れ、うねりが尾へ速く走り、先へ細く薄くなる。
 // どれも塊が通った幅の中に収める。尾の先に置き去りの土ぼこりの切れ端が進行方向に伸びて残り、速度線が後ろへ抜ける。
 const H_DUST = ['#9a8f86', '#7a7068', '#c9bfb2'].map(hexc);
-function hLumpDust(S, R, b, age, dir) {
-  const p = R.back, pos = add(b.from, mul(dir, b.speed * age)), head = toL(pos), rad = b.radius * WL * 1.1 * R.P.size, on = smooth(0, 0.06, age), full = b.speed * 0.42 * WL * R.P.dust, L = Math.min(b.speed * age * WL, full), ux = dir.x, uy = dir.y, TONGUES = 6;
+// stop：止まる時刻（そのあと尾が薄れる）。curved：曲がって飛ぶ岩（まっすぐの切れ端と速度線を出さず、尾を短くする）
+function hRockGhosts(pos, dir, speed, spin, size) { for (let k = 4; k >= 1; k--) drawImg('meteor_0', sub(pos, mul(dir, speed * 0.016 * k)), spin - k * 0.08, size, 0.26 - k * 0.05); } // 速さでぶれる残像
+function hRockComet(R, b, age, dir, { stop = Infinity, curved = false } = {}) {
+  const p = R.back, pos = add(b.from, mul(dir, b.speed * Math.min(age, stop))), head = toL(pos), rad = b.radius * WL * 1.1 * R.P.size, on = smooth(0, 0.06, age) * (1 - smooth(stop, stop + 0.2, age)), full = b.speed * (curved ? 0.14 : 0.42) * WL * R.P.dust, L = Math.min(b.speed * age * WL, full), ux = dir.x, uy = dir.y, TONGUES = 6;
   if (L > 2) { const tongue = (i) => ({ off: (i / (TONGUES - 1) - 0.5) * 1.5, len: lerp(0.55, 1, hash(i * 3.1 + 2)), ph: hash(i * 5.7) * TAU, wid: lerp(0.32, 0.55, hash(i * 2.3 + 7)) }), T = Array.from({ length: TONGUES }, (_, i) => tongue(i));
     p.each(Math.min(head.x, head.x - ux * L) - rad * 1.6, Math.min(head.y, head.y - uy * L) - rad * 1.6, Math.max(head.x, head.x - ux * L) + rad * 1.6, Math.max(head.y, head.y - uy * L) + rad * 1.6, (x, y, sx, sy) => {
       const dx = x - head.x, dy = y - head.y, along = -(dx * ux + dy * uy), lat = dx * -uy + dy * ux, k0 = along / L; if (k0 < -0.04 || k0 > 1) return; let a = 0, k1 = 0;
       for (const t of T) { const k = k0 / t.len; if (k > 1) continue; const c = rad * (t.off * (1 - k * 0.75) + Math.sin(k * 7 - age * 34 + t.ph) * 0.26 * clamp(k * 2.2)), w = rad * t.wid * Math.pow(1 - k, 0.75) * (0.6 + 0.4 * clamp(k * 4)), e = 1 - Math.abs(lat - c) / Math.max(0.4, w); if (e <= 0) continue; const v = smooth(0, 0.5, e) * Math.pow(1 - k, 1.3) * 0.85; if (v > a) { a = v; k1 = k; } }
       if (a > 0.02) p.blendPx(sx, sy, PX.mix(H_DUST[2], H_DUST[1], clamp(k1 * 1.5)), a * on); }); }
+  if (curved) return;
   // 置き去りの土ぼこりの切れ端：進行方向に伸びたまま薄れる
-  for (let i = Math.max(0, Math.floor((age - 0.45) * 26)); i / 26 <= age; i++) { const born = i / 26, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.2, 0.45, rnd(1)), a = age - born, k = 1 - a / life; if (k <= 0) continue;
+  for (let i = Math.max(0, Math.floor((age - 0.45) * 26)); i / 26 <= Math.min(age, stop); i++) { const born = i / 26, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.2, 0.45, rnd(1)), a = age - born, k = 1 - a / life; if (k <= 0) continue;
     const q = toL(add(add(b.from, mul(dir, b.speed * born - b.radius)), mul(orth(dir), (rnd(3) - 0.5) * b.radius * 1.5))), len = lerp(5, 14, rnd(2)) * R.P.size; for (let t = 0; t < len; t += 0.5) { const n = t / len; p.blend(q.x - ux * t, q.y - uy * t, H_DUST[rnd(6) < 0.5 ? 0 : 1], k * k * (1 - n) * 0.6); } }
   // 塊が通った幅の中を後ろへ抜ける速度線
   for (let i = 0; i < 4; i++) { const life = 0.14, off = hash(i * 3.3 + b.seed) * life, c = Math.floor((age + off) / life), a = (age + off - c * life) / life, rnd = (k) => hash(i * 9.1 + c * 4.7 + k * 2.3), lat = (rnd(1) < 0.5 ? -1 : 1) * rad * lerp(0.25, 0.8, rnd(2)), start = rad * 0.7 + L * 0.8 * a, len = rad * lerp(3, 6, rnd(4)), fade = Math.sin(Math.PI * a) * on;
@@ -436,12 +439,10 @@ function hLumpDust(S, R, b, age, dir) {
 function hRocks(S, R, back) {
   for (const b of S.shots) {
     if (b.kind !== 'rock') continue; const age = S.t - b.t; if (age > 6) continue; const dir = fromA(b.angle), pos = add(b.from, mul(dir, b.speed * age));
-    if (back && R.proto && S.tech === 'rubble_lump') { hLumpDust(S, R, b, age, dir); continue; }
-    if (back && R.proto) { for (let k = 1; k < 16; k++) { const tk = age - k * 0.03; if (tk < 0) break; const a = k * 0.03 / R.P.timing, p = add(b.from, mul(dir, b.speed * tk)), q = toL(p), rr = (1 + a * 7) * (b.radius / 26) * R.P.size * R.P.dust;
-        for (let y = -rr; y <= rr; y++) for (let x = -rr; x <= rr; x++) { if (x * x + y * y > rr * rr || hash(b.seed * 31 + k * 7 + x * 3 + y * 11) < a * 1.9) continue; R.back.dot(q.x + x, q.y + y, H_STONE[a < 0.15 ? 3 : 2], (1 - a / 0.5) * 0.5); } } continue; }
+    if (back && R.proto) { hRockComet(R, b, age, dir); continue; }
     if (back) continue;
-    const spin = age * (3 + 3 * hash(b.seed)) * (S.tech === 'rubble_lump' ? 2 : 1) * (hash(b.seed * 3) > 0.5 ? 1 : -1);
-    if (S.tech === 'rubble_lump' && R.proto) for (let k = 4; k >= 1; k--) drawImg('meteor_0', sub(pos, mul(dir, b.speed * 0.016 * k)), spin - k * 0.08, b.radius * 1.25, 0.26 - k * 0.05); // 速さでぶれる残像
+    const spin = age * (3 + 3 * hash(b.seed)) * 2 * (hash(b.seed * 3) > 0.5 ? 1 : -1);
+    if (R.proto) hRockGhosts(pos, dir, b.speed, spin, b.radius * 1.25);
     drawImg('meteor_0', pos, spin, b.radius * 1.25);
   }
 }

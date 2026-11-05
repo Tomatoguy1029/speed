@@ -83,7 +83,7 @@ function hmTornadoDraw(S, R) {
     if (S.tor && !S.tor.launched) { const fill = clamp((S.mt - r.tornado_charge * 5 / 12) / (r.tornado_charge * 7 / 12)), k = 0.35 + 0.65 * smooth(0, r.tornado_charge, S.mt);
       hmVortex(S, R, S.tor.center, r.tornado_width * 0.4 * (0.5 + 0.5 * k), k, col, S.t * 7, 5);
       const M = hmMouth(wind, poses.get(wind)); for (let i = 0; i < 18; i++) { const ph = (S.t * 2.2 + hash(i * 3.7)) % 1, q = toL(add(lerpV(M, S.tor.center, ph), mul(orth(S.tor.dir), (hash(i) - 0.5) * 40 * Math.sin(ph * Math.PI)))); R.front.dot(q.x, q.y, FX.ramp(col)[3], 0.7 * (1 - ph)); }
-      for (let j = 0; j < 3; j++) { const k2 = hmTornadoRock(S, j); if (k2.p > 0 && k2.p < 1) { const tr = []; for (let m = 0; m < 10; m++) { const back = S.mt - m * 0.03; if (back < 0) break; const save = S.mt; S.mt = back; tr.push(hmTornadoRock(S, j).pos); S.mt = save; } hmRockTrail(S, R, tr, 40 + j, 0.7); } } }
+      for (let j = 0; j < 3; j++) { const k2 = hmTornadoRock(S, j); if (k2.p > 0 && k2.p < 1) { const save = S.mt; S.mt = Math.max(0, save - 0.03); const prev = hmTornadoRock(S, j).pos; S.mt = save; const step = sub(k2.pos, prev), sp = len(step) / 0.03; if (sp > 1) hRockComet(R, { from: sub(k2.pos, mul(norm(step), sp * 0.5)), speed: sp, radius: k2.r, seed: j * 3 + 1 }, 0.5, norm(step), { curved: true }); } } }
     if (S.tor && S.tor.launched) { const a = S.t - S.tor.launched, life = r.tornado_life; if (a < life) { const c = add(S.tor.center, mul(S.tor.dir, r.tornado_speed * a)), fade = clamp((life - a) / 0.4);
       hmVortex(S, R, c, r.tornado_width * 0.5, fade, col, S.t * 9, 7);
       const tr = []; for (let m = 0; m < 14; m++) tr.push(add(S.tor.center, mul(S.tor.dir, r.tornado_speed * Math.max(0, a - m * 0.03)))); hmRockTrail(S, R, tr, 61, 2.2); } }
@@ -117,7 +117,7 @@ function hmShatterDraw(S, R) {
     if (S.mt < 0) { hmEyes(S, R, debris, poses.get(debris), u, HM_COLORS.debris); hmChew(S, R, debris, poses.get(debris), u); }
     hmEyes(S, R, beam, pb, S.mt < r.shatter_deploy ? clamp(S.age / (r.warning_time + r.shatter_deploy)) : 0.5, HM_COLORS.beam);
     if (S.sh) {
-      for (const s of S.sh.stones) if (S.mt < r.shatter_deploy && S.mt > 0) { const tr = []; for (let m = 0; m < 10; m++) tr.push(lerpV(s.from, s.to, clamp((S.mt - m * 0.03) / r.shatter_deploy))); hmRockTrail(S, R, tr, 70 + s.seed, 0.7); }
+      for (const s of S.sh.stones) if (!s.shattered && S.mt > 0) hRockComet(R, { from: s.from, speed: dist(s.from, s.to) / r.shatter_deploy, radius: HM_ROCK_R, seed: s.seed }, S.mt, norm(sub(s.to, s.from)), { stop: r.shatter_deploy });
       const A = toL(M), B = toL(add(M, mul(fromA(beam.angle), r.beam_len)));
       if (S.mt < r.shatter_deploy) { const k = clamp(S.age / (r.warning_time + r.shatter_deploy)); FX.warnRail(R.front, A, B, { color: HM_COLORS.beam, k, time: S.t, seed: 4, maxLv: 2, intensity: R.P.intensity }); hmGather(S, R, M, k, HM_COLORS.beam, 8); }
       else if (S.mt < r.shatter_deploy + r.shatter_time + 0.1) { const e = S.mt - r.shatter_deploy, from = clamp((e - r.shatter_time + 0.1) / 0.1); FX.beam(R.front, A, B, { w: r.beam_width * 0.5 * WL * R.P.size, source: false, color: HM_COLORS.beam, time: S.t, from, to: clamp(e / 0.07), taper: 6, alpha: 1, intensity: R.P.intensity }); FX.flare(R.front, A, 1.4 * R.P.size, HM_COLORS.beam, S.t, 0.5 * (1 - from), 4); }
@@ -129,7 +129,7 @@ function hmShatterDraw(S, R) {
     }
   }
   R.blitBack(); hmDrawBody(S, R, poses);
-  if (S.sh) for (const s of S.sh.stones) if (!s.shattered && S.mt >= 0) drawImg('meteor_0', s.pos, S.t * 3 + s.seed, HM_ROCK_R * 1.2);
+  if (S.sh) for (const s of S.sh.stones) if (!s.shattered && S.mt >= 0) { if (S.mt < r.shatter_deploy) hRockGhosts(s.pos, norm(sub(s.to, s.from)), dist(s.from, s.to) / r.shatter_deploy, S.t * 3 + s.seed, HM_ROCK_R * 1.2); drawImg('meteor_0', s.pos, S.t * 3 + s.seed, HM_ROCK_R * 1.2); }
   if (!R.proto && S.sh) { const A = beam.strike, B = add(A, mul(fromA(beam.angle), r.beam_len)); if (S.mt >= r.shatter_deploy && S.mt < r.shatter_deploy + r.shatter_time) D2.roundBeam(A, B, rgba('#ff4066', 0.85), r.beam_width); for (const b of S.shots) { const a = S.t - b.t; if (a < 2.5) D2.circle(add(b.from, mul(fromA(b.angle), r.shard_speed * a)), 8, '#c98f6a'); } }
   drawShip(S.ship);
 }

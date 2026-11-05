@@ -128,8 +128,9 @@ function dDraw(S, R) {
     for (const impact of S.impacts) dImpactFx(S, R, impact.at, t - impact.t, impact.radius, 83 + Math.floor(impact.t * 10));
     for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dGroundTremble(S, R, q.at, r.radius, clamp((t - q.t - q.wait) / q.warn), 171);
   }
-  for (const q of S.projectiles) { if (R.proto) drawImg('meteor_0', q.pos, q.seed + t, q.radius); else D2.circle(q.pos, q.radius, '#8c704c'); }
+  if (R.proto) for (const q of S.projectiles) if (q.vel && q.t != null) { const sp = len(q.vel), dir = norm(q.vel), age = t - q.t; hRockComet(R, { from: sub(q.pos, mul(q.vel, age)), speed: sp, radius: q.radius, seed: q.seed || 1 }, age, dir); }
   R.blitBack();
+  for (const q of S.projectiles) { if (R.proto) { if (q.vel) hRockGhosts(q.pos, norm(q.vel), len(q.vel), q.seed + t, q.radius); drawImg('meteor_0', q.pos, q.seed + t, q.radius); } else D2.circle(q.pos, q.radius, '#8c704c'); }
   for (const rock of S.rocks) drawImg('meteor_0', rock.pos, rock.seed * 1.7, rock.radius);
   if (id === 'clones' && B.mode === 'active') { for (const unit of S.units) drawDraco(unit.points, unit.angle, unit.index > 0 ? 0.85 : 1); }
   else if (R.proto) drawDraco(pose.points, pose.facing, 1, pose.width || DP.body_width, pose.arms);
