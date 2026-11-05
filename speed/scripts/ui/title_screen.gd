@@ -100,6 +100,7 @@ func _build_title_art() -> void:
 	canvas.add_child(_map)
 	_map.back_requested.connect(_close_start_panel)
 	_map.rotation_changed.connect(func(angle: float): _radar_material.set_shader_parameter("map_angle", angle))
+	_map.scroll_changed.connect(func(offset: float): _radar_material.set_shader_parameter("map_scroll", offset))
 	_map.hide()
 	resized.connect(_layout_title)
 	_layout_title()
