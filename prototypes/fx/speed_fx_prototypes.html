@@ -7778,17 +7778,17 @@ function hRubbleWarn(S, R, n, pose, pts) {
 const H_DUST = ['#9a8f86', '#7a7068', '#c9bfb2'].map(hexc);
 // stop：止まる時刻（そのあと尾が薄れる）。curved：曲がって飛ぶ岩（まっすぐの切れ端と速度線を出さず、尾を短くする）
 function hRockGhosts(pos, dir, speed, spin, size) { for (let k = 4; k >= 1; k--) drawImg('meteor_0', sub(pos, mul(dir, speed * 0.016 * k)), spin - k * 0.08, size, 0.26 - k * 0.05); } // 速さでぶれる残像
-function hRockComet(R, b, age, dir, { stop = Infinity, curved = false } = {}) {
+function hRockComet(R, b, age, dir, { stop = Infinity, curved = false, pace = 1 } = {}) { // pace：尾の動きの勢い（遅い岩は小さくする）
   const p = R.back, pos = add(b.from, mul(dir, b.speed * Math.min(age, stop))), head = toL(pos), rad = b.radius * WL * 1.1 * R.P.size, on = smooth(0, 0.06, age) * (stop === Infinity ? 1 : 1 - smooth(stop, stop + 0.2, age)), full = b.speed * (curved ? 0.14 : 0.42) * WL * R.P.dust, L = Math.min(b.speed * age * WL, full), ux = dir.x, uy = dir.y, TONGUES = 6;
   if (L > 2) { const tongue = (i) => ({ off: (i / (TONGUES - 1) - 0.5) * 1.5, len: lerp(0.55, 1, hash(i * 3.1 + 2)), ph: hash(i * 5.7) * TAU, wid: lerp(0.32, 0.55, hash(i * 2.3 + 7)) }), T = Array.from({ length: TONGUES }, (_, i) => tongue(i));
     p.each(Math.min(head.x, head.x - ux * L) - rad * 1.6, Math.min(head.y, head.y - uy * L) - rad * 1.6, Math.max(head.x, head.x - ux * L) + rad * 1.6, Math.max(head.y, head.y - uy * L) + rad * 1.6, (x, y, sx, sy) => {
       const dx = x - head.x, dy = y - head.y, along = -(dx * ux + dy * uy), lat = dx * -uy + dy * ux, k0 = along / L; if (k0 < -0.04 || k0 > 1) return; let a = 0, k1 = 0;
-      for (const t of T) { const k = k0 / t.len; if (k > 1) continue; const c = rad * (t.off * (1 - k * 0.75) + Math.sin(k * 7 - age * 34 + t.ph) * 0.26 * clamp(k * 2.2)), w = rad * t.wid * Math.pow(1 - k, 0.75) * (0.6 + 0.4 * clamp(k * 4)), e = 1 - Math.abs(lat - c) / Math.max(0.4, w); if (e <= 0) continue; const v = smooth(0, 0.5, e) * Math.pow(1 - k, 1.3) * 0.85; if (v > a) { a = v; k1 = k; } }
+      for (const t of T) { const k = k0 / t.len; if (k > 1) continue; const c = rad * (t.off * (1 - k * 0.75) + Math.sin(k * 7 - age * 34 * pace + t.ph) * 0.26 * clamp(k * 2.2)), w = rad * t.wid * Math.pow(1 - k, 0.75) * (0.6 + 0.4 * clamp(k * 4)), e = 1 - Math.abs(lat - c) / Math.max(0.4, w); if (e <= 0) continue; const v = smooth(0, 0.5, e) * Math.pow(1 - k, 1.3) * 0.85; if (v > a) { a = v; k1 = k; } }
       if (a > 0.02) p.blendPx(sx, sy, PX.mix(H_DUST[2], H_DUST[1], clamp(k1 * 1.5)), a * on); }); }
   if (curved) return;
   // 置き去りの土ぼこりの切れ端：進行方向に伸びたまま薄れる
   for (let i = Math.max(0, Math.floor((age - 0.45) * 26)); i / 26 <= Math.min(age, stop); i++) { const born = i / 26, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.2, 0.45, rnd(1)), a = age - born, k = 1 - a / life; if (k <= 0) continue;
-    const q = toL(add(add(b.from, mul(dir, b.speed * born - b.radius)), mul(orth(dir), (rnd(3) - 0.5) * b.radius * 1.5))), len = lerp(5, 14, rnd(2)) * R.P.size; for (let t = 0; t < len; t += 0.5) { const n = t / len; p.blend(q.x - ux * t, q.y - uy * t, H_DUST[rnd(6) < 0.5 ? 0 : 1], k * k * (1 - n) * 0.6); } }
+    const q = toL(add(add(b.from, mul(dir, b.speed * born - b.radius)), mul(orth(dir), (rnd(3) - 0.5) * b.radius * 1.5))), len = lerp(5, 14, rnd(2)) * R.P.size * lerp(0.4, 1, pace); for (let t = 0; t < len; t += 0.5) { const n = t / len; p.blend(q.x - ux * t, q.y - uy * t, H_DUST[rnd(6) < 0.5 ? 0 : 1], k * k * (1 - n) * 0.6); } }
   // 塊が通った幅の中を後ろへ抜ける速度線（通った長さより後ろへ出さない）
   if (L > rad * 7) for (let i = 0; i < 4; i++) { const life = 0.14, off = hash(i * 3.3 + b.seed) * life, c = Math.floor((age + off) / life), a = (age + off - c * life) / life, rnd = (k) => hash(i * 9.1 + c * 4.7 + k * 2.3), lat = (rnd(1) < 0.5 ? -1 : 1) * rad * lerp(0.25, 0.8, rnd(2)), start = rad * 0.7 + L * 0.8 * a, len = rad * lerp(3, 6, rnd(4)), fade = Math.sin(Math.PI * a) * on;
     for (let d = 0; d < len; d += 0.5) { const t = d / len; p.blend(head.x - ux * (start + d) - uy * lat, head.y - uy * (start + d) + ux * lat, H_DUST[2], fade * Math.sin(Math.PI * t) * (1 - t * 0.6) * 0.5); } }
@@ -8095,14 +8095,14 @@ function hmTornadoDraw(S, R) {
 }
 
 // ---------- 瓦礫のビーム破砕（debris_shatter.cpp）
-const HM_SHATTER_CREEP = 150; // 試作の値：岩が機体へ進む速さ
+const HM_SHATTER_SPEED = 220; // 試作の値：岩の速さ。打ち出しからずっと同じ速さで進む
 function hmShatterTick(S, dt) {
   const r = S.r, [debris, beam] = S.parts, t = S.mt;
   // 瓦礫の首は岩を吐く扇の真ん中を向く（予兆のあいだに少しずつ向きを変える）
-  S.shFace ??= debris.angle; const fan = add(beam.strike, mul(norm(sub(S.ship.pos, beam.strike)), 420)); debris.angle = S.shFace + angDiff(angOf(sub(fan, debris.strike)), S.shFace) * smooth(0, 1, clamp(S.age / r.warning_time)); if (t < 0) return;
-  if (!S.sh) { const aim = angOf(sub(S.ship.pos, beam.strike)), from = add(debris.strike, mul(fromA(debris.angle), hMouthDist(debris))); S.sh = { aim, stones: [] }; for (let j = 0; j < r.rubble_count; j++) { const off = (j / Math.max(1, r.rubble_count - 1) - 0.5) * 1.4; S.sh.stones.push({ from: { ...from }, to: add(beam.strike, mul(fromA(aim + off), 420)), seed: j }); } }
-  // 岩は扇に吐き出されて勢いが落ち、そのまま止まらず機体へゆっくり進む
-  for (const s of S.sh.stones) { if (s.shattered) continue; const u = clamp(t / r.shatter_deploy), base = lerpV(s.from, s.to, 1 - Math.pow(1 - u, 2.2)), prev = s.pos || base; s.vel = mul(norm(sub(S.ship.pos, prev)), HM_SHATTER_CREEP * smooth(0.15, 0.75, u)); s.drift = add(s.drift || V(0, 0), mul(s.vel, dt)); s.pos = add(base, s.drift); }
+  S.shFace ??= debris.angle; debris.angle = S.shFace + angDiff(angOf(sub(S.ship.pos, debris.strike)), S.shFace) * smooth(0, 1, clamp(S.age / r.warning_time)); if (t < 0) return;
+  if (!S.sh) { const aim = angOf(sub(S.ship.pos, beam.strike)), from = add(debris.strike, mul(fromA(debris.angle), hMouthDist(debris))); S.sh = { aim, stones: [] }; for (let j = 0; j < r.rubble_count; j++) { const off = (j / Math.max(1, r.rubble_count - 1) - 0.5) * 1.4; S.sh.stones.push({ from: { ...from }, pos: { ...from }, a: debris.angle + off, seed: j }); } }
+  // 岩は扇の真ん中が機体を狙うように打ち出され、同じ速さでまっすぐ進む
+  for (const s of S.sh.stones) { if (s.shattered) continue; s.vel = mul(fromA(s.a), HM_SHATTER_SPEED); s.pos = add(s.pos, mul(s.vel, dt)); }
   if (t >= r.shatter_deploy && t < r.shatter_deploy + r.shatter_time) {
     beam.angle = S.sh.aim - r.shatter_arc * 0.5 + r.shatter_arc * clamp((t - r.shatter_deploy) / r.shatter_time);
     const A = beam.strike, B = add(A, mul(fromA(beam.angle), r.beam_len)), d = sub(B, A);
@@ -8117,8 +8117,7 @@ function hmShatterDraw(S, R) {
     if (S.mt < 0) { hmEyes(S, R, debris, poses.get(debris), u, HM_COLORS.debris); hmChew(S, R, debris, poses.get(debris), u); }
     hmEyes(S, R, beam, pb, S.mt < r.shatter_deploy ? clamp(S.age / (r.warning_time + r.shatter_deploy)) : 0.5, HM_COLORS.beam);
     if (S.sh) {
-      for (const s of S.sh.stones) if (!s.shattered && S.mt > 0) { const dir = norm(sub(s.to, s.from)), sp = dist(s.from, s.to) / r.shatter_deploy, age = Math.min(S.mt, r.shatter_deploy + 0.3); hRockComet(R, { from: sub(s.pos, mul(dir, sp * Math.min(age, r.shatter_deploy))), speed: sp, radius: HM_ROCK_R, seed: s.seed }, age, dir, { stop: r.shatter_deploy });
-        if (s.vel && S.mt > r.shatter_deploy * 0.7) for (let m = 1; m <= 7; m++) { const q = toL(sub(s.pos, mul(norm(s.vel), HM_ROCK_R * 0.7 + m * 12))), f = 1 - m / 8; R.back.disc(q.x, q.y, (2.6 * f + 0.8) * R.P.size, H_DUST[0], (d) => f * f * 0.4 * (1 - d * d)); } } // 進むあいだの土ぼこり
+      for (const s of S.sh.stones) if (!s.shattered && S.mt > 0 && s.vel) { const dir = fromA(s.a); hRockComet(R, { from: sub(s.pos, mul(dir, HM_SHATTER_SPEED * S.mt)), speed: HM_SHATTER_SPEED, radius: HM_ROCK_R, seed: s.seed }, S.mt, dir, { pace: HM_SHATTER_SPEED / 676 }); }
       const A = toL(M), B = toL(add(M, mul(fromA(beam.angle), r.beam_len)));
       if (S.mt < r.shatter_deploy) { const k = clamp(S.age / (r.warning_time + r.shatter_deploy)); FX.warnRail(R.front, A, B, { color: HM_COLORS.beam, k, time: S.t, seed: 4, maxLv: 2, intensity: R.P.intensity }); hmGather(S, R, M, k, HM_COLORS.beam, 8); }
       else if (S.mt < r.shatter_deploy + r.shatter_time + 0.1) { const e = S.mt - r.shatter_deploy, from = clamp((e - r.shatter_time + 0.1) / 0.1); FX.beam(R.front, A, B, { w: r.beam_width * 0.5 * WL * R.P.size, source: false, color: HM_COLORS.beam, time: S.t, from, to: clamp(e / 0.07), taper: 6, alpha: 1, intensity: R.P.intensity }); FX.flare(R.front, A, 1.4 * R.P.size, HM_COLORS.beam, S.t, 0.5 * (1 - from), 4); }
@@ -8130,7 +8129,7 @@ function hmShatterDraw(S, R) {
     }
   }
   R.blitBack(); hmDrawBody(S, R, poses);
-  if (S.sh) for (const s of S.sh.stones) if (!s.shattered && S.mt >= 0) { if (S.mt < r.shatter_deploy * 0.5) hRockGhosts(s.pos, norm(sub(s.to, s.from)), dist(s.from, s.to) / r.shatter_deploy, S.t * 3 + s.seed, HM_ROCK_R * 1.2); drawImg('meteor_0', s.pos, S.t * 3 + s.seed, HM_ROCK_R * 1.2); }
+  if (S.sh) for (const s of S.sh.stones) if (!s.shattered && S.mt >= 0) drawImg('meteor_0', s.pos, S.t * 1.6 + s.seed, HM_ROCK_R * 1.2);
   if (!R.proto && S.sh) { const A = beam.strike, B = add(A, mul(fromA(beam.angle), r.beam_len)); if (S.mt >= r.shatter_deploy && S.mt < r.shatter_deploy + r.shatter_time) D2.roundBeam(A, B, rgba('#ff4066', 0.85), r.beam_width); for (const b of S.shots) { const a = S.t - b.t; if (a < 2.5) D2.circle(add(b.from, mul(fromA(b.angle), r.shard_speed * a)), 8, '#c98f6a'); } }
   drawShip(S.ship);
 }
@@ -8164,7 +8163,7 @@ function hmRegister(id, ids, o, tick, draw, desc) {
 hmRegister('tornado', ['H04', 'H08', 'H13'], { kinds: ['vortex', 'debris'], color: HM_COLORS.vortex, ship: V(520, 60) }, hmTornadoTick, hmTornadoDraw,
   '予兆：渦の首と瓦礫の首が左右へ開き、渦の首は目が光ってため、瓦礫の首は首の瓦礫を口へ送って噛み砕く → 風の首の口元にまわりの風が巻きながら集まり、小さな渦が少しずつ育つ。らせんの腕が中心へ巻き込み、緑の風の腕に瓦礫の砂ぼこりの腕が混ざる。育った渦へ瓦礫の首が岩をまっすぐ打ち込み、岩は土ぼこりを上げて捕まり、渦の中を回る。砂利と葉も外から巻き込まれる → 渦が機体の方向へ走り、通った跡に土ぼこりが残る → 寿命の終わりに岩が外へ放り出され、渦が薄れて消える');
 hmRegister('debris_shatter', ['H04', 'H08', 'H14'], { kinds: ['debris', 'beam'], color: HM_COLORS.beam, ship: V(722, 60) }, hmShatterTick, hmShatterDraw,
-  '予兆：瓦礫の首は吐く方向を向いて瓦礫を噛み砕き、ビームの首は目が光って口に光を集める → 岩6つを扇に吐き出し、勢いが落ちてから機体へゆっくり進む（土ぼこり）。ビームの首は振り始めの向きに照準の光（白くしない）→ 光線が弧を薙ぎ、当たった岩は閃光と欠片・土ぼこりを出して砕け、赤く熱い破片6つが尾を引いて飛び、冷えて石の色になる');
+  '予兆：瓦礫の首は吐く方向を向いて瓦礫を噛み砕き、ビームの首は目が光って口に光を集める → 岩6つを扇に打ち出す。扇の真ん中が機体を狙い、岩は打ち出しから同じ速さでまっすぐゆっくり進む（速さに合わせた土煙の尾）。ビームの首は振り始めの向きに照準の光（白くしない）→ 光線が弧を薙ぎ、当たった岩は閃光と欠片・土ぼこりを出して砕け、赤く熱い破片6つが尾を引いて飛び、冷えて石の色になる');
 hmRegister('beam_pincer', ['H04', 'H10', 'H15'], { kinds: ['beam', 'beam'], color: HM_COLORS.beam, ship: V(560, 0) }, hmPincerTick, hmPincerDraw,
   '予兆：2本のビームの首が目を光らせ、口へ光を集め、左右に開いた向きへ照準の光（白くしない）→ 2本の光線が左右から機体の方向へ閉じていく → 根元から消える');
 
