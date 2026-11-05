@@ -8,7 +8,9 @@ const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
 const SYMBOL_ORBIT := Vector2(112, 84)
 const SYMBOL_OFFSET := Vector2(-1, -0.5)
-const INNER_ORBIT_RATE := -4.0
+const INNER_ORBIT_RATE := -1.0
+const INNER_LARGE_ORBIT_RATE := -2.0
+const INNER_TURN_SPEED := 60.0
 # 大円の公転半径と揃え、オオイヌ選択時に小円の中心を星図の中心へ合わせる。
 const INNER_ORBIT_OFFSET := Vector2(0, -48)
 # 半径45.5pxの小円が、公転半径48pxで内接する大円のサイズ。
@@ -73,6 +75,7 @@ var navigation_enabled := true
 var _selected := 0
 var _last_orbit_selection := 0
 var _angle := 0.0
+var _ring_angle := 0.0
 var _turn: Tween
 var _projection: Node2D
 var _origin := ORIGIN
@@ -201,6 +204,7 @@ func _ready() -> void:
 	add_child(monitor)
 	_refresh_stage_visibility()
 	_apply_rotation(0.0)
+	_apply_ring_rotation(0.0)
 	_hide_details()
 	visibility_changed.connect(func():
 		if not is_visible_in_tree():
@@ -489,11 +493,6 @@ func _apply_rotation(degrees: float) -> void:
 	_angle = degrees
 	var radians := deg_to_rad(degrees)
 	rotation_changed.emit(radians)
-	_inner1.position = Vector2(0, -48).rotated(-radians)
-	_inner1.rotation = -radians * 5.0
-	# 小円は大円の内側を別の速さで公転し、選択移動で接点を変える。
-	_inner2.position = _inner1.position + INNER_ORBIT_OFFSET.rotated(radians * INNER_ORBIT_RATE)
-	_inner2.rotation = radians * 35.0 / 30.0
 	for i in _stars.size():
 		var angle := deg_to_rad(degrees + SYMBOL_ANGLES[i])
 		var depth := sin(angle)
@@ -503,6 +502,21 @@ func _apply_rotation(degrees: float) -> void:
 		star.position = _origin + SYMBOL_OFFSET + Vector2(cos(angle), depth * _flatten) * SYMBOL_ORBIT - SYMBOL_TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
+
+func _process(delta: float) -> void:
+	# 星座の選択速度は変えず、円だけをゆっくり追従させる。
+	if _ring_angle != _angle:
+		_apply_ring_rotation(move_toward(_ring_angle, _angle, INNER_TURN_SPEED * delta))
+
+func _apply_ring_rotation(degrees: float) -> void:
+	_ring_angle = degrees
+	var radians := deg_to_rad(degrees)
+	# 大円は2段階で一周し、オオイヌでは小円の中心を星図の中心へ合わせる。
+	_inner1.position = Vector2(0, -48).rotated(radians * INNER_LARGE_ORBIT_RATE)
+	_inner1.rotation = -radians * 5.0
+	# 小円は1段階ごとに反時計回りに90度進み、接点を12時→9時→6時→3時へ変える。
+	_inner2.position = _inner1.position + INNER_ORBIT_OFFSET.rotated(radians * INNER_ORBIT_RATE)
+	_inner2.rotation = radians * 35.0 / 30.0
 
 func set_transition(progress: float) -> void:
 	_transition_progress = progress
