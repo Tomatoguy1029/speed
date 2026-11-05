@@ -49,6 +49,7 @@ func _ready() -> void:
 	_text = Label.new()
 	_text.position = Vector2(82, 258)
 	_text.size = Vector2(476, 66)
+	_text.add_theme_font_override("font", preload("res://assets/ui/aseprite_font.tres"))
 	_text.add_theme_font_size_override("font_size", 14)
 	_text.add_theme_color_override("font_color", Color("e6f1f6"))
 	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
