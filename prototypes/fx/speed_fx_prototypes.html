@@ -8096,8 +8096,10 @@ function hmTornadoDraw(S, R) {
 
 // ---------- 瓦礫のビーム破砕（debris_shatter.cpp）
 function hmShatterTick(S, dt) {
-  const r = S.r, [debris, beam] = S.parts, t = S.mt; if (t < 0) return;
-  if (!S.sh) { const aim = angOf(sub(S.ship.pos, beam.strike)); S.sh = { aim, stones: [] }; for (let j = 0; j < r.rubble_count; j++) { const off = (j / Math.max(1, r.rubble_count - 1) - 0.5) * 1.4; S.sh.stones.push({ from: { ...debris.strike }, to: add(beam.strike, mul(fromA(aim + off), 420)), seed: j }); } debris.angle = angOf(sub(beam.strike, debris.strike)); }
+  const r = S.r, [debris, beam] = S.parts, t = S.mt;
+  // 瓦礫の首は岩を吐く扇の真ん中を向く（予兆のあいだに少しずつ向きを変える）
+  S.shFace ??= debris.angle; const fan = add(beam.strike, mul(norm(sub(S.ship.pos, beam.strike)), 420)); debris.angle = S.shFace + angDiff(angOf(sub(fan, debris.strike)), S.shFace) * smooth(0, 1, clamp(S.age / r.warning_time)); if (t < 0) return;
+  if (!S.sh) { const aim = angOf(sub(S.ship.pos, beam.strike)), from = add(debris.strike, mul(fromA(debris.angle), hMouthDist(debris))); S.sh = { aim, stones: [] }; for (let j = 0; j < r.rubble_count; j++) { const off = (j / Math.max(1, r.rubble_count - 1) - 0.5) * 1.4; S.sh.stones.push({ from: { ...from }, to: add(beam.strike, mul(fromA(aim + off), 420)), seed: j }); } }
   for (const s of S.sh.stones) s.pos = s.shattered ? s.pos : lerpV(s.from, s.to, clamp(t / r.shatter_deploy));
   if (t >= r.shatter_deploy && t < r.shatter_deploy + r.shatter_time) {
     beam.angle = S.sh.aim - r.shatter_arc * 0.5 + r.shatter_arc * clamp((t - r.shatter_deploy) / r.shatter_time);
