@@ -4,6 +4,7 @@
 #include "attack_budget.h"
 #include "../content/content_bundle.h"
 #include "../state/boss_states.h"
+#include "../bosses/canis_major/state.h"
 #include <algorithm>
 #include <cmath>
 #include <unordered_set>
@@ -231,7 +232,7 @@ void AttackSystem::sync_observation_positions(State &state) {
         case AttackPool::Friendly: break;
         }
     }
-    for (const auto &b:state.bosses->bodies) for (const auto &v:b.canis.burning)
+    for (const auto &b:state.bosses->bodies) for (const auto &v:b.canis->burning)
         if (state.enemy_handles.contains(v.actor)) o.effect_position(v.effect_id,state.enemies[v.actor.slot].pos);
 }
 bool AttackSystem::rebuild(State &state) {

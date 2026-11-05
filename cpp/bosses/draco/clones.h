@@ -2,6 +2,7 @@
 #include "technique.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 namespace speed {class DracoClones {public:
     static void begin(RunRuntime &,TechniqueState &);
     static void active(RunRuntime &,TechniqueState &,double);

@@ -232,7 +232,7 @@ Main (Node)
 | 対象 | 戦闘の所有者 | 表示の入口 |
 |---|---|---|
 | 通常敵 | Enemyの共通値・種類別状態と種類別処理 | `run_frame_view.gd` と `render/enemies/` |
-| 5体のボス | `state/boss_states.h` と `cpp/bosses/<ボス>/` | 同じ描画出力から体・部位・技シーンを更新する |
+| 5体のボス | 共通の状態は `state/boss_states.h`、ボス固有の状態は `cpp/bosses/<ボス>/state.h`、処理は `cpp/bosses/<ボス>/` | 同じ描画出力から体・部位・技シーンを更新する |
 | 区間フロー | `cpp/bosses/flow/flow_runner.cpp` | GodotのボスAI編集画面 |
 | 技とコンボ | `technique_runner.cpp` とボス固有の技処理 | 技ごとの予告・実行・回復の表示 |
 | 形態・登場・決着 | `phase_controller.cpp` とボス固有のbody・finish | 出来事と位置・姿勢・演出位相 |

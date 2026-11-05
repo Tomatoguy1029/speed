@@ -6,6 +6,7 @@
 #include "../../systems/motion_math.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -27,9 +28,9 @@ void MonocerosSweep::begin(RunRuntime &r,TechniqueState &t) {
     auto &e=r.state.enemies[t.actor.slot];e.vel={};t.aim=r.state.ship_pos;t.direction=godot::Vector2::from_angle(e.facing);t.previous_ship=r.state.ship_pos;
     MonocerosSweepState v;v.angle=e.facing;v.speed=rule(r,t).approach_speed_start;if (const auto *body=PhaseController::find(r,t.actor)) v.side=body->sweep_side;t.detail=v;
 }
-godot::PackedVector2Array MonocerosSweep::horn(const RunRuntime &r,const TechniqueState &t) {const auto &e=r.state.enemies[t.actor.slot];const auto direction=godot::Vector2::from_angle(std::get<MonocerosSweepState>(t.detail).angle);godot::PackedVector2Array out;out.push_back(e.pos+direction*e.radius*0.65);out.push_back(e.pos+direction*length(r,t));return out;}
+godot::PackedVector2Array MonocerosSweep::horn(const RunRuntime &r,const TechniqueState &t) {const auto &e=r.state.enemies[t.actor.slot];const auto direction=godot::Vector2::from_angle(t.detail.get<MonocerosSweepState>().angle);godot::PackedVector2Array out;out.push_back(e.pos+direction*e.radius*0.65);out.push_back(e.pos+direction*length(r,t));return out;}
 void MonocerosSweep::step(RunRuntime &r,TechniqueState &t,double dt) {
-    auto &e=r.state.enemies[t.actor.slot];const auto &p=rule(r,t);auto &v=std::get<MonocerosSweepState>(t.detail);using Stage=MonocerosSweepState::Stage;
+    auto &e=r.state.enemies[t.actor.slot];const auto &p=rule(r,t);auto &v=t.detail.get<MonocerosSweepState>();using Stage=MonocerosSweepState::Stage;
     if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     auto prior=horn(r,t);const double before=v.elapsed;v.elapsed+=dt;
     switch (v.stage) {
@@ -58,7 +59,7 @@ void MonocerosSweep::step(RunRuntime &r,TechniqueState &t,double dt) {
     }
 }
 bool MonocerosSweep::validate(const TechniqueState &t) {
-    if (!std::holds_alternative<MonocerosSweepState>(t.detail)) return false;const auto &v=std::get<MonocerosSweepState>(t.detail);
+    if (!t.detail.holds<MonocerosSweepState>()) return false;const auto &v=t.detail.get<MonocerosSweepState>();
     return v.stage<=MonocerosSweepState::Stage::Return && std::isfinite(v.elapsed) && v.elapsed>=0 && std::isfinite(v.angle) && std::isfinite(v.base) && std::isfinite(v.glow) && v.glow>=0 && v.glow<=1 && std::isfinite(v.speed) && v.speed>=0 && (v.side==1 || v.side==-1);
 }
 }

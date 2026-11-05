@@ -6,6 +6,7 @@
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -24,7 +25,7 @@ void cue(RunRuntime &r,const TechniqueState &t,const char *name) {
 bool CentaurusPower::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return definition && definition<=r.content->boss_techniques.size() && r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;}
 void CentaurusPower::begin(RunRuntime &r,TechniqueState &t) {t.detail=CentaurusPowerState{};t.aim=r.state.ship_pos;t.previous_ship=r.state.ship_pos;r.state.enemies[t.actor.slot].vel={};cue(r,t,"telegraph");}
 void CentaurusPower::step(RunRuntime &r,TechniqueState &t,double dt) {
-    auto &e=r.state.enemies[t.actor.slot];e.vel={};const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=std::get<CentaurusPowerState>(t.detail);
+    auto &e=r.state.enemies[t.actor.slot];e.vel={};const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=t.detail.get<CentaurusPowerState>();
     if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
     if (v.alerting) e.facing=v.angle;
     else if (!TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked()) {
@@ -33,7 +34,7 @@ void CentaurusPower::step(RunRuntime &r,TechniqueState &t,double dt) {
     }
 }
 void CentaurusPower::command(RunRuntime &r,TechniqueState &t,TechniqueCommand command) {
-    auto &v=std::get<CentaurusPowerState>(t.detail);const auto &p=r.content->boss_techniques[t.definition-1];const auto &power=rule(*r.content,t);auto &e=r.state.enemies[t.actor.slot];
+    auto &v=t.detail.get<CentaurusPowerState>();const auto &p=r.content->boss_techniques[t.definition-1];const auto &power=rule(*r.content,t);auto &e=r.state.enemies[t.actor.slot];
     if (command==TechniqueCommand::AlertPower && t.stage==TechniqueStage::Windup) {v.origin=mouth(r,t);v.angle=e.facing;v.alerting=true;cue(r,t,"alert");}
     else if (command==TechniqueCommand::ReleaseArrow && (t.stage==TechniqueStage::Windup || t.stage==TechniqueStage::Active)) {
         const auto from=v.alerting?v.origin:mouth(r,t);const auto target=p.track_during_warn?r.state.ship_pos:t.aim;
@@ -42,9 +43,9 @@ void CentaurusPower::command(RunRuntime &r,TechniqueState &t,TechniqueCommand co
         t.stage=TechniqueStage::Active;cue(r,t,"released");
     } else if (command==TechniqueCommand::FinishVolley && (t.stage==TechniqueStage::Windup || t.stage==TechniqueStage::Active)) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;v.alerting=false;cue(r,t,"recovery_started");}
 }
-bool CentaurusPower::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=std::get_if<CentaurusPowerState>(&t.detail);return v && v->origin.is_finite() && std::isfinite(v->angle) && v->released<=rule(c,t).count;}
+bool CentaurusPower::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=t.detail.get_if<CentaurusPowerState>();return v && v->origin.is_finite() && std::isfinite(v->angle) && v->released<=rule(c,t).count;}
 godot::Dictionary CentaurusPower::snapshot(const RunRuntime &r,const TechniqueState &t) {
-    const auto &p=rule(*r.content,t);const auto &v=std::get<CentaurusPowerState>(t.detail);godot::Dictionary out;out["alerting"]=v.alerting;out["released"]=v.released;out["locked_origin"]=v.origin;out["locked_angle"]=v.angle;out["travel"]=p.travel;
+    const auto &p=rule(*r.content,t);const auto &v=t.detail.get<CentaurusPowerState>();godot::Dictionary out;out["alerting"]=v.alerting;out["released"]=v.released;out["locked_origin"]=v.origin;out["locked_angle"]=v.angle;out["travel"]=p.travel;
     if (r.state.enemy_handles.contains(t.actor)) {out["aim_origin"]=v.alerting?v.origin:mouth(r,t);out["aim_angle"]=v.alerting?v.angle:double(r.state.enemies[t.actor.slot].facing);}
     if (const auto *body=PhaseController::find(r,t.actor)) out["alert_age"]=body->clock-t.started_at-(r.content->boss_techniques[t.definition-1].warn-p.alert);
     out["ship_position"]=r.state.ship_pos;out["ship_radius"]=r.state.ship_config.ship_radius;

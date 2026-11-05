@@ -1,6 +1,7 @@
 #pragma once
 #include "technique.h"
 #include "../../state/boss_states.h"
+#include "state.h"
 namespace speed {class DracoScreenStaging {public:
     static void side_entry(RunRuntime &,TechniqueState &,DracoSideEntryState &);
     static void advance_side(RunRuntime &,TechniqueState &,const DracoSideEntryState &,double);

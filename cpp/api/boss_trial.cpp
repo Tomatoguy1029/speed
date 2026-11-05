@@ -12,6 +12,9 @@
 #include "../systems/attack_system.h"
 #include "../state/boss_states.h"
 #include "../content/content_bundle.h"
+#include "../bosses/centaurus/state.h"
+#include "../bosses/canis_major/state.h"
+#include "../bosses/hydra/state.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -34,13 +37,13 @@ Dictionary SpeedRunCore::development_boss_trial_command(const Dictionary &p) {
     if (action=="state" && p.size()==2) {
         Dictionary value;for (const auto &item:speed::PhaseController::snapshot(runtime)) {const Dictionary row=item;if (int64_t(row["actor"])==int64_t(p["entity_id"])) value=row;}
         value["pinned"]=runtime.state.control.lab_pinned;value["pin"]=runtime.state.control.lab_pin;value["selection"]=flow->selection_enabled;value["flow_index"]=flow->index;value["flow_active"]=flow->active;value["guard"]=runtime.state.enemies[actor.slot].guard;value["steering_locked"]=runtime.state.steering_locked;
-        bool busy=!flow->roots.empty() || body->mode!=speed::BossMode::Idle || body->phase_pending || body->centaurus.leaping || body->canis.barking || body->canis.calling || (hydra && (body->hydra.growth_left>0 || body->hydra.separation_left>0));String technique;
+        bool busy=!flow->roots.empty() || body->mode!=speed::BossMode::Idle || body->phase_pending || body->centaurus->leaping || body->canis->barking || body->canis->calling || (hydra && (body->hydra->growth_left>0 || body->hydra->separation_left>0));String technique;
         for (const auto &t:runtime.state.bosses->techniques) if ((speed::same_handle(t.actor,actor) || (hydra && speed::HydraNormalAttack::body(runtime,t.actor)==body)) && t.stage<speed::TechniqueStage::Finished) {busy=true;technique=String::utf8(runtime.content->boss_techniques[t.definition-1].external_id.c_str());}
-        if (hydra) value["phase"]=body->hydra.separated?4:body->hydra.necks.size()>=8?3:body->hydra.necks.size()>=5?2:1;
+        if (hydra) value["phase"]=body->hydra->separated?4:body->hydra->necks.size()>=8?3:body->hydra->necks.size()>=5?2:1;
         value["busy"]=busy;value["technique"]=technique;return reply(true,value);
     }
     if (action=="phase_two" && p.size()==2 && !hydra && !draco && body->phase==1) {body->phase_pending=true;return reply(true);}
-    if (action=="separate" && p.size()==2 && hydra && body->hydra.necks.size()==8 && !body->hydra.separated) return reply(speed::HydraSwim::begin(runtime,*body));
+    if (action=="separate" && p.size()==2 && hydra && body->hydra->necks.size()==8 && !body->hydra->separated) return reply(speed::HydraSwim::begin(runtime,*body));
     if (action=="leap" && p.size()==2 && runtime.content->bosses[boss-1].kind==1 && !flow->selection_enabled && speed::PhaseController::can_start(runtime,actor)) {speed::CentaurusFinish::leap(runtime,*body);return reply(true);}
     if (action=="restart" && p.size()==2 && flow->roots.empty() && speed::PhaseController::can_start(runtime,actor)) {
         const auto definition=flow->definition,phase=flow->phase;const auto participants=flow->participants;*flow={};flow->actor=actor;flow->definition=definition;flow->participants=participants;flow->phase=phase;flow->selection_enabled=true;flow->stamina=runtime.content->boss_flows[definition-1].maximum_stamina;return reply(true);
@@ -63,7 +66,7 @@ Dictionary SpeedRunCore::development_boss_trial_command(const Dictionary &p) {
     if (draco) speed::DracoBody::reset_trial(runtime,*body);
     const auto definition=flow->definition;const auto participants=flow->participants;*flow={};flow->actor=actor;flow->definition=definition;flow->participants=participants;flow->phase=hydra?1:phase;flow->selection_enabled=p["selection"];flow->stamina=runtime.content->boss_flows[definition-1].maximum_stamina;
     body->mode=speed::BossMode::Idle;body->phase=hydra?1:phase;body->phase_pending=false;body->phase_remaining=0;body->initial_wait=0;body->sweep_side=1;body->has_slash=false;
-    body->centaurus.leaping=false;body->centaurus.path_hold=body->centaurus.turn_motion=0;body->centaurus.cooldowns.clear();body->centaurus.leap_ready_at=body->centaurus.retreat_ready_at=body->clock;
+    body->centaurus->leaping=false;body->centaurus->path_hold=body->centaurus->turn_motion=0;body->centaurus->cooldowns.clear();body->centaurus->leap_ready_at=body->centaurus->retreat_ready_at=body->clock;
     auto &e=runtime.state.enemies[actor.slot];e.pos=origin;e.vel={};e.facing=0;e.charge=0;e.guard=guard;e.mode=EnemyMode::Move;
     if (runtime.content->bosses[boss-1].kind==2) speed::CanisMajorBody::reset_trial(runtime,*body);
     if (hydra) {runtime.state.ship_pos=target;speed::HydraBody::reset_trial(runtime,*body,uint32_t(phase));e.guard=guard;}

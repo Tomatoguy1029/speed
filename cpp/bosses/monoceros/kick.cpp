@@ -5,6 +5,7 @@
 #include "../../systems/motion_math.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -32,7 +33,7 @@ void MonocerosKick::command(RunRuntime &r,TechniqueState &t,TechniqueCommand com
         if (auto *body=PhaseController::find(r,t.actor)) {
             MonocerosBreathVisual visual;visual.position=t.direction*rule(r,t).reach;visual.direction=t.direction.angle();
             visual.started=body->clock;visual.lifetime=r.content->config.fx_monoceros_kick_life;visual.spread=0.9;visual.reach=120;visual.seed=39;visual.attached=true;
-            body->monoceros_breaths.push_back(visual);
+            body->monoceros->breaths.push_back(visual);
         }
         recovery(r,t);
     }

@@ -2,6 +2,7 @@
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 namespace speed {class HydraSquad {public:
     static const HydraSquadDefinition &rule(const RunRuntime &,const BossBodyState &);
     static HydraSquadRole profile(const HydraNeckState &);

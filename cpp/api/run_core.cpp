@@ -53,6 +53,7 @@
 #include "../state/boss_states.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
+#include "../bosses/hydra/state.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>
@@ -254,7 +255,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 bool SpeedRunCore::advance_enemies(double delta) {
-    for (auto &body:runtime.state.bosses->bodies) body.hydra.attack_field_advance=false;
+    for (auto &body:runtime.state.bosses->bodies) body.hydra->attack_field_advance=false;
     capture_avoidance();
     ++runtime.state.ticks;
     if (runtime.state.aim_ready && !runtime.state.draw.tracing) {

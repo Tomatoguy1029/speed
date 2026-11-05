@@ -16,6 +16,7 @@
 #include "../state/boss_states.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
+#include "../bosses/draco/state.h"
 namespace speed {
 MetricsDetailTimer::~MetricsDetailTimer() {
     if (!sample) return;
@@ -99,7 +100,7 @@ void MetricsBuilder::set_recording(RunRuntime &r,bool active,uint32_t level) {
         for (auto &t:s.bosses->techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
         for (auto &b:s.bosses->bodies) {
             b.final_observation_id=0;
-            if (b.mode==BossMode::Final && (!b.final_landed || b.draco.finale.active)) TechniqueRunner::observe_scripted(r,b,b.draco.finale.active?"draco_finale":"final_strike",b.draco.finale.active?"scripted_finale":"final_strike_replay",ObservationEvent::Selected,false);
+            if (b.mode==BossMode::Final && (!b.final_landed || b.draco->finale.active)) TechniqueRunner::observe_scripted(r,b,b.draco->finale.active?"draco_finale":"final_strike",b.draco->finale.active?"scripted_finale":"final_strike_replay",ObservationEvent::Selected,false);
         }
         // 終了して行が再利用された技も、発生時のHandleと出所で分ける。
         std::map<std::tuple<int64_t,uint64_t,uint32_t>,int64_t> remaining;

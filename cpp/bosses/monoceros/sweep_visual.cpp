@@ -1,6 +1,7 @@
 #include "sweep_visual.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -26,14 +27,14 @@ void emit(MonocerosSweepVisual &v) {
 }
 }
 void MonocerosSweepVisualSystem::step(RunRuntime &r,BossBodyState &body,const TechniqueState *t,godot::Vector2 center,godot::Vector2 tip) {
-    const MonocerosSweepState *s=t?std::get_if<MonocerosSweepState>(&t->detail):nullptr;
+    const MonocerosSweepState *s=t?t->detail.get_if<MonocerosSweepState>():nullptr;
     const BossTechniqueDefinition *definition=t && t->definition && t->definition<=r.content->boss_techniques.size()?&r.content->boss_techniques[t->definition-1]:nullptr;
     if (s && definition && s->stage==MonocerosSweepState::Stage::Swing &&
-        std::none_of(body.monoceros_sweeps.begin(),body.monoceros_sweeps.end(),[&](const auto &v){return v.technique_id==t->id;})) {
+        std::none_of(body.monoceros->sweeps.begin(),body.monoceros->sweeps.end(),[&](const auto &v){return v.technique_id==t->id;})) {
         MonocerosSweepVisual v;v.technique_id=t->id;v.started=v.last_clock=body.clock;v.start_angle=v.last_angle=s->angle;v.arc=definition->arc;v.duration=definition->active;v.side=s->side;
-        body.monoceros_sweeps.push_back(std::move(v));
+        body.monoceros->sweeps.push_back(std::move(v));
     }
-    for (auto &v:body.monoceros_sweeps) {
+    for (auto &v:body.monoceros->sweeps) {
         const double dt=std::max(0.0,body.clock-v.last_clock);
         if (dt>0) {
             for (auto &m:v.motes) {m.life-=dt;if (m.life<=0) continue;m.velocity-=m.velocity*(0.6*dt);m.position+=m.velocity*dt;}
@@ -48,6 +49,6 @@ void MonocerosSweepVisualSystem::step(RunRuntime &r,BossBodyState &body,const Te
         if (!current || s->stage!=MonocerosSweepState::Stage::Swing) {v.finished=true;emit(v);}
     }
     const double timing=r.content->config.fx_monoceros_sweep_timing;
-    body.monoceros_sweeps.erase(std::remove_if(body.monoceros_sweeps.begin(),body.monoceros_sweeps.end(),[&](const auto &v){return v.finished && body.clock-v.started>v.duration+std::max(0.32*timing,0.55);}),body.monoceros_sweeps.end());
+    body.monoceros->sweeps.erase(std::remove_if(body.monoceros->sweeps.begin(),body.monoceros->sweeps.end(),[&](const auto &v){return v.finished && body.clock-v.started>v.duration+std::max(0.32*timing,0.55);}),body.monoceros->sweeps.end());
 }
 }

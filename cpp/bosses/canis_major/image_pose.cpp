@@ -5,6 +5,7 @@
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <algorithm>
@@ -32,9 +33,9 @@ const TechniqueState *active(const RunRuntime &r,EnemyHandle actor) {
 }
 const CanisPounceState *jump(const TechniqueState *t) {
     if (!t) return nullptr;
-    if (const auto *p=std::get_if<CanisPounceState>(&t->detail)) return p;
-    if (const auto *p=std::get_if<CanisBayState>(&t->detail)) return p->jumping?&p->jump:nullptr;
-    if (const auto *p=std::get_if<CanisHuntPounceState>(&t->detail)) return p->jumping?&p->jump:nullptr;
+    if (const auto *p=t->detail.get_if<CanisPounceState>()) return p;
+    if (const auto *p=t->detail.get_if<CanisBayState>()) return p->jumping?&p->jump:nullptr;
+    if (const auto *p=t->detail.get_if<CanisHuntPounceState>()) return p->jumping?&p->jump:nullptr;
     return nullptr;
 }
 void pounce(std::array<CanisImageNodePose,7> &nodes,double time) {
@@ -55,7 +56,7 @@ void pounce(std::array<CanisImageNodePose,7> &nodes,double time) {
 }
 void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
     if (!r.state.enemy_handles.contains(b.actor) || r.content->canis_image_parts.size()!=7) {b.image_parts.clear();return;}
-    auto &c=b.canis.image_pose;const auto &e=r.state.enemies[b.actor.slot];const auto *t=active(r,b.actor);
+    auto &c=b.canis->image_pose;const auto &e=r.state.enemies[b.actor.slot];const auto *t=active(r,b.actor);
     const double dt=c.clock>=0?std::max(0.0,b.clock-c.clock):0;
     if (c.clock>b.clock) {c.gait=c.walk_phase=0;c.landed_at=-1;}
     if (c.clock>=0 && dt>0) c.walk_phase+=c.previous_position.distance_to(e.pos)/std::max(double(e.radius)*.95,.001)*godot::Math::TAU;
@@ -81,11 +82,11 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
     const auto *p=jump(t);const double land_age=c.landed_at>=0?b.clock-c.landed_at:-1;
     if (t && !p) {
         const auto *roar=CanisRoar::settings(*r.content,t->definition);
-        const auto *hunt=std::get_if<CanisHuntState>(&t->detail);
-        const auto *relay=std::get_if<CanisRelayState>(&t->detail);
+        const auto *hunt=t->detail.get_if<CanisHuntState>();
+        const auto *relay=t->detail.get_if<CanisRelayState>();
         const bool aiming=(hunt && hunt->aiming) || (relay && relay->aiming);
         if (roar && roar->has_roar && roar->external_id!="O-nova" && !aiming) {
-            const double age=b.canis.roar_last_technique==t->id?b.clock-b.canis.roar_started:-1;
+            const double age=b.canis->roar_last_technique==t->id?b.clock-b.canis->roar_started:-1;
             const double inhale=age>=0?0:std::clamp((t->stage==TechniqueStage::Windup?e.charge:0.0)*2.0,0.0,1.0);
             const double push=age>=0?smooth(0,.035,age)*(1-smooth(.09,.24,age)):0;
             c.nodes[6].rotation=-.045*inhale;c.nodes[6].position={0,float(42-inhale*9+push*13)};c.nodes[6].scale={float(1+push*.035),float(1+push*.09)};
@@ -102,7 +103,7 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
         c.nodes[6].rotation+=std::sin(b.clock*23)*.018;
         c.nodes[6].position=Vector2(0,42+std::sin(b.clock*16)*1.2);
     }
-    if (r.state.bosses->handles.contains(b.canis.nova)) {
+    if (r.state.bosses->handles.contains(b.canis->nova)) {
         const auto head=CanisNova::image_head_pose(r,b);c.nodes[6].position={0,head.x};c.nodes[6].rotation=head.y;
         const auto motion=CanisNova::image_brace_flash(r,b);const double brace=motion.x,flash=motion.y;
         c.nodes[5].position=Vector2(0,-5.0*brace-14.0*flash);c.nodes[5].rotation=0;c.nodes[5].scale=Vector2(1.0+0.04*brace,1.0-0.08*brace);
@@ -123,12 +124,12 @@ void CanisImagePose::update(RunRuntime &r,BossBodyState &b) {
 }
 godot::Vector2 CanisImagePose::mouth(const RunRuntime &r,const BossBodyState &b) {
     if (!r.state.enemy_handles.contains(b.actor)) return {};
-    const auto &enemy=r.state.enemies[b.actor.slot];const auto &head=b.canis.image_pose.nodes[6];
+    const auto &enemy=r.state.enemies[b.actor.slot];const auto &head=b.canis->image_pose.nodes[6];
     return enemy.pos+(head.position+(godot::Vector2(0,59)*head.scale).rotated(head.rotation)).rotated(enemy.facing-godot::Math::PI/2)*(enemy.radius/100.0);
 }
 godot::Array CanisImagePose::snapshot(const RunRuntime &,const BossBodyState &b) {
     godot::Array out;
-    for (const auto &node:b.canis.image_pose.nodes) {godot::Dictionary row;row["position"]=node.position;row["rotation"]=node.rotation;row["scale"]=node.scale;out.push_back(row);}
+    for (const auto &node:b.canis->image_pose.nodes) {godot::Dictionary row;row["position"]=node.position;row["rotation"]=node.rotation;row["scale"]=node.scale;out.push_back(row);}
     return out;
 }
 }

@@ -23,6 +23,7 @@
 #include "../state/boss_states.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
+#include "../bosses/draco/state.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <climits>
@@ -308,7 +309,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {
         response=speed::BossFinish::abort(runtime)?success():failure(4,"result","結果は確定済みです");
     } else if (kind=="skip_boss_entrance" && payload.is_empty()) {
-        for (auto &body:runtime.state.bosses->bodies) if (body.draco.intro.active) speed::DracoIntro::end(runtime,body);response=success();
+        for (auto &body:runtime.state.bosses->bodies) if (body.draco->intro.active) speed::DracoIntro::end(runtime,body);response=success();
     } else if (kind=="skip_finish" && payload.is_empty()) {
         response=speed::BossFinish::skip(runtime)?success():failure(4,"phase","クリア演出中だけスキップできます");
     } else if (kind=="dev_finish" && runtime.api_development && payload.size()==1 && is(payload,"cleared",Variant::BOOL)) {

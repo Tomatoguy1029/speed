@@ -2,6 +2,7 @@
 #include "../../runtime/run_runtime.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <optional>
 namespace speed {class HydraTechnique {public:
     static bool supports(uint32_t kind) {return kind==72 || kind==73 || kind==74 || kind==82 || kind==83 || kind==88 || kind==89 || kind==90;}

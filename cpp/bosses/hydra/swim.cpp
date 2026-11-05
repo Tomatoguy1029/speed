@@ -15,6 +15,7 @@
 #include "../../systems/motion_math.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -24,28 +25,28 @@ bool locked(const RunRuntime &r,const BossBodyState &b) {const auto &e=r.state.e
 }
 const HydraSwimDefinition &HydraSwim::rule(const RunRuntime &r,const BossBodyState &b) {const auto boss=r.content->boss_bodies[b.definition-1].boss;return *std::find_if(r.content->hydra_swim.begin(),r.content->hydra_swim.end(),[&](const auto &p){return p.boss==boss;});}
 bool HydraSwim::begin(RunRuntime &r,BossBodyState &b) {
-    if (b.hydra.separated) return false;for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) FlowRunner::cancel(r,f);
+    if (b.hydra->separated) return false;for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) FlowRunner::cancel(r,f);
     for (uint32_t i=0;i<r.state.bosses->techniques.size();++i) {const auto actor=r.state.bosses->techniques[i].actor;if (same_handle(actor,b.actor) || HydraNormalAttack::body(r,actor)==&b) TechniqueRunner::cancel(r,r.state.bosses->handles.at(i));}
     const auto boss_handle=r.state.bosses->body_handles.at(uint32_t(&b-r.state.bosses->bodies.data()));AttackSystem::end_boss(r.state,boss_handle);
-    HydraRegrow::set_count(r,b,b.hydra.necks.size());for (auto &n:b.hydra.necks) {n.free_pos=HydraBody::head_position(r,b,n);n.look_angle=n.angle;}
-    b.hydra.separated=true;b.hydra.separation_pending=false;b.hydra.chance_left=0;const auto &p=rule(r,b);b.hydra.separation_left=p.separation_time;
+    HydraRegrow::set_count(r,b,b.hydra->necks.size());for (auto &n:b.hydra->necks) {n.free_pos=HydraBody::head_position(r,b,n);n.look_angle=n.angle;}
+    b.hydra->separated=true;b.hydra->separation_pending=false;b.hydra->chance_left=0;const auto &p=rule(r,b);b.hydra->separation_left=p.separation_time;
     HydraNeckState n;n.free_pos=r.state.enemies[b.actor.slot].pos;n.angle=(n.free_pos-r.state.ship_pos).angle();if (locked(r,b)) n.angle=r.state.enemies[b.actor.slot].facing;n.look_angle=n.angle;n.cd=HydraBody::rule(r,b).attack_cd;
-    const auto id=EnemySystem::spawn_part(r,b.actor,p.immortal-1,n.free_pos);if (id<0) {b.hydra.separated=false;b.hydra.separation_pending=true;b.hydra.separation_left=0;return false;}n.actor=r.state.enemy_handles.at(r.state.rows_by_id.at(id));n.id=id;auto &e=r.state.enemies[n.actor.slot];e.hp=e.max_hp=p.immortal_hp*r.content->definitions[r.content->boss_bodies[b.definition-1].enemy-1].scaling.hp_mult;e.armor=0;e.guard=p.separation_time;e.facing=n.angle;n.head_hp=0;b.hydra.bearer=n;b.participants.push_back({n.actor,n.actor,id,false,true});r.state.enemies[b.actor.slot].hp=r.state.enemies[b.actor.slot].max_hp=e.max_hp;
-    HydraSquad::init(r,b);HydraNormalAttack::cue(r,b,b.hydra.bearer,"separation_started",0,0,p.separation_time);return true;
+    const auto id=EnemySystem::spawn_part(r,b.actor,p.immortal-1,n.free_pos);if (id<0) {b.hydra->separated=false;b.hydra->separation_pending=true;b.hydra->separation_left=0;return false;}n.actor=r.state.enemy_handles.at(r.state.rows_by_id.at(id));n.id=id;auto &e=r.state.enemies[n.actor.slot];e.hp=e.max_hp=p.immortal_hp*r.content->definitions[r.content->boss_bodies[b.definition-1].enemy-1].scaling.hp_mult;e.armor=0;e.guard=p.separation_time;e.facing=n.angle;n.head_hp=0;b.hydra->bearer=n;b.participants.push_back({n.actor,n.actor,id,false,true});r.state.enemies[b.actor.slot].hp=r.state.enemies[b.actor.slot].max_hp=e.max_hp;
+    HydraSquad::init(r,b);HydraNormalAttack::cue(r,b,b.hydra->bearer,"separation_started",0,0,p.separation_time);return true;
 }
 bool HydraSwim::step(RunRuntime &r,BossBodyState &b,double dt) {
-    if (b.hydra.separation_pending) begin(r,b);if (!b.hydra.separated) return false;
-    if (b.hydra.separation_left>0) {b.hydra.separation_left=std::max(0.0,b.hydra.separation_left-dt);r.state.enemies[b.actor.slot].guard=b.hydra.separation_left;for (const auto &n:b.hydra.necks) if (HydraRegrow::alive(r,n)) r.state.enemies[n.actor.slot].guard=b.hydra.separation_left;if (HydraRegrow::alive(r,b.hydra.bearer)) r.state.enemies[b.hydra.bearer.actor.slot].guard=b.hydra.separation_left;for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) f.suspended=true;return true;}
+    if (b.hydra->separation_pending) begin(r,b);if (!b.hydra->separated) return false;
+    if (b.hydra->separation_left>0) {b.hydra->separation_left=std::max(0.0,b.hydra->separation_left-dt);r.state.enemies[b.actor.slot].guard=b.hydra->separation_left;for (const auto &n:b.hydra->necks) if (HydraRegrow::alive(r,n)) r.state.enemies[n.actor.slot].guard=b.hydra->separation_left;if (HydraRegrow::alive(r,b.hydra->bearer)) r.state.enemies[b.hydra->bearer.actor.slot].guard=b.hydra->separation_left;for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) f.suspended=true;return true;}
     for (auto &f:r.state.bosses->flows) if (same_handle(f.actor,b.actor)) f.suspended=b.mode!=BossMode::Idle;
-    auto &n=b.hydra.bearer;if (!HydraRegrow::alive(r,n)) {DamageRequest death=b.hydra.bearer_death;death.struck=b.actor;CombatResolver::kill_enemy(r,death);return true;}
-    auto &part=r.state.enemies[n.actor.slot];if (part.hp<n.head_hp) {n.hit_left=0.35;HydraNormalAttack::cue(r,b,n,"hit",0,n.head_hp-std::max(0.0,part.hp));}const bool major=HydraTechnique::busy(r,b);const bool alone=std::none_of(b.hydra.necks.begin(),b.hydra.necks.end(),[&](const auto &v){return HydraRegrow::alive(r,v);});
+    auto &n=b.hydra->bearer;if (!HydraRegrow::alive(r,n)) {DamageRequest death=b.hydra->bearer_death;death.struck=b.actor;CombatResolver::kill_enemy(r,death);return true;}
+    auto &part=r.state.enemies[n.actor.slot];if (part.hp<n.head_hp) {n.hit_left=0.35;HydraNormalAttack::cue(r,b,n,"hit",0,n.head_hp-std::max(0.0,part.hp));}const bool major=HydraTechnique::busy(r,b);const bool alone=std::none_of(b.hydra->necks.begin(),b.hydra->necks.end(),[&](const auto &v){return HydraRegrow::alive(r,v);});
     if (alone && n.normal) {for (auto &t:r.state.bosses->techniques) if (same_handle(t.actor,n.actor) && t.stage<TechniqueStage::Finished) {HydraNormalAttack::step(r,t,dt);break;}}else {if (alone && n.cd<=0) {for (const auto &normal:r.content->hydra_normals) if (r.content->boss_techniques[normal.technique-1].kind==64) {TechniqueRunner::begin(r,n.actor,normal.technique,"natural_ai");break;}}
         else if (!alone && !major && b.mode==BossMode::Idle) {n.cd=std::max(0.0,n.cd-dt);HydraSquad::tick_bearer(r,b,dt);}else {n.cd=std::max(0.0,n.cd-dt);const auto &p=rule(r,b);auto away=(n.free_pos-r.state.ship_pos).normalized();if (away==godot::Vector2()) away={-1,0};auto target=r.state.ship_pos+away.rotated(std::sin(b.clock*0.7)*0.6)*p.solo_bearer_distance;const auto grid=HydraTechnique::bearer_target(r,b);if (grid) target=*grid;if (grid && n.free_pos.distance_to(target)<45) {n.free_pos=n.free_pos.lerp(target,1-std::exp(-4*dt));n.velocity={};}else steer(r,b,n,target,dt,p.bearer_speed/p.snake_speed,grid.has_value());}}
     if (!alone && !major && b.mode==BossMode::Idle) HydraSquad::update_look(r,b,n,dt,HydraSquadRole::Bearer,false);
     const auto at=HydraBody::head_position(r,b,n);part.pos=at;part.facing=alone || major?n.angle:n.look_angle;part.vel=n.velocity;r.state.enemies[b.actor.slot].pos=at;r.state.enemies[b.actor.slot].hp=part.hp;r.state.enemies[b.actor.slot].vel={};n.head_hp=part.hp;
     HydraSquad::tick(r,b,dt);
-    for (auto &v:b.hydra.necks) {if (!HydraRegrow::alive(r,v)) {HydraRegrow::tick_dead(r,b,v,dt);continue;}auto &head=r.state.enemies[v.actor.slot];if (head.hp<v.head_hp) {v.hit_left=0.35;HydraSquad::watch_player(r,b,v,HydraSquad::profile(v));HydraNormalAttack::cue(r,b,v,"hit",v.normal,v.head_hp-std::max(0.0,head.hp));}v.head_hp=head.hp;if (!v.normal) v.cd=std::max(0.0,v.cd-dt);head.pos=HydraBody::head_position(r,b,v);head.facing=v.look_angle;head.vel=v.velocity;}
-    b.hydra.recovery_left=std::max(0.0,b.hydra.recovery_left-dt);return true;
+    for (auto &v:b.hydra->necks) {if (!HydraRegrow::alive(r,v)) {HydraRegrow::tick_dead(r,b,v,dt);continue;}auto &head=r.state.enemies[v.actor.slot];if (head.hp<v.head_hp) {v.hit_left=0.35;HydraSquad::watch_player(r,b,v,HydraSquad::profile(v));HydraNormalAttack::cue(r,b,v,"hit",v.normal,v.head_hp-std::max(0.0,head.hp));}v.head_hp=head.hp;if (!v.normal) v.cd=std::max(0.0,v.cd-dt);head.pos=HydraBody::head_position(r,b,v);head.facing=v.look_angle;head.vel=v.velocity;}
+    b.hydra->recovery_left=std::max(0.0,b.hydra->recovery_left-dt);return true;
 }
 godot::Vector2 HydraSwim::destination(const RunRuntime &r,const BossBodyState &b,const HydraNeckState &n,godot::Vector2 target,bool formation) {
     const double radius=r.state.enemies[n.actor.slot].radius;const auto rect=bounds(r,b);const auto from=FieldSystem::safe_point(r,rect,n.free_pos,radius+1);auto destination=FieldSystem::safe_point(r,rect,target,formation?radius+12:HydraBody::rule(r,b).neck_rest+radius+24);
@@ -62,5 +63,5 @@ void HydraSwim::follow(RunRuntime &r,BossBodyState &b,HydraNeckState &n,double d
     std::vector<godot::Vector2> path{head};path.insert(path.end(),n.trail.begin(),n.trail.end());n.points.resize(p.neck_segments+1);n.points.back()=head;size_t cursor=1;auto at=head;for (uint32_t i=1;i<=p.neck_segments;++i) {double needed=p.neck_rest/p.neck_segments;while (cursor<path.size() && at.distance_to(path[cursor])<needed) {needed-=at.distance_to(path[cursor]);at=path[cursor++];}const auto direction=cursor<path.size()?(path[cursor]-at).normalized():-godot::Vector2::from_angle(n.angle);at+=direction*needed;const double f=double(i)/p.neck_segments,amplitude=p.neck_wave_amplitude*(0.3+0.7*n.weights[0]),wave=std::sin(b.clock*p.neck_wave_speed*2-f*6.283185307179586*p.neck_wave_frequency+n.base_angle)*amplitude*std::sin(f*3.141592653589793),recoil=std::sin(f*3.141592653589793)*std::sin(b.clock*35-f*5)*n.weights[2]*12;n.points[p.neck_segments-i]=at+direction.orthogonal()*(wave+recoil);}
     const auto rect=bounds(r,b);for (auto &point:n.points) point=FieldSystem::safe_point(r,rect,point,24);
 }
-bool HydraSwim::bearer_defeated(RunRuntime &r,const DeathContext &death) {for (auto &b:r.state.bosses->bodies) if (b.hydra.separated && same_handle(b.hydra.bearer.actor,death.target)) {b.hydra.bearer_death=death.request;r.state.enemies[b.actor.slot].hp=0;for (auto &p:b.participants) if (same_handle(p.actor,death.target)) p.active=false;return true;}return false;}
+bool HydraSwim::bearer_defeated(RunRuntime &r,const DeathContext &death) {for (auto &b:r.state.bosses->bodies) if (b.hydra->separated && same_handle(b.hydra->bearer.actor,death.target)) {b.hydra->bearer_death=death.request;r.state.enemies[b.actor.slot].hp=0;for (auto &p:b.participants) if (same_handle(p.actor,death.target)) p.active=false;return true;}return false;}
 }

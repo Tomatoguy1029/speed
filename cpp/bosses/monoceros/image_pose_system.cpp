@@ -3,6 +3,7 @@
 #include "../flow/technique_runner.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -38,9 +39,9 @@ size_t gait_frame(const MonocerosImagePoseData &data,double time) {
 }
 bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const auto &c=*run.content;const auto &data=c.monoceros_image_pose;
-    body.monoceros_burns.erase(std::remove_if(body.monoceros_burns.begin(),body.monoceros_burns.end(),[&](const auto &v){return body.clock-v.started>2.5;}),body.monoceros_burns.end());
-    body.monoceros_shatters.erase(std::remove_if(body.monoceros_shatters.begin(),body.monoceros_shatters.end(),[&](const auto &v){return body.clock-v.started>v.lifetime;}),body.monoceros_shatters.end());
-    body.monoceros_breaths.erase(std::remove_if(body.monoceros_breaths.begin(),body.monoceros_breaths.end(),[&](const auto &v){return body.clock-v.started>v.lifetime;}),body.monoceros_breaths.end());
+    body.monoceros->burns.erase(std::remove_if(body.monoceros->burns.begin(),body.monoceros->burns.end(),[&](const auto &v){return body.clock-v.started>2.5;}),body.monoceros->burns.end());
+    body.monoceros->shatters.erase(std::remove_if(body.monoceros->shatters.begin(),body.monoceros->shatters.end(),[&](const auto &v){return body.clock-v.started>v.lifetime;}),body.monoceros->shatters.end());
+    body.monoceros->breaths.erase(std::remove_if(body.monoceros->breaths.begin(),body.monoceros->breaths.end(),[&](const auto &v){return body.clock-v.started>v.lifetime;}),body.monoceros->breaths.end());
     if (!run.state.enemy_handles.contains(body.actor) || !body.definition || body.definition>c.boss_bodies.size()) return false;
     const auto &body_def=c.boss_bodies[body.definition-1];
     if (!body_def.boss || body_def.boss>c.bosses.size() || c.bosses[body_def.boss-1].kind!=0 || data.nodes.empty() || data.sprites.empty() || data.gait.empty() || data.horns.empty()) return false;
@@ -53,7 +54,7 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     for (const auto &v:data.tuning) if (v.move==move) {tuning=&v;break;}
     if (!tuning) for (const auto &v:data.tuning) if (v.move.empty()) {tuning=&v;break;}
     if (!tuning) return false;
-    auto pose=body.monoceros_pose;
+    auto pose=body.monoceros->pose;
     if (!pose.initialized || pose.last_body_clock>body.clock) {
         pose.initialized=true;pose.body=pose.neck=pose.head=pose.tail=pose.flame=enemy.facing;pose.gait=0;pose.last_body_clock=body.clock;
     }
@@ -64,7 +65,7 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     const bool stuck=live && t && t->stage==TechniqueStage::Stuck;
     const bool attacking=active || stuck || (windup && t->locked);
     const bool sweeping=(move=="sweep" || move=="lance" || move=="return_charge" || move=="horn_wave" || move=="horn_dance" || move=="sword_flash") && (windup || active);
-    const auto *wave_pose=t?std::get_if<MonocerosHornWaveState>(&t->detail):nullptr;
+    const auto *wave_pose=t?t->detail.get_if<MonocerosHornWaveState>():nullptr;
     double wave_pull_scale=1.0;
     if (wave_pose && attack) {
         using Stage=MonocerosHornWaveState::Stage;
@@ -129,8 +130,8 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     bool first_sequence=true,run_stage=false;double elapsed=0;
     if (t && attack) {
         if (attack->kind==0) {run_stage=active;elapsed=std::max(0.0,t->elapsed-attack->warn);}
-        if (const auto *v=std::get_if<MonocerosReturnState>(&t->detail)) {first_sequence=v->stage==MonocerosReturnState::Stage::Aim;run_stage=active && v->stage==MonocerosReturnState::Stage::Run;elapsed=v->elapsed;}
-        if (const auto *v=std::get_if<MonocerosDanceState>(&t->detail)) {first_sequence=v->stage==MonocerosDanceState::Stage::Aim;run_stage=active && v->stage==MonocerosDanceState::Stage::Run;elapsed=v->elapsed;}
+        if (const auto *v=t->detail.get_if<MonocerosReturnState>()) {first_sequence=v->stage==MonocerosReturnState::Stage::Aim;run_stage=active && v->stage==MonocerosReturnState::Stage::Run;elapsed=v->elapsed;}
+        if (const auto *v=t->detail.get_if<MonocerosDanceState>()) {first_sequence=v->stage==MonocerosDanceState::Stage::Aim;run_stage=active && v->stage==MonocerosDanceState::Stage::Run;elapsed=v->elapsed;}
     }
     const double progress=t && attack?std::clamp(t->elapsed/std::max(0.001,attack->warn),0.0,1.0):0;
     const double prepare=aimed && windup && first_sequence?godot::Math::smoothstep(0.0,0.62,progress):0;
@@ -138,7 +139,7 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     nodes[head].position+=Vector2(0,-prepare*5+release*3);nodes[torso].position+=Vector2(0,-prepare*2+release*2);
     for (size_t i=0;i<2;++i) {const auto foot=find(nodes,std::string("Parts/")+feet[i]+"/Foot");nodes[foot].position+=Vector2(0,-prepare*7+release*3);}
     // monoWavePose の頭・胴の溜め、震え、突き出しを画像境界と表示で共有する。
-    if (move=="horn_wave" && t && attack) if (const auto *v=std::get_if<MonocerosHornWaveState>(&t->detail)) {
+    if (move=="horn_wave" && t && attack) if (const auto *v=t->detail.get_if<MonocerosHornWaveState>()) {
         using Stage=MonocerosHornWaveState::Stage;double pull=0,thrust=0,shake=0;
         if (v->stage==Stage::Windup || v->stage==Stage::Recharge) {
             const double duration=v->stage==Stage::Windup?attack->warn:attack->recharge;
@@ -203,7 +204,7 @@ bool MonocerosImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
         part.visible=body.mode<BossMode::Defeated;for (uint32_t n=sprite.node;n;n=nodes[n].parent) part.visible=part.visible && nodes[n].visible;
         body.image_parts.push_back(part);
     }
-    body.monoceros_pose=std::move(pose);
+    body.monoceros->pose=std::move(pose);
     return true;
 }
 }

@@ -6,6 +6,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -14,10 +15,10 @@ void bite(RunRuntime &r,const BossBodyState &b,TechniqueState &t,godot::Vector2 
 }
 }
 void HydraNormalAttack::step_thrust(RunRuntime &r,TechniqueState &t,double dt,const HydraThunderDefinition *thunder,const HydraNormalContext *ctx) {
-    auto *b=body(r,t.actor,ctx);if (!b) {t.stage=TechniqueStage::Failed;return;}auto &n=*neck(*b,t.actor,ctx);if (b->hydra.growth_left>0 || b->hydra.separation_left>0) return;
-    const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=*std::find_if(r.content->hydra_normals.begin(),r.content->hydra_normals.end(),[&](const auto &v){return v.technique==t.definition;});const double neck_rest=ctx?ctx->neck_rest:HydraBody::rule(r,*b).neck_rest;const bool free=b->hydra.separated && &n!=&b->hydra.bearer;
+    auto *b=body(r,t.actor,ctx);if (!b) {t.stage=TechniqueStage::Failed;return;}auto &n=*neck(*b,t.actor,ctx);if (b->hydra->growth_left>0 || b->hydra->separation_left>0) return;
+    const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=*std::find_if(r.content->hydra_normals.begin(),r.content->hydra_normals.end(),[&](const auto &v){return v.technique==t.definition;});const double neck_rest=ctx?ctx->neck_rest:HydraBody::rule(r,*b).neck_rest;const bool free=b->hydra->separated && &n!=&b->hydra->bearer;
     const double duration=p.active+(free && thunder?thunder->flash:0.0);n.elapsed+=dt;const double time=n.elapsed,elapsed=time-p.warn;t.elapsed=time;t.remaining=std::max(0.0,p.warn+duration+p.hold-time);const auto &health=r.state.enemies[t.actor.slot];if (health.hp<n.head_hp) {n.hit_left=0.35;if (free) HydraSquad::watch_player(r,*b,n,HydraSquad::profile(n));cue(r,*b,n,"hit",t.definition,n.head_hp-std::max(0.0,health.hp),0,ctx);}n.head_hp=health.hp;const auto from=head_position(r,*b,n,ctx);const auto base=neck_base(r,*b,n,ctx);
-    const auto &e=r.state.enemies[b->actor.slot];const bool tracking_locked=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked();if (tracking_locked && !n.locked) n.target=from+godot::Vector2::from_angle(b->hydra.separated?n.look_angle:n.angle)*std::max(1.0,double(from.distance_to(n.target)));if (p.track_during_warn && time<=std::min(v.aim_tracking,p.warn) && !tracking_locked) n.target=r.state.ship_pos;
+    const auto &e=r.state.enemies[b->actor.slot];const bool tracking_locked=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked();if (tracking_locked && !n.locked) n.target=from+godot::Vector2::from_angle(b->hydra->separated?n.look_angle:n.angle)*std::max(1.0,double(from.distance_to(n.target)));if (p.track_during_warn && time<=std::min(v.aim_tracking,p.warn) && !tracking_locked) n.target=r.state.ship_pos;
     const auto previous_phase=n.normal_phase;n.normal_phase=time<p.warn?0:time<p.warn+duration?1:2;if (free && n.normal_phase==2 && previous_phase!=2) {HydraSquad::watch_player(r,*b,n,HydraSquad::profile(n));AttackSystem::source_ended(r.state,t.actor,AttackEndReason::TechniqueEnd);}
     if (time<p.warn) {aim(r,*b,n,(n.target-(free?n.free_pos:base)).angle(),dt,ctx);if (!free) n.length+=std::clamp(neck_rest*0.4-n.length,-neck_rest*dt*2,neck_rest*dt*2);n.glow=time/std::max(p.warn,0.001);}
     else {
@@ -29,8 +30,8 @@ void HydraNormalAttack::step_thrust(RunRuntime &r,TechniqueState &t,double dt,co
         if (!ctx || time>=p.warn+p.active) n.glow=0;
     }
     t.aim=n.target;t.locked=n.locked;t.direction=godot::Vector2::from_angle(free?n.look_angle:n.angle);t.stage=time<p.warn?TechniqueStage::Windup:time<p.warn+duration?TechniqueStage::Active:TechniqueStage::Recovery;
-    auto &part=r.state.enemies[t.actor.slot];if (!ctx) {part.pos=head_position(r,*b,n,ctx);part.facing=b->hydra.separated?n.look_angle:n.angle;}
-    if (time>=p.warn+duration+p.hold) {if (!ctx) {const auto at=part.pos;if (!b->hydra.separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;}t.stage=TechniqueStage::Finished;finish(r,t,ctx);if (b->hydra.separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra.bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished",0,0,0,ctx);}
+    auto &part=r.state.enemies[t.actor.slot];if (!ctx) {part.pos=head_position(r,*b,n,ctx);part.facing=b->hydra->separated?n.look_angle:n.angle;}
+    if (time>=p.warn+duration+p.hold) {if (!ctx) {const auto at=part.pos;if (!b->hydra->separated) n.angle=(at-base).angle();n.length=at.distance_to(base);n.free_pos=at;n.locked=n.extension=false;n.normal=0;n.cd=v.attack_cd;}t.stage=TechniqueStage::Finished;finish(r,t,ctx);if (b->hydra->separated) HydraSquad::watch_player(r,*b,n,&n==&b->hydra->bearer?HydraSquadRole::Bearer:HydraSquad::profile(n));cue(r,*b,n,"finished",0,0,0,ctx);}
     t.previous_ship=r.state.ship_pos;
 }
 }

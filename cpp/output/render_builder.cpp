@@ -32,6 +32,7 @@
 #include "../state/boss_states.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
+#include "../bosses/canis_major/state.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -223,7 +224,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (body_visible) if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) enemy_batch.ruler_sides.push_back(ruler->side);
         bool relay_warning=false;
         if (definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i))))
-            for (const auto &technique:state.bosses->techniques) if (const auto *relay=std::get_if<CanisRelayState>(&technique.detail); relay && technique.stage<TechniqueStage::Finished && !relay->cancelled && !relay->aiming)
+            for (const auto &technique:state.bosses->techniques) if (const auto *relay=technique.detail.get_if<CanisRelayState>(); relay && technique.stage<TechniqueStage::Finished && !relay->cancelled && !relay->aiming)
                 for (const auto &item:relay->items) if (item.marked && !item.fired && same_handle(item.actor,state.enemy_handles.at(uint32_t(i)))) relay_warning=true;
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && !relay_warning && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {

@@ -7,6 +7,7 @@
 #include "../../systems/tracking_policy.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -16,7 +17,7 @@ const CentaurusBodyDefinition &parameters(const RunRuntime &r,const BossBodyStat
 }
 void remember_guard(RunRuntime &r,BossBodyState &body,int64_t id) {
     if (id<0) return;const auto &p=parameters(r,body);
-    body.centaurus.guards.push_back({r.state.enemy_handles.at(r.state.rows_by_id.at(id)),r.state.control.rng.randf_range(p.sail_guard_min,p.sail_guard_max),r.state.control.rng.randf_range(0,6.283185307179586)});
+    body.centaurus->guards.push_back({r.state.enemy_handles.at(r.state.rows_by_id.at(id)),r.state.control.rng.randf_range(p.sail_guard_min,p.sail_guard_max),r.state.control.rng.randf_range(0,6.283185307179586)});
 }
 uint32_t guards_near(const RunRuntime &r,const BossBodyState &body,godot::Vector2 &sum) {
     const auto &p=parameters(r,body);const auto at=r.state.enemies[body.actor.slot].pos;uint32_t count=0;
@@ -35,16 +36,16 @@ void CentaurusBody::spawned(RunRuntime &r,BossBodyState &body) {
         EnemySpawn spawn;spawn.position=actor.pos+back.rotated(offset)*(actor.radius+70.0);spawn.facing=actor.facing;spawn.has_facing=true;
         remember_guard(r,body,EnemySystem::spawn(r,p.guard-1,spawn));
     }
-    body.centaurus.guard_refill=p.guard_refill;
+    body.centaurus->guard_refill=p.guard_refill;
 }
 void CentaurusBody::pre_step(RunRuntime &r,BossBodyState &body,double dt) {
-    auto &v=body.centaurus;v.turn_motion=0;const auto &p=parameters(r,body);const auto &e=r.state.enemies[body.actor.slot];const auto offset=r.state.ship_pos-e.pos;const auto speed=r.state.ship.vel.length();
+    auto &v=*body.centaurus;v.turn_motion=0;const auto &p=parameters(r,body);const auto &e=r.state.enemies[body.actor.slot];const auto offset=r.state.ship_pos-e.pos;const auto speed=r.state.ship.vel.length();
     bool busy=false;for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,body.actor) && t.stage<TechniqueStage::Finished) busy=true;
     if (body.phase<2 || body.mode!=BossMode::Idle || v.leaping || busy || speed<r.content->config.ship_config_base_max_speed*r.content->config.ship_config_steer_cruise*0.5 || speed<0.001 || offset.length()<p.path_min || offset.length()>p.path_max || std::abs(r.state.ship.vel.normalized().dot(offset.normalized()))>=p.path_cos) v.path_hold=0;
     else v.path_hold+=dt;
 }
 void CentaurusBody::step(RunRuntime &r,BossBodyState &body,double dt) {
-    auto &v=body.centaurus;const auto &p=parameters(r,body);
+    auto &v=*body.centaurus;const auto &p=parameters(r,body);
     v.guard_refill=std::max(0.0,v.guard_refill-dt);
     if (v.guard_refill<=0) {
         v.guard_refill=p.guard_refill;godot::Vector2 sum;
@@ -58,7 +59,7 @@ void CentaurusBody::step(RunRuntime &r,BossBodyState &body,double dt) {
     position_tick(r,body,dt);
 }
 void CentaurusBody::position_tick(RunRuntime &r,BossBodyState &body,double dt) {
-    auto &v=body.centaurus;const auto &p=parameters(r,body);const auto &d=r.content->bosses[r.content->boss_bodies[body.definition-1].boss-1];
+    auto &v=*body.centaurus;const auto &p=parameters(r,body);const auto &d=r.content->bosses[r.content->boss_bodies[body.definition-1].boss-1];
     v.guard_scan-=dt;if (v.guard_scan<=0) {v.guard_scan=p.guard_scan;godot::Vector2 sum;const auto count=guards_near(r,body,sum);v.has_guard_point=count>=p.guard_min && count>0;v.guard_point=v.has_guard_point?sum/double(count):godot::Vector2();}
     auto &e=r.state.enemies[body.actor.slot];const auto aim=r.state.enemy_aim;const auto offset=e.pos-aim;const double distance=offset.length();auto direction=offset/std::max(distance,1.0);
     if (v.has_guard_point && v.guard_point.distance_squared_to(aim)>1) direction=(v.guard_point-aim).normalized();
@@ -67,7 +68,7 @@ void CentaurusBody::position_tick(RunRuntime &r,BossBodyState &body,double dt) {
     const double before=e.facing;if (!tracking.locked()) e.facing+=std::clamp(angle_difference((aim-e.pos).angle()-e.facing),-d.turn*dt,d.turn*dt);v.turn_motion=angle_difference(e.facing-before)/std::max(dt,0.001);
 }
 bool CentaurusBody::validate(const godot::RunState &s,const ContentBundle &c,const BossBodyState &body) {
-    if (c.bosses[c.boss_bodies[body.definition-1].boss-1].kind!=1) return true;const auto &v=body.centaurus;
+    if (c.bosses[c.boss_bodies[body.definition-1].boss-1].kind!=1) return true;const auto &v=*body.centaurus;
     if (!v.guard_point.is_finite() || !v.leap_from.is_finite() || !v.leap_to.is_finite() || (v.path_side!=1 && v.path_side!=-1) || (v.sail_side!=1 && v.sail_side!=-1) || !std::isfinite(v.turn_motion)) return false;
     for (double value:{v.guard_refill,v.path_hold,v.leap_ready_at,v.leap_elapsed,v.retreat_ready_at}) if (!std::isfinite(value) || value<0) return false;
     if (!std::isfinite(v.guard_scan)) return false;

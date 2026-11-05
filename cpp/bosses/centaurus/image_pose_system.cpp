@@ -2,6 +2,7 @@
 #include "image_pose.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "state.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -14,7 +15,7 @@ std::string mode(const BossBodyState &body,const TechniqueState *t,const std::st
     if (body.mode==BossMode::Phase) return "phase";
     if (body.mode==BossMode::Final) return "final";
     if (body.mode>=BossMode::Defeated) return "defeated";
-    if (body.centaurus.leaping) return "leap";
+    if (body.centaurus->leaping) return "leap";
     if (t && t->stage==TechniqueStage::Active) {
         if (technique=="sail_run") return "sail";
         if (technique=="rain" || technique=="shower_chase" || technique=="shower_wall" || technique=="shower_path") return "rain";
@@ -43,21 +44,21 @@ bool CentaurusImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
         const auto &p=content.boss_techniques[t->definition-1];
         technique=p.external_id;id=t->id;
         if (p.kind==8 || p.kind==13) {
-            if (const auto *v=std::get_if<CentaurusVolleyState>(&t->detail)) released=v->released;
+            if (const auto *v=t->detail.get_if<CentaurusVolleyState>()) released=v->released;
             if (p.kind==8) for (const auto &v:content.centaurus_volleys) if (v.technique==p.id) {interval=v.interval;break;}
             if (p.kind==13) for (const auto &v:content.centaurus_fans) if (v.technique==p.id) {interval=v.interval;break;}
         } else if (p.kind==11) {
-            if (const auto *v=std::get_if<CentaurusPowerState>(&t->detail)) released=v->released;
+            if (const auto *v=t->detail.get_if<CentaurusPowerState>()) released=v->released;
         } else if (p.kind==15) {
-            if (const auto *v=std::get_if<CentaurusSailState>(&t->detail)) released=v->fired;
+            if (const auto *v=t->detail.get_if<CentaurusSailState>()) released=v->fired;
             for (const auto &v:content.centaurus_sails) if (v.technique==p.id) {interval=v.interval;break;}
         } else if (p.kind==12) pose_time=t->stage==TechniqueStage::Active?std::max(0.0,body.clock-t->started_at-p.warn):0.0;
     }
     double leap=0;
-    if (body.centaurus.leaping) {
+    if (body.centaurus->leaping) {
         const auto found=std::find_if(content.centaurus_bodies.begin(),content.centaurus_bodies.end(),[&](const auto &v){return v.body==body.definition;});
         if (found==content.centaurus_bodies.end()) return false;
-        const double progress=std::clamp(body.centaurus.leap_elapsed/std::max(0.001,found->leap_time),0.0,1.0);
+        const double progress=std::clamp(body.centaurus->leap_elapsed/std::max(0.001,found->leap_time),0.0,1.0);
         leap=std::sin(godot::Math::PI*progress);
     }
     const auto smooth=[](double a,double b,double value){const double k=std::clamp((value-a)/(b-a),0.0,1.0);return k*k*(3-2*k);};
@@ -79,10 +80,10 @@ bool CentaurusImagePoseSystem::refresh(RunRuntime &run,BossBodyState &body) {
     }
     const double scale=enemy.radius/135.0*(1.0+0.12*leap)*scale_mul;
     const godot::Transform2D root(enemy.facing-godot::Math::PI*0.5,godot::Vector2(scale,scale),0.0,enemy.pos+godot::Vector2(0,-65.0*leap)+lift);
-    auto clock=body.centaurus.image_pose;
+    auto clock=body.centaurus->image_pose;
     const double dt=clock.last_body_clock<0?0:std::max(0.0,body.clock-clock.last_body_clock);
     if (!CentaurusImagePoseEvaluator::step(content.centaurus_image_pose,clock,id,technique,mode(body,t,technique),enemy.charge,dt,pose_time,released,interval,root,body.image_parts)) return false;
-    clock.last_body_clock=body.clock;body.centaurus.image_pose=clock;
+    clock.last_body_clock=body.clock;body.centaurus->image_pose=clock;
     if (body.mode>=BossMode::Defeated) for (auto &part:body.image_parts) part.visible=false;
     return true;
 }
