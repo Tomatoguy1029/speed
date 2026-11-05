@@ -130,6 +130,29 @@ static func _refresh_source_signature(path: String, input_signature: String) -> 
 	file.close()
 	return DirAccess.rename_absolute(path+".pending",path)
 
+static func _source_files() -> PackedStringArray:
+	var files := PackedStringArray()
+	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
+	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle","bake_phoenix_fx","bake_centaurus_contact_masks","bake_canis_fx","bake_canis_contact_masks","bake_monoceros_contact_masks","bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
+	return files
+
+static func _all_inputs(files: PackedStringArray) -> PackedStringArray:
+	var all_inputs := files.duplicate()
+	var boss_inputs := PackedStringArray()
+	preload("res://addons/content_build/incremental.gd").files("res://data/bosses",boss_inputs)
+	for path in boss_inputs:
+		if not path in all_inputs: all_inputs.append(path)
+	return all_inputs
+
+static func _unchanged(output: String, input_fingerprint: String) -> bool:
+	var stamp_path := output.path_join("stamp.json")
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(stamp_path)) if FileAccess.file_exists(stamp_path) else null
+	return saved is Dictionary and saved.get("input_fingerprint","") == input_fingerprint and not saved.get("outputs",[]).is_empty() and saved.outputs.all(func(path): return FileAccess.file_exists(path)) and FileAccess.file_exists(output.path_join("dev/build_cache.json"))
+
+## 別プロセスを起動せず、全編集元と出力の照合だけを行う。
+static func is_unchanged(output := ROOT) -> bool:
+	return _unchanged(output,_file_signature(_all_inputs(_source_files())))
+
 static func build_all(force := false, output := ROOT) -> Error:
 	var resources = preload("res://tools/content/build_run_resources.gd")
 	resources.begin_batch()
@@ -143,19 +166,11 @@ static func _build_units(force: bool, output: String) -> Error:
 	var cache := preload("res://addons/content_build/incremental.gd").new()
 	cache.open(output.path_join("dev/build_cache.json"))
 	last_build_report = cache.report
-	var files := PackedStringArray()
-	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
-	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle","bake_phoenix_fx","bake_centaurus_contact_masks","bake_canis_fx","bake_canis_contact_masks","bake_monoceros_contact_masks","bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
+	var files := _source_files()
 	# 全編集元を内容で照合し、変更も出力欠落もなければResourceの読込前に返す。
-	var all_inputs := files.duplicate()
-	var boss_inputs := PackedStringArray()
-	cache.files("res://data/bosses",boss_inputs)
-	for path in boss_inputs:
-		if not path in all_inputs: all_inputs.append(path)
+	var all_inputs := _all_inputs(files)
 	var input_fingerprint := _file_signature(all_inputs)
-	var stamp_path := output.path_join("stamp.json")
-	var saved = JSON.parse_string(FileAccess.get_file_as_string(stamp_path)) if FileAccess.file_exists(stamp_path) else null
-	if not force and saved is Dictionary and saved.get("input_fingerprint","") == input_fingerprint and not saved.get("outputs",[]).is_empty() and saved.outputs.all(func(path): return FileAccess.file_exists(path)) and FileAccess.file_exists(output.path_join("dev/build_cache.json")):
+	if not force and _unchanged(output,input_fingerprint):
 		last_build_report.append({"unit":"all","rebuilt":false})
 		return OK
 	# 変更がないときは技のResourceを読み込まず、依存の内容だけを照合する。

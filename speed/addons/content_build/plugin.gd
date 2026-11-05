@@ -58,6 +58,9 @@ func _build() -> bool:
 		EditorInterface.get_editor_toaster().push_toast("データを生成中です。終わったら起動します。")
 		return false
 	var started := Time.get_ticks_usec()
+	if BUILD.is_unchanged():
+		print("起動前の確認: %.2f秒（変更なし）" % ((Time.get_ticks_usec()-started)/1000000.0))
+		return true
 	var error := BUILD.build_for_editor()
 	var rebuilt := BUILD.last_build_report.filter(func(row): return row.rebuilt).size()
 	print("起動前の生成: %.2f秒（作り直し%d件）" % [(Time.get_ticks_usec()-started)/1000000.0,rebuilt])

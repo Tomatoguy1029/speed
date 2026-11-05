@@ -217,6 +217,21 @@ var _resource_jobs: Dictionary = {}
 var _composite_scopes: Array[WeakRef] = []
 var _prepared_resources: Dictionary = {}
 var _startup_resources: ContentResourceScope
+var _fast_loads := 0
+var _vsync_mode := DisplayServer.VSYNC_ENABLED
+
+## 読込画面の間は画面更新を待たず、フレーム単位の読込と描画準備を早く回す。
+func begin_fast_loading() -> void:
+	if DisplayServer.get_name() == "headless": return
+	if _fast_loads == 0:
+		_vsync_mode = DisplayServer.window_get_vsync_mode()
+		DisplayServer.window_set_vsync_mode(DisplayServer.VSYNC_DISABLED)
+	_fast_loads += 1
+
+func end_fast_loading() -> void:
+	if DisplayServer.get_name() == "headless" or _fast_loads == 0: return
+	_fast_loads -= 1
+	if _fast_loads == 0: DisplayServer.window_set_vsync_mode(_vsync_mode)
 
 ## 全ステージと装備の生成済み一覧を起動時に準備し、終了まで保持する。
 func prepare_startup_resources() -> ContentResourceScope:
