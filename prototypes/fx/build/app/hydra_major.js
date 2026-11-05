@@ -49,7 +49,7 @@ function hmDrawBody(S, R, poses) {
 }
 function hmMouth(n, pose) { return add(pose.head, mul(fromA(pose.angle), hMouthDist(n))); }
 function hmEyes(S, R, n, pose, k, color) { // 目の光（参加する首の合図）
-  if (k <= 0.01) return; const pal = FX.ramp(color);
+  if (k <= 0.01) return; if (color === HM_COLORS.bite) { hBiteEyes(S, R, pose, k ** 0.7, color); return; } const pal = FX.ramp(color);
   for (const sx of [-8.5, 8.5]) { const e = toL(hLocal(pose.head, pose.angle, sx, -9.5, pose.sx, pose.sy)); R.front.glow(e.x, e.y, 1.6 + 3 * k, pal[3], (0.2 + 0.5 * k) * R.P.intensity); if (k > 0.4) R.front.px(e.x, e.y, pal[k > 0.8 ? 4 : 3]); }
 }
 function hmGather(S, R, M, k, color, seed) { bossGather({ ...R, P: { ...R.P, color } }, M, 42, k, S.t, seed); }

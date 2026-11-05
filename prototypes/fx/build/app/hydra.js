@@ -204,10 +204,18 @@ function hVisualNeck(S, n, pose, R) {
 
 // ---------- 試作のエフェクト（論理ピクセルに描く）
 const H_STONE = ['#1b2430', '#2f3c4a', '#4b5a68', '#6f7f8d', '#a3b0ba'].map(hexc);
+// 噛みつき系の予兆の目：大きく強く光って点滅し、ためが深まると目から光の筋が横へ伸びる。k は 0→1 のため具合
+function hBiteEyes(S, R, pose, k, color) {
+  const red = hexc(color), blink = 0.72 + 0.28 * Math.sin(S.t * (14 + 26 * k)), L = (2 + 7 * k) * R.P.size, sd = orth(fromA(pose.angle));
+  for (const sx of [-8.5, 8.5]) { const e = toL(hLocal(pose.head, pose.angle, sx, -9.5, pose.sx, pose.sy));
+    R.back.glow(e.x, e.y, (5 + 11 * k) * R.P.size, red, (0.5 + 0.7 * k) * blink * R.P.intensity); R.front.disc(e.x, e.y, (1.6 + 1 * k) * R.P.size, red, 1); if (k > 0.6) R.front.disc(e.x, e.y, 0.6 * R.P.size, PX.WHITE, 1);
+    for (let d = -L; d <= L; d += 0.5) { const a = Math.pow(1 - Math.abs(d) / L, 2); R.front.blend(e.x + sd.x * d, e.y + sd.y * d, red, a * 0.95 * k * blink); } }
+}
 function hEyes(S, R, n, pose) { // 予兆：赤い目が強まり、溜めの終わりに横へ光が走る
   if (n !== S.actor || S.age < 0) return;
   const pal = FX.ramp(R.P.color), T = pose.T, t = S.age;
   let k = t < T.warn ? clamp(t / T.warn) ** 1.4 : Math.exp(-(t - T.warn) / 0.25); if (k <= 0.01) return;
+  if (hTech(S).kind === 'bite' && t < T.warn) { hBiteEyes(S, R, pose, clamp(t / T.warn) ** 0.8, R.P.color); return; }
   for (const sx of [-8.5, 8.5]) {
     const e = toL(hLocal(pose.head, pose.angle, sx, -9.5, pose.sx, pose.sy));
     R.front.glow(e.x, e.y, 1.6 + 3.2 * k * R.P.size, pal[3], (0.22 + 0.55 * k) * R.P.intensity);
