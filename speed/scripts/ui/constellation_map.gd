@@ -9,7 +9,10 @@ const ORIGIN := Vector2(198, 195)
 const SYMBOL_ORBIT := Vector2(112, 84)
 const SYMBOL_OFFSET := Vector2(-1, -0.5)
 const INNER_ORBIT_RATE := -4.0
-const INNER_ORBIT_OFFSET := Vector2(0, -55.172457)
+# 大円の公転半径と揃え、オオイヌ選択時に小円の中心を星図の中心へ合わせる。
+const INNER_ORBIT_OFFSET := Vector2(0, -48)
+# 半径45.5pxの小円が、公転半径48pxで内接する大円のサイズ。
+const INNER_LARGE_RING_SCALE := 93.5 / 101.0
 const SELECTION_RECT := Rect2(141, 207, 112, 59)
 const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAGON_INDEX := 4
@@ -113,6 +116,7 @@ func _ready() -> void:
 	_map_content.add_child(projection)
 	_inner1 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle1.png"))
 	_inner1.offset = Vector2(48, 1)
+	_inner1.scale = Vector2.ONE * INNER_LARGE_RING_SCALE
 	_inner2 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle2.png"))
 	_inner2.offset = Vector2(61, 35)
 	_inner2.scale = Vector2.ONE * 0.7
