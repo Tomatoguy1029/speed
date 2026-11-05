@@ -46,7 +46,7 @@ theme/custom="res://assets/ui/theme.tres"
 
 [internationalization]
 
-locale/translations=PackedStringArray("res://data/text/strings.ja.translation", "res://data/text/strings.en.translation")
+locale/translations=PackedStringArray("res://data/text/strings.ja.translation")
 
 [physics]
 

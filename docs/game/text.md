@@ -39,7 +39,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 <!-- csv:start -->
 | keys | ja | en |
 | --- | --- | --- |
-|  | ゲーム中に表示する文章の生成データ。編集元は docs/game/text.md。ja 列が日本語、en 列が英語。設定の「言語」で切り替える。 |  |
+|  | ゲーム中に表示する文章の生成データ。編集元は docs/game/text.md。ja 列が日本語、en 列が英語。ゲーム内では ja 列を表示する。 |  |
 |  | キーは「場所.項目」の形で、コードと画面がこのキーで文章を読む。武器・特性・伝説のモジュール・機体の強化は &lt;種類&gt;.&lt;ID&gt;.name と .desc（ID は .tres の id）、ステージは stage.&lt;番号&gt;.name。 |  |
 |  | {n} などの波かっこは、ゲームが数値や名前に置き換える場所。両方の言語で同じ名前を使う。 |  |
 |  | キーが空の行はこの説明と見出しで、ゲームは読まない。 |  |
@@ -81,9 +81,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | settings.windowed | ウィンドウ | Windowed |
 | settings.fullscreen | フルスクリーン | Fullscreen |
 | settings.exclusive | 排他フルスクリーン | Exclusive Fullscreen |
-| settings.language | 言語 | Language |
-| settings.language&#95;ja | 日本語 | 日本語 |
-| settings.language&#95;en | English | English |
 | settings.key&#95;bindings | キー設定（ボタンを押してから、割り当てるキーを押す） | Key Bindings (click a button, then press the key to assign) |
 | settings.reset&#95;bindings | キー設定を初期値に戻す | Reset Key Bindings |
 | settings.no&#95;key | （なし） | (None) |
