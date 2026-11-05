@@ -311,7 +311,7 @@ const HM_CURVE_TILT = 35 * Math.PI / 180;
 function hmCurveTick(S, dt) {
   const r = S.r; if (S.mt >= 0) S.B.facing += r.curve_turn * dt;
   // 首は伸ばしきらず弓なりに曲げ、先が頭の向きへつながる。長さはゆるく呼吸する
-  const ext = smooth(0, 1, clamp(S.age / r.warning_time)); for (const n of S.parts) { n.moving = true; n.angle = n.baseAngle + S.B.facing; n.tilt = -HM_CURVE_TILT * ext; const L = HP.neck_rest * (1 + (0.3 + 0.035 * Math.sin(S.t * 2.6 + n.baseAngle * 3)) * ext); n.bend = L * 0.2 * ext; n.pos = add(hBase(S, n), mul(fromA(n.angle), L)); }
+  const ext = smooth(0, 1, clamp(S.age / r.warning_time)); for (const n of S.parts) { n.moving = true; const b = hBase(S, n), home = n.baseAngle + S.B.facing; n.curveFrom ??= { a: angOf(sub(n.pos, b)), L: dist(n.pos, b) }; n.angle = home + angDiff(n.curveFrom.a, home) * (1 - ext); n.tilt = -HM_CURVE_TILT * ext; const goal = HP.neck_rest * (1.3 + 0.035 * Math.sin(S.t * 2.6 + n.baseAngle * 3) * ext), L = lerp(n.curveFrom.L, goal, ext); n.bend = L * 0.2 * ext; n.pos = add(b, mul(fromA(n.angle), L)); } // 今の向きと長さから予兆のあいだになめらかに移る
 }
 function hmPolyBeam(S, R, pts, w, color, a0, a1, k) { // 折れ線に沿う光の帯。芯が白く、縁へ冷え、流れる明るさの山が先へ走る。先ほど細い
   const pal = FX.ramp(color), L = pts.map(toL); let total = 0; const seg = []; for (let i = 1; i < L.length; i++) { const l = dist(L[i - 1], L[i]); seg.push(l); total += l; }
