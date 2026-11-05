@@ -10,7 +10,11 @@ stage = 2
 stars = PackedVector2Array(-120, -200, -60, -100, 0, 0, 60, 110, 100, 220, 60, 330, 140, 40, 220, 80)
 links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 2, 6, 6, 7)
 cooldown = 60.0
-duration = 6.0
+duration = 3.8
 params = {
-"boss_stun": 1.5
+"boss_stun": 1.5,
+"open_delay": 2.0,
+"shatter_delay": 0.6,
+"big_damage_ratio": 0.25,
+"boss_damage_ratio": 0.08
 }

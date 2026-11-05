@@ -239,6 +239,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         godot::Vector2 deform;double amount=0;bool flash=false;
         for (const auto &w:state.loadout->contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
         if (flash) color.r=1;
+        // ペルセウス座で石になった敵：色の b に石になってからの秒を渡し、絵を石の灰色へ置き換える
+        if (!definition.polygon_visual && enemy.stone>0 && !run.content->perseus.empty()) color.b=std::clamp(run.content->perseus.front().shatter_delay+0.5-enemy.stone,0.004,1.0);
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,iron?Color(0,0,0,1):color,iron?int32_t((state.field.rock_handles.contains(enemy.rock)?int64_t(enemy.rock.slot):enemy.id)%3):(enemy.flash>0 || warning || flash?1:0));
         const auto *parent=state.enemy_handles.contains(enemy.parent)?&state.enemies[enemy.parent.slot]:nullptr;
         enemy_batch.marks.push_back((enemy.landmark || (parent && parent->landmark)?1:0) | (enemy.elite || (parent && parent->elite)?2:0));

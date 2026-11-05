@@ -101,7 +101,7 @@ bool HeroesSystem::captive(const RunRuntime &run) {const auto &h=run.state.heroe
 void HeroesSystem::step(RunRuntime &run,double real_dt,double world_dt) {
     auto &s=run.state;auto &h=s.heroes;const auto &cfg=run.content->hero_config;
     h.cooldown=std::max(0.0,h.cooldown-real_dt);
-    if (h.active>0) {h.active=std::max(0.0,h.active-real_dt);if (h.active<=0) {Dictionary data;data["id"]=name(run,h.power);emit(run,"hero_power_end",data);}}
+    if (h.active>0) {const double before=h.active;h.active=std::max(0.0,h.active-real_dt);PerseusBehavior::step(run,before,h.active);if (h.active<=0) {Dictionary data;data["id"]=name(run,h.power);emit(run,"hero_power_end",data);}}
     if (h.next>=0) {h.next-=real_dt;if (h.next<0) place(run,random_hero(run,h.power));}
     HerculesBehavior::step(run,real_dt);
     const auto from=h.previous;h.previous=s.ship.pos;if (!captive(run)) return;
@@ -132,7 +132,7 @@ void HeroesSystem::recovered(RunRuntime &run,EnemyHandle enemy) {
 void HeroesSystem::select_power(RunRuntime &run,uint32_t id) {run.state.heroes.power=id;run.state.heroes.active=0;}
 void HeroesSystem::activate(RunRuntime &run) {
     auto &h=run.state.heroes;if (!h.power || h.cooldown>0) return;const auto &d=run.content->heroes[h.power-1].definition;h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);
-    if (d.external_id=="perseus") PerseusBehavior::activate(run,d.duration);
+    if (d.external_id=="perseus") PerseusBehavior::activate(run);
 }
 Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
     const auto &h=run.state.heroes;Dictionary out;out["trace_width"]=trace_width(run);out["trace_radius"]=run.state.trace_radius*trace_width(run);out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;

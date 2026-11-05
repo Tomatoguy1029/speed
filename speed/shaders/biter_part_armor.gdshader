@@ -1,17 +1,22 @@
 shader_type canvas_item;
 uniform sampler2D paint_tex : source_color, filter_nearest;
 #include "res://shaders/elite_death.gdshaderinc"
+#include "res://shaders/hero_stone.gdshaderinc"
 varying float death_age;
 uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
+// HDR の画面へ描くときは true（石の色をリニアで出す）
+uniform bool stone_linear = false;
 varying float hit_flash;
+varying float stone_since;
 varying vec2 instance_x;
 varying vec2 instance_y;
 
 void vertex() {
 	death_age = COLOR.a;
 	hit_flash = COLOR.r;
+	stone_since = COLOR.b;
 	instance_x = normalize(MODEL_MATRIX[0].xy);
 	instance_y = normalize(MODEL_MATRIX[1].xy);
 }
@@ -21,6 +26,7 @@ void fragment() {
 	vec2 sprite_uv = mapped.xy;
 	// RGBは共通の確定塗装、アルファと法線は制作時に分割した部位。
 	vec4 armor = texture(paint_tex, sprite_uv);
+	armor.rgb = hero_stone(armor.rgb, sprite_uv, vec2(textureSize(paint_tex, 0)), stone_since, TIME, stone_linear);
 	float alpha = texture(TEXTURE, sprite_uv).a;
 	COLOR = vec4(mix(armor.rgb, vec3(1.0), hit_flash * 0.8) * ambient * brightness, alpha);
 	if (death_enabled) NORMAL = texture(NORMAL_TEXTURE, sprite_uv).rgb * vec3(2.0, -2.0, 2.0) + vec3(-1.0, 1.0, -1.0);
@@ -29,6 +35,7 @@ void fragment() {
 }
 void light() {
 	vec2 sprite_uv = death_sample(UV, death_age).xy;
-	vec3 albedo = mix(texture(paint_tex, sprite_uv).rgb, vec3(1.0), hit_flash * 0.8);
+	vec3 albedo = hero_stone(texture(paint_tex, sprite_uv).rgb, sprite_uv, vec2(textureSize(paint_tex, 0)), stone_since, TIME, stone_linear);
+	albedo = mix(albedo, vec3(1.0), hit_flash * 0.8);
 	LIGHT = vec4(albedo * brightness * LIGHT_COLOR.rgb * LIGHT_ENERGY * max(dot(NORMAL, LIGHT_DIRECTION), 0.0), LIGHT_COLOR.a);
 }

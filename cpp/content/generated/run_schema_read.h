@@ -3034,6 +3034,14 @@ inline bool read(BinaryReader &input, PerseusDefinition &out) {
     if (!input.read_u32(out.hero)) return false;
     if (!input.read_f64(out.boss_stun)) return false;
     if (out.boss_stun < 0) return false;
+    if (!input.read_f64(out.open_delay)) return false;
+    if (out.open_delay < 0) return false;
+    if (!input.read_f64(out.shatter_delay)) return false;
+    if (out.shatter_delay < 0) return false;
+    if (!input.read_f64(out.big_damage_ratio)) return false;
+    if (out.big_damage_ratio < 0) return false;
+    if (!input.read_f64(out.boss_damage_ratio)) return false;
+    if (out.boss_damage_ratio < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, LeoDefinition &out) {
@@ -5864,7 +5872,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 283: {
         if (version != 1) return false;
-        if (count > input.remaining()/16) return false;
+        if (count > input.remaining()/48) return false;
         for (uint32_t i=0; i<count; ++i) { PerseusDefinition row; if (!read(input,row)) return false; out.PerseusDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }

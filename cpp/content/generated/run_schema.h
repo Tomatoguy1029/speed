@@ -1702,6 +1702,10 @@ struct PerseusDefinition {
     uint32_t id{};
     uint32_t hero{};
     double boss_stun{};
+    double open_delay{};
+    double shatter_delay{};
+    double big_damage_ratio{};
+    double boss_damage_ratio{};
 };
 struct LeoDefinition {
     uint32_t id{};

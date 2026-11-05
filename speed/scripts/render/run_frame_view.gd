@@ -28,7 +28,8 @@ var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
 var _hero_fire_canvas: DrawLayer
-var _hero_power_visual: Node2D
+const HeroPowers := preload("res://scripts/render/equipment/heroes.gd")
+var _hero_power_visual: HeroPowers
 var _hero_canvas: DrawLayer
 var _hero_frame := {}
 var _hero_aura: MeshInstance2D
@@ -209,8 +210,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	elite_crackle = preload("res://scripts/render/elite_crackle.gd").new()
 	mark_layer.add_child(elite_crackle)
 	elite_crackle.setup(scope)
-	_hero_power_visual = preload("res://scripts/render/equipment/heroes.gd").new()
+	_hero_power_visual = HeroPowers.new()
 	_layer(9).add_child(_hero_power_visual)
+	var hero_sky := Node2D.new()
+	mark_layer.add_child(hero_sky)
+	_hero_power_visual.setup(_pixel,hero_sky)
 	_hero_fire_canvas = DrawLayer.new()
 	_hero_fire_canvas.draw_fn = _hero_power_visual.draw_fire
 	_layer(2).add_child(_hero_fire_canvas)
@@ -444,6 +448,9 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D,entry.get("rect",Rect2()))
 			var material := ShaderMaterial.new()
 			material.shader = load("res://shaders/xp_crystal.gdshader" if entry.role==3 else "res://shaders/pixel_sprite.gdshader")
+			if entry.role==VISUAL_ROLE.EnemySprite:
+				material.set_shader_parameter("stone_enabled",true)
+				material.set_shader_parameter("stone_linear",RenderingServer.get_current_rendering_method()!="gl_compatibility")
 			batch.material = material
 	_layer(layer).add_child(batch)
 	batches[id] = batch
@@ -1460,12 +1467,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
 	for event: Dictionary in _queued_events:
+		var stone_kill := _hero_power_visual.frame_event(event)
 		if event.type==&"kill" and not captured.has(event.id):
 			_elite_deaths.add_event(event,frame.ui.world_time,death_view)
 			var enemy_type := StringName(event.enemy_type)
 			if enemy_type not in [&"meteor", &"iron", &"saw", &"hydra_rubble"] and ContentManager.catalog.table(&"enemies").has(enemy_type) and death_view.grow(96.0).has_point(event.pos):
 				var radius: float = event.r
-				if not event.has("death_visual") and enemy_type != &"pump":
+				if not event.has("death_visual") and enemy_type != &"pump" and not stone_kill:
 					_burst(event.pos, event.color, 6 + roundi(radius / 3.0), 260.0 + radius * 4.0, event.dir)
 				# 他の揺れと最大値で合成し、カメラ側で設定の強度を掛ける。
 				if radius > 25.0:
@@ -1606,6 +1614,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	_hero_power_visual.frame_tick(effect_dt,_ship_visual_position if _ship_visual_position.is_finite() else ui.ship.ship_pos,ui.get("hero",{}))
 	finish_flash = maxf(0.0,finish_flash-effect_dt*2.0)
 	if ui.has("light_lances"):
 		if not ui.light_lances.is_empty() and not is_instance_valid(_critical_lances):

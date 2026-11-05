@@ -121,6 +121,8 @@ func cpp_perseus_display() -> void:
 	var intent := Intent.new()
 	intent.hero_press = true
 	var frame: Dictionary = behavior._cpp_step(bridge,intent)
+	bridge.command("dev_tick_heroes",{"dt":2.0,"run_time":2.0})
+	frame = behavior._cpp_read(bridge)
 	var held: Dictionary = bridge.checkpoint()
 	var v := viewport()
 	var camera := Camera2D.new()
@@ -134,7 +136,7 @@ func cpp_perseus_display() -> void:
 	view.setup(scope,guide._cpp_visuals,frame.ui.character_scale)
 	view.update_effects(frame,0.0)
 	var rect := Rect2(-512,-384,1024,768)
-	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3,"救出して発動した敵の石化表示を受け取る")
+	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3,"目が開ききった敵の石化表示を受け取る")
 	var layer := CanvasLayer.new()
 	layer.layer = 100
 	v.add_child(layer)
@@ -153,7 +155,7 @@ func cpp_perseus_display() -> void:
 	frame = behavior._cpp_read(bridge)
 	view.update_effects(frame,0.0)
 	hud.apply_snapshot(frame.ui)
-	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3 and frame.ui.hero.active>5.0,"復帰で残り時間・石の円・使用中の枠が戻る")
+	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.petrified.size()==3 and frame.ui.hero.active>1.0,"復帰で残り時間・石の表示・使用中の枠が戻る")
 	await settle()
 	check(v.get_texture().get_image().save_png("/tmp/speed-heroes-perseus.png")==OK,"ペルセウスの実表示を保存する")
 	v.queue_free()

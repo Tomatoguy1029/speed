@@ -131,6 +131,26 @@
           "name": "boss_stun",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "open_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shatter_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "big_damage_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boss_damage_ratio",
+          "type": "f64",
+          "min": 0
         }
       ]
     },
