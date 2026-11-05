@@ -10,21 +10,40 @@ Godot のプロジェクトは [speed/project.godot](speed/project.godot) です
 
 開発用の入口はメニューバーの **プロジェクト → ツール → SPEED** にまとめています。データ編集・ボス行動・出現タイムライン／編成・ステージ敵調整、ステージ起動・各実験場、ビジュアル／背景編集、素材確認・性能計測をここから開けます。既存のツールバーボタンとショートカットも使えます。無効にしたエディタープラグインの項目は表示されません。
 
-Godot 4.7.2・Forward Plus で開発します。ランの状態と戦闘処理は C++ の GDExtension、制作画面・入力・資源読み込み・表示・UI は Godot が担当します。初回の起動前に、固定SDKで拡張をビルドし、実行用データを生成してください。
+Godot 4.7.2・Forward Plus で開発します。ランの状態と戦闘処理は C++ の GDExtension、制作画面・入力・資源読み込み・表示・UI は Godot が担当します。
 
-依存の正は [cpp/dependencies.json](cpp/dependencies.json) です。Godot 4.7.2、API 4.7、export template `4.7.2.stable`、SCons 4.11.1、単精度を使います。macOSではXcode Command Line Tools、WindowsではC++コンパイラーを用意します。SDKと中間ファイルはソースの外に置きます。以下はApple Siliconの例です。
+### C++ライブラリ
+
+Godotでプロジェクトを開くと、ツールバーの右側に状態を表示します。
+
+| 表示 | 意味 | すること |
+|---|---|---|
+| `C++: 最新` | ライブラリがソースと一致している | なし |
+| `C++: 取得中` | CIが作ったライブラリを取得している | 完了を待つ |
+| `C++: 再起動で反映` | 取得は完了し、ゲームは新しいライブラリで動く | エディター内の機能にも反映するならGodotを開き直す |
+| `C++: ビルドが必要` | 同じソースのライブラリが公開されていない | **ビルド** を押す |
+
+`main` のC++は、統合後にGitHub Actionsがビルドし、Godotが自動で取得します。クローン直後の初回は拡張の読み込みエラーが出ますが、取得が終われば起動できます。初回のデータ生成はエディターを開いたあと裏で進み、ツールバーに進み具合が出ます。生成中にF5を押すと、終わり次第起動します。
+
+手元でC++を編集したら、ツールバーの **ビルド** を押します。ビルドは押したときだけ別プロセスで動き、その間もエディターを使えます。ログは下部パネルの **C++ビルド** に表示します。ライブラリが古いまま起動しようとすると、**このまま起動** と **ビルド** を選ぶ確認を表示します。
+
+手元ビルドにはPython 3とC++コンパイラーを使います。macOSはXcode Command Line Tools、Windowsは「C++によるデスクトップ開発」を入れたVisual Studioです。固定版のSDKとSConsは初回のビルドで取得します。SDK・中間ファイル・共有キャッシュは、macOSは `~/.cache/speed-build`、Windowsは `%LOCALAPPDATA%\\speed-build` に置き、全worktreeで使います。
+
+Godotを使わない場合は次の入口を使います。
 
 ```bash
-python3 -m venv /tmp/speed-build-python
-/tmp/speed-build-python/bin/pip install scons==4.11.1
-git clone https://github.com/godotengine/godot-cpp.git /tmp/speed-godot-cpp
-git -C /tmp/speed-godot-cpp checkout e103d348c4b2d8df7b819126d855e19381cb9a87
-python3 tools/build/build_run.py --sdk /tmp/speed-godot-cpp --scons /tmp/speed-build-python/bin/scons --platform macos --arch arm64
+python3 tools/build/dev_build.py status
 ```
 
-Intel Macは `--arch x86_64`、Windowsは `--platform windows --arch x86_64` を使います。拡張は `speed/extensions/run/bin/` へ出力します。SDKの完全コミット・APIハッシュ・SConsの版が一致しない場合はビルドを止めます。
+```bash
+python3 tools/build/dev_build.py build
+```
 
-拡張を用意したら、Godotのimportと共通生成を順に実行します。
+依存の正は [cpp/dependencies.json](cpp/dependencies.json) です。Godot 4.7.2、API 4.7、export template `4.7.2.stable`、SCons 4.11.1、単精度を使います。SDKの完全コミット・APIハッシュ・SConsの版が一致しない場合はビルドを止めます。
+
+### 実行用データ
+
+F5などの実行前に、変更した分だけ自動で生成します。CLIではGodotのimportと共通生成を順に実行します。
 
 ```bash
 godot --headless --editor --import --path speed
@@ -33,7 +52,7 @@ godot --headless --path speed --script res://tools/content/build_all.gd -- --for
 
 `.content/run/` に戦闘バイナリ・索引・表示用資源表がそろってから起動できます。生成失敗時はGodotの出力を確認し、古い生成物のまま進めないでください。タイトル・ステージ選択・ゲーム本体のメインシーンは `scenes/app/main.tscn` です。Godot 4.7.2 で開き、**F5 → ゲームスタート → ステージ選択 → 任意のステージ**で遊べます。エディタからの実行とデバッグ用ビルドでは、ステージ選択の「デバッグ全開放」で全ステージを表示できます。調整機能は [仕様書](docs/spec.md#20-調整機能) を参照してください。
 
-開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場**（**▶ ステージ** の右隣）から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/spec.md#201-敵ルート実験場) を参照してください。
+開発版のメインメニューにある **敵・ルート実験場** から、敵の配置、数値編集、停止・巻き戻し、線の隔離試行、ランダム候補の比較を使えます。エディタでは上部の **▶ 実験場** から直接起動できます。専用シーン `speed/gyms/enemy_lab/enemy_lab.tscn` を開いてF6でも起動できます。操作と保存・反映の流れは [仕様書の実験場](docs/spec.md#201-敵ルート実験場) を参照してください。
 
 実験場上部の **ヒットストップ（試遊のみ）** では、敵種類を選ぶか配置済みの敵を選択し、「選択中の敵」で対象を合わせて倍率を変えます。試遊を続けながら、現在の同種の敵と次に出現する敵で効果を確認できます。0は停止なし、1は共通時間です。「元の値へ戻す」は選択種類の定義またはステージ上書きへ戻し、実験場の条件リセットも試遊値を消します。恒久保存は **データ編集** または **ステージ敵調整** で行います。
 
@@ -58,14 +77,22 @@ godot-bg --editor --path speed
 配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。Macでは `godot-bg` をPATHへ用意します。importと共通生成はheadlessで行い、シェーダー事前変換を使うexportは `godot-bg` で行います。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。
 
 ```bash
-python3 tools/build/build_run.py --sdk /tmp/speed-godot-cpp --scons /tmp/speed-build-python/bin/scons --platform macos --package-dir /tmp/speed-package --godot godot --templates /path/to/4.7.2.stable
+python3 tools/build/build_run.py --sdk ~/.cache/speed-build/sdk/godot-cpp-e103d348c4b2 --scons ~/.cache/speed-build/scons-4.11.1/bin/scons --platform macos --package-dir <ソース外の新しい作業先> --godot godot --templates /path/to/4.7.2.stable
 ```
 
 この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると `godot-bg` で描画付きの確認を行います。`--verify-final` は隔離した保存先で通常出撃から自然な終了・結果保存・戻るを確認します。Macの出撃準備・初期装備・交換・取消の計測は `--verify-loading --verify-final --rendered` を使います。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
-検査は `/tmp` の独立コピーで、変更に関係する既存の入口だけ使います。C++の人数・出現の確認は `res://tests/runtime/run_population.tscn`、制作・生成・UI・配布は `speed/tests/` の各対象を参照します。検査を行う範囲は [AGENTS.md](AGENTS.md#検証) に従います。
+検査は一時作業場所で、変更に関係する既存の入口だけ使います。C++の人数・出現の確認は `res://tests/runtime/run_population.tscn`、制作・生成・UI・配布は `speed/tests/` の各対象を参照します。検査を行う範囲は [AGENTS.md](AGENTS.md#検証) に従います。
 
-性能計測の入口は `res://tools/profiling/profile_run.tscn`。生成済みのラン定義がある `/tmp` の独立コピーを使い、`SaveManager.SAVE_PATH` と `SETTINGS_PATH` を両方 `/tmp` 内へ隔離してから `godot-bg` で起動します。`--time` で開始ラン秒、`--seconds` で60秒以上の計測区間、`--revision` で確認したコミットID、`--out` で結果の保存先を指定します。通常の出撃・C++ラン・入力・描画を使い、条件の未成立と性能未達を分けて出力します。
+一時作業場所は次の入口で作ります。`--with-generated` を付けるとライブラリ・実行用データ・importキャッシュも複製します。置き場所はユーザーキャッシュの `work/` です。
+
+```bash
+python3 tools/dev/workspace.py create <名前> --with-generated
+```
+
+終わったら `python3 tools/dev/workspace.py remove <パス>` で消します。残ったものは次の `create` と `clean` が片付けます。7日を過ぎたものと、合計20GBを超えた分の古いものが対象です。使用中のもの、未コミットの変更や未pushのコミットがあるものは残します。
+
+性能計測の入口は `res://tools/profiling/profile_run.tscn`。生成済みのラン定義がある一時作業場所を使い、`SaveManager.SAVE_PATH` と `SETTINGS_PATH` を両方その中へ隔離してから `godot-bg` で起動します。`--time` で開始ラン秒、`--seconds` で60秒以上の計測区間、`--revision` で確認したコミットID、`--out` で結果の保存先を指定します。通常の出撃・C++ラン・入力・描画を使い、条件の未成立と性能未達を分けて出力します。
 
 ## 構成
 

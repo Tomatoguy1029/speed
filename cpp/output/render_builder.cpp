@@ -29,6 +29,10 @@
 #include "../behaviors/enemies/pulser.h"
 #include "../behaviors/enemies/aquarius.h"
 #include "../behaviors/enemies/lynx.h"
+#include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
+#include "../bosses/canis_major/state.h"
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/transform2d.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
@@ -220,7 +224,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (body_visible) if (const auto *ruler=std::get_if<RulerState>(&enemy.behavior_state)) enemy_batch.ruler_sides.push_back(ruler->side);
         bool relay_warning=false;
         if (definition.kind==EnemyDefinition::Kind::Hound && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i))))
-            for (const auto &technique:state.bosses.techniques) if (const auto *relay=std::get_if<CanisRelayState>(&technique.detail); relay && technique.stage<TechniqueStage::Finished && !relay->cancelled && !relay->aiming)
+            for (const auto &technique:state.bosses->techniques) if (const auto *relay=technique.detail.get_if<CanisRelayState>(); relay && technique.stage<TechniqueStage::Finished && !relay->cancelled && !relay->aiming)
                 for (const auto &item:relay->items) if (item.marked && !item.fired && same_handle(item.actor,state.enemy_handles.at(uint32_t(i)))) relay_warning=true;
         const bool warning=definition.kind==EnemyDefinition::Kind::Hound && !relay_warning && GroupSystem::warning(state,state.enemy_handles.at(uint32_t(i)));
         if (warning) {
@@ -233,7 +237,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         auto color=definition.polygon_visual?(enemy.flash>0?Color(1,1,1,1):CanisMajorBody::color(run,state.enemy_handles.at(i),definition.color)):Color(!meteor && (enemy.flash>0 || warning)?1.0:0.0,0,0,1);
         if (definition.kind==EnemyDefinition::Kind::Bomber && enemy.mode==EnemyMode::Windup) color.g=std::fmod(enemy.charge*3.0,1.0)>=0.45?1.0:0.0;
         godot::Vector2 deform;double amount=0;bool flash=false;
-        for (const auto &w:state.loadout.contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
+        for (const auto &w:state.loadout->contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
         if (flash) color.r=1;
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,iron?Color(0,0,0,1):color,iron?int32_t((state.field.rock_handles.contains(enemy.rock)?int64_t(enemy.rock.slot):enemy.id)%3):(enemy.flash>0 || warning || flash?1:0));
         const auto *parent=state.enemy_handles.contains(enemy.parent)?&state.enemies[enemy.parent.slot]:nullptr;
@@ -436,7 +440,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     Vector2 ship=state.ship.pos;double angle=state.ship.heading.angle();
     if (previous.ready) {ship=previous.ship_position.lerp(ship,alpha);angle=previous.ship_angle+angle_difference(angle-previous.ship_angle)*alpha;}
     const double forward_recoil=state.forward.recoil>0?(state.forward.recoil>0.06?2.0:1.0)*pixel:0;
-    const auto &scatter=state.loadout.scatter;
+    const auto &scatter=state.loadout->scatter;
     const double scatter_recoil=scatter.recoil>0?(scatter.recoil>0.035?2.0:1.0)*pixel:0;
     const auto at=ship-state.ship.heading*std::max(forward_recoil,scatter_recoil);
     const Transform2D transform(angle+godot::Math::PI/2.0,Vector2(config.character_scale,config.character_scale),0,at);
@@ -449,7 +453,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     }
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}
-    if (ram.serial>0) {boss_ram["cut_exit"]=ram.exit-ram.direction*(state.ship_config.ship_radius+4.0);int64_t body_id=0;for (const auto &body:state.bosses.bodies) if (same_handle(body.actor,ram.target)) {body_id=body.id;break;}boss_ram["body_id"]=body_id;}
+    if (ram.serial>0) {boss_ram["cut_exit"]=ram.exit-ram.direction*(state.ship_config.ship_radius+4.0);int64_t body_id=0;for (const auto &body:state.bosses->bodies) if (same_handle(body.actor,ram.target)) {body_id=body.id;break;}boss_ram["body_id"]=body_id;}
     Dictionary out;out["schema_version"]=1;out["epoch"]=run.epoch;out["tick"]=state.control.tick;out["boss_ram"]=boss_ram;
     out["crab_fx"]=crab_fx;out["ruler_fx"]=ruler_fx;out["dolphin_actors"]=dolphin_actors;out["dolphin_waves"]=dolphin_waves;out["auriga_trails"]=auriga_trails;out["telescope_beams"]=telescope_beams;out["telescope_actors"]=telescope_actors;out["reticle_fx"]=reticle_fx;out["aquarius_jets"]=aquarius_jets;out["soldier_fx"]=soldier_fx;out["soldier_bolts"]=soldier_bolts;out["cepheus_fx"]=cepheus_fx;out["cepheus_actors"]=cepheus_actors;out["corona_selected"]=corona_selected;out["corona_thrown"]=corona_thrown;out["hound_warning"]=hound_warning;out["aquila_actors"]=aquila_actors;out["aquila_zones"]=aquila_zones;
     out["enemy_weak"]=enemy_weak;out["enemy_health"]=enemy_health;out["petrified_enemies"]=petrified_enemies;out["boss_bodies"]=PhaseController::snapshot(run);out["boss_techniques"]=TechniqueRunner::snapshot(run);out["batches"]=batches;out["shapes"]=shapes;out["poses"]=poses;out["marlin"]=marlin;out["pulser"]=pulser;out["gravity"]=gravity;out["warp"]=warp;out["phoenix"]=phoenix;out["phoenix_fx"]=phoenix_fx;out["phoenix_impacts"]=phoenix_impacts;out["beamer_fx"]=beamer_fx;out["lynx_fx"]=lynx_fx;out["lynx_actors"]=lynx_actors;out["lynx_afterimages"]=lynx_afterimages;out["bite_fx"]=bite_fx;out["cross_actors"]=cross_actors;out["cross_beams"]=cross_beams;out["aquila"]=aquila;out["crows"]=crows;out["comets"]=comets;out["capsules"]=capsules;out["cepheus"]=cepheus;out["triangle_star"]=triangle_star;out["corona"]=corona;out["corona_members"]=corona_members;out["ruler"]=ruler;

@@ -4,6 +4,7 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/field.h"
 #include "../../systems/motion_math.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <limits>

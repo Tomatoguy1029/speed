@@ -50,6 +50,10 @@
 #include "../systems/pickup_system.h"
 #include "../systems/attack_budget.h"
 #include "../behaviors/enemies/pursuit.h"
+#include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
+#include "../bosses/hydra/state.h"
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>
@@ -251,7 +255,7 @@ bool SpeedRunCore::step(double delta) {
 }
 
 bool SpeedRunCore::advance_enemies(double delta) {
-    for (auto &body:runtime.state.bosses.bodies) body.hydra.attack_field_advance=false;
+    for (auto &body:runtime.state.bosses->bodies) body.hydra->attack_field_advance=false;
     capture_avoidance();
     ++runtime.state.ticks;
     if (runtime.state.aim_ready && !runtime.state.draw.tracing) {
@@ -378,12 +382,12 @@ bool SpeedRunCore::advance_enemies(double delta) {
     if (runtime.state.heroes.boss_stun>0) {
         const double real_dt=runtime.state.control.last_world_real_dt>0?runtime.state.control.last_world_real_dt:delta;
         runtime.state.heroes.boss_stun=speed::remaining_time(runtime.state.heroes.boss_stun,real_dt);
-        for (const auto &body:runtime.state.bosses.bodies) if (runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) runtime.state.enemies[body.actor.slot].vel=Vector2();
+        for (const auto &body:runtime.state.bosses->bodies) if (runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) runtime.state.enemies[body.actor.slot].vel=Vector2();
     } else {
         speed::MonocerosHornWave::advance_waves(runtime,delta);
         speed::PhaseController::step(runtime,delta);
         speed::FlowRunner::step(runtime,delta);
-        for (auto &body:runtime.state.bosses.bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisNova::effect_tick(runtime,body,delta);speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
+        for (auto &body:runtime.state.bosses->bodies) if (runtime.content->bosses[runtime.content->boss_bodies[body.definition-1].boss-1].kind==2 && body.mode<speed::BossMode::Defeated && runtime.state.enemy_handles.contains(body.actor) && !runtime.state.enemies[body.actor.slot].dead) {speed::CanisHoundLunge::step(runtime,body);speed::CanisMajorBody::lead(runtime,body,delta);speed::CanisHowl::ring_tick(runtime,body);if (body.mode!=speed::BossMode::Final) {speed::CanisNova::effect_tick(runtime,body,delta);speed::CanisBlaze::burning_tick(runtime,body,delta);speed::CanisFlames::step(runtime,body,delta);}}
     }
     speed::RulerBehavior::after_tick(runtime);
     return true;

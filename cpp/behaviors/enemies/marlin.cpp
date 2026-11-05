@@ -5,6 +5,7 @@
 #include "../../systems/field.h"
 #include "../../systems/motion_math.h"
 #include "../../systems/enemy_motion.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 namespace {

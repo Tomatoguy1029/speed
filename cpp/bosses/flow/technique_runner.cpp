@@ -33,6 +33,11 @@
 #include "../monoceros/sword_flash.h"
 #include "phase_controller.h"
 #include "../../systems/attack_system.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "../centaurus/state.h"
+#include "../monoceros/state.h"
+#include "../canis_major/state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -48,11 +53,11 @@ double TechniqueRunner::attack_length(const BossTechniqueDefinition &p) {return 
 double TechniqueRunner::cooldown(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return r.content->boss_techniques[definition-1].kind==42?CanisPounce::cooldown(r,actor,definition):r.content->boss_techniques[definition-1].cd;}
 double TechniqueRunner::attack_length(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return r.content->boss_techniques[definition-1].kind==51?CanisSiriusFlame::attack_length(r,definition):r.content->boss_techniques[definition-1].kind==50?CanisRelay::attack_length(r,actor,definition):r.content->boss_techniques[definition-1].kind==49?CanisNova::attack_length(r,definition):r.content->boss_techniques[definition-1].kind==48?CanisHuntPounce::attack_length(r,actor,definition):r.content->boss_techniques[definition-1].kind==47?CanisHunt::attack_length(r,actor,definition):r.content->boss_techniques[definition-1].kind==45?CanisBlaze::attack_length(r,definition):r.content->boss_techniques[definition-1].kind==44?CanisBay::attack_length(r,definition):r.content->boss_techniques[definition-1].kind==43?CanisSirius::attack_length(r,definition):r.content->boss_techniques[definition-1].kind==42?CanisPounce::attack_length(r,actor,definition):attack_length(r.content->boss_techniques[definition-1]);}
 bool TechniqueRunner::owns(const RunRuntime &run,EnemyHandle actor) {
-    for (const auto &technique:run.state.bosses.techniques) if (same_handle(technique.actor,actor)) return true;
+    for (const auto &technique:run.state.bosses->techniques) if (same_handle(technique.actor,actor)) return true;
     return false;
 }
 bool TechniqueRunner::running(const RunRuntime &run,TechniqueHandle handle) {
-    return run.state.bosses.handles.contains(handle) && live(run.state.bosses.techniques[handle.slot].stage);
+    return run.state.bosses->handles.contains(handle) && live(run.state.bosses->techniques[handle.slot].stage);
 }
 TechniqueHandle TechniqueRunner::begin(RunRuntime &run,EnemyHandle actor,uint32_t definition,const char *origin,int64_t decision_id) {
     auto &s=run.state;
@@ -62,18 +67,18 @@ TechniqueHandle TechniqueRunner::begin(RunRuntime &run,EnemyHandle actor,uint32_
         if (base.boss!=run.content->boss_bodies[body->definition-1].boss) return {};
         definition=0;for (const auto &p:run.content->boss_techniques) if (p.boss==base.boss && p.external_id==base.external_id && p.phase==body->phase) {definition=p.id;break;}
     }
-    if (!PhaseController::can_start(run,actor) || !definition || definition>run.content->boss_techniques.size() || !s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead || s.bosses.next_id==INT64_MAX) return {};
+    if (!PhaseController::can_start(run,actor) || !definition || definition>run.content->boss_techniques.size() || !s.enemy_handles.contains(actor) || s.enemies[actor.slot].dead || s.bosses->next_id==INT64_MAX) return {};
     if (run.content->boss_techniques[definition-1].kind==14 && !CentaurusShower::ready(run,actor,definition)) return {};
     if (run.content->boss_techniques[definition-1].kind==16 && !CentaurusCombo::ready(run,actor,definition)) return {};
     if (HydraTechnique::supports(run.content->boss_techniques[definition-1].kind) && (!HydraTechnique::ready(run,actor,definition) || !HydraTechnique::reserve(run,actor,definition))) return {};
     if (HydraNormalAttack::supports(run.content->boss_techniques[definition-1].kind) && (!HydraNormalAttack::ready(run,actor,definition) || !HydraNormalAttack::reserve(run,actor,definition))) return {};
     if (run.content->boss_techniques[definition-1].kind==15 && !CentaurusSail::ready(run,actor,definition)) return {};
-    for (const auto &t:s.bosses.techniques) if (live(t.stage) && same_handle(t.actor,actor)) return {};
-    size_t row=0;while (row<s.bosses.techniques.size() && (live(s.bosses.techniques[row].stage) || s.bosses.techniques[row].ticket_refs)) ++row;
-    if (row==s.bosses.techniques.size()) s.bosses.techniques.emplace_back();
-    else s.bosses.handles.release(s.bosses.handles.at(uint32_t(row)));
-    auto &technique=s.bosses.techniques[row];technique={};technique.id=s.bosses.next_id++;technique.actor=actor;technique.definition=definition;technique.observation_origin=origin;technique.decision_id=decision_id;
-    const auto handle=s.bosses.handles.attach(uint32_t(row),technique.id);
+    for (const auto &t:s.bosses->techniques) if (live(t.stage) && same_handle(t.actor,actor)) return {};
+    size_t row=0;while (row<s.bosses->techniques.size() && (live(s.bosses->techniques[row].stage) || s.bosses->techniques[row].ticket_refs)) ++row;
+    if (row==s.bosses->techniques.size()) s.bosses->techniques.emplace_back();
+    else s.bosses->handles.release(s.bosses->handles.at(uint32_t(row)));
+    auto &technique=s.bosses->techniques[row];technique={};technique.id=s.bosses->next_id++;technique.actor=actor;technique.definition=definition;technique.observation_origin=origin;technique.decision_id=decision_id;
+    const auto handle=s.bosses->handles.attach(uint32_t(row),technique.id);
     CentaurusCombo::started(run,technique,definition);
     if (run.content->boss_techniques[definition-1].kind==16) CentaurusCombo::begin(run,technique);else begin_part(run,technique,definition);
     return handle;
@@ -94,20 +99,20 @@ void TechniqueRunner::begin_part(RunRuntime &run,TechniqueState &technique,uint3
 }
 void TechniqueRunner::cancel(RunRuntime &run,TechniqueHandle handle,const char *reason) {
     if (!running(run,handle)) return;
-    auto &technique=run.state.bosses.techniques[handle.slot];observe_boundaries(run,technique,reason);if (HydraTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) HydraTechnique::cancel(run,technique);if (DracoTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) DracoTechnique::cancel(run,technique);if (HydraNormalAttack::supports(run.content->boss_techniques[technique.definition-1].kind)) HydraNormalAttack::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==50) CanisRelay::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==49) CanisNova::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==48) CanisHuntPounce::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==47) CanisHunt::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==46) CanisStream::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==44) CanisBay::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==41) CanisHowl::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==40) CanisCommand::cancel(run,technique);technique.stage=TechniqueStage::Cancelled;
+    auto &technique=run.state.bosses->techniques[handle.slot];observe_boundaries(run,technique,reason);if (HydraTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) HydraTechnique::cancel(run,technique);if (DracoTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) DracoTechnique::cancel(run,technique);if (HydraNormalAttack::supports(run.content->boss_techniques[technique.definition-1].kind)) HydraNormalAttack::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==50) CanisRelay::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==49) CanisNova::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==48) CanisHuntPounce::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==47) CanisHunt::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==46) CanisStream::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==44) CanisBay::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==41) CanisHowl::cancel(run,technique);else if (run.content->boss_techniques[technique.definition-1].kind==40) CanisCommand::cancel(run,technique);technique.stage=TechniqueStage::Cancelled;
     CentaurusSail::release(run,technique);
-    if (auto *rain=std::get_if<CentaurusRainState>(&technique.detail)) *rain={};
-    if (auto *shower=std::get_if<CentaurusShowerState>(&technique.detail)) shower->marks.clear();
-    if (auto *power=std::get_if<CentaurusPowerState>(&technique.detail)) power->alerting=false;
+    if (auto *rain=technique.detail.get_if<CentaurusRainState>()) *rain={};
+    if (auto *shower=technique.detail.get_if<CentaurusShowerState>()) shower->marks.clear();
+    if (auto *power=technique.detail.get_if<CentaurusPowerState>()) power->alerting=false;
     if (run.state.enemy_handles.contains(technique.actor)) {auto &e=run.state.enemies[technique.actor.slot];e.vel={};e.charge=0;e.mode=EnemyMode::Move;}
     AttackSystem::end_technique(run.state,handle,true);
 }
 void TechniqueRunner::step(RunRuntime &run,double dt) {
     if (dt<=0) return;
     auto &s=run.state;
-    for (uint32_t row=0;row<s.bosses.techniques.size();++row) {
-        auto &technique=s.bosses.techniques[row];if (!live(technique.stage)) continue;
-        const auto handle=s.bosses.handles.at(row);
+    for (uint32_t row=0;row<s.bosses->techniques.size();++row) {
+        auto &technique=s.bosses->techniques[row];if (!live(technique.stage)) continue;
+        const auto handle=s.bosses->handles.at(row);
         if (!s.enemy_handles.contains(technique.actor) || s.enemies[technique.actor.slot].dead) {cancel(run,handle,"actor_end");continue;}
         if (HydraNormalAttack::supports(run.content->boss_techniques[technique.definition-1].kind) || HydraTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) continue;
         // 本体の待機反応・着地で今始めた技は、その更新のdtを使わない。
@@ -128,7 +133,7 @@ void TechniqueRunner::step(RunRuntime &run,double dt) {
         observe_boundaries(run,technique);
         CentaurusCombo::transition(run,technique);
         const auto &p=run.content->boss_techniques[technique.definition-1];auto &e=s.enemies[technique.actor.slot];
-        e.charge=p.kind==51?(technique.stage==TechniqueStage::Windup?CanisSiriusFlame::progress(technique,run.content->boss_techniques[technique.definition-1]):0):p.kind==50?CanisRelay::progress(run,technique):p.kind==49?CanisNova::progress(run,technique):p.kind==48?CanisHuntPounce::progress(run,technique):p.kind==47?CanisHunt::progress(run,technique):p.kind==45?CanisBlaze::progress(technique,p):p.kind==44?CanisBay::progress(run,technique):p.kind==43?CanisSirius::progress(technique,p):p.kind==42?CanisPounce::progress(std::get<CanisPounceState>(technique.detail)):p.kind==7?std::get<MonocerosSwordState>(technique.detail).glow:p.kind==6?std::get<MonocerosDanceState>(technique.detail).glow:p.kind==5?std::get<MonocerosHornWaveState>(technique.detail).glow:p.kind==4?std::get<MonocerosReturnState>(technique.detail).glow:p.kind==3?std::get<MonocerosLanceState>(technique.detail).glow:p.kind==2 && (technique.stage==TechniqueStage::Windup || technique.stage==TechniqueStage::Active)?std::get<MonocerosSweepState>(technique.detail).glow:technique.stage==TechniqueStage::Windup?std::clamp(technique.elapsed/std::max(0.001,p.warn),0.0,1.0):0;
+        e.charge=p.kind==51?(technique.stage==TechniqueStage::Windup?CanisSiriusFlame::progress(technique,run.content->boss_techniques[technique.definition-1]):0):p.kind==50?CanisRelay::progress(run,technique):p.kind==49?CanisNova::progress(run,technique):p.kind==48?CanisHuntPounce::progress(run,technique):p.kind==47?CanisHunt::progress(run,technique):p.kind==45?CanisBlaze::progress(technique,p):p.kind==44?CanisBay::progress(run,technique):p.kind==43?CanisSirius::progress(technique,p):p.kind==42?CanisPounce::progress(technique.detail.get<CanisPounceState>()):p.kind==7?technique.detail.get<MonocerosSwordState>().glow:p.kind==6?technique.detail.get<MonocerosDanceState>().glow:p.kind==5?technique.detail.get<MonocerosHornWaveState>().glow:p.kind==4?technique.detail.get<MonocerosReturnState>().glow:p.kind==3?technique.detail.get<MonocerosLanceState>().glow:p.kind==2 && (technique.stage==TechniqueStage::Windup || technique.stage==TechniqueStage::Active)?technique.detail.get<MonocerosSweepState>().glow:technique.stage==TechniqueStage::Windup?std::clamp(technique.elapsed/std::max(0.001,p.warn),0.0,1.0):0;
         e.mode=technique.stage==TechniqueStage::Windup?EnemyMode::Windup:technique.stage==TechniqueStage::Active?EnemyMode::Dash:live(technique.stage)?EnemyMode::Recover:EnemyMode::Move;
         technique.previous_ship=s.ship_pos;
         if (!live(technique.stage)) AttackSystem::end_technique(s,handle,technique.stage!=TechniqueStage::Finished);
@@ -139,9 +144,9 @@ void TechniqueRunner::observe_boundaries(RunRuntime &r,const TechniqueState &t,c
     auto *a=o.find(t.observation_id);if (!a) return;
     const auto &p=r.content->boss_techniques[t.definition-1];uint32_t pass=1;
     bool warning=t.stage==TechniqueStage::Windup;
-    if (const auto *v=std::get_if<MonocerosReturnState>(&t.detail)) {pass=std::min(v->completed+1,std::max(1u,p.passes));warning=warning || v->stage==MonocerosReturnState::Stage::Turn;}
-    if (const auto *v=std::get_if<MonocerosDanceState>(&t.detail)) {pass=std::min(v->completed+1,std::max(1u,p.passes));warning=warning || v->stage==MonocerosDanceState::Stage::Aim;}
-    if (const auto *v=std::get_if<MonocerosSwordState>(&t.detail)) {pass=v->cut+1;warning=warning || v->stage==MonocerosSwordState::Stage::Aim;}
+    if (const auto *v=t.detail.get_if<MonocerosReturnState>()) {pass=std::min(v->completed+1,std::max(1u,p.passes));warning=warning || v->stage==MonocerosReturnState::Stage::Turn;}
+    if (const auto *v=t.detail.get_if<MonocerosDanceState>()) {pass=std::min(v->completed+1,std::max(1u,p.passes));warning=warning || v->stage==MonocerosDanceState::Stage::Aim;}
+    if (const auto *v=t.detail.get_if<MonocerosSwordState>()) {pass=v->cut+1;warning=warning || v->stage==MonocerosSwordState::Stage::Aim;}
     const auto *e=r.state.enemy_handles.contains(t.actor)?&r.state.enemies[t.actor.slot]:nullptr;
     godot::Dictionary d;d["row"]=t.actor.slot;d["ship_position"]=r.state.ship_pos;d["ship_velocity"]=r.state.ship.vel;d["aim"]=t.aim;d["direction"]=t.direction;d["phase"]=p.phase;d["pass"]=pass;d["stage"]=int(t.stage);d["t"]=r.state.time;d["world_t"]=r.state.world_time;
     if (e) {d["body_position"]=e->pos;d["facing"]=e->facing;d["distance"]=e->pos.distance_to(r.state.ship_pos);}
@@ -179,10 +184,10 @@ void TechniqueRunner::finish_scripted(RunRuntime &r,BossBodyState &b,const char 
 }
 bool TechniqueRunner::validate(const godot::RunState &s,const ContentBundle &content) {
     std::vector<uint64_t> actors;
-    for (uint32_t row=0;row<s.bosses.techniques.size();++row) {
-        const auto &t=s.bosses.techniques[row];
-        if (t.id<=0 || t.id>=s.bosses.next_id || s.bosses.handles.entity_id(s.bosses.handles.at(row))!=t.id || !t.definition || t.definition>content.boss_techniques.size() || t.stage>TechniqueStage::Cancelled || t.command_cursor>std::count_if(content.boss_stages.begin(),content.boss_stages.end(),[&](const auto &p){return p.technique==t.definition;}) || !t.aim.is_finite() || !t.direction.is_finite() || !t.previous_ship.is_finite() || !t.stuck_offset.is_finite() || !t.reposition_direction.is_finite()) return false;
-        if (HydraTechnique::supports(content.boss_techniques[t.definition-1].kind)?!HydraTechnique::validate(t,content):content.boss_techniques[t.definition-1].kind==51?!CanisSiriusFlame::validate(t):content.boss_techniques[t.definition-1].kind==50?!CanisRelay::validate(t,content):content.boss_techniques[t.definition-1].kind==49?!CanisNova::validate(t,content):content.boss_techniques[t.definition-1].kind==48?!CanisHuntPounce::validate(t,content):content.boss_techniques[t.definition-1].kind==47?!CanisHunt::validate(t,content):content.boss_techniques[t.definition-1].kind==46?!CanisStream::validate(t,content):content.boss_techniques[t.definition-1].kind==45?!CanisBlaze::validate(t):content.boss_techniques[t.definition-1].kind==44?!CanisBay::validate(t,content):content.boss_techniques[t.definition-1].kind==43?!CanisSirius::validate(t,content):DracoTechnique::supports(content.boss_techniques[t.definition-1].kind)?!DracoTechnique::validate(t,content):content.boss_techniques[t.definition-1].kind==42?(!std::holds_alternative<CanisPounceState>(t.detail) || !CanisPounce::validate(std::get<CanisPounceState>(t.detail),content)):content.boss_techniques[t.definition-1].kind==41?!CanisHowl::validate(t):content.boss_techniques[t.definition-1].kind==40?!CanisCommand::validate(t):content.boss_techniques[t.definition-1].kind==15?!CentaurusSail::validate(t,content):content.boss_techniques[t.definition-1].kind==14?!CentaurusShower::validate(t,content):content.boss_techniques[t.definition-1].kind==13?!CentaurusFan::validate(t,content):content.boss_techniques[t.definition-1].kind==11?!CentaurusPower::validate(t,content):content.boss_techniques[t.definition-1].kind==10?!CentaurusRain::validate(t,content):content.boss_techniques[t.definition-1].kind==8?!CentaurusVolley::validate(t,content):content.boss_techniques[t.definition-1].kind==7?!MonocerosSword::validate(t):content.boss_techniques[t.definition-1].kind==6?!MonocerosDance::validate(t):content.boss_techniques[t.definition-1].kind==5?!MonocerosHornWave::validate(t):content.boss_techniques[t.definition-1].kind==4?!MonocerosReturn::validate(t):content.boss_techniques[t.definition-1].kind==3?!MonocerosLance::validate(t):content.boss_techniques[t.definition-1].kind==2?!MonocerosSweep::validate(t):!std::holds_alternative<std::monostate>(t.detail)) return false;
+    for (uint32_t row=0;row<s.bosses->techniques.size();++row) {
+        const auto &t=s.bosses->techniques[row];
+        if (t.id<=0 || t.id>=s.bosses->next_id || s.bosses->handles.entity_id(s.bosses->handles.at(row))!=t.id || !t.definition || t.definition>content.boss_techniques.size() || t.stage>TechniqueStage::Cancelled || t.command_cursor>std::count_if(content.boss_stages.begin(),content.boss_stages.end(),[&](const auto &p){return p.technique==t.definition;}) || !t.aim.is_finite() || !t.direction.is_finite() || !t.previous_ship.is_finite() || !t.stuck_offset.is_finite() || !t.reposition_direction.is_finite()) return false;
+        if (HydraTechnique::supports(content.boss_techniques[t.definition-1].kind)?!HydraTechnique::validate(t,content):content.boss_techniques[t.definition-1].kind==51?!CanisSiriusFlame::validate(t):content.boss_techniques[t.definition-1].kind==50?!CanisRelay::validate(t,content):content.boss_techniques[t.definition-1].kind==49?!CanisNova::validate(t,content):content.boss_techniques[t.definition-1].kind==48?!CanisHuntPounce::validate(t,content):content.boss_techniques[t.definition-1].kind==47?!CanisHunt::validate(t,content):content.boss_techniques[t.definition-1].kind==46?!CanisStream::validate(t,content):content.boss_techniques[t.definition-1].kind==45?!CanisBlaze::validate(t):content.boss_techniques[t.definition-1].kind==44?!CanisBay::validate(t,content):content.boss_techniques[t.definition-1].kind==43?!CanisSirius::validate(t,content):DracoTechnique::supports(content.boss_techniques[t.definition-1].kind)?!DracoTechnique::validate(t,content):content.boss_techniques[t.definition-1].kind==42?(!t.detail.holds<CanisPounceState>() || !CanisPounce::validate(t.detail.get<CanisPounceState>(),content)):content.boss_techniques[t.definition-1].kind==41?!CanisHowl::validate(t):content.boss_techniques[t.definition-1].kind==40?!CanisCommand::validate(t):content.boss_techniques[t.definition-1].kind==15?!CentaurusSail::validate(t,content):content.boss_techniques[t.definition-1].kind==14?!CentaurusShower::validate(t,content):content.boss_techniques[t.definition-1].kind==13?!CentaurusFan::validate(t,content):content.boss_techniques[t.definition-1].kind==11?!CentaurusPower::validate(t,content):content.boss_techniques[t.definition-1].kind==10?!CentaurusRain::validate(t,content):content.boss_techniques[t.definition-1].kind==8?!CentaurusVolley::validate(t,content):content.boss_techniques[t.definition-1].kind==7?!MonocerosSword::validate(t):content.boss_techniques[t.definition-1].kind==6?!MonocerosDance::validate(t):content.boss_techniques[t.definition-1].kind==5?!MonocerosHornWave::validate(t):content.boss_techniques[t.definition-1].kind==4?!MonocerosReturn::validate(t):content.boss_techniques[t.definition-1].kind==3?!MonocerosLance::validate(t):content.boss_techniques[t.definition-1].kind==2?!MonocerosSweep::validate(t):!t.detail.empty()) return false;
         for (double value:{t.elapsed,t.remaining,t.reposition,t.started_at}) if (!std::isfinite(value) || value<0) return false;
         if (live(t.stage)) {
             if (!s.enemy_handles.contains(t.actor) || s.enemies[t.actor.slot].dead || std::find(actors.begin(),actors.end(),handle_key(t.actor))!=actors.end()) return false;
@@ -194,8 +199,8 @@ bool TechniqueRunner::validate(const godot::RunState &s,const ContentBundle &con
 }
 godot::Array TechniqueRunner::snapshot(const RunRuntime &run) {
     godot::Array out;
-    for (uint32_t row=0;row<run.state.bosses.techniques.size();++row) {
-        const auto &t=run.state.bosses.techniques[row];godot::Dictionary item;
+    for (uint32_t row=0;row<run.state.bosses->techniques.size();++row) {
+        const auto &t=run.state.bosses->techniques[row];godot::Dictionary item;
         item["kind"]=run.content->boss_techniques[t.definition-1].kind;item["technique"]=godot::String(run.content->boss_techniques[t.definition-1].external_id.c_str());item["id"]=t.id;item["definition"]=t.definition;item["actor"]=run.state.enemy_handles.entity_id(t.actor);item["stage"]=int(t.stage);
         const auto &p=run.content->boss_techniques[t.definition-1];const double back=p.return_speed>0?godot::Math::PI/p.return_speed:0;
         item["windup_progress"]=std::clamp(t.elapsed/std::max(0.001,p.warn),0.0,1.0);item["active_progress"]=std::clamp((t.elapsed-p.warn)/std::max(0.001,p.active*0.4),0.0,1.0);item["settle_progress"]=t.stage==TechniqueStage::Recovery?(back>0?std::clamp((back+p.recover-t.remaining)/back,0.0,1.0):1.0):0.0;
@@ -203,24 +208,24 @@ godot::Array TechniqueRunner::snapshot(const RunRuntime &run) {
         if (p.kind<=7) {
             const char *stage="other";double travel=0,run_speed=0,approach_speed_max=0;
             if (p.kind==0) {stage=t.stage==TechniqueStage::Active?"run":"other";travel=p.distance;run_speed=p.distance/std::max(p.active,0.001);}
-            else if (p.kind==2) {const auto &v=std::get<MonocerosSweepState>(t.detail);using Stage=MonocerosSweepState::Stage;stage=v.stage==Stage::Approach?"approach":v.stage==Stage::Stop?"stop":"other";run_speed=approach_speed_max=p.approach_speed_max;}
-            else if (p.kind==3) {const auto &v=std::get<MonocerosLanceState>(t.detail);using Stage=MonocerosLanceState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::Stop?"stop":"other";travel=p.distance;run_speed=p.speed;}
-            else if (p.kind==4) {const auto &v=std::get<MonocerosReturnState>(t.detail);using Stage=MonocerosReturnState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::Brake?"brake":"other";travel=v.travel;run_speed=p.distance/std::max(p.active,0.001);}
-            else if (p.kind==6) {const auto &v=std::get<MonocerosDanceState>(t.detail);using Stage=MonocerosDanceState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::End?"end":"other";travel=v.travel;run_speed=v.run_speed;}
+            else if (p.kind==2) {const auto &v=t.detail.get<MonocerosSweepState>();using Stage=MonocerosSweepState::Stage;stage=v.stage==Stage::Approach?"approach":v.stage==Stage::Stop?"stop":"other";run_speed=approach_speed_max=p.approach_speed_max;}
+            else if (p.kind==3) {const auto &v=t.detail.get<MonocerosLanceState>();using Stage=MonocerosLanceState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::Stop?"stop":"other";travel=p.distance;run_speed=p.speed;}
+            else if (p.kind==4) {const auto &v=t.detail.get<MonocerosReturnState>();using Stage=MonocerosReturnState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::Brake?"brake":"other";travel=v.travel;run_speed=p.distance/std::max(p.active,0.001);}
+            else if (p.kind==6) {const auto &v=t.detail.get<MonocerosDanceState>();using Stage=MonocerosDanceState::Stage;stage=v.stage==Stage::Run?"run":v.stage==Stage::End?"end":"other";travel=v.travel;run_speed=v.run_speed;}
             if (t.stage!=TechniqueStage::Active && p.kind!=2) stage="other";
             if (p.kind==2 && t.stage!=TechniqueStage::Windup && t.stage!=TechniqueStage::Active) stage="other";
             item["fx_boost_stage"]=godot::String(stage);item["fx_boost_travel"]=travel;item["fx_boost_run_speed"]=run_speed;item["fx_boost_approach_speed_max"]=approach_speed_max;
-            item["fx_boost_elapsed"]=p.kind==0?std::max(0.0,t.elapsed-p.warn):p.kind==4?std::get<MonocerosReturnState>(t.detail).elapsed:p.kind==6?std::get<MonocerosDanceState>(t.detail).elapsed:0.0;
+            item["fx_boost_elapsed"]=p.kind==0?std::max(0.0,t.elapsed-p.warn):p.kind==4?t.detail.get<MonocerosReturnState>().elapsed:p.kind==6?t.detail.get<MonocerosDanceState>().elapsed:0.0;
         }
         if (HydraTechnique::supports(p.kind)) {const auto value=HydraTechnique::snapshot(t,*run.content);for (const auto &key:value.keys()) item[key]=value[key];}
-        if (p.kind==2) {const auto &v=std::get<MonocerosSweepState>(t.detail);item["stop_progress"]=std::clamp(v.elapsed/std::max(p.stop_time,0.001),0.0,1.0);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["side"]=v.side;item["speed"]=v.speed;item["glow"]=v.glow;item["booster"]=v.stage==MonocerosSweepState::Stage::Approach?0.55+1.95*v.speed/std::max(p.approach_speed_max,0.001):v.stage==MonocerosSweepState::Stage::Stop?0.3:0.55;}
-        if (p.kind==3) {const auto &v=std::get<MonocerosLanceState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["form"]=v.form;item["glow"]=v.glow;item["traveled"]=v.traveled;item["boom_time"]=v.boom_time;item["speed"]=v.speed;item["head_length"]=p.head_length;item["booster"]=v.stage==MonocerosLanceState::Stage::Gather?0.55+0.45*v.form:v.stage==MonocerosLanceState::Stage::Run?3.5:1.0;}
-        if (p.kind==4) {const auto &v=std::get<MonocerosReturnState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["travel"]=v.travel;item["traveled"]=v.traveled;item["completed"]=v.completed;item["brake_progress"]=std::clamp(v.elapsed/std::max(p.brake_time,0.001),0.0,1.0);item["booster"]=v.stage==MonocerosReturnState::Stage::Aim?0.55+0.45*v.glow:v.stage==MonocerosReturnState::Stage::Run?2.5:0.55;}
-        if (p.kind==5) {const auto &v=std::get<MonocerosHornWaveState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["side"]=v.direction;item["released"]=v.released;}
-        if (p.kind==6) {const auto &v=std::get<MonocerosDanceState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["travel"]=v.travel;item["traveled"]=v.traveled;item["completed"]=v.completed;item["heading"]=v.heading;item["speed"]=v.speed;item["run_speed"]=v.run_speed;item["booster"]=v.stage==MonocerosDanceState::Stage::Aim?0.55+0.45*v.glow:v.stage==MonocerosDanceState::Stage::Run?2.5:v.stage==MonocerosDanceState::Stage::Circle?1.2:0.55;}
-        if (p.kind==7) {const auto &v=std::get<MonocerosSwordState>(t.detail);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["cut"]=v.cut;item["side"]=v.side;item["target"]=v.target;item["speed"]=v.speed;item["released"]=v.released;item["released_at"]=v.released_at;}
+        if (p.kind==2) {const auto &v=t.detail.get<MonocerosSweepState>();item["stop_progress"]=std::clamp(v.elapsed/std::max(p.stop_time,0.001),0.0,1.0);item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["side"]=v.side;item["speed"]=v.speed;item["glow"]=v.glow;item["booster"]=v.stage==MonocerosSweepState::Stage::Approach?0.55+1.95*v.speed/std::max(p.approach_speed_max,0.001):v.stage==MonocerosSweepState::Stage::Stop?0.3:0.55;}
+        if (p.kind==3) {const auto &v=t.detail.get<MonocerosLanceState>();item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["form"]=v.form;item["glow"]=v.glow;item["traveled"]=v.traveled;item["boom_time"]=v.boom_time;item["speed"]=v.speed;item["head_length"]=p.head_length;item["booster"]=v.stage==MonocerosLanceState::Stage::Gather?0.55+0.45*v.form:v.stage==MonocerosLanceState::Stage::Run?3.5:1.0;}
+        if (p.kind==4) {const auto &v=t.detail.get<MonocerosReturnState>();item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["travel"]=v.travel;item["traveled"]=v.traveled;item["completed"]=v.completed;item["brake_progress"]=std::clamp(v.elapsed/std::max(p.brake_time,0.001),0.0,1.0);item["booster"]=v.stage==MonocerosReturnState::Stage::Aim?0.55+0.45*v.glow:v.stage==MonocerosReturnState::Stage::Run?2.5:0.55;}
+        if (p.kind==5) {const auto &v=t.detail.get<MonocerosHornWaveState>();item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["side"]=v.direction;item["released"]=v.released;}
+        if (p.kind==6) {const auto &v=t.detail.get<MonocerosDanceState>();item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["travel"]=v.travel;item["traveled"]=v.traveled;item["completed"]=v.completed;item["heading"]=v.heading;item["speed"]=v.speed;item["run_speed"]=v.run_speed;item["booster"]=v.stage==MonocerosDanceState::Stage::Aim?0.55+0.45*v.glow:v.stage==MonocerosDanceState::Stage::Run?2.5:v.stage==MonocerosDanceState::Stage::Circle?1.2:0.55;}
+        if (p.kind==7) {const auto &v=t.detail.get<MonocerosSwordState>();item["sequence_stage"]=int(v.stage);item["sequence_elapsed"]=v.elapsed;item["angle"]=v.angle;item["glow"]=v.glow;item["cut"]=v.cut;item["side"]=v.side;item["target"]=v.target;item["speed"]=v.speed;item["released"]=v.released;item["released_at"]=v.released_at;}
         if (t.combo_definition) {item["combo"]=godot::String(run.content->boss_techniques[t.combo_definition-1].external_id.c_str());item["combo_step"]=t.combo_step;item["combo_waiting"]=t.combo_waiting;}
-        if (p.kind==8) {item["released"]=std::get<CentaurusVolleyState>(t.detail).released;item["interval"]=run.content->centaurus_volleys[std::find_if(run.content->centaurus_volleys.begin(),run.content->centaurus_volleys.end(),[&](const auto &v){return v.technique==p.id;})-run.content->centaurus_volleys.begin()].interval;}
+        if (p.kind==8) {item["released"]=t.detail.get<CentaurusVolleyState>().released;item["interval"]=run.content->centaurus_volleys[std::find_if(run.content->centaurus_volleys.begin(),run.content->centaurus_volleys.end(),[&](const auto &v){return v.technique==p.id;})-run.content->centaurus_volleys.begin()].interval;}
         if (p.kind==15) {const auto sail=CentaurusSail::snapshot(run,t);for (const auto &key:sail.keys()) item[key]=sail[key];}
         if (p.kind==14) item["shower"]=CentaurusShower::snapshot(run,t);
         if (p.kind==51) {const auto flame=CanisSiriusFlame::snapshot(run,t);for (const auto &key:flame.keys()) item[key]=flame[key];}

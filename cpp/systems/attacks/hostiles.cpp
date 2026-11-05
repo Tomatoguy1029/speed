@@ -10,6 +10,7 @@
 #include "../geometry.h"
 #include "../combat_resolver.h"
 #include "../../output/event_builder.h"
+#include "../../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>

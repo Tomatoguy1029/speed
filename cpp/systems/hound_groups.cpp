@@ -3,6 +3,7 @@
 #include "group_system.h"
 #include "tracking_policy.h"
 #include "../behaviors/enemies/hound.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;

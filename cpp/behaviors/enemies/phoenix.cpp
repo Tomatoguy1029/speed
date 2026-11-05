@@ -5,6 +5,7 @@
 #include "../../systems/attack_system.h"
 #include "../../systems/attacks/zone.h"
 #include "../../state/combat_types.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void PhoenixBehavior::step(RunRuntime &r,uint32_t row,double dt) {

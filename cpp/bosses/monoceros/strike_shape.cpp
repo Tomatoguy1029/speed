@@ -1,6 +1,8 @@
 #include "strike_shape.h"
 #include "../../systems/combat_resolver.h"
 #include "../../systems/boss_contact.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void MonocerosStrike::damage(RunRuntime &r,TechniqueState &t,const godot::PackedVector2Array &before,const godot::PackedVector2Array &points,double width) {
     if (t.hit || t.stage!=TechniqueStage::Active) return;

@@ -4,11 +4,14 @@
 #include "../flow/phase_controller.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_system.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 void HydraTechnique::tornado(RunRuntime &r,TechniqueState &t,double) {
-    auto *b=PhaseController::find(r,t.actor);auto &v=std::get<HydraTechniqueState>(t.detail);auto &move=std::get<HydraTornadoState>(v.move);
+    auto *b=PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();auto &move=std::get<HydraTornadoState>(v.move);
     const auto &p=*std::find_if(r.content->hydra_tornadoes.begin(),r.content->hydra_tornadoes.end(),[&](const auto &p){return p.technique==t.definition;});
     auto &wind=*HydraNormalAttack::neck(*b,v.participants[0]);auto &debris=*HydraNormalAttack::neck(*b,v.participants[1]);
     if (!move.initialized) {

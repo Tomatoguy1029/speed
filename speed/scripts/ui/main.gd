@@ -31,19 +31,17 @@ func _ready() -> void:
 	GameManager.screen_changed.connect(_show)
 	startup_complete = true
 	if GameManager.boot_request.is_valid() and GameManager.boot_request.call(): return
-	startup_complete = false
-	if DisplayServer.get_name() != "headless":
-		var loading := preload("res://scripts/ui/startup_loading.gd").new()
-		add_child(loading)
-		if not await loading.prepare():
-			startup_failed = true
-			return
-		loading.queue_free()
-	startup_complete = true
 	_show(GameManager.screen)
+	# タイトルを先に出し、出撃用の資源は裏で揃える。間に合わない出撃は読込画面で待つ。
+	if DisplayServer.get_name() == "headless": return
+	startup_complete = false
+	var preparation := preload("res://scripts/ui/startup_preparation.gd").new()
+	add_child(preparation)
+	startup_failed = not await preparation.prepare()
+	preparation.queue_free()
+	startup_complete = not startup_failed
 
 func _show(screen: GameManager.Screen) -> void:
-	if not startup_complete: return
 	if _prepared_run != null:
 		_prepared_run.free()
 		_prepared_run = null

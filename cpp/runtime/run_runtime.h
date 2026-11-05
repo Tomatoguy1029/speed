@@ -1,6 +1,5 @@
 #pragma once
 #include "../state/run_state.h"
-#include "../content/content_bundle.h"
 #include <memory>
 #include "../output/render_builder.h"
 #include "../output/frame_builder.h"
@@ -13,10 +12,13 @@ struct RunWorkspace {
     std::vector<int64_t> avoidance_ids;
     std::vector<godot::Vector2> avoidance_from;
 };
+struct ContentBundle;
 class RunRuntime {
 public:
     godot::RunState state;
-    std::shared_ptr<const ContentBundle> content = std::make_shared<const ContentBundle>();
+    RunRuntime();
+    ~RunRuntime();
+    std::shared_ptr<const ContentBundle> content;
     RunWorkspace workspace;
     mutable RenderWorkspace render_workspace;
     FrameWorkspace frame_workspace;
@@ -30,10 +32,6 @@ public:
     // 開発計測のHP保持。通常ランと保存状態には含めず、明示命令のときだけ有効にする。
     double benchmark_boss_hp=-1;
     bool benchmark_survive=false;
-    void replace_definitions(std::vector<EnemyDefinition> definitions) {
-        auto next = std::make_shared<ContentBundle>();
-        next->definitions = std::move(definitions);
-        content = std::move(next);
-    }
+    void replace_definitions(std::vector<EnemyDefinition> definitions);
 };
 }

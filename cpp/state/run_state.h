@@ -3,13 +3,13 @@
 #include "../content/population_data.h"
 #include "entity_store.h"
 #include "enemy_states.h"
-#include "boss_states.h"
+#include "state_box.h"
 #include "combat_types.h"
 #include "attack_state.h"
 #include "observation_state.h"
 #include "recording_state.h"
 #include "world_state.h"
-#include "loadout_state.h"
+#include "forward_weapon_state.h"
 #include "pickup_state.h"
 #include "group_state.h"
 #include "lifecycle_state.h"
@@ -38,7 +38,7 @@ namespace godot {
 // ランの値状態。保持・複製は全フィールドをまとめてコピーする。
 struct RunState {
     speed::HeroState heroes;
-    speed::BossStates bosses;
+    speed::StateBox<speed::BossStates> bosses;
     std::vector<speed::BossLandingContact> boss_landings;
     bool boss_contact_interrupt_trace=false;
     speed::RunControlState control;
@@ -117,7 +117,7 @@ struct RunState {
         int64_t level = 0, pending_levels = 0, rerolls = 0, revision = 0, pending_choice = -1;
         double xp = 0, gained = 0;
     } legacy_progression;
-    speed::LoadoutState loadout;
+    speed::StateBox<speed::LoadoutState> loadout;
     bool draw_ready = false;
     bool ship_ready = false;
     struct CombatConfig {

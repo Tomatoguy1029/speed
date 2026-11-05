@@ -3,6 +3,7 @@
 #include "../attack_system.h"
 #include "../attack_budget.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

@@ -1,5 +1,6 @@
 #pragma once
 #include "../state/run_state.h"
+#include "../content/content_bundle.h"
 namespace speed {
 struct ContentBundle;class RunRuntime;
 class AttackSystem {

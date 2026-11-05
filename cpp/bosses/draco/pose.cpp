@@ -1,6 +1,8 @@
 #include "pose.h"
 #include "body.h"
 #include "../../systems/collision_query.h"
+#include "../../state/boss_states.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -22,7 +24,7 @@ void DracoPose::follow(std::vector<godot::Vector2> &trail,std::vector<godot::Vec
 }
 std::vector<godot::Vector2> DracoPose::samples(const std::vector<godot::Vector2> &v,uint32_t count) {return sample_spine(v,count);}
 void DracoPose::update(RunRuntime &r,BossBodyState &b) {
-    const auto &p=DracoBody::rule(r,b);auto &d=b.draco;const auto &head=r.state.enemies[b.actor.slot];
+    const auto &p=DracoBody::rule(r,b);auto &d=*b.draco;const auto &head=r.state.enemies[b.actor.slot];
     if (d.trail.empty()) {d.trail.push_back(head.pos);for (uint32_t j=0;j<p.body_segments;++j) {const double t=double(j+1)/p.body_segments;const double wave=std::sin(t*TAU*1.25-b.clock*0.75)*p.body_wave*std::sin(t*PI*0.8);d.trail.push_back(head.pos+godot::Vector2(-t*p.body_length,wave).rotated(head.facing));}const double n=length(d.trail);if (n>0.001) for (auto &v:d.trail) v=head.pos+(v-head.pos)*(p.body_length/n);}
     if (d.override_points.empty()) {
         const auto previous=d.trail.front();const double distance=previous.distance_to(head.pos);const bool settled=distance<0.01 && d.trail.size()==p.body_segments+1 && std::abs(length(d.trail)-p.body_length)<p.body_length*0.02;if (!settled) {if (distance>0.01) {const uint32_t steps=std::max(1,int(std::ceil(distance/24.0)));for (uint32_t j=1;j<=steps;++j) d.trail.insert(d.trail.begin(),previous.lerp(head.pos,double(j)/steps));}else d.trail.front()=head.pos;
@@ -33,8 +35,8 @@ void DracoPose::update(RunRuntime &r,BossBodyState &b) {
     for (size_t j=1;j<b.participants.size();++j) {const auto actor=b.participants[j].actor;if (!r.state.enemy_handles.contains(actor) || r.state.enemies[actor.slot].dead) continue;auto &e=r.state.enemies[actor.slot];e.pos=row_points[j-1];e.guard=head.guard;e.radius=d.width*0.5*taper(double(j)/p.body_segments)*d.depth;}
 }
 
-std::vector<godot::Vector2> DracoPose::points(const RunRuntime &r,const BossBodyState &b) {auto out=b.draco.override_points.empty()?b.draco.pose:b.draco.override_points;const auto head=r.state.enemies[b.actor.slot].pos;if (!godot::Math::is_equal_approx(b.draco.depth,1.0)) for (auto &v:out) v=head+(v-head)*b.draco.depth;return out;}
-void DracoPose::depth(RunRuntime &r,BossBodyState &b,double value,double alpha) {b.draco.depth=std::clamp(value,0.1,1.0);b.draco.alpha=std::clamp(alpha,0.0,1.0);update(r,b);}
-void DracoPose::reset(RunRuntime &r,BossBodyState &b) {if (!r.state.enemy_handles.contains(b.actor)) return;auto &d=b.draco;if (r.state.enemy_handles.contains(b.actor) && std::abs(d.depth-1.0)<0.00001) d.trail=d.override_points.empty()?points(r,b):d.override_points;else d.trail.clear();d.override_points.clear();d.pose.clear();const auto &p=DracoBody::rule(r,b);d.width=p.body_width;d.head_scale=p.head_scale;d.depth=d.alpha=1;update(r,b);}
-bool DracoPose::contains(const RunRuntime &r,const BossBodyState &b,godot::Vector2 point,double radius) {const auto &e=r.state.enemies[b.actor.slot];if (e.guard>=1 || e.dead) return false;if (point.distance_to(e.pos)<=e.radius+radius) return true;const auto spine=points(r,b);const double total=length(spine);double traversed=0;for (size_t j=1;j<spine.size();++j) {const auto delta=spine[j]-spine[j-1];const double span=delta.length();const double t=delta.length_squared()>0?std::clamp(double((point-spine[j-1]).dot(delta))/delta.length_squared(),0.0,1.0):0;const auto nearest=spine[j-1]+delta*t;const double fraction=total>0.001?(traversed+t*span)/total:0;const double width=b.draco.width*0.5*taper(fraction)*b.draco.depth;if (nearest.distance_to(point)<=width+radius) return true;traversed+=span;}return false;}
+std::vector<godot::Vector2> DracoPose::points(const RunRuntime &r,const BossBodyState &b) {auto out=b.draco->override_points.empty()?b.draco->pose:b.draco->override_points;const auto head=r.state.enemies[b.actor.slot].pos;if (!godot::Math::is_equal_approx(b.draco->depth,1.0)) for (auto &v:out) v=head+(v-head)*b.draco->depth;return out;}
+void DracoPose::depth(RunRuntime &r,BossBodyState &b,double value,double alpha) {b.draco->depth=std::clamp(value,0.1,1.0);b.draco->alpha=std::clamp(alpha,0.0,1.0);update(r,b);}
+void DracoPose::reset(RunRuntime &r,BossBodyState &b) {if (!r.state.enemy_handles.contains(b.actor)) return;auto &d=*b.draco;if (r.state.enemy_handles.contains(b.actor) && std::abs(d.depth-1.0)<0.00001) d.trail=d.override_points.empty()?points(r,b):d.override_points;else d.trail.clear();d.override_points.clear();d.pose.clear();const auto &p=DracoBody::rule(r,b);d.width=p.body_width;d.head_scale=p.head_scale;d.depth=d.alpha=1;update(r,b);}
+bool DracoPose::contains(const RunRuntime &r,const BossBodyState &b,godot::Vector2 point,double radius) {const auto &e=r.state.enemies[b.actor.slot];if (e.guard>=1 || e.dead) return false;if (point.distance_to(e.pos)<=e.radius+radius) return true;const auto spine=points(r,b);const double total=length(spine);double traversed=0;for (size_t j=1;j<spine.size();++j) {const auto delta=spine[j]-spine[j-1];const double span=delta.length();const double t=delta.length_squared()>0?std::clamp(double((point-spine[j-1]).dot(delta))/delta.length_squared(),0.0,1.0):0;const auto nearest=spine[j-1]+delta*t;const double fraction=total>0.001?(traversed+t*span)/total:0;const double width=b.draco->width*0.5*taper(fraction)*b.draco->depth;if (nearest.distance_to(point)<=width+radius) return true;traversed+=span;}return false;}
 }

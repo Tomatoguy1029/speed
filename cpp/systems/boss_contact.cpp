@@ -12,6 +12,9 @@
 #include "../bosses/monoceros/horn_dance.h"
 #include "../bosses/centaurus/stomp.h"
 #include "../output/event_builder.h"
+#include "../state/boss_states.h"
+#include "../content/content_bundle.h"
+#include "../bosses/monoceros/state.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -42,10 +45,10 @@ bool mono_shape(const RunRuntime &r,const TechniqueState &t,ContactShape &shape)
     switch (p.kind) {
     case 0:points=MonocerosCharge::horn(r,t);break;
     case 1:points=MonocerosKick::horn(r,t);break;
-    case 2:if (std::get<MonocerosSweepState>(t.detail).stage!=MonocerosSweepState::Stage::Swing) return false;points=MonocerosSweep::horn(r,t);break;
-    case 3:if (std::get<MonocerosLanceState>(t.detail).stage!=MonocerosLanceState::Stage::Run) return false;points=MonocerosLance::horn(r,t);break;
-    case 4:if (std::get<MonocerosReturnState>(t.detail).stage!=MonocerosReturnState::Stage::Run) return false;points=MonocerosReturn::horn(r,t);break;
-    case 6:if (std::get<MonocerosDanceState>(t.detail).stage!=MonocerosDanceState::Stage::Run) return false;points=MonocerosDance::horn(r,t);break;
+    case 2:if (t.detail.get<MonocerosSweepState>().stage!=MonocerosSweepState::Stage::Swing) return false;points=MonocerosSweep::horn(r,t);break;
+    case 3:if (t.detail.get<MonocerosLanceState>().stage!=MonocerosLanceState::Stage::Run) return false;points=MonocerosLance::horn(r,t);break;
+    case 4:if (t.detail.get<MonocerosReturnState>().stage!=MonocerosReturnState::Stage::Run) return false;points=MonocerosReturn::horn(r,t);break;
+    case 6:if (t.detail.get<MonocerosDanceState>().stage!=MonocerosDanceState::Stage::Run) return false;points=MonocerosDance::horn(r,t);break;
     default:return false;
     }
     if (points.size()<2) return false;
@@ -100,7 +103,7 @@ bool BossContactSystem::resolve(RunRuntime &r,godot::Vector2 from,godot::Vector2
         if (!entry.attempted) {entry.attempted=true;hit(r,entry.actor,entry.technique,entry.observation,Cause::Pounce);}
         push(r,entry.actor,from,to);return true;
     }
-    for (auto &t:r.state.bosses.techniques) {
+    for (auto &t:r.state.bosses->techniques) {
         if (!alive(r,t.actor,t.definition)) continue;
         ContactShape shape;Cause cause=Cause::Horn;
         const bool active=mono_shape(r,t,shape) || centaurus_shape(r,t,shape,cause);

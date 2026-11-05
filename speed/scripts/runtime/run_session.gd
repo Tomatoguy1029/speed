@@ -33,6 +33,7 @@ var _cpp_pending_result: Dictionary = {}
 var _cpp_published_result := 0
 var resources: ContentResourceScope
 var _loading: CanvasLayer
+var _fast_loading := false
 ## resource_wait_msは要求の投入と暗転中の経過を含む。ほかの区間と単純合算しない。
 var loading_timings: Dictionary = {}
 var _load_started_us := 0
@@ -91,6 +92,7 @@ func _process(_delta: float) -> void:
 		return
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
+		_end_fast_loading()
 		# 受付停止後、記録・資源・表示・C++・登録の順に片付ける。
 		_cpp_accepting = false
 		if SaveManager.settings_changed.is_connected(_on_cpp_settings_changed): SaveManager.settings_changed.disconnect(_on_cpp_settings_changed)
@@ -153,8 +155,16 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 		resources = ContentResourceScope.new()
 		resources.warmup_complete = true
 	loading_timings["resource_request_ms"] = (Time.get_ticks_usec()-_load_started_us)/1000.0
+	if with_view and not (resources.is_ready() and resources.warmup_complete):
+		_fast_loading = true
+		ContentManager.begin_fast_loading()
 	_poll_cpp_loading()
 	return cpp_error
+
+func _end_fast_loading() -> void:
+	if not _fast_loading: return
+	_fast_loading = false
+	ContentManager.end_fast_loading()
 
 func _on_cpp_settings_changed() -> void:
 	_apply_cpp_settings.call_deferred()
@@ -195,6 +205,7 @@ func _poll_cpp_loading() -> void:
 		_fail_cpp_loading(ERR_INVALID_DATA)
 		return
 	loading_timings["simulation_initialize_ms"] = (Time.get_ticks_usec()-initialize_started)/1000.0
+	_end_fast_loading()
 	if _loading!=null:
 		_loading.queue_free()
 		_loading = null
@@ -256,6 +267,7 @@ func _fail_cpp_loading(error: Error) -> void:
 	_pending_cpp.clear()
 	if resources!=null: resources.cancel()
 	cpp_resources = null
+	_end_fast_loading()
 	if _loading!=null:
 		_loading.queue_free()
 		_loading = null

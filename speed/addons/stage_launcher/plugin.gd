@@ -1,4 +1,4 @@
-## ツールバーからステージ・実験場・ビジュアル編集を起動する（設計書 14.1）。
+## ツールバーとツールメニューからステージ・実験場・ビジュアル編集を起動する（設計書 14.1）。
 ##
 ## 押すと起動するステージを予約し、通常どおりメインシーンを実行する。予約はゲーム側が
 ## 起動時に1回だけ消費するので、F5（通常実行）はこれまでどおりタイトルから始まる。
@@ -7,6 +7,7 @@ extends EditorPlugin
 
 const Request := preload("res://addons/stage_launcher/launch_request.gd")
 const FireInspector := preload("res://addons/stage_launcher/fire_inspector.gd")
+const GATE := preload("res://addons/runtime_library/run_gate.gd")
 const LAB_SCENE := "res://gyms/enemy_lab/enemy_lab.tscn"
 const MENU_SEPARATORS := ["試遊", "表示制作", "計測"]
 const SEPARATOR_IDS := [0x535001, 0x535002, 0x535003]
@@ -19,7 +20,6 @@ const SCENES := {
 	"performance": "res://gyms/perf_enemies/perf_enemies.tscn",
 	"profile": "res://tools/profiling/profile_run.tscn",
 }
-var _button: Button = null
 var _lab_button: Button = null
 var _visual_button: Button = null
 var _menu_items: Array[String] = []
@@ -34,11 +34,6 @@ func _enter_tree() -> void:
 	_launch_error = AcceptDialog.new()
 	_launch_error.title = "ビジュアル編集を開けません"
 	add_child(_launch_error)
-	_button = Button.new()
-	_button.text = "▶ ステージ"
-	_button.tooltip_text = "編集中のステージを直接起動する（F5 は通常どおりタイトルから）"
-	_button.pressed.connect(_on_pressed)
-	add_control_to_container(CONTAINER_TOOLBAR, _button)
 	_lab_button = Button.new()
 	_lab_button.text = "▶ 実験場"
 	_lab_button.tooltip_text = "敵・ボスの試遊とヒットストップ調整を共通の実験場で行う"
@@ -97,7 +92,7 @@ func _on_menu_separator() -> void:
 
 func _add_scene(label: String, key: String) -> void:
 	if ResourceLoader.exists(SCENES[key]):
-		_add_menu_item(label, EditorInterface.play_custom_scene.bind(SCENES[key]))
+		_add_menu_item(label, GATE.play_scene.bind(SCENES[key]))
 
 func _add_menu_item(label: String, action: Callable) -> void:
 	add_tool_menu_item(label, action)
@@ -106,15 +101,14 @@ func _add_menu_item(label: String, action: Callable) -> void:
 ## 既定では右端に置かれて見つけにくいので、「2D／3D／スクリプト」の並びの直後へ移す。
 ## エディタ内部のノードが見つからなければ、既定の位置のままにする。
 func _move_next_to_main_screen_buttons() -> void:
-	var bar := _button.get_parent()
+	var bar := _lab_button.get_parent()
 	if bar == null:
 		return
 	var anchor := bar.get_node_or_null("EditorMainScreenButtons")
 	if anchor == null:
 		push_warning("Stage Launcher: ツールバーの並び替え先が見つからないので既定の位置に置く")
 		return
-	bar.move_child(_button, anchor.get_index() + 1)
-	bar.move_child(_lab_button, _button.get_index() + 1)
+	bar.move_child(_lab_button, anchor.get_index() + 1)
 	bar.move_child(_visual_button, _lab_button.get_index() + 1)
 
 func _exit_tree() -> void:
@@ -136,10 +130,6 @@ func _exit_tree() -> void:
 		remove_control_from_container(CONTAINER_TOOLBAR, _lab_button)
 		_lab_button.queue_free()
 		_lab_button = null
-	if _button != null:
-		remove_control_from_container(CONTAINER_TOOLBAR, _button)
-		_button.queue_free()
-		_button = null
 
 func _on_pressed() -> void:
 	var stage := Request.resolve(_current_scene_path())
@@ -149,7 +139,7 @@ func _on_pressed() -> void:
 
 func _on_lab_pressed() -> void:
 	print("[Stage Launcher] 実験場を起動します")
-	EditorInterface.play_custom_scene(LAB_SCENE)
+	GATE.play_scene(LAB_SCENE)
 
 func _on_visual_pressed() -> void:
 	var path: String = SCENES.visual
@@ -158,7 +148,7 @@ func _on_visual_pressed() -> void:
 		return
 	print("[Stage Launcher] ビジュアル編集を起動します")
 	OS.set_environment("SPEED_VISUAL_EDITOR_SCREEN", str(DisplayServer.window_get_current_screen()))
-	EditorInterface.play_custom_scene(path)
+	GATE.play_scene(path)
 	await get_tree().process_frame
 	if not is_inside_tree(): return
 	if EditorInterface.get_playing_scene() != path:

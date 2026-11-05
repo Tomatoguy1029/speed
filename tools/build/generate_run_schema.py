@@ -45,47 +45,50 @@ def generate():
             assert field.get('ref',record['name']) in names
             assert field.get('source',field['name']) not in keys
             keys.add(field.get('source',field['name']))
-    cpp=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include "../binary_reader.h"','#include <vector>','#include <unordered_set>','#include "../../state/run_state.h"','namespace speed {']
+    cpp=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include <cstdint>','#include <string>','#include <vector>','namespace speed {']
+    # 読込処理は使う場所が限られるので、広くincludeされる型定義から分ける。
+    reader=['// 共通スキーマから生成。直接編集しない。','#pragma once','#include "run_schema.h"','#include "../binary_reader.h"','#include "../runtime_data.h"','#include "../../state/run_state.h"','#include <unordered_set>','namespace speed {']
     for rec in records:
         cpp += [f'struct {rec["name"]} {{']+[f'    {TYPES[f["type"]]} {f["name"]}{{}};' for f in rec['fields']]+['};']
-        cpp += [f'inline bool read(BinaryReader &input, {rec["name"]} &out) {{']
+        reader += [f'inline bool read(BinaryReader &input, {rec["name"]} &out) {{']
         for f in rec['fields']:
-            cpp += [f'    if (!input.read_{f["type"]}(out.{f["name"]})) return false;']
+            reader += [f'    if (!input.read_{f["type"]}(out.{f["name"]})) return false;']
             for constraint,op in [('min','<'),('max','>')]:
-                if constraint in f:cpp += [f'    if (out.{f["name"]} {op} {f[constraint]}) return false;']
-        cpp += ['    return true;','}']
+                if constraint in f:reader += [f'    if (out.{f["name"]} {op} {f[constraint]}) return false;']
+        reader += ['    return true;','}']
     cpp+=['struct ContentRecords {']+[f'    std::vector<{r["name"]}> {r["name"]}_rows;' for r in records]+['};']
-    cpp+=['inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {','    switch(kind) {']
+    reader+=['inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {','    switch(kind) {']
     for rec in records:
         n=rec['name'];minimum=sum(WIDTH[f['type']] for f in rec['fields'])
-        cpp += [f'    case {rec["section"]}: {{',f'        if (version != {rec.get("version",1)}) return false;']
-        if not rec.get('enabled',True):cpp+=['        if (count) return false;']
-        cpp += [f'        if (count > input.remaining()/{minimum}) return false;',f'        for (uint32_t i=0; i<count; ++i) {{ {n} row; if (!read(input,row)) return false; out.{n}_rows.push_back(std::move(row)); }}','        return input.remaining()==0;','    }']
-    cpp+=['    default: return false;','    }','}']
-    cpp+=['inline bool validate_references(const ContentRecords &data) {']
+        reader += [f'    case {rec["section"]}: {{',f'        if (version != {rec.get("version",1)}) return false;']
+        if not rec.get('enabled',True):reader+=['        if (count) return false;']
+        reader += [f'        if (count > input.remaining()/{minimum}) return false;',f'        for (uint32_t i=0; i<count; ++i) {{ {n} row; if (!read(input,row)) return false; out.{n}_rows.push_back(std::move(row)); }}','        return input.remaining()==0;','    }']
+    reader+=['    default: return false;','    }','}']
+    reader+=['inline bool validate_references(const ContentRecords &data) {']
     for rec in records:
-        n=rec['name'];cpp += [f'    std::unordered_set<uint32_t> {n}_ids;',f'    for (const auto &row:data.{n}_rows) if (!{n}_ids.insert(row.id).second) return false;']
+        n=rec['name'];reader += [f'    std::unordered_set<uint32_t> {n}_ids;',f'    for (const auto &row:data.{n}_rows) if (!{n}_ids.insert(row.id).second) return false;']
     for rec in records:
         for f in rec['fields']:
-            if 'ref' in f:cpp += [f'    for (const auto &row:data.{rec["name"]}_rows) if (!{f["ref"]}_ids.count(row.{f["name"]})) return false;']
-    cpp+=['    return true;','}']
-    cpp+=['inline void apply_config(const RunConfig &config, godot::RunState &state) {']
+            if 'ref' in f:reader += [f'    for (const auto &row:data.{rec["name"]}_rows) if (!{f["ref"]}_ids.count(row.{f["name"]})) return false;']
+    reader+=['    return true;','}']
+    reader+=['inline void apply_config(const RunConfig &config, godot::RunState &state) {']
     for f in records[0]['fields']:
-        if 'runtime' in f:cpp += [f'    state.{f["runtime"]}=config.{f["name"]};']
-    cpp+=['}']
-    cpp+=['inline godot::Dictionary config_snapshot(const RunConfig &config) {','    godot::Dictionary out;']
+        if 'runtime' in f:reader += [f'    state.{f["runtime"]}=config.{f["name"]};']
+    reader+=['}']
+    reader+=['inline godot::Dictionary config_snapshot(const RunConfig &config) {','    godot::Dictionary out;']
     for f in records[0]['fields']:
-        cpp += [f'    out["{f["name"]}"]=config.{f["name"]};']
-    cpp+=['    return out;','}']
-    cpp+=['inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {','    EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;']
+        reader += [f'    out["{f["name"]}"]=config.{f["name"]};']
+    reader+=['    return out;','}']
+    reader+=['inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {','    EnemyDefinition out; out.id=id; out.spawn_ready=true; out.scaling.ready=true;']
     for f in next(r for r in records if r['name']=='EnemyRecord')['fields']:
-        if 'native' in f:cpp += [f'    out.{f["native"]}=row.{f["name"]};']
-    cpp+=['    out.kind=static_cast<EnemyDefinition::Kind>(row.kind);','    return out;','}',f'inline constexpr uint32_t FORMAT_VERSION={schema["format_version"]}, ABI_VERSION={schema["abi_version"]}, SECTION_COUNT={len(records)};','}']
+        if 'native' in f:reader += [f'    out.{f["native"]}=row.{f["name"]};']
+    reader+=['    out.kind=static_cast<EnemyDefinition::Kind>(row.kind);','    return out;','}','}']
+    cpp+=[f'inline constexpr uint32_t FORMAT_VERSION={schema["format_version"]}, ABI_VERSION={schema["abi_version"]}, SECTION_COUNT={len(records)};','}']
     gd=['## 共通スキーマから生成。直接編集しない。','extends RefCounted','',f'const SCHEMA = {json.dumps(schema,ensure_ascii=False).replace("false","false").replace("true","true")}']
     enum_values={name:{entry['name']:index for index,entry in enumerate(entries)} for name,entries in schema['enums'].items()}
     gd += ['const ENUMS = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS', GD_WRITER]
     runtime_ids = '## 共通スキーマから生成。直接編集しない。\nextends RefCounted\nconst ENUMS = ' + json.dumps(enum_values,ensure_ascii=False) + '\n'
-    return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd).rstrip()+'\n','speed/scripts/data_types/generated/run_ids.gd':runtime_ids}
+    return {'cpp/content/generated/combat_ids.h':'\n'.join(enums)+'\n','cpp/content/generated/run_schema.h':'\n'.join(cpp)+'\n','cpp/content/generated/run_schema_read.h':'\n'.join(reader)+'\n','speed/tools/content/generated/run_schema.gd':'\n'.join(gd).rstrip()+'\n','speed/scripts/data_types/generated/run_ids.gd':runtime_ids}
 
 GD_WRITER = r'''
 static func write_content(data: Dictionary, input_sha256: PackedByteArray) -> PackedByteArray:

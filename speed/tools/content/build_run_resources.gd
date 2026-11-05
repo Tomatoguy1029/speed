@@ -11,6 +11,8 @@ static var _batch_active := false
 static var _batch_hashes := {}
 static var _batch_dependencies := {}
 static var _batch_signatures := {}
+static var _batch_tables := {}
+static var _batch_held: Array[Resource] = []
 static func begin_batch() -> void:
 	end_batch()
 	_batch_active = true
@@ -19,6 +21,24 @@ static func end_batch() -> void:
 	_batch_hashes.clear()
 	_batch_dependencies.clear()
 	_batch_signatures.clear()
+	_batch_tables.clear()
+	_batch_held.clear()
+
+## load()の保持はResourceの参照が切れると失われるので、定義を読み直さないよう一括生成の間だけ握る。
+static func hold_definitions() -> void:
+	if not _batch_active: return
+	var catalog := load("res://data/content_catalog.tres") as ContentCatalog
+	_batch_held.append(catalog)
+	for category: StringName in [&"enemies",&"bosses",&"heroes",&"weapons",&"traits"]:
+		for entry: ContentEntry in catalog.table(category).values(): _batch_held.append(load(entry.path))
+	for name in DirAccess.get_files_at("res://scenes/attacks"):
+		if name.ends_with(".tscn"): _batch_held.append(load("res://scenes/attacks/"+name))
+
+## 一括生成の間だけ、同じ入力から作る固定表を使い回す。
+static func batch_tables(key: String, make: Callable) -> Dictionary:
+	if not _batch_active: return make.call()
+	if not _batch_tables.has(key): _batch_tables[key] = make.call()
+	return _batch_tables[key]
 
 static func _constant_paths(value: Variant, paths: PackedStringArray) -> void:
 	if value is Resource:

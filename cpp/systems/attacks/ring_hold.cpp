@@ -1,6 +1,7 @@
 #include "ring_hold.h"
 #include "bullet.h"
 #include "../attack_system.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 namespace speed {
 std::vector<AttackHandle> RingHoldSystem::emit(RunRuntime &run,const RingHoldParams &p) {

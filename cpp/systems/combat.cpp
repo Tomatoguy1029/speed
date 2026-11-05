@@ -12,6 +12,9 @@
 #include "boss_ram.h"
 #include "boss_image.h"
 #include "../output/event_builder.h"
+#include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -98,7 +101,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
     auto candidates=query_enemy_rows(from.min(to) - pad, from.max(to) + pad);
-    for (const auto &body:runtime.state.bosses.bodies) {
+    for (const auto &body:runtime.state.bosses->bodies) {
         if (runtime.state.enemy_handles.contains(body.actor) && speed::BossImageSystem::available(runtime,body.actor) && std::find(candidates.begin(),candidates.end(),body.actor.slot)==candidates.end()) candidates.push_back(body.actor.slot);
     }
     for (size_t row : candidates) {
@@ -181,7 +184,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         speed::DamageRequest gate_request;gate_request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));gate_request.cause=speed::Cause::Ram;gate_request.direction=direction;gate_request.impact=position;gate_request.has_impact=true;
         const auto gate=speed::CombatResolver::gate(runtime,gate_request.struck,gate_request);
         if (gate==speed::GateResult::Pass) {health.hit_cd=c.contact_cooldown;if (runtime.state.draw.tracing) runtime.state.draw.inside[health.id]=target.slot;continue;}
-        if (gate==speed::GateResult::Allow && (runtime.state.loadout.effects.ignore_armor || (runtime.state.draw.tracing && speed::HeroesSystem::trace_width(runtime)>1.0) || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
+        if (gate==speed::GateResult::Allow && (runtime.state.loadout->effects.ignore_armor || (runtime.state.draw.tracing && speed::HeroesSystem::trace_width(runtime)>1.0) || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
                 speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));

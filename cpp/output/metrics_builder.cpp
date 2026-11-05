@@ -11,6 +11,12 @@
 #include <climits>
 #include <map>
 #include <tuple>
+#include "build_identity.h"
+#include "../content/generated/run_schema_read.h"
+#include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
+#include "../bosses/draco/state.h"
 namespace speed {
 MetricsDetailTimer::~MetricsDetailTimer() {
     if (!sample) return;
@@ -87,22 +93,22 @@ void MetricsBuilder::set_recording(RunRuntime &r,bool active,uint32_t level) {
     if (o.recording==active && (!active || o.detail_level==level)) return;
     if (o.recording) {AttackSystem::sync_observation_positions(s);o.stop();flush_observations(r);}
     RecordingBuilder::set_active(r,active);
-    for (auto &f:s.bosses.flows) {f.decision_id=0;for (auto &n:f.nodes) n.decision_id=0;}
-    for (auto &t:s.bosses.techniques) t.decision_id=0;
+    for (auto &f:s.bosses->flows) {f.decision_id=0;for (auto &n:f.nodes) n.decision_id=0;}
+    for (auto &t:s.bosses->techniques) t.decision_id=0;
     if (active) {
         o.detail_level=level;o.recording=true;
-        for (auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
-        for (auto &b:s.bosses.bodies) {
+        for (auto &t:s.bosses->techniques) if (t.stage<TechniqueStage::Finished) t.observation_id=o.begin(s.enemy_handles.entity_id(t.actor),t.definition,false);
+        for (auto &b:s.bosses->bodies) {
             b.final_observation_id=0;
-            if (b.mode==BossMode::Final && (!b.final_landed || b.draco.finale.active)) TechniqueRunner::observe_scripted(r,b,b.draco.finale.active?"draco_finale":"final_strike",b.draco.finale.active?"scripted_finale":"final_strike_replay",ObservationEvent::Selected,false);
+            if (b.mode==BossMode::Final && (!b.final_landed || b.draco->finale.active)) TechniqueRunner::observe_scripted(r,b,b.draco->finale.active?"draco_finale":"final_strike",b.draco->finale.active?"scripted_finale":"final_strike_replay",ObservationEvent::Selected,false);
         }
         // 終了して行が再利用された技も、発生時のHandleと出所で分ける。
         std::map<std::tuple<int64_t,uint64_t,uint32_t>,int64_t> remaining;
-        for (auto &a:s.attacks.records) if (a.alive && (a.spec.source_technique || s.bosses.body_handles.contains(a.spec.boss))) {
+        for (auto &a:s.attacks.records) if (a.alive && (a.spec.source_technique || s.bosses->body_handles.contains(a.spec.boss))) {
             auto &spec=a.spec;int64_t id=0;
-            if (!spec.source_technique && s.bosses.body_handles.contains(spec.boss)) id=s.bosses.bodies[spec.boss.slot].final_observation_id;
-            else if (s.bosses.handles.contains(spec.technique)) id=s.bosses.techniques[spec.technique.slot].observation_id;
-            else for (const auto &t:s.bosses.techniques) if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && s.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {id=t.observation_id;break;}
+            if (!spec.source_technique && s.bosses->body_handles.contains(spec.boss)) id=s.bosses->bodies[spec.boss.slot].final_observation_id;
+            else if (s.bosses->handles.contains(spec.technique)) id=s.bosses->techniques[spec.technique.slot].observation_id;
+            else for (const auto &t:s.bosses->techniques) if (t.stage<TechniqueStage::Finished && t.definition==spec.source_technique && s.enemy_handles.entity_id(t.actor)==spec.owner.source_id) {id=t.observation_id;break;}
             if (!spec.source_technique && !id) continue;
             if (!o.find(id)) {
                 const auto key=std::make_tuple(spec.owner.source_id,handle_key(spec.technique),spec.source_technique);
@@ -160,11 +166,11 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
     Dictionary rolls;rolls["eligible"]=int64_t(p.gold_rolls);rolls["won"]=int64_t(p.gold_won);xp["gold_rolls"]=rolls;xp["collected_actual_xp"]=p.collected_actual_xp;
     int64_t weapons=0,traits=0,wm=0,tm=0;Dictionary weapon_levels,trait_levels;
     for (const auto &d:c.equipment) {auto &maximum=d.kind==0?wm:tm;maximum=std::max(maximum,int64_t(d.maximum_level));}
-    for (const auto &v:s.loadout.weapons) {const auto &d=c.equipment[v.definition-1];weapons+=std::min(v.level,d.maximum_level);weapon_levels[String::utf8(d.external_id.c_str())]=v.level;}
-    for (const auto &v:s.loadout.traits) {const auto &d=c.equipment[v.definition-1];traits+=std::min(v.level,d.maximum_level);trait_levels[String::utf8(d.external_id.c_str())]=v.level;}
+    for (const auto &v:s.loadout->weapons) {const auto &d=c.equipment[v.definition-1];weapons+=std::min(v.level,d.maximum_level);weapon_levels[String::utf8(d.external_id.c_str())]=v.level;}
+    for (const auto &v:s.loadout->traits) {const auto &d=c.equipment[v.definition-1];traits+=std::min(v.level,d.maximum_level);trait_levels[String::utf8(d.external_id.c_str())]=v.level;}
     const int64_t maximum=c.progression.weapon_slots*wm+c.progression.trait_slots*tm;
     Dictionary progress;progress["weapon_levels"]=weapons;progress["trait_levels"]=traits;progress["max_levels"]=maximum;progress["completion"]=maximum?double(weapons+traits)/maximum:0.0;
-    Dictionary out;out["t"]=s.time;out["world_t"]=s.world_time;out["level"]=s.loadout.level;out["hp"]=s.ship.hp;out["kills"]=s.kills;out["weapons"]=weapon_levels;out["traits"]=trait_levels;out["xp"]=xp;out["equipment_progress"]=progress;
+    Dictionary out;out["t"]=s.time;out["world_t"]=s.world_time;out["level"]=s.loadout->level;out["hp"]=s.ship.hp;out["kills"]=s.kills;out["weapons"]=weapon_levels;out["traits"]=trait_levels;out["xp"]=xp;out["equipment_progress"]=progress;
     Dictionary origins,roles;
     for (const auto &e:s.enemies) if (e.alive && !e.dead) {
         const StringName origin(symbol_name(e.origin)),role(symbol_name(e.role));origins[origin]=int64_t(origins.get(origin,0))+1;roles[role]=int64_t(roles.get(role,0))+1;
@@ -174,8 +180,8 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
     Dictionary diagnostics;diagnostics["level"]=s.observations.detail_level;diagnostics["tracked_effects"]=int64_t(s.observations.effects.size());diagnostics["effect_tracking_dropped"]=int64_t(s.observations.effect_tracking_dropped);out["combat_diagnostics"]=diagnostics;
     out.merge(RecordingBuilder::read(run),true);
     if (initial) {
-        Dictionary start;start["t"]=s.time;start["world_t"]=s.world_time;start["phase"]=int(s.phase);start["level"]=s.loadout.level;
-        start["xp"]=s.loadout.xp;start["xp_gained"]=s.loadout.xp_gained;start["xp_dropped"]=p.xp_dropped;start["hp"]=s.ship.hp;start["hp_max"]=s.ship_config.max_hp;start["kills"]=s.kills;
+        Dictionary start;start["t"]=s.time;start["world_t"]=s.world_time;start["phase"]=int(s.phase);start["level"]=s.loadout->level;
+        start["xp"]=s.loadout->xp;start["xp_gained"]=s.loadout->xp_gained;start["xp_dropped"]=p.xp_dropped;start["hp"]=s.ship.hp;start["hp_max"]=s.ship_config.max_hp;start["kills"]=s.kills;
         start["weapons"]=weapon_levels;start["traits"]=trait_levels;start["hero_power"]=HeroesSystem::snapshot(run)["power"];start["bonus_t"]=s.control.bonus_remaining;start["endless"]=s.lifecycle.endless;out["run_state"]=start;
         Array bands;for (const auto &phase:s.spawn_timeline.phases) {Dictionary row;row["id"]=phase.id;row["start"]=phase.start;bands.push_back(row);}out["bands"]=bands;
         Dictionary conditions,stats,profile,mult,add,reduce;
@@ -183,9 +189,9 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         stats["attack_mult"]=s.combat_config.attack_mult;stats["crit_chance"]=s.combat_config.crit_chance;stats["crit_mult"]=s.combat_config.crit_mult;
         stats["pickup_radius"]=s.pickup_config.coin_radius;stats["xp_pickup_radius"]=s.pickup_config.xp_radius;stats["charge_time"]=s.draw_config.charge_time;
         stats["capacity"]=s.draw_config.capacity;stats["length_mult"]=s.draw_config.length_mult;stats["glide_duration_mult"]=s.ship_config.glide_duration_mult;
-        stats["xp_mult"]=s.pickup_config.xp_mult;stats["xp_gain_mult"]=s.loadout.xp_gain_mult;stats["acceleration"]=s.ship_config.acceleration;
+        stats["xp_mult"]=s.pickup_config.xp_mult;stats["xp_gain_mult"]=s.loadout->xp_gain_mult;stats["acceleration"]=s.ship_config.acceleration;
         stats["turn_rate"]=s.ship_config.turn_rate;stats["invulnerability"]=s.ship_config.invulnerability;stats["repair_fraction"]=s.pickup_config.repair_fraction;stats["pickup_speed_mult"]=s.pickup_config.speed_mult;
-        const auto &l=s.loadout;mult["max_speed"]=l.speed_profile_factor;mult["attack"]=l.attack_profile_factor;mult["pickup"]=l.pickup_profile_factor;mult["length"]=l.length_profile_factor;mult["xp"]=l.xp_profile_factor;
+        const auto &l=*s.loadout;mult["max_speed"]=l.speed_profile_factor;mult["attack"]=l.attack_profile_factor;mult["pickup"]=l.pickup_profile_factor;mult["length"]=l.length_profile_factor;mult["xp"]=l.xp_profile_factor;
         add["max_hp"]=l.hp_profile_add;add["reroll"]=l.reroll_profile_add;reduce["charge_time"]=l.charge_profile_factor;profile["mult"]=mult;profile["add"]=add;profile["reduce"]=reduce;
         conditions["config"]=config_snapshot(c.config);conditions["stats"]=stats;conditions["profile"]=profile;
         conditions["rng_state"]=String::num_uint64(s.control.rng.get_state());conditions["rng_algorithm"]="pcg32";
@@ -197,11 +203,11 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         Dictionary values,rewards;for (size_t i=0;i<3;++i) values[names[i]]=c.crystal_values[i];
         for (const auto &d:c.definitions) {Array counts;for (auto n:d.xp_rewards) counts.push_back(int64_t(n));Dictionary reward;reward["rank"]=d.rank;reward["counts"]=counts;reward["strong_gold"]=d.gold_eligible;rewards[d.id]=reward;}
         Dictionary config;config["xp_reward_version"]=2;config["xp_crystal_values"]=values;config["enemy_rewards"]=rewards;config["strong_gold_chance"]=s.pickup_config.strong_gold_chance;config["gem_draw_max"]=s.pickup_config.gem_draw_max;Dictionary limit=cap.duplicate();limit.erase("absorber_id");config["cap"]=limit;
-        config["ship_multiplier"]=s.pickup_config.xp_mult;config["run_multiplier"]=s.loadout.xp_gain_mult;config["collection_multiplier"]=s.pickup_config.xp_mult*s.loadout.xp_gain_mult;config["multiplier_application"]="collection_once";
+        config["ship_multiplier"]=s.pickup_config.xp_mult;config["run_multiplier"]=s.loadout->xp_gain_mult;config["collection_multiplier"]=s.pickup_config.xp_mult*s.loadout->xp_gain_mult;config["multiplier_application"]="collection_once";
         config["xp_base"]=c.progression.xp_base;config["xp_growth"]=c.progression.xp_growth;config["xp_curve"]=c.progression.xp_curve;out["xp_config"]=config;
         PackedByteArray digest;digest.resize(32);std::copy(c.payload_sha256.begin(),c.payload_sha256.end(),digest.ptrw());Dictionary identity;identity["payload_sha256"]=digest.hex_encode();
         std::copy(c.input_sha256.begin(),c.input_sha256.end(),digest.ptrw());identity["input_sha256"]=digest.hex_encode();
-        identity["implementation_sha256"]=SPEED_IMPLEMENTATION_SHA256;
+        identity["implementation_sha256"]=speed::implementation_sha256();
         identity["abi_version"]=ABI_VERSION;identity["state_schema_version"]=STATE_SCHEMA_VERSION;identity["stage_id"]=s.control.stage_id;out["identity"]=identity;
     }
     return out;

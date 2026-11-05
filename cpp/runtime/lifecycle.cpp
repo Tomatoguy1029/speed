@@ -2,6 +2,8 @@
 #include "../behaviors/weapons/afterimage.h"
 #include "../output/frame_builder.h"
 #include "../output/event_builder.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <climits>
 using namespace godot;
 namespace speed {
@@ -14,15 +16,15 @@ bool Lifecycle::finish(RunRuntime &run,ResultKind kind) {
     auto &state=run.state;auto &lifecycle=state.lifecycle;
     if (lifecycle.result || next_result_id==INT64_MAX) return false;
     RunResult result;result.id=next_result_id++;result.kind=kind;result.run_time=state.time;result.world_time=state.world_time;
-    result.level=state.loadout.level;result.kills=state.kills;result.coins=lifecycle.coins+(kind==ResultKind::Clear?run.content->lifecycle.clear_bonus:0);
-    result.peak_speed=state.ship.peak_speed;result.weapons=state.loadout.weapons;result.traits=state.loadout.traits;
+    result.level=state.loadout->level;result.kills=state.kills;result.coins=lifecycle.coins+(kind==ResultKind::Clear?run.content->lifecycle.clear_bonus:0);
+    result.peak_speed=state.ship.peak_speed;result.weapons=state.loadout->weapons;result.traits=state.loadout->traits;
     for (auto id:lifecycle.obtained) result.rewards.push_back({id,1});
     result.last_request=lifecycle.last_request;result.last_damage=lifecycle.last_damage;result.has_damage=lifecycle.has_damage;
     lifecycle.result=std::move(result);
     state.draw.drawing=state.draw.tracing=false;state.ship.vel=Vector2();state.phase=RunState::Phase::Ended;AfterimageBehavior::clear(run);state.hitstop=0;
     state.control.boss_ram={};
     state.control.world_real_accum=state.control.world_dt_accum=0;state.control.world_steps=0;
-    state.loadout.candidates.clear();state.loadout.offer_id=state.loadout.selected_id=0;run.resource_workspace.requests.clear();
+    state.loadout->candidates.clear();state.loadout->offer_id=state.loadout->selected_id=0;run.resource_workspace.requests.clear();
     Dictionary event;event["result_id"]=lifecycle.result->id;event["kind"]=symbol_name(kind);FrameBuilder::append(run,"run_finished",event);return true;
 }
 Variant Lifecycle::result(const RunRuntime &run) {

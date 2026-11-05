@@ -133,7 +133,7 @@ func _ready() -> void:
 	var size := String(options.size).split("x")
 	DisplayServer.window_set_size(Vector2i(int(size[0]),int(size[1])))
 	# 通常起動と同じ資源を保持し、起動準備の後から戦闘の区間を測る。
-	var loading := preload("res://scripts/ui/startup_loading.gd").new()
+	var loading := preload("res://scripts/ui/startup_preparation.gd").new()
 	add_child(loading)
 	var startup_ready: bool = await loading.prepare()
 	loading.queue_free()

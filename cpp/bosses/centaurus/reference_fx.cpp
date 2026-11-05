@@ -2,6 +2,9 @@
 #include "../flow/phase_controller.h"
 #include "stomp.h"
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
+#include "state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -32,13 +35,13 @@ std::vector<godot::Vector2> feet(const RunRuntime &r,const BossBodyState &b) {
 }
 }
 void CentaurusReferenceFx::released(RunRuntime &r,const TechniqueState &t,godot::Vector2 position,double angle) {
-    if (auto *b=PhaseController::find(r,t.actor)) b->centaurus.reference_fx.releases.push_back({position,angle,b->clock});
+    if (auto *b=PhaseController::find(r,t.actor)) b->centaurus->reference_fx.releases.push_back({position,angle,b->clock});
 }
 void CentaurusReferenceFx::update(RunRuntime &r,BossBodyState &b) {
-    auto &fx=b.centaurus.reference_fx;const auto &e=r.state.enemies[b.actor.slot];const auto &p=r.content->centaurus_fx;
-    if (fx.leaping && !b.centaurus.leaping) {auto points=feet(r,b);if (points.size()==4) fx.landings.push_back({e.pos,std::move(points),b.clock,e.radius});}
-    fx.leaping=b.centaurus.leaping;
-    for (const auto &t:r.state.bosses.techniques) {
+    auto &fx=b.centaurus->reference_fx;const auto &e=r.state.enemies[b.actor.slot];const auto &p=r.content->centaurus_fx;
+    if (fx.leaping && !b.centaurus->leaping) {auto points=feet(r,b);if (points.size()==4) fx.landings.push_back({e.pos,std::move(points),b.clock,e.radius});}
+    fx.leaping=b.centaurus->leaping;
+    for (const auto &t:r.state.bosses->techniques) {
         if (!same_handle(t.actor,b.actor) || t.stage>=TechniqueStage::Finished) continue;
         const auto &technique=r.content->boss_techniques[t.definition-1];
         if (technique.kind==12 && t.stage!=TechniqueStage::Windup && fx.stomp_id!=t.id) {
@@ -62,7 +65,7 @@ void CentaurusReferenceFx::update(RunRuntime &r,BossBodyState &b) {
     prune(fx.releases,p.release_life);prune(fx.landings,p.landing_life);prune(fx.stomps,p.stomp_life);prune(fx.ups,.5);
 }
 godot::Dictionary CentaurusReferenceFx::snapshot(const BossBodyState &b) {
-    godot::Dictionary out;godot::Array releases,landings,stomps,ups;const auto &fx=b.centaurus.reference_fx;
+    godot::Dictionary out;godot::Array releases,landings,stomps,ups;const auto &fx=b.centaurus->reference_fx;
     for (const auto &v:fx.releases) {godot::Dictionary d;d["position"]=v.position;d["angle"]=v.angle;d["started"]=v.started;releases.push_back(d);}
     for (const auto &v:fx.landings) {godot::Dictionary d;godot::PackedVector2Array points;for (auto p:v.feet) points.push_back(p);d["position"]=v.position;d["feet"]=points;d["started"]=v.started;d["radius"]=v.radius;landings.push_back(d);}
     for (const auto &v:fx.stomps) {godot::Dictionary d;d["position"]=v.position;d["angle"]=v.angle;d["half"]=v.half;d["radius"]=v.radius;d["started"]=v.started;stomps.push_back(d);}

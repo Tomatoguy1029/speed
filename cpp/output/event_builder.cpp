@@ -5,6 +5,7 @@
 #include "../systems/attacks/flood.h"
 #include "../systems/pickup_system.h"
 #include "../runtime/run_runtime.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

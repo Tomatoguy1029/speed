@@ -2,6 +2,7 @@
 #include <cmath>
 #include "../attack_system.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 AttackHandle FloodSystem::emit(RunRuntime &run,const BeamParams &params) {
     if (run.content->floods.empty()) return {};

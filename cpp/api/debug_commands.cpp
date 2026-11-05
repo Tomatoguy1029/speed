@@ -10,6 +10,8 @@
 #include "../systems/attacks/zone.h"
 #include "../systems/attacks/wave.h"
 #include "../systems/attacks/wall.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -58,7 +60,7 @@ Dictionary SpeedRunCore::development_debug_command(const Dictionary &p) {
         }
         return reply(false);
     }
-    else if (action=="level_up") return reply(speed::ProgressionSystem::add_experience(*this,speed::ProgressionSystem::next_xp(runtime)-s.loadout.xp+0.01));
+    else if (action=="level_up") return reply(speed::ProgressionSystem::add_experience(*this,speed::ProgressionSystem::next_xp(runtime)-s.loadout->xp+0.01));
     else if (action=="gauge_full") s.draw.gauge=1;
     else if (action=="heal") s.ship.hp=s.ship_config.max_hp;
     else if (action=="clear_enemies") {speed::EnemySystem::clear_regular(runtime);rebuild_enemy_grid(s.frame_grid_cell);}
@@ -67,12 +69,12 @@ Dictionary SpeedRunCore::development_debug_command(const Dictionary &p) {
         speed::ShipDamageRequest hit;hit.amount=action=="hurt"?1:s.ship.hp+1;hit.cause=speed::Cause::Debug;speed::CombatResolver::ship_damage(runtime,hit);
         if (action=="hurt") {s.invincible=keep;s.ship.shield_t=shield;}
     } else if (action=="reset_loadout") {
-        auto weapons=s.loadout.weapons,traits=s.loadout.traits;
+        auto weapons=s.loadout->weapons,traits=s.loadout->traits;
         for (const auto &v:weapons) if (!speed::EquipmentSystem::remove_weapon(runtime,v.definition)) return reply(false);
         for (const auto &v:traits) if (!speed::EquipmentSystem::remove_trait(runtime,v.definition)) return reply(false);
-        for (const auto &d:runtime.content->post_max) if (auto stack=speed::ProgressionSystem::post_stacks(s.loadout,d.external_id)) *stack=0;
-        s.loadout.candidates.clear();s.loadout.offer_id=s.loadout.selected_id=0;s.loadout.initial_offer=false;s.loadout.comet_weapon=0;s.loadout.comet_direct=false;s.loadout.pending_comet_weapons.clear();runtime.resource_workspace.requests.clear();
-        s.loadout.boost_distance=0;s.loadout.contact_wave={};s.loadout.kill_sonic={};s.loadout.crit_beam={};s.loadout.vortex={};s.loadout.run_up={};s.loadout.rampage={};
+        for (const auto &d:runtime.content->post_max) if (auto stack=speed::ProgressionSystem::post_stacks(*s.loadout,d.external_id)) *stack=0;
+        s.loadout->candidates.clear();s.loadout->offer_id=s.loadout->selected_id=0;s.loadout->initial_offer=false;s.loadout->comet_weapon=0;s.loadout->comet_direct=false;s.loadout->pending_comet_weapons.clear();runtime.resource_workspace.requests.clear();
+        s.loadout->boost_distance=0;s.loadout->contact_wave={};s.loadout->kill_sonic={};s.loadout->crit_beam={};s.loadout->vortex={};s.loadout->run_up={};s.loadout->rampage={};
         if (s.phase==Phase::LevelUp) s.phase=Phase::Play;else if (s.phase==Phase::Paused && s.control.resume_phase==int32_t(Phase::LevelUp)) s.control.resume_phase=int32_t(Phase::Play);
         speed::EquipmentSystem::refresh_effects(runtime);
     } else if (action=="hazards") {

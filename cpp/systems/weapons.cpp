@@ -2,6 +2,8 @@
 #include "../behaviors/weapons/forward.h"
 #include "attacks/friend_shot.h"
 #include "attack_system.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -47,18 +49,18 @@ Dictionary SpeedRunCore::forward_snapshot() const {
 }
 
 Dictionary SpeedRunCore::scatter_snapshot() const {
-    const auto &weapon=runtime.state.loadout.scatter;
+    const auto &weapon=runtime.state.loadout->scatter;
     Dictionary out;out["elapsed"]=weapon.elapsed;out["recoil"]=weapon.recoil;return out;
 }
 
 Dictionary SpeedRunCore::rear_snapshot() const {
-    const auto &weapon=runtime.state.loadout.rear;
+    const auto &weapon=runtime.state.loadout->rear;
     Dictionary out;out["elapsed"]=weapon.interval-weapon.fire.remaining;out["recoil"]=weapon.recoil;
     out["ready"]=weapon.ready;out["mount"]=runtime.state.ship.pos+Vector2(weapon.mount_x,weapon.mount_y).rotated(runtime.state.ship.heading.angle()+Math::PI/2.0)*weapon.character_scale;out["aim"]=-runtime.state.ship.heading;return out;
 }
 
 Dictionary SpeedRunCore::barrier_snapshot() const {
-    const auto &barrier=runtime.state.loadout.barrier;Dictionary out;out["equipped"]=barrier.ready;out["durability"]=barrier.durability;out["restore"]=barrier.restore;out["restore_visual_age"]=barrier.restore_visual_age;
+    const auto &barrier=runtime.state.loadout->barrier;Dictionary out;out["equipped"]=barrier.ready;out["durability"]=barrier.durability;out["restore"]=barrier.restore;out["restore_visual_age"]=barrier.restore_visual_age;
     Array waves;for (const auto &wave:barrier.waves) {Dictionary value;value["pos"]=wave.pos;value["age"]=wave.age;value["radius"]=wave.radius;value["damage"]=wave.damage;value["angle"]=wave.angle;value["broken"]=wave.broken;Array hits;std::vector<int64_t> sorted(wave.hits.begin(),wave.hits.end());std::sort(sorted.begin(),sorted.end());for (auto id:sorted) hits.push_back(id);value["hits"]=hits;waves.push_back(value);}out["waves"]=waves;return out;
 }
 

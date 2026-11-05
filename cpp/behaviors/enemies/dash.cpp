@@ -3,6 +3,7 @@
 #include "../../systems/enemy_motion.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_budget.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void DashBehavior::step(RunRuntime &run,uint32_t row,double dt) {
     auto &state=run.state;auto &enemy=state.enemies[row];const auto &def=run.content->definitions[enemy.definition];
