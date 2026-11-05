@@ -579,7 +579,7 @@ function hDraw(S, R) {
   hRocks(S, R, true);
   R.blitBack();
   S.necks.forEach((n, i) => hDrawNeck(S, n, n === actor ? vis : n.points, i));
-  hStamp('body', null, S.B.pos, 0, S.B.r * 2 / IMG['hydra/body'].width);
+  hStamp('body', null, S.B.pos, S.B.facing, S.B.r * 2 / IMG['hydra/body'].width);
   for (const n of S.necks) { if (!R.proto || n !== actor) hDrawHead(n, n.pos, n.angle); else hDrawHead(n, pose.head, pose.angle, pose.sx, pose.sy); }
   hRocks(S, R, false);
   if (!R.proto) hCurrent(S, actor);

@@ -7936,7 +7936,7 @@ function hDraw(S, R) {
   hRocks(S, R, true);
   R.blitBack();
   S.necks.forEach((n, i) => hDrawNeck(S, n, n === actor ? vis : n.points, i));
-  hStamp('body', null, S.B.pos, 0, S.B.r * 2 / IMG['hydra/body'].width);
+  hStamp('body', null, S.B.pos, S.B.facing, S.B.r * 2 / IMG['hydra/body'].width);
   for (const n of S.necks) { if (!R.proto || n !== actor) hDrawHead(n, n.pos, n.angle); else hDrawHead(n, pose.head, pose.angle, pose.sx, pose.sy); }
   hRocks(S, R, false);
   if (!R.proto) hCurrent(S, actor);
@@ -8030,7 +8030,7 @@ function hmVisNeck(S, n, pose) { // 頭の見た目の位置まで首の先を�
 }
 function hmDrawBody(S, R, poses) {
   S.necks.forEach((n, i) => { if (!n.gone) hDrawNeck(S, n, R.proto && poses.has(n) ? hmVisNeck(S, n, poses.get(n)) : n.points, i); });
-  hStamp('body', null, S.B.pos, 0, S.B.r * 2 / IMG['hydra/body'].width);
+  hStamp('body', null, S.B.pos, S.B.facing, S.B.r * 2 / IMG['hydra/body'].width);
   for (const n of S.necks) { if (n.gone) continue; const p = R.proto && poses.get(n); if (p) hDrawHead(n, p.head, p.angle, p.sx, p.sy); else hDrawHead(n, n.pos, n.angle); }
 }
 function hmMouth(n, pose) { return add(pose.head, mul(fromA(pose.angle), hMouthDist(n))); }
@@ -8254,7 +8254,7 @@ function hmNorthDraw(S, R) {
   });
   R.blitBack();
   S.necks.forEach((n, i) => hDrawNeck(S, n, R.proto && poses.has(n) ? hmLungeNeck(S, n, poses.get(n)) : n.points, i));
-  hStamp('body', null, S.B.pos, 0, S.B.r * 2 / IMG['hydra/body'].width);
+  hStamp('body', null, S.B.pos, S.B.facing, S.B.r * 2 / IMG['hydra/body'].width);
   for (const n of S.necks) { const p = R.proto && poses.get(n); if (p) hDrawHead(n, p.head, p.angle, p.sx, p.sy); else hDrawHead(n, n.pos, n.angle); }
   if (!R.proto && S.age >= 0 && S.mt < 0) for (const n of S.parts) { const c = S.nlocked ? '#fff2b0' : '#ffd16c'; D2.line(n.pos, n.target, rgba(c, 0.55), 3); D2.arc(n.target, r.bite_radius, 0, TAU, c, 3); }
   drawShip(S.ship);
@@ -8276,16 +8276,18 @@ function hmSeqDraw(S, R) {
   });
   R.blitBack();
   S.necks.forEach((n, i) => hDrawNeck(S, n, R.proto && poses.has(n) ? hmLungeNeck(S, n, poses.get(n)) : n.points, i));
-  hStamp('body', null, S.B.pos, 0, S.B.r * 2 / IMG['hydra/body'].width);
+  hStamp('body', null, S.B.pos, S.B.facing, S.B.r * 2 / IMG['hydra/body'].width);
   for (const n of S.necks) { const p = R.proto && poses.get(n); if (p) hDrawHead(n, p.head, p.angle, p.sx, p.sy); else hDrawHead(n, n.pos, n.angle); }
   drawShip(S.ship);
 }
 
-// ---------- 回転する曲線ビーム（curve.cpp）：根元の回転に先が遅れてついてくる光の帯
+// ---------- 回転するビーム（curve.cpp を元に見た目を変更）：首を伸ばし、頭だけ傾けて直線のビームを撃つ。本体の回転で風車のように回る
 function hmCurvePoints(S, n) { const r = S.r, pts = [add(hBase(S, n), mul(fromA(n.angle), HP.neck_rest))]; for (let j = 1; j <= 24; j++) pts.push(add(pts[pts.length - 1], mul(fromA(n.angle - j / 24 * r.curve_lag), r.beam_len / 24))); return pts; }
+const HM_CURVE_TILT = 15 * Math.PI / 180;
 function hmCurveTick(S, dt) {
   const r = S.r; if (S.mt >= 0) S.B.facing += r.curve_turn * dt;
-  for (const n of S.parts) { n.moving = true; n.angle = n.baseAngle + S.B.facing; n.pos = add(hBase(S, n), mul(fromA(n.angle), HP.neck_rest)); }
+  // 首を伸ばして、頭だけ左へ傾ける（首は放射状のまま、ビームだけ斜めになる）
+  const ext = smooth(0, 1, clamp(S.age / r.warning_time)); for (const n of S.parts) { n.moving = true; n.angle = n.baseAngle + S.B.facing; n.tilt = -HM_CURVE_TILT * ext; n.pos = add(hBase(S, n), mul(fromA(n.angle), HP.neck_rest * (1 + 0.45 * ext))); }
 }
 function hmPolyBeam(S, R, pts, w, color, a0, a1, k) { // 折れ線に沿う光の帯。芯が白く、縁へ冷え、流れる明るさの山が先へ走る。先ほど細い
   const pal = FX.ramp(color), L = pts.map(toL); let total = 0; const seg = []; for (let i = 1; i < L.length; i++) { const l = dist(L[i - 1], L[i]); seg.push(l); total += l; }
@@ -8297,19 +8299,12 @@ function hmPolyBeam(S, R, pts, w, color, a0, a1, k) { // 折れ線に沿う光�
       if (Math.floor(s) % 2 === 0) R.front.light(x, y, pal[2], 0.3 * k * R.P.intensity); }
     s0 += seg[i - 1]; }
 }
-function hmPolyRail(S, R, pts, color, k) { // 折れ線の照準の光：1画素の芯を途切れずに引き、明るさの山が先へ流れる（白くしない）
-  const pal = FX.ramp(color), L = pts.map(toL); let s = 0;
-  for (let i = 1; i < L.length; i++) { const A = L[i - 1], B = L[i], l = dist(A, B), u = norm(sub(B, A)), nr = orth(u);
-    for (let d = 0; d < l; d += 0.5, s += 0.5) { const x = A.x + u.x * d, y = A.y + u.y * d, f = 0.5 + 0.5 * Math.sin(s * 0.12 - S.t * 14), b = k * (0.55 + 0.45 * f);
-      R.front.px(x, y, pal[b > 0.75 ? 3 : 2]); R.front.light(x + nr.x, y + nr.y, pal[2], 0.12 * b * R.P.intensity); R.front.light(x - nr.x, y - nr.y, pal[2], 0.12 * b * R.P.intensity); } }
-}
 function hmCurveDraw(S, R) {
-  const r = S.r, col = HM_COLORS.beam, poses = new Map(S.parts.map(n => [n, hmPose(S, n, r.curve_delay)]));
+  const r = S.r, col = HM_COLORS.beam, poses = new Map(S.parts.map(n => { const p = hmPose(S, n, r.curve_delay); if (n.tilt) p.angle += n.tilt; return [n, p]; }));
   if (R.proto && S.age >= 0) for (const n of S.parts) {
-    const p = poses.get(n), pts = hmCurvePoints(S, n); pts[0] = hmMouth(n, p); const e = S.mt - r.curve_delay;
-    if (e < 0) { const k = clamp(S.age / (r.warning_time + r.curve_delay)); hmEyes(S, R, n, p, k, col); hmGather(S, R, pts[0], k, col, S.parts.indexOf(n) + 21);
-      if (S.mt >= 0) hmPolyRail(S, R, pts, col, k); }
-    else if (S.mt < r.curve_time + 0.15) { const end = clamp((S.mt - r.curve_time + 0.15) / 0.15); hmPolyBeam(S, R, pts, r.beam_width * WL * R.P.size, col, end, clamp(e / 0.12), 1); hmEyes(S, R, n, p, 0.6, col); const A = toL(pts[0]); R.front.glow(A.x, A.y, 5 * R.P.size, FX.ramp(col)[3], 0.45 * (1 - end) * R.P.intensity); }
+    const p = poses.get(n), M = hmMouth(n, p), A = toL(M), B = toL(add(M, mul(fromA(p.angle), r.beam_len ?? 1400))), e = S.mt - r.curve_delay;
+    if (e < 0) { const k = clamp(S.age / (r.warning_time + r.curve_delay)); hmEyes(S, R, n, p, k, col); hmGather(S, R, M, k, col, S.parts.indexOf(n) + 21); }
+    else if (S.mt < r.curve_time + 0.15) { const from = clamp((S.mt - r.curve_time) / 0.15); FX.beam(R.front, A, B, { w: r.beam_width * 0.5 * WL * R.P.size, source: false, color: col, time: S.t, from, to: clamp(e / 0.07), taper: 6, alpha: 1, intensity: R.P.intensity }); FX.flare(R.front, A, 1.4 * R.P.size, col, S.t, 0.5 * (1 - from), 4); hmEyes(S, R, n, p, 0.6, col); }
   }
   R.blitBack(); hmDrawBody(S, R, poses);
   if (!R.proto && S.mt >= r.curve_delay && S.mt < r.curve_time) for (const n of S.parts) D2.polyline(hmCurvePoints(S, n), rgba('#ff4066', 0.85), r.beam_width);
@@ -8320,7 +8315,7 @@ hmRegister('north', ['H16'], { kinds: null, color: HM_COLORS.bite, ship: V(430, 
 hmRegister('sequence', ['H17'], { kinds: null, color: HM_COLORS.bite, ship: V(430, 60), facing: 0, front: 3 }, hmSeqTick, hmSeqDraw,
   '予兆：前の3本が順に目を光らせ、自分の番の直前に照準の光を出してS字にためて止まる → 0.55秒ずつずれて1本ずつ伸びて噛む（空気の筋・牙・閃光）→ 噛み終えた頭はその場で止まる');
 hmRegister('curve', ['H18'], { kinds: null, color: HM_COLORS.beam, ship: V(500, 60), facing: 0 }, hmCurveTick, hmCurveDraw,
-  '予兆：全部の首が外を向いて目を光らせ、口へ光を集め、遅れて曲がる照準の光（白くしない）→ 本体ごと回り、根元の回転に先が遅れてついてくる光の帯。芯が白く、流れる明るさの山が先へ走り、先ほど細い → 根元から消える');
+  '予兆：全部の首を伸ばし、頭だけ左へ15度傾ける。目が光り、口に光が集まる → まっすぐのビームを全部の首から撃つ。首は放射状のままビームだけ斜めになり、本体の回転で風車のように回る → 終わると首が順に戻る');
 
 // ---------- 分離後の蛇（swim.cpp：steer と follow を写す）
 function hsSteer(S, n, target, dt, scale = 1) {
