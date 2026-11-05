@@ -9,11 +9,11 @@ TYPES = {'u8':'uint8_t','u32':'uint32_t','u64':'uint64_t','i64':'int64_t','f32':
 WIDTH = {'u8':1,'u32':4,'u64':8,'i64':8,'f32':4,'f64':8,'bool':1,'string':4}
 
 def generate():
-    schema=json.loads((ROOT/'cpp/content/schema/run.json').read_text())
+    schema=json.loads((ROOT/'cpp/content/schema/run.json').read_text(encoding='utf-8'))
     assert set(schema)=={'schema_version','format_version','abi_version','records','enums','event_fields','includes'}
     for include in schema['includes']:
         assert Path(include).name==include and include.endswith('.json')
-        extra=json.loads((ROOT/'cpp/content/schema'/include).read_text())
+        extra=json.loads((ROOT/'cpp/content/schema'/include).read_text(encoding='utf-8'))
         assert set(extra)=={'records','enums'} and not set(extra['enums']) & set(schema['enums'])
         schema['records'] += extra['records']
         schema['enums'].update(extra['enums'])
@@ -184,8 +184,8 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__);parser.add_argument('--check',action='store_true');args=parser.parse_args()
     outputs=generate()
     if args.check:
-        return 0 if all((ROOT/p).exists() and (ROOT/p).read_text()==s for p,s in outputs.items()) else 1
+        return 0 if all((ROOT/p).exists() and (ROOT/p).read_text(encoding='utf-8')==s for p,s in outputs.items()) else 1
     for path,text in outputs.items():
-        destination=ROOT/path;destination.parent.mkdir(parents=True,exist_ok=True);destination.write_text(text)
+        destination=ROOT/path;destination.parent.mkdir(parents=True,exist_ok=True);destination.write_text(text,encoding='utf-8',newline='\n')
     return 0
 if __name__=='__main__':raise SystemExit(main())

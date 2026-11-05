@@ -28,6 +28,8 @@ const MINIMAP_R := 43.0
 const MINIMAP_CENTER := Vector2(584, 55)
 const ART_SIZE := Vector2(640, 360)
 const CYAN := Color("#5bc8db")
+## ボーナスステージの残り時間の文字
+const BONUS_GOLD := Color("#ffd86b")
 const ART := "res://assets/ui/combat/"
 const RADAR := preload(ART + "combat_ui_radar.png")
 const HEALTH := preload(ART + "combat_ui_health_bar.png")
@@ -84,6 +86,8 @@ var _cpp_ui: Dictionary = {}
 var cpp_scope: ContentResourceScope
 var cpp_resources: Resource
 var _font: Font
+## ボーナスの残り時間用。字形そのものを太らせ、縁取りは付けない。
+var _bold_font: FontVariation
 var _cards_box: Control
 var _cards_dim: ColorRect
 var _reroll_button: Button
@@ -649,6 +653,9 @@ func _ready_cpp() -> void:
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
 	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
 	_font = get_theme_default_font()
+	_bold_font = FontVariation.new()
+	_bold_font.base_font = _font
+	_bold_font.variation_embolden = 0.6
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_speed_indicator = SPEED_INDICATOR.new()
@@ -753,7 +760,9 @@ func _draw_cpp() -> void:
 	var seconds := int(_cpp_ui.run_time)
 	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
-		draw_string(_font,Vector2(240,37),tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))}),HORIZONTAL_ALIGNMENT_CENTER,160,10,CYAN)
+		# 明るいボーナス背景の上でも読めるよう、ほかのHUDと同じ書体を太らせて金色で描く。
+		var bonus_text: String = tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))})
+		draw_string(_bold_font,Vector2(230,38),bonus_text,HORIZONTAL_ALIGNMENT_CENTER,180,11,BONUS_GOLD)
 	var loadout_region := LOADOUT_REGION
 	if StringName(hero.get("power", &"")) == &"":
 		loadout_region.size.x = LOADOUT_HERO.x - LOADOUT_REGION.position.x

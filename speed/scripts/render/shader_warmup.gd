@@ -1,9 +1,16 @@
 ## 利用するmaterialを専用の小さなViewportで描き、戦闘の前に描画パイプラインを準備する。
 extends SubViewport
 const COLLECT_BUDGET_US := 4000
+## 1回に並べるmaterialの上限。並べた回の最も長いフレームが GROW_SECONDS 未満なら倍にし、SHRINK_SECONDS を超えたら半分にする。
+const MAX_BATCH := 64
+const GROW_SECONDS := 1.0 / 30.0
+const SHRINK_SECONDS := 0.1
 var _scope: ContentResourceScope
 var _frames := 0
 var _material_index := 0
+var _batch := 1
+var _batch_count := 0
+var _batch_longest := 0.0
 var _layers: Array[CanvasLayer] = []
 var _texture: Texture2D
 var _lit_texture: CanvasTexture
@@ -117,7 +124,7 @@ func _collect_materials() -> void:
 			_scope.warm_materials.append(material)
 		elif resource is ShaderMaterial: _scope.warm_materials.append(resource)
 
-func _process(_dt: float) -> void:
+func _process(delta: float) -> void:
 	if _scope == null: return
 	if _scope.cancelled:
 		_scope.warming = false
@@ -128,23 +135,30 @@ func _process(_dt: float) -> void:
 		_collect_materials()
 		return
 	# 一度に全materialを投入すると、最初の描画だけでロード表示まで止まる。
-	# 同じ幾何と照明の組をmaterialごとに描き、各組の描画を終えてから次へ進む。
+	# 同じ幾何と照明の組を数個のmaterialずつ描き、各組の描画を終えてから次へ進む。
+	# 並べる数はフレームの長さを見て増減し、ロード表示を止めない範囲でまとめる。
 	if _frames > 0:
 		_frames += 1
+		_batch_longest = maxf(_batch_longest, delta)
 		if _frames < 3: return
 		for layer in _layers:
 			for child in layer.get_children():
 				if child is DirectionalLight2D: continue
 				layer.remove_child(child)
 				child.queue_free()
-		_material_index += 1
+		_material_index += _batch_count
+		if _batch_longest < GROW_SECONDS: _batch = mini(_batch * 2, MAX_BATCH)
+		elif _batch_longest > SHRINK_SECONDS: _batch = maxi(_batch >> 1, 1)
 		_frames = 0
 		_scope.warmup_progress = float(_material_index) / _scope.warm_materials.size()
-	if _material_index == _scope.warm_materials.size():
+	if _material_index >= _scope.warm_materials.size():
 		_finish()
 		return
-	for index in _layers.size():
-		_geometry(_layers[index], _scope.warm_materials[_material_index], _lit_texture if index == 1 else _texture)
+	_batch_count = mini(_batch, _scope.warm_materials.size() - _material_index)
+	for offset in _batch_count:
+		for index in _layers.size():
+			_geometry(_layers[index], _scope.warm_materials[_material_index + offset], _lit_texture if index == 1 else _texture)
+	_batch_longest = 0.0
 	_frames = 1
 func _finish() -> void:
 	_scope.warmup_complete = true
