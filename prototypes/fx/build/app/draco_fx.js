@@ -9,7 +9,7 @@ function dTellDraw(S, R, pose) {
   if (!R.proto) { for (const path of S.tell) D2.polyline(path, rgba('#f8b05b', 0.42 + k * 0.4), 3); if (S.tech === 'tail_slam' && S.B.mode === 'windup' && S.target) D2.arc(S.target, S.r.radius, 0, TAU, '#f8b05b', 3); if (S.tech === 'star_fan' && S.B.mode === 'windup') for (const q of S.starPositions || []) D2.circle(q.pos, 8 + k * 4, '#ffca7a'); return; }
   if (S.tech === 'spiral') { dSpiralCountdown(S, R, pose); return; }
   dEyesTell(S, R, pose, k);
-  S.tell.forEach((path, i) => { if (path.length > 2) { for (let m = 0; m < path.length; m += 4) dGroundTremble(S, R, path[m], 40, k, 500 + m); } else FX.warnRail(R.back, toL(path[0]), toL(path[1]), { color: R.P.color, k: 0.3 + 0.7 * k, time: S.t, seed: 300 + i, maxLv: 2, intensity: R.P.intensity }); });
+  if (S.tech !== 'bite') S.tell.forEach((path, i) => { if (path.length > 2) { for (let m = 0; m < path.length; m += 4) dGroundTremble(S, R, path[m], 40, k, 500 + m); } else FX.warnRail(R.back, toL(path[0]), toL(path[1]), { color: R.P.color, k: 0.3 + 0.7 * k, time: S.t, seed: 300 + i, maxLv: 2, intensity: R.P.intensity }); });
   if (S.B.mode !== 'windup' || (S.staging && S.staging.phase !== 'ready')) return;
   const id = S.tech;
   if (id === 'rifts') for (let i = 0; i < 2; i++) { bossGather(R, pose.claws[i], 66, k, S.t, 191 + i); dSupply(R, pose.chest, pose.claws[i], k, S.t, 211 + i, i ? 32 : -32); }
@@ -103,6 +103,17 @@ function dFangs(S, R, mouth, angle, t, radius, seed) {
   const hit = toL(add(mouth, mul(fw, 0.45 * Rr))), fl = Math.exp(-Math.max(0, t - 0.05) / 0.07);
   if (t > 0.04) { for (const [u, l] of [[fw, 16], [mul(fw, -1), 5], [sd, 8], [mul(sd, -1), 7]]) for (let d = 0; d <= l * fl * R.P.size; d += 0.5) R.front.light(hit.x + u.x * d, hit.y + u.y * d, pal[3], (1 - d / (l * fl * R.P.size + 0.01)) * 0.9 * R.P.intensity); R.front.px(hit.x, hit.y, pal[4]); }
 }
+// りゅうの噛みつき：閉じる牙の形に空間が裂ける。口が離れても裂け目はその場に残り、暗い宇宙と星がのぞいて、根元から閉じる
+function dBiteTear(S, R, pose) {
+  const B = S.B, r = S.r; if (B.mode === 'windup' || B.mode === 'idle') return; const t = (B.mode === 'active' ? S.elapsed : r.active + S.elapsed) - r.active * 0.7; if (t < 0) return;
+  S.bite ||= { at: { ...pose.mouth }, angle: pose.facing }; const pal = dRamp(R), fw = fromA(S.bite.angle), sd = orth(fw), size = r.width * 1.25 * R.P.size, c = add(S.bite.at, mul(fw, size * 0.3)), snap = dBurst(t / 0.07), close = smooth(0.16, r.recover * 0.7, t); if (close >= 1) return;
+  for (const side of [-1, 1]) for (let i = 0; i < 4; i++) { const along = (i - 1.5 + side * 0.22) * size * 0.46, big = (1 - Math.abs(i - 1.5) * 0.2) * (0.78 + 0.4 * hash(i * 3.1 + side * 2)), base = add(add(c, mul(fw, along)), mul(sd, side * size * lerp(1.5, 0.82, snap))), tip = add(base, mul(sd, -side * size * 1.02 * big)), A = toL(base), Bp = toL(tip), L = dist(A, Bp), u = norm(sub(Bp, A)), n = orth(u), wide = (5.5 + 2.5 * big) * R.P.size;
+    for (let d = 0; d <= L; d += 0.5) { const f = d / L; if (f < close) continue; const open = Math.pow(1 - f, 0.8), jag = (hash(i * 7 + side * 3 + Math.floor(d / 2)) - 0.5) * 1.4 * f + f * f * wide * 0.3 * (i < 2 ? 1 : -1) * side, w = wide * open * (1 - close * 0.7), x = A.x + u.x * d + n.x * jag, y = A.y + u.y * d + n.y * jag, fade = 1 - close;
+      for (let o = -w; o <= w; o += 0.5) { const e = Math.abs(o) / Math.max(0.5, w); R.front.blend(x + n.x * o, y + n.y * o, D_SPACE[e < 0.45 ? 1 : e < 0.8 ? 2 : 3], 0.95 * fade); }
+      const rim = pal[t < 0.14 ? 4 : 3]; R.front.blend(x + n.x * w, y + n.y * w, rim, 0.8 * fade); R.front.blend(x - n.x * w, y - n.y * w, rim, 0.8 * fade); if (hash(d * 3.7 + i * 9 + side) > 0.86) dStar(R, V(x, y), 1, S.t * 5 + d, fade, pal); } }
+  const k = toL(c), flash = 1 - smooth(0.05, 0.16, t); if (snap >= 1 && flash > 0) R.front.glow(k.x, k.y, size * WL * 1.3, pal[3], 0.75 * flash * R.P.intensity);
+  if (snap >= 1) for (let i = 0; i < 12; i++) { const age = t - 0.07, life = 0.3 + 0.4 * hash(i * 3.7); if (age > life) continue; const a = hash(i * 5.3) * TAU, d = (24 + 46 * hash(i * 1.9)) * (1 - Math.exp(-age / 0.16)) * R.P.size; dStar(R, V(k.x + Math.cos(a) * d, k.y + Math.sin(a) * d), 1.6, age * 9 + i, 1 - age / life, pal); }
+}
 // 着弾：最初に白く光り、割れ目が光って冷え、土ぼこりと欠片が外へ散る
 function dImpactFx(S, R, at, age, radius, seed) {
   if (age < 0 || age > 1.4) return; const pal = dRamp(R), c = toL(at), rr = radius * WL * R.P.size, heat = Math.pow(clamp(1 - age / 1.1), 1.4);
@@ -138,7 +149,7 @@ function dDraw(S, R) {
     if (S.exhale && B.mode === 'active') { const e = S.exhale, age = t - e.t, end = add(e.at, mul(fromA(e.a), r.reach)); if (age < r.beam_warn) D2.line(e.at, end, rgba('#d4bbff', 0.35), 4); else D2.line(e.at, add(e.at, mul(fromA(e.a), r.reach * clamp((age - r.beam_warn) / r.beam_extend))), '#d4bbff', r.width); }
     for (const q of S.rifts) if (q) D2.line(q.a, q.b, '#34224d', r.width);
   } else { dBreathFx(S, R); dRiftFx(S, R); dInhaleFx(S, R); dExhaleFx(S, R); dRushFx(S, R, pose); dCloneFx(S, R);
-    if (id === 'bite' && B.mode !== 'windup') dFangs(S, R, pose.mouth, pose.facing, (B.mode === 'active' ? S.elapsed : r.active + S.elapsed) - r.active * 0.7, r.width * 0.7, 3);
+    if (id === 'bite') dBiteTear(S, R, pose);
     for (const impact of S.impacts) dImpactFx(S, R, impact.at, t - impact.t, impact.radius, 83 + Math.floor(impact.t * 10));
     for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dGroundTremble(S, R, q.at, r.radius, clamp((t - q.t - q.wait) / q.warn), 171);
   }
