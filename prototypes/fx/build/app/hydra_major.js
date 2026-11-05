@@ -167,7 +167,8 @@ function hmShatterDraw(S, R) {
 function hmPincerTick(S) {
   const r = S.r; if (S.mt < 0) return;
   if (!S.aims) S.aims = S.parts.map(n => angOf(sub(S.ship.pos, n.strike)));
-  S.parts.forEach((n, j) => { const side = j === 0 ? 1 : -1, f = clamp((S.mt - r.pincer_delay) / r.pincer_time); n.angle = S.aims[j] + side * (r.pincer_open_angle + (r.pincer_close_angle - r.pincer_open_angle) * f); });
+  // それぞれ相手の首から離れる側へ開き、そこから機体へ閉じる（交差して自分の首の上を通らない）
+  S.parts.forEach((n, j) => { const o = sub(n.strike, S.parts[1 - j].strike), d = fromA(S.aims[j]), side = Math.sign(d.x * o.y - d.y * o.x) || (j === 0 ? 1 : -1), f = clamp((S.mt - r.pincer_delay) / r.pincer_time); n.angle = S.aims[j] + side * (r.pincer_open_angle + (r.pincer_close_angle - r.pincer_open_angle) * f); });
 }
 function hmPincerDraw(S, R) {
   const r = S.r, poses = new Map(S.parts.map(n => [n, hmPose(S, n, r.pincer_delay)])), col = HM_COLORS.beam;
