@@ -34,8 +34,6 @@ var _accepted_cpp_results: Dictionary = {}
 func goto(next: Screen, push := true) -> void:
 	if screen_transition_active:
 		return
-	if next == Screen.STAGE_SELECT and not SaveManager.has_seen_intro() and screen != Screen.INTRO:
-		next = Screen.INTRO
 	if screen == Screen.INTRO and next == Screen.INTRO:
 		return
 	if push and screen != next and screen != Screen.RUN and screen != Screen.RESULT:
@@ -53,7 +51,7 @@ func reset_to_main_menu() -> void:
 	_history = [Screen.TITLE]
 	goto(Screen.MAIN_MENU, false)
 
-## メニュー端から、初回と同じカットシーン・操作体験を再生する。
+## タイトルから、初回と同じイラストと文章の導入を再生する。
 func replay_intro() -> void:
 	goto(Screen.INTRO)
 
@@ -62,8 +60,8 @@ func finish_intro() -> void:
 	if screen != Screen.INTRO or screen_transition_active:
 		return
 	SaveManager.mark_intro_seen()
-	_history = [Screen.TITLE, Screen.MAIN_MENU]
-	goto(Screen.STAGE_SELECT, false)
+	_history.clear()
+	goto(Screen.TITLE, false)
 
 func start_run(stage: int, endless := false) -> void:
 	if screen_transition_active:

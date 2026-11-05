@@ -31,6 +31,13 @@ var _increments_alpha := 1.0
 
 func _ready() -> void:
 	_build_title_art()
+	var replay := Button.new()
+	replay.name = "ReplayIntroButton"
+	replay.text = tr("intro.replay")
+	_style_menu_button(replay)
+	replay.add_theme_font_size_override("font_size", 18)
+	replay.pressed.connect(GameManager.replay_intro)
+	_title_menu.add_child(replay)
 	%StartButton.pressed.connect(func(): _go(GameManager.Screen.MAIN_MENU))
 	%SettingsButton.pressed.connect(func(): _go(GameManager.Screen.SETTINGS))
 	%QuitButton.pressed.connect(GameManager.quit_game)
@@ -162,14 +169,6 @@ func _build_start_panel(canvas: Control) -> void:
 	back.focus_exited.connect(fill.hide)
 	back.pressed.connect(_close_start_panel)
 	_menu_back.add_child(back)
-	var replay := Button.new()
-	replay.name = "ReplayIntroButton"
-	replay.text = tr("intro.replay")
-	_style_menu_button(replay)
-	replay.add_theme_font_size_override("font_size", 12)
-	replay.position = Vector2(450, 322)
-	replay.pressed.connect(GameManager.replay_intro)
-	_menu_options.add_child(replay)
 	var labels := ["ステージセレクト", "機体強化", "コーデックス"]
 	var destinations := [GameManager.Screen.STAGE_SELECT, GameManager.Screen.UPGRADE, GameManager.Screen.ENCYCLOPEDIA]
 	for i in labels.size():

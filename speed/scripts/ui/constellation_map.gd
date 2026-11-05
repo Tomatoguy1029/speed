@@ -8,11 +8,21 @@ const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
 const SYMBOL_ORBIT := Vector2(112, 84)
 const SYMBOL_OFFSET := Vector2(-1, -0.5)
+const INNER_ORBIT_RATE := -2.0
+const INNER_LARGE_ORBIT_RATE := -1.0
+const INNER_TURN_SPEED := 60.0
+const SELECTION_TURN_DURATION := 0.65
+# 外周の内側の縁（半径149px）と小円（半径45.5px）の両方に内接する寸法。
+const INNER_ORBIT_RADIUS := (149.0 - 45.5) * 0.5
+# 大円の公転半径と揃え、オオイヌ選択時に小円の中心を星図の中心へ合わせる。
+const INNER_ORBIT_OFFSET := Vector2(0, -INNER_ORBIT_RADIUS)
+const INNER_LARGE_RING_SCALE := (149.0 - INNER_ORBIT_RADIUS) / 101.0
 const SELECTION_RECT := Rect2(141, 207, 112, 59)
 const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAGON_INDEX := 4
 const DRAGON_ORIGIN := Vector2(77, 270)
 const DRAGON_RECT := Rect2(95, 130, 45, 152)
+const DRAGON_FRAME_CORNER := Vector2(81, 131)
 const DRAGON_ART := preload("res://assets/ui/map/dragon_dragon.png")
 const DRAGON_SCROLL := 280.0
 const DRAG_THRESHOLD := 4.0
@@ -67,6 +77,7 @@ var navigation_enabled := true
 var _selected := 0
 var _last_orbit_selection := 0
 var _angle := 0.0
+var _ring_angle := 0.0
 var _turn: Tween
 var _projection: Node2D
 var _origin := ORIGIN
@@ -110,9 +121,14 @@ func _ready() -> void:
 	_map_content.add_child(projection)
 	_inner1 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle1.png"))
 	_inner1.offset = Vector2(48, 1)
+	_inner1.scale = Vector2.ONE * INNER_LARGE_RING_SCALE
 	_inner2 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle2.png"))
 	_inner2.offset = Vector2(61, 35)
 	_inner2.scale = Vector2.ONE * 0.7
+	var ring_material := ShaderMaterial.new()
+	ring_material.shader = preload("res://assets/ui/map/orbit_ring.gdshader")
+	_inner1.material = ring_material
+	_inner2.material = ring_material
 	for i in SYMBOL_TEXTURES.size():
 		var star := TextureButton.new()
 		star.name = "Constellation%d" % (i + 1)
@@ -190,6 +206,7 @@ func _ready() -> void:
 	add_child(monitor)
 	_refresh_stage_visibility()
 	_apply_rotation(0.0)
+	_apply_ring_rotation(0.0)
 	_hide_details()
 	visibility_changed.connect(func():
 		if not is_visible_in_tree():
@@ -211,6 +228,7 @@ func _build_dragon_page() -> void:
 	_final_stage.reparent(_map_content)
 	_final_stage.tooltip_text = tr("stage.5.name")
 	_transparent_button(_final_stage)
+	_final_stage.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	_final_stage.pressed.connect(select_constellation.bind(DRAGON_INDEX))
 	var portrait := AtlasTexture.new()
 	portrait.atlas = DRAGON_ART
@@ -330,9 +348,11 @@ func select_constellation(index: int) -> void:
 		_reveal_details()
 		return
 	var target := _angle + wrapf(90.0 - SYMBOL_ANGLES[index] - _angle, -180.0, 180.0)
-	_turn = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
-	_turn.tween_method(_apply_rotation, _angle, target, 0.65)
-	_turn.tween_callback(_reveal_details)
+	# 外側と内側を同じTweenで動かし、移動距離によらず停止フレームを揃える。
+	_turn = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	_turn.tween_method(_apply_rotation, _angle, target, SELECTION_TURN_DURATION)
+	_turn.tween_method(_apply_ring_rotation, _ring_angle, target, SELECTION_TURN_DURATION)
+	_turn.chain().tween_callback(_reveal_details)
 
 func _on_stage_focus(index: int) -> void:
 	if not _pointer_down and index != _selected:
@@ -365,7 +385,7 @@ func _input(event: InputEvent) -> void:
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:
 		return
-	# 左右は表示位置、上下は従来どおりのステージ順に選ぶ。
+	# 下は解放済みのステージ5へ移動し、上で直前の星座へ戻る。
 	if event.is_action(&"ui_left") or event.is_action(&"ui_up") or event.is_action(&"ui_right") or event.is_action(&"ui_down"):
 		get_viewport().set_input_as_handled()
 		if event.is_pressed() and not event.is_echo():
@@ -373,6 +393,10 @@ func _input(event: InputEvent) -> void:
 			if event.is_action(&"ui_left") or event.is_action(&"ui_right"):
 				if _selected != DRAGON_INDEX:
 					select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
+			elif event.is_action(&"ui_down") and _visible_stage_count() > DRAGON_INDEX:
+				select_constellation(DRAGON_INDEX)
+			elif event.is_action(&"ui_up") and _selected == DRAGON_INDEX:
+				select_constellation(_last_orbit_selection)
 			else:
 				var step := -1 if event.is_action(&"ui_up") else 1
 				select_constellation(posmod(_selected + step, _visible_stage_count()))
@@ -450,12 +474,18 @@ func _select(index: int) -> void:
 	_preview.texture = PREVIEW_ART[index] if index < PREVIEW_ART.size() else null
 	_preview_stars.texture = PREVIEW_STARS[index] if index < PREVIEW_STARS.size() else null
 	_selection_frame.visible = index < SYMBOL_TEXTURES.size()
+	var selection_corner := SELECTION_RECT.position
+	if index == DRAGON_INDEX:
+		selection_corner = DRAGON_ORIGIN + DRAGON_FRAME_CORNER - Vector2(0, DRAGON_SCROLL)
+	_detail_material.set_shader_parameter("selection_corner", selection_corner + Vector2(0.5, 0.5))
 	if _final_stage != null:
 		var dragon_selected := index == DRAGON_INDEX
 		_dragon_preview.visible = dragon_selected
 		_dragon_frame.visible = dragon_selected
 		_final_stage.focus_mode = Control.FOCUS_ALL if dragon_selected else Control.FOCUS_NONE
 		_page_arrow.flip_v = dragon_selected
+		_page_arrow.position.y = 60.0 if dragon_selected else 304.0
+		_page_button.position = _page_arrow.position
 		_page_button.tooltip_text = "星図に戻る" if dragon_selected else tr("stage.5.name")
 		for star in _stars:
 			star.focus_mode = Control.FOCUS_NONE if dragon_selected else Control.FOCUS_ALL
@@ -467,10 +497,6 @@ func _apply_rotation(degrees: float) -> void:
 	_angle = degrees
 	var radians := deg_to_rad(degrees)
 	rotation_changed.emit(radians)
-	_inner1.position = Vector2(0, -48).rotated(-radians)
-	_inner1.rotation = -radians * 5.0
-	_inner2.position = _inner1.position + Vector2(-40, 38).rotated(radians)
-	_inner2.rotation = radians * 35.0 / 30.0
 	for i in _stars.size():
 		var angle := deg_to_rad(degrees + SYMBOL_ANGLES[i])
 		var depth := sin(angle)
@@ -480,6 +506,21 @@ func _apply_rotation(degrees: float) -> void:
 		star.position = _origin + SYMBOL_OFFSET + Vector2(cos(angle), depth * _flatten) * SYMBOL_ORBIT - SYMBOL_TEXTURES[i].get_size() * factor * 0.5
 		star.z_index = roundi(10 + depth * 4)
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
+
+func _process(delta: float) -> void:
+	# 選択中は外側の回転と同期し、ドラッグ中だけ角度へ追従させる。
+	if (_turn == null or not _turn.is_running()) and _ring_angle != _angle:
+		_apply_ring_rotation(move_toward(_ring_angle, _angle, INNER_TURN_SPEED * delta))
+
+func _apply_ring_rotation(degrees: float) -> void:
+	_ring_angle = degrees
+	var radians := deg_to_rad(degrees)
+	# 大円は星図中心に対して、1段階ごとに12時→9時→6時→3時へ進む。
+	_inner1.position = INNER_ORBIT_OFFSET.rotated(radians * INNER_LARGE_ORBIT_RATE)
+	_inner1.rotation = -radians * 5.0
+	# 小円は大円の内側を半周し、ステージ1・3で12時、2・4で6時に来る。
+	_inner2.position = _inner1.position + INNER_ORBIT_OFFSET.rotated(radians * INNER_ORBIT_RATE)
+	_inner2.rotation = radians * 35.0 / 30.0
 
 func set_transition(progress: float) -> void:
 	_transition_progress = progress

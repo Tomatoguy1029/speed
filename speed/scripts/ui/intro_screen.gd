@@ -1,129 +1,217 @@
-## 導入の画面。場面の状態を表示し、操作は既存のセッション命令へ渡す。
-## 尺と差し替え用の仮素材は data/visuals/intro_presentation.tres。
-extends Node
-const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
+## 原画の配置を保ち、文章と重ね絵を順に再生する導入。
+extends Control
 
-const SEQUENCE := preload("res://scripts/runtime/intro_sequence.gd")
-const Beat = SEQUENCE.Beat
+const STORY := preload("res://scripts/ui/intro_story.gd")
+const ART_SIZE := Vector2(640, 360)
 
-@export var presentation: IntroPresentation = preload("res://data/visuals/intro_presentation.tres")
+@export_range(5.0, 100.0, 1.0) var characters_per_second := 28.0
+@export_range(0.0, 10.0, 0.1) var text_hold_seconds := 2.8
+@export_range(0.0, 3.0, 0.05) var scene_fade_seconds := 0.8
+@export_range(0.0, 3.0, 0.05) var star_fade_seconds := 0.9
+@export_range(0.0, 2.0, 0.05) var star_gap_seconds := 0.3
 
-var sequence := SEQUENCE.new()
-var session: RunSession:
-	get: return sequence.session
-var run: RefCounted:
-	get: return sequence.run
-var practice: RefCounted:
-	get: return sequence.practice
-var beat: int:
-	get: return sequence.beat
-var beat_time: float:
-	get: return sequence.beat_time
-var _paused: bool:
-	get: return run != null and run.state.phase == Phase.Paused
-
-var visual: Node2D
-var sky: Node2D
-var _hud: CanvasLayer
+var scene_index := 0
+var paragraph_index := 0
+var _canvas: Control
+var _picture: Control
+var _text: Label
+var _next: Button
 var _hint: Label
-var _motive: Label
-var _draw_button: Button
-var _touch := false
+var _stars: Array[TextureRect] = []
+var _transition: Tween
+var _transitioning := false
+var _ending := false
+var _characters := 0.0
+var _hold := 0.0
 
 func _ready() -> void:
-	sequence.beat_changed.connect(_on_beat_changed)
-	sequence.completed.connect(GameManager.finish_intro)
-	await sequence.setup(self,presentation)
-	if run==null: return
-	run.input.process_mode = Node.PROCESS_MODE_DISABLED
-	run.frame_events.connect(_on_events)
-	visual = preload("res://scripts/render/intro_visual.gd").new()
-	visual.intro = sequence
-	visual.z_index = 30
-	session.view.get_node("World").add_child(visual)
-	# 遠景は背景星の直上、機体・敵・瓦礫より奥に置く。
-	sky = preload("res://scripts/render/intro_visual.gd").new()
-	sky.intro = sequence
-	sky.distant_sky = true
-	sky.z_index = 1
-	sky.visibility_layer = 1 | RenderPipeline.GLOW_LAYER
-	session.view.get_node("World").add_child(sky)
-	_build_overlay()
-	get_window().focus_exited.connect(_pause)
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	var background := ColorRect.new()
+	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	background.color = Color.BLACK
+	background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	add_child(background)
+	_canvas = Control.new()
+	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.size = ART_SIZE
+	_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	add_child(_canvas)
+	var frame := _art(preload("res://assets/ui/intro/outline.png"), _canvas)
+	frame.name = "ArtFrame"
+	frame.z_index = 1
+	var panel := ColorRect.new()
+	panel.position = Vector2(64, 248)
+	panel.size = Vector2(512, 100)
+	panel.color = Color(0.02, 0.025, 0.05, 0.9)
+	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.z_index = 1
+	_canvas.add_child(panel)
+	_text = Label.new()
+	_text.position = Vector2(82, 258)
+	_text.size = Vector2(476, 66)
+	_text.add_theme_font_override("font", preload("res://assets/ui/aseprite_font.tres"))
+	_text.add_theme_font_size_override("font_size", 14)
+	_text.add_theme_color_override("font_color", Color("e6f1f6"))
+	_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	panel.add_sibling(_text)
+	_text.z_index = 2
+	_hint = Label.new()
+	_hint.position = Vector2(82, 328)
+	_hint.add_theme_font_size_override("font_size", 9)
+	_hint.modulate = Color("92a7b3")
+	_hint.text = tr("intro.continue")
+	_hint.z_index = 2
+	_canvas.add_child(_hint)
+	_next = _button("NextIntro", tr("intro.next"), Vector2(492, 325), Vector2(66, 20))
+	_next.pressed.connect(advance)
+	var skip := _button("SkipIntro", tr("intro.skip"), Vector2(548, 10), Vector2(80, 23))
+	skip.pressed.connect(_finish)
+	resized.connect(_layout)
+	_layout()
+	_show_scene(0)
+	GameManager.screen_ready.emit(self)
 
-func _physics_process(delta: float) -> void:
-	if run == null or _paused:
+func _button(node_name: String, caption: String, at: Vector2, dimensions: Vector2) -> Button:
+	var button := Button.new()
+	button.name = node_name
+	button.text = caption
+	button.position = at
+	button.size = dimensions
+	button.add_theme_font_size_override("font_size", 10)
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.04, 0.06, 0.09, 0.85)
+	style.set_content_margin_all(3.0)
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		button.add_theme_stylebox_override(state, style)
+	button.z_index = 3
+	_canvas.add_child(button)
+	button.size = dimensions
+	return button
+
+func _layout() -> void:
+	if _canvas == null:
 		return
-	sequence.advance(delta)
-	if beat == Beat.PRACTICE:
-		_update_hint()
-	visual.queue_redraw()
-	sky.queue_redraw()
+	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y)
+	_canvas.scale = Vector2.ONE * factor
+	_canvas.position = (size - ART_SIZE * factor) * 0.5
 
-func _on_beat_changed(next: int) -> void:
-	_hint.hide()
-	if next==Beat.DEPART: AudioManager.play(&"roar",-12.0,0.7)
-	_draw_button.visible = next == Beat.PRACTICE and _touch
-	_motive.visible = next == Beat.MOTIVE
-	if next in [Beat.FLIGHT,Beat.PRACTICE]:
-		run.input.cancel_gesture()
-		run.input.process_mode = Node.PROCESS_MODE_INHERIT
-		if next == Beat.PRACTICE: _update_hint()
-	if next == Beat.TRANSFORM: run.input.process_mode=Node.PROCESS_MODE_DISABLED
-	if next == Beat.RESTORE:
-		run.input.process_mode = Node.PROCESS_MODE_DISABLED
-		var renderer: RunPresentation = session.view.get_node("RunPresentation")
-		if renderer.frame_view!=null: renderer.frame_view._layer(6).hide()
+func _art(texture: Texture2D, parent: Control) -> TextureRect:
+	var art := TextureRect.new()
+	art.texture = texture
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.size = ART_SIZE
+	art.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	parent.add_child(art)
+	return art
 
-func _on_events(events: Array[Dictionary]) -> void:
-	for event in events:
-		if event.type == &"trace_end": AudioManager.end_dash()
-		if event.type == &"launch":
-			AudioManager.play(&"dash", -6.0)
-		if event.type == &"kill":
-			AudioManager.play(&"kill", -10.0)
+func _show_scene(index: int) -> void:
+	scene_index = index
+	paragraph_index = 0
+	_stars.clear()
+	_transitioning = true
+	_text.text = ""
+	_next.disabled = true
+	var data: Dictionary = STORY.SCENES[index]
+	var fade_target: CanvasItem
+	if index == 1:
+		# Scene1の原画を残し、竜のレイヤーだけを重ねてフェードする。
+		fade_target = _art(data.layers[1], _picture)
+	else:
+		var previous := _picture
+		var image := ColorRect.new()
+		image.color = Color.BLACK
+		image.size = ART_SIZE
+		image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_canvas.add_child(image)
+		_picture = image
+		for texture: Texture2D in data.layers:
+			_art(texture, image)
+		for texture: Texture2D in data.get("stars", []):
+			_stars.append(_art(texture, image))
+		fade_target = image
+		if previous != null:
+			# 前の絵は新しい絵のフェードが終わるまで保持する。
+			_transition = create_tween()
+			fade_target.modulate.a = 0.0
+			_transition.tween_property(fade_target, "modulate:a", 1.0, scene_fade_seconds)
+			_transition.tween_callback(previous.queue_free)
+			_transition.tween_callback(_begin_paragraph)
+			return
+	fade_target.modulate.a = 0.0
+	_transition = create_tween()
+	_transition.tween_property(fade_target, "modulate:a", 1.0, scene_fade_seconds)
+	_transition.tween_callback(_begin_paragraph)
 
-func _update_hint() -> void:
-	_hint.visible = beat_time >= presentation.hint_delay
-	_hint.text = tr("intro.touch") if _touch else tr("intro.confirm" if run.state.drawing else "intro.draw")
+func _begin_paragraph() -> void:
+	_transitioning = false
+	_characters = 0.0
+	_hold = 0.0
+	_text.text = tr(STORY.SCENES[scene_index].text[paragraph_index])
+	_text.visible_characters = 0
+	_next.disabled = false
+	_next.text = tr("intro.reveal")
 
-func _input(event: InputEvent) -> void:
-	if event is InputEventScreenTouch:
-		_touch = true
-		_draw_button.visible = beat == Beat.PRACTICE
+func _process(delta: float) -> void:
+	if _transitioning or _ending or _text == null:
+		return
+	var total := _text.get_total_character_count()
+	if _text.visible_characters < total:
+		_characters += delta * characters_per_second
+		_text.visible_characters = mini(int(_characters), total)
+		if _text.visible_characters == total:
+			_next.text = tr("intro.next")
+	else:
+		_hold += delta
+		if _hold >= text_hold_seconds:
+			advance()
+
+func advance() -> void:
+	if _transitioning or _ending:
+		return
+	var total := _text.get_total_character_count()
+	if _text.visible_characters < total:
+		_characters = total
+		_text.visible_characters = total
+		_next.text = tr("intro.next")
+		_hold = 0.0
+		return
+	if paragraph_index + 1 < STORY.SCENES[scene_index].text.size():
+		paragraph_index += 1
+		_begin_paragraph()
+	elif not _stars.is_empty():
+		_fade_stars()
+	elif scene_index + 1 < STORY.SCENES.size():
+		_show_scene(scene_index + 1)
+	else:
+		_finish()
+
+func _fade_stars() -> void:
+	_transitioning = true
+	_next.disabled = true
+	_transition = create_tween()
+	for star in _stars:
+		_transition.tween_property(star, "modulate:a", 0.0, star_fade_seconds)
+		_transition.tween_interval(star_gap_seconds)
+	_transition.tween_callback(_show_scene.bind(scene_index + 1))
+
+func _gui_input(event: InputEvent) -> void:
+	if (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) or (event is InputEventScreenTouch and event.pressed):
+		accept_event()
+		advance()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed(&"pause"):
+	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
-		if _paused:
-			_resume()
-		else:
-			_pause()
+		GameManager.back()
+	elif event.is_action_pressed("ui_accept") or (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) or (event is InputEventScreenTouch and event.pressed):
+		get_viewport().set_input_as_handled()
+		advance()
 
-func _pause() -> void:
-	if run != null:
-		sequence.command("pause",{"paused":true})
-		run.input.cancel_gesture()
-		run.input.process_mode = Node.PROCESS_MODE_DISABLED
-		_hud.get_node("Pause").show()
-		_hud.get_node("Pause").get_child(0).get_child(0).grab_focus()
-
-func _resume() -> void:
-	_hud.get_node("Pause").hide()
-	sequence.command("pause",{"paused":false})
-	run.input.process_mode = Node.PROCESS_MODE_INHERIT if beat in [Beat.FLIGHT,Beat.PRACTICE] else Node.PROCESS_MODE_DISABLED
-
-func _exit_tree() -> void:
-	AudioManager.end_dash()
-	sequence.dispose()
-	# RenderPipeline が導入の間だけ設定した HDR を次のメニューへ残さない。
-	get_viewport().use_hdr_2d = false
-
-func _build_overlay() -> void:
-	var overlay := preload("res://scripts/ui/intro_overlay.gd").new()
-	overlay.intro = self
-	_hud = overlay
-	add_child(overlay)
-	_hint = overlay.hint
-	_motive = overlay.motive
-	_draw_button = overlay.draw_button
+func _finish() -> void:
+	if _ending:
+		return
+	_ending = true
+	if _transition != null:
+		_transition.kill()
+	GameManager.finish_intro()

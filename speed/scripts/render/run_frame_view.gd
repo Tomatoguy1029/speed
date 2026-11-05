@@ -71,6 +71,7 @@ var _capsules := {}
 var _comet_canvas: DrawLayer
 var _capsule_canvas: DrawLayer
 var _warp := {}
+var _warp_visual: Sprite2D
 var _gravity := {}
 var _gravity_canvas: DrawLayer
 var _reticle := PackedFloat32Array()
@@ -312,10 +313,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_layer(6).add_child(_capsule_canvas)
 	_gravity_canvas = DrawLayer.new()
 	_gravity_canvas.draw_fn = func(canvas: CanvasItem):
-		if _warp.get("gone",-1.0)>=0.0: RunPresentation.draw_warp(canvas,_warp.position,_warp.radius,_warp.time,1.0/maxf(_zoom,0.01))
 		var values: PackedFloat64Array = _gravity.get("wells",PackedFloat64Array())
 		for n in range(0,values.size(),5): RunPresentation.draw_gravity(canvas,Vector2(values[n],values[n+1]),values[n+2],values[n+3],values[n+4],_gravity.time,1.0/maxf(_zoom,0.01))
 	_layer(1).add_child(_gravity_canvas)
+	_warp_visual = preload("res://scripts/render/fx/warp_hole_visual.gd").new()
+	_layer(1).add_child(_warp_visual)
 	_gunner_marks = DrawLayer.new()
 	_gunner_marks.draw_fn = func(canvas: CanvasItem):
 		var began := Time.get_ticks_usec() if perf.active else 0
@@ -987,7 +989,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		_capsule_canvas.queue_redraw()
 	if frame.has("warp") and frame.warp!=_warp:
 		_warp = frame.warp
-		_gravity_canvas.queue_redraw()
+		_warp_visual.apply(_warp,_pixel)
 	if frame.has("gravity") and frame.gravity!=_gravity:
 		_gravity = frame.gravity
 		_gravity_canvas.queue_redraw()

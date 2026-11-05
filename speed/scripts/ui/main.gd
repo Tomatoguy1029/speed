@@ -31,6 +31,8 @@ func _ready() -> void:
 	GameManager.screen_changed.connect(_show)
 	startup_complete = true
 	if GameManager.boot_request.is_valid() and GameManager.boot_request.call(): return
+	if GameManager.screen == GameManager.Screen.TITLE and not SaveManager.has_seen_intro():
+		GameManager.screen = GameManager.Screen.INTRO
 	_show(GameManager.screen)
 	# タイトルを先に出し、出撃用の資源は裏で揃える。間に合わない出撃は読込画面で待つ。
 	if DisplayServer.get_name() == "headless": return

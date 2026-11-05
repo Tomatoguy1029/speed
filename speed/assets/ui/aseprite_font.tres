@@ -1,0 +1,13 @@
+[gd_resource type="SystemFont" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://assets/ui/aseprite_font.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+font_names = PackedStringArray("Arial")
+antialiasing = 0
+disable_embedded_bitmaps = false
+hinting = 2
+subpixel_positioning = 0
+oversampling = 1.0
+allow_system_fallback = false

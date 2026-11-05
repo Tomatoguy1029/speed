@@ -1,32 +1,61 @@
-## 結果（仕様書 3）。記録と獲得した部品を表示し、「もう一回やる」か「メインメニューに戻る」を選ぶ。
+## 原画の結果画面にランの記録を重ねる。
 extends UiScreen
+
+const CLEARED := preload("res://assets/ui/results/stage_cleared.png")
+const FAILED := preload("res://assets/ui/results/game_over_screen.png")
+const RESULT_FONT := preload("res://assets/ui/aseprite_font.tres")
+const DESIGN_SIZE := Vector2(640, 360)
 
 func _ready() -> void:
 	can_go_back = false
-	var r := GameManager.last_result
-	var cleared: bool = r.get("cleared", false)
+	%Modules.add_theme_font_override("font", RESULT_FONT)
+	var result := GameManager.last_result
+	var cleared: bool = result.get("cleared", false)
 	%Heading.text = tr("result.cleared") if cleared else tr("result.failed")
-	var t := float(r.get("time", 0.0))
-	var lines := [
-		tr("result.stage").format({n = int(r.get("stage", 0))}),
-		tr("result.time").format({time = "%d:%02d" % [int(t) / 60, int(t) % 60]}),
-		tr("result.kills").format({n = int(r.get("kills", 0))}),
-		tr("result.level").format({n = int(r.get("level", 1))}),
-		tr("result.peak_speed").format({speed = "%.2f" % (float(r.get("peak_speed", 0.0)) * ContentManager.cfg.speed_to_kms)}),
-		tr("result.parts").format({n = int(r.get("coins", 0))}),
-	]
-	if cleared and r.get("legendary", "") != "":
-		var def = ContentManager.catalog.find(&"legendary_modules", StringName(r.legendary))
-		if def != null:
-			lines.append(tr("result.legendary").format({name = def.get_display_name()}))
-	var best: Dictionary = SaveManager.data.best
-	if float(best.fastest_clear) >= 0.0:
-		var f := float(best.fastest_clear)
-		lines.append(tr("result.fastest").format({time = "%d:%02d" % [int(f) / 60, int(f) % 60]}))
-	for line in lines:
-		var l := Label.new()
-		l.text = line
-		%Content.add_child(l)
+	%Artwork.texture = CLEARED if cleared else FAILED
+	var seconds := maxi(0, int(result.get("time", 0.0)))
+	_value("%d:%02d" % [seconds / 60, seconds % 60], Rect2(175, 89, 139, 24))
+	_value(str(result.get("coins", 0)), Rect2(175, 130, 139, 24))
+	_value(str(result.get("level", 1)), Rect2(175, 176, 139, 24))
+	_value(str(result.get("kills", 0)), Rect2(175, 221, 139, 24))
+	%Scroll.visible = cleared
+	if cleared:
+		_show_modules(result)
 	%RetryButton.pressed.connect(func(): AudioManager.play(&"ui"); GameManager.retry_run())
 	%MenuButton.pressed.connect(func(): AudioManager.play(&"ui"); GameManager.reset_to_main_menu())
+	resized.connect(_fit_canvas)
+	_fit_canvas()
 	super()
+
+func _fit_canvas() -> void:
+	var factor := minf(size.x / DESIGN_SIZE.x, size.y / DESIGN_SIZE.y)
+	%Canvas.scale = Vector2.ONE * factor
+	%Canvas.position = ((size - DESIGN_SIZE * factor) * 0.5).floor()
+
+func _value(value: String, rect: Rect2) -> void:
+	var label := Label.new()
+	label.text = value
+	label.add_theme_font_override("font", RESULT_FONT)
+	label.position = rect.position
+	label.size = rect.size
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	label.add_theme_font_size_override("font_size", 16)
+	label.add_theme_color_override("font_color", Color("56cee1"))
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	%Canvas.add_child(label)
+
+func _show_modules(result: Dictionary) -> void:
+	var ids: Array = result.get("modules", []).duplicate()
+	var legendary := str(result.get("legendary", ""))
+	if not legendary.is_empty() and not ids.has(legendary):
+		ids.append(legendary)
+	var names := PackedStringArray()
+	for id in ids:
+		for category in [&"weapons", &"traits", &"legendary_modules"]:
+			var entry = ContentManager.catalog.find(category, StringName(id))
+			if entry != null:
+				var display_name: String = entry.get_display_name()
+				if not names.has(display_name):
+					names.append(display_name)
+				break
+	%Modules.text = "\n".join(names) if not names.is_empty() else "—"
