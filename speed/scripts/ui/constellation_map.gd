@@ -8,8 +8,8 @@ const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
 const SYMBOL_ORBIT := Vector2(112, 84)
 const SYMBOL_OFFSET := Vector2(-1, -0.5)
-const INNER_ORBIT_RATE := -1.0
-const INNER_LARGE_ORBIT_RATE := -2.0
+const INNER_ORBIT_RATE := -2.0
+const INNER_LARGE_ORBIT_RATE := -1.0
 const INNER_TURN_SPEED := 60.0
 # 大円の公転半径と揃え、オオイヌ選択時に小円の中心を星図の中心へ合わせる。
 const INNER_ORBIT_OFFSET := Vector2(0, -48)
@@ -511,10 +511,10 @@ func _process(delta: float) -> void:
 func _apply_ring_rotation(degrees: float) -> void:
 	_ring_angle = degrees
 	var radians := deg_to_rad(degrees)
-	# 大円は2段階で一周し、オオイヌでは小円の中心を星図の中心へ合わせる。
+	# 大円は星図中心に対して、1段階ごとに12時→9時→6時→3時へ進む。
 	_inner1.position = Vector2(0, -48).rotated(radians * INNER_LARGE_ORBIT_RATE)
 	_inner1.rotation = -radians * 5.0
-	# 小円は1段階ごとに反時計回りに90度進み、接点を12時→9時→6時→3時へ変える。
+	# 小円は大円の内側を半周し、ステージ1・3で12時、2・4で6時に来る。
 	_inner2.position = _inner1.position + INNER_ORBIT_OFFSET.rotated(radians * INNER_ORBIT_RATE)
 	_inner2.rotation = radians * 35.0 / 30.0
 
