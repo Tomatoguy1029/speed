@@ -13,6 +13,7 @@ const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAGON_INDEX := 4
 const DRAGON_ORIGIN := Vector2(77, 270)
 const DRAGON_RECT := Rect2(95, 130, 45, 152)
+const DRAGON_FRAME_CORNER := Vector2(81, 131)
 const DRAGON_ART := preload("res://assets/ui/map/dragon_dragon.png")
 const DRAGON_SCROLL := 280.0
 const DRAG_THRESHOLD := 4.0
@@ -113,6 +114,10 @@ func _ready() -> void:
 	_inner2 = _ring(projection, preload("res://assets/ui/map/ui_inner_circle2.png"))
 	_inner2.offset = Vector2(61, 35)
 	_inner2.scale = Vector2.ONE * 0.7
+	var ring_material := ShaderMaterial.new()
+	ring_material.shader = preload("res://assets/ui/map/orbit_ring.gdshader")
+	_inner1.material = ring_material
+	_inner2.material = ring_material
 	for i in SYMBOL_TEXTURES.size():
 		var star := TextureButton.new()
 		star.name = "Constellation%d" % (i + 1)
@@ -211,6 +216,7 @@ func _build_dragon_page() -> void:
 	_final_stage.reparent(_map_content)
 	_final_stage.tooltip_text = tr("stage.5.name")
 	_transparent_button(_final_stage)
+	_final_stage.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	_final_stage.pressed.connect(select_constellation.bind(DRAGON_INDEX))
 	var portrait := AtlasTexture.new()
 	portrait.atlas = DRAGON_ART
@@ -365,7 +371,7 @@ func _input(event: InputEvent) -> void:
 	var focus := get_viewport().gui_get_focus_owner()
 	if focus is LineEdit or focus is TextEdit:
 		return
-	# 左右は表示位置、上下は従来どおりのステージ順に選ぶ。
+	# 下は解放済みのステージ5へ移動し、上で直前の星座へ戻る。
 	if event.is_action(&"ui_left") or event.is_action(&"ui_up") or event.is_action(&"ui_right") or event.is_action(&"ui_down"):
 		get_viewport().set_input_as_handled()
 		if event.is_pressed() and not event.is_echo():
@@ -373,6 +379,10 @@ func _input(event: InputEvent) -> void:
 			if event.is_action(&"ui_left") or event.is_action(&"ui_right"):
 				if _selected != DRAGON_INDEX:
 					select_constellation(_horizontal_neighbor(-1 if event.is_action(&"ui_left") else 1))
+			elif event.is_action(&"ui_down") and _visible_stage_count() > DRAGON_INDEX:
+				select_constellation(DRAGON_INDEX)
+			elif event.is_action(&"ui_up") and _selected == DRAGON_INDEX:
+				select_constellation(_last_orbit_selection)
 			else:
 				var step := -1 if event.is_action(&"ui_up") else 1
 				select_constellation(posmod(_selected + step, _visible_stage_count()))
@@ -450,12 +460,18 @@ func _select(index: int) -> void:
 	_preview.texture = PREVIEW_ART[index] if index < PREVIEW_ART.size() else null
 	_preview_stars.texture = PREVIEW_STARS[index] if index < PREVIEW_STARS.size() else null
 	_selection_frame.visible = index < SYMBOL_TEXTURES.size()
+	var selection_corner := SELECTION_RECT.position
+	if index == DRAGON_INDEX:
+		selection_corner = DRAGON_ORIGIN + DRAGON_FRAME_CORNER - Vector2(0, DRAGON_SCROLL)
+	_detail_material.set_shader_parameter("selection_corner", selection_corner + Vector2(0.5, 0.5))
 	if _final_stage != null:
 		var dragon_selected := index == DRAGON_INDEX
 		_dragon_preview.visible = dragon_selected
 		_dragon_frame.visible = dragon_selected
 		_final_stage.focus_mode = Control.FOCUS_ALL if dragon_selected else Control.FOCUS_NONE
 		_page_arrow.flip_v = dragon_selected
+		_page_arrow.position.y = 30.0 if dragon_selected else 304.0
+		_page_button.position = _page_arrow.position
 		_page_button.tooltip_text = "星図に戻る" if dragon_selected else tr("stage.5.name")
 		for star in _stars:
 			star.focus_mode = Control.FOCUS_NONE if dragon_selected else Control.FOCUS_ALL

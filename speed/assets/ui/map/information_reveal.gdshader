@@ -11,6 +11,7 @@ uniform float spectrum_correlation : hint_range(0.0, 1.0) = 0.18;
 uniform float spectrum_peak_frequency = 0.08;
 uniform float spectrum_peak_strength : hint_range(0.0, 1.0) = 0.95;
 uniform float orbit_speed = 0.025;
+uniform vec2 selection_corner = vec2(141.5, 207.5);
 varying vec4 tint;
 
 void vertex() {
@@ -68,6 +69,20 @@ float orbit_glint(vec2 p, vec2 center, float radius, float angle) {
 void fragment() {
 	vec4 art = texture(TEXTURE, UV);
 	vec2 p = UV * vec2(640.0, 360.0);
+	// 選択位置は黄色い枠で示す。元絵の灰色の四隅は重ねない。
+	if (p.x >= 141.0 && p.x < 253.0 && p.y >= 207.0 && p.y < 266.0) {
+		art.a = 0.0;
+	}
+	// 左上の軌道からの線を、黄色い選択枠の左上までつなぐ。
+	vec2 pixel = floor(p) + vec2(0.5);
+	vec2 bend = vec2(128.5, 114.5) + vec2(min(selection_corner.x - 128.5, selection_corner.y - 114.5));
+	float diagonal = pixel.y - pixel.x + 14.0;
+	bool leader_extension = (pixel.x >= 128.5 && pixel.x <= bend.x && abs(diagonal) < 0.5)
+		|| (pixel.x == selection_corner.x && pixel.y >= bend.y && pixel.y < selection_corner.y)
+		|| (pixel.y == selection_corner.y && pixel.x >= bend.x && pixel.x < selection_corner.x);
+	if (leader_extension) {
+		art = texture(TEXTURE, vec2(120.5, 106.5) / vec2(640.0, 360.0));
+	}
 	float position = -1.0;
 	if (p.x >= 237.0 && p.y >= 105.0 && p.y < 204.0) {
 		position = along_leader(p, vec2(237.5, 202.0), vec2(285.0, 106.5), vec2(385.0, 106.5));
@@ -75,8 +90,18 @@ void fragment() {
 		position = along_leader(p, vec2(141.5, 271.0), vec2(111.5, 330.0), vec2(27.0, 330.0));
 	} else if (p.x >= 251.0 && p.y >= 270.0) {
 		position = along_leader(p, vec2(252.0, 271.0), vec2(296.0, 317.0), vec2(378.0, 317.0));
-	} else if (p.x >= 89.0 && p.x <= 130.0 && p.y >= 98.0 && p.y <= 115.0) {
-		position = along_leader(p, vec2(128.5, 114.0), vec2(113.5, 99.0), vec2(89.5, 99.0));
+	} else if (p.x >= 89.0 && p.x < selection_corner.x + 0.5 && p.y >= 98.0 && p.y < selection_corner.y + 0.5) {
+		float first = 24.0;
+		float second = length(bend - vec2(113.5, 99.5));
+		float tail = length(selection_corner - bend);
+		float total = first + second + tail;
+		if (p.x < 113.5) {
+			position = along_segment(p, vec2(89.5, 99.0), vec2(113.5, 99.0)) * first / total;
+		} else if (p.x < bend.x || p.y < bend.y) {
+			position = (first + along_segment(p, vec2(113.5, 99.5), bend) * second) / total;
+		} else {
+			position = (first + second + along_segment(p, bend, selection_corner) * tail) / total;
+		}
 	}
 	if (p.x >= 32.0 && p.x < 96.0 && p.y >= 290.0 && p.y < 328.5) {
 		float band = floor((p.x - 32.0) / 4.0);
