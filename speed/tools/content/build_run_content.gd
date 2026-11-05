@@ -5,6 +5,7 @@ const Schema = preload("res://tools/content/generated/run_schema.gd")
 const AttackDefaults = preload("res://scripts/data_types/attack_defaults.gd")
 const Legacy = preload("res://tools/content/build_native_data.gd")
 const BossProgram = preload("res://tools/content/build_boss_program.gd")
+const RunResources = preload("res://tools/content/build_run_resources.gd")
 
 ## 固定試作の値と輪郭を、通常ステージと単独試行の同じ入力へ通す。
 static func _prepare_reference_fx(data: Dictionary) -> Error:
@@ -12,17 +13,27 @@ static func _prepare_reference_fx(data: Dictionary) -> Error:
 	if error != OK: return error
 	error = preload("res://tools/content/build_canis_fx.gd").apply(data)
 	if error != OK: return error
-	error = preload("res://tools/content/build_boss_image_fx.gd").apply(data)
+	error = _apply_image_tables(data,"centaurus_image",{},preload("res://tools/content/build_boss_image_fx.gd"))
 	if error != OK: return error
 	error = preload("res://tools/content/build_canis_image_fx.gd").apply(data)
 	if error != OK: return error
-	error = preload("res://tools/content/build_monoceros_image_fx.gd").apply(data)
+	var masks: Array = data.get("BossImageMaskRecord",[])
+	error = _apply_image_tables(data,"monoceros_image_%d" % masks.size(),{"BossImageMaskRecord":masks},preload("res://tools/content/build_monoceros_image_fx.gd"))
 	if error != OK: return error
 	error = preload("res://tools/content/build_canis_roar_fx.gd").apply(data)
 	if error != OK: return error
 	error = preload("res://tools/content/build_canis_fire_fx.gd").apply(data)
 	if error != OK: return error
 	return preload("res://tools/content/build_centaurus_fx.gd").apply(data)
+
+## 画像由来の表は敵やボスの定義に依存しない。一括生成では一度だけ作り、各パッケージへ複製する。
+static func _apply_image_tables(data: Dictionary, key: String, base: Dictionary, builder: GDScript) -> Error:
+	var tables: Dictionary = RunResources.batch_tables(key,func():
+		var result := base.duplicate(true)
+		return result if builder.apply(result)==OK else {})
+	if tables.is_empty(): return ERR_INVALID_DATA
+	for name: String in tables: data[name] = tables[name].duplicate(true)
+	return OK
 
 static func _write_reference_content(data: Dictionary, signature: PackedByteArray) -> PackedByteArray:
 	if _prepare_reference_fx(data) != OK: return PackedByteArray()

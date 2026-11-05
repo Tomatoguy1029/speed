@@ -54,13 +54,15 @@ const STAGES := preload("res://tools/content/build_stage_bundle.gd")
 static var last_build_report: Array[Dictionary] = []
 const EDITOR_RESULT_PREFIX := "SPEED_CONTENT_BUILD_RESULT:"
 
+static func editor_arguments() -> PackedStringArray:
+	return PackedStringArray(["--headless","--path",ProjectSettings.globalize_path("res://"),"--quit-after","1",
+		"--script","res://tools/content/build_all.gd","--","--editor-build-report"])
+
 ## エディターが保持した古いC++拡張・Resourceを、生成に使わない。
 static func build_for_editor() -> Error:
 	last_build_report = []
 	var output := []
-	var args := PackedStringArray(["--headless","--path",ProjectSettings.globalize_path("res://"),"--quit-after","1",
-		"--script","res://tools/content/build_all.gd","--","--editor-build-report"])
-	var exit_code := OS.execute(OS.get_executable_path(),args,output,true)
+	var exit_code := OS.execute(OS.get_executable_path(),editor_arguments(),output,true)
 	var result_error: Error = FAILED
 	for chunk: String in output:
 		for line: String in chunk.split("\n"):
@@ -184,6 +186,7 @@ static func _build_units(force: bool, output: String) -> Error:
 		if unit[0] == "attacks": inputs.append_array(preload("res://tools/content/build_attack_visuals.gd").input_paths())
 		var error: Error = cache.run(unit[0],inputs,unit[2],force)
 		if error != OK: return error
+	preload("res://tools/content/build_run_resources.gd").hold_definitions()
 	var input_signature := signature()
 	for name in DirAccess.get_files_at("res://data/stages"):
 		if not name.ends_with(".tres"): continue
