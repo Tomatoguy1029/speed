@@ -78,7 +78,6 @@ var _selected := 0
 var _last_orbit_selection := 0
 var _angle := 0.0
 var _ring_angle := 0.0
-var _ring_turn: Tween
 var _turn: Tween
 var _projection: Node2D
 var _origin := ORIGIN
@@ -275,21 +274,15 @@ func _hide_details() -> void:
 	_set_detail_line(0.0)
 	_set_detail_light(0.0)
 
-func _reveal_details(sync_rings: bool = false) -> void:
+func _reveal_details() -> void:
 	if _transition_progress < 1.0 or not is_visible_in_tree():
 		return
 	_hide_details()
 	_apply_reveal_settings()
-	if sync_rings and _ring_turn != null:
-		_ring_turn.kill()
-	_detail_fade = create_tween().set_parallel(true)
+	_detail_fade = create_tween()
 	_detail_fade.tween_method(_set_detail_line, 0.0, 1.0, reveal_settings.line_duration)
-	_detail_fade.tween_method(_set_detail_light, 0.0, 1.0, reveal_settings.fade_duration).set_delay(reveal_settings.line_duration + reveal_settings.information_delay)
-	if sync_rings:
-		# 情報の点灯と同じTweenで終え、直接移動でも完了フレームを揃える。
-		_ring_turn = _detail_fade
-		var duration: float = reveal_settings.line_duration + reveal_settings.information_delay + reveal_settings.fade_duration
-		_ring_turn.tween_method(_apply_ring_rotation, _ring_angle, _angle, duration)
+	_detail_fade.tween_interval(reveal_settings.information_delay)
+	_detail_fade.tween_method(_set_detail_light, 0.0, 1.0, reveal_settings.fade_duration)
 
 func _apply_reveal_settings() -> void:
 	for parameter: String in ["spectrum_speed", "spectrum_base_height", "spectrum_motion", "spectrum_correlation", "spectrum_peak_frequency", "spectrum_peak_strength", "orbit_speed"]:
@@ -355,14 +348,11 @@ func select_constellation(index: int) -> void:
 		_reveal_details()
 		return
 	var target := _angle + wrapf(90.0 - SYMBOL_ANGLES[index] - _angle, -180.0, 180.0)
-	if _ring_turn != null:
-		_ring_turn.kill()
-	var ring_duration: float = SELECTION_TURN_DURATION + reveal_settings.line_duration + reveal_settings.information_delay + reveal_settings.fade_duration
-	_ring_turn = create_tween()
-	_ring_turn.tween_method(_apply_ring_rotation, _ring_angle, target, ring_duration)
-	_turn = create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+	# 外側と内側を同じTweenで動かし、移動距離によらず停止フレームを揃える。
+	_turn = create_tween().set_parallel(true).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 	_turn.tween_method(_apply_rotation, _angle, target, SELECTION_TURN_DURATION)
-	_turn.tween_callback(_reveal_details.bind(true))
+	_turn.tween_method(_apply_ring_rotation, _ring_angle, target, SELECTION_TURN_DURATION)
+	_turn.chain().tween_callback(_reveal_details)
 
 func _on_stage_focus(index: int) -> void:
 	if not _pointer_down and index != _selected:
@@ -450,8 +440,6 @@ func _input(event: InputEvent) -> void:
 			_dragging = true
 			if _turn != null:
 				_turn.kill()
-			if _ring_turn != null:
-				_ring_turn.kill()
 			_hide_details()
 		if _dragging:
 			var offset := (point - _origin) / Vector2(1.0, _flatten)
@@ -520,8 +508,8 @@ func _apply_rotation(degrees: float) -> void:
 		star.modulate = Color.WHITE if i == _selected else Color(0.55, 0.55, 0.55)
 
 func _process(delta: float) -> void:
-	# 選択中は情報表示と同期し、ドラッグ中だけ角度へ追従させる。
-	if (_ring_turn == null or not _ring_turn.is_running()) and _ring_angle != _angle:
+	# 選択中は外側の回転と同期し、ドラッグ中だけ角度へ追従させる。
+	if (_turn == null or not _turn.is_running()) and _ring_angle != _angle:
 		_apply_ring_rotation(move_toward(_ring_angle, _angle, INNER_TURN_SPEED * delta))
 
 func _apply_ring_rotation(degrees: float) -> void:
