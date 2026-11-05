@@ -381,26 +381,30 @@ function hWindBand(S, R, n, pose) {
   hCycle(e, T.active, 14, 0.5, 0.7, 23, (age, life, rnd) => { const s0 = age * lerp(380, 520, rnd(1)); if (s0 > L) return; const th = rnd(2) * TAU + s0 * 0.042 - e * 15, depth = 0.5 + 0.5 * Math.sin(th), q = W(s0, rad(s0) * 0.85 * Math.cos(th)), spin = age * 18 + rnd(3) * 6, f = fadeS(s0);
     if (f < 0.2) return; p.px(q.x, q.y, depth > 0.5 ? C[5] : C[3]); p.px(q.x + Math.round(Math.cos(spin)), q.y + Math.round(Math.sin(spin)), depth > 0.5 ? C[6] : C[4]); });
 }
-// 三日月の風刃：斬撃の形。外側のふちが鋭く光り、内側へ向けて緑に薄れてかすれ、両端は針のように細い。色と半透明のむらは風の帯にそろえる。
-// 刃の中を風の筋が弧に沿って流れ、後ろに同じ弧の細い残像が2本ついてくる。寿命の終わりは内側からかすれて消える。
+// 三日月の風刃：pixelFX melee の斬撃の作り（Sprite Fusion の slash 由来 MIT）。ふちが一瞬で弧を走って開き、頭の側が太く、尾の側へ長く細く伸びる。
+// 太さの方向は白から緑へなめらかに変わり（段をつけない）、内側は空気の薄い膜へ溶ける。光が弧に沿って走り、ふちから風の粒が飛ぶ。寿命の終わりは尾が頭へ追いついて閉じる。
 function hBlades(S, R) {
-  const r = S.r, p = R.front, C = H_WIND;
+  const r = S.r, p = R.front, C = H_WIND, STOPS = [[0, PX.WHITE], [0.2, C[6]], [0.5, C[5]], [0.8, C[4]], [1, C[3]]];
+  const ramp = (q) => { let i = 0; while (i < STOPS.length - 2 && q > STOPS[i + 1][0]) i++; const [q0, c0] = STOPS[i], [q1, c1] = STOPS[i + 1]; return PX.mix(c0, c1, clamp((q - q0) / (q1 - q0))); };
   for (const b of S.shots) {
     if (b.kind !== 'blade') continue; const age = S.t - b.t, life = r.blade_life; if (age > life) continue;
-    const dir = fromA(b.angle), c = add(b.from, mul(dir, r.blade_speed * age)), g0 = lerp(0.35, 1, smooth(0, 0.07, age)), size = r.blade_size * g0 * R.P.size, endK = clamp((age - (life - 0.6)) / 0.6), seed = Math.floor(b.t * 97) % 89, fr = 1 - endK;
-    const arcOf = (u) => -Math.PI / 2 + Math.PI * u, spine = (u, off = 0) => { const a = arcOf(u); return add(add(c, mul(dir, off)), rotateV(V(Math.cos(a) * size * 0.6, Math.sin(a) * size), b.angle)); };
-    const normal = (u) => { const a = arcOf(u); return rotateV(norm(V(Math.cos(a) / 0.6, Math.sin(a))), b.angle); }, LEN = size * 2.5, W = (R.P.bladeW ?? 46) * g0 * R.P.size;
-    const hit = new Map(), mark = (P, a, tone) => { const x = Math.floor(P.x), y = Math.floor(P.y), key = x * 4096 + y, o = hit.get(key); if (!o || a > o.a) hit.set(key, { x, y, a, tone }); }; // 同じ画素は一番濃い値だけ（重ね塗りのむらを出さない）
-    const blade = (off, width, u0, u1, strength) => { const steps = Math.ceil(LEN * (u1 - u0) * WL * 1.6);
-      for (let m = 0; m <= steps; m++) { const k = m / steps, u = lerp(u0, u1, k), body = Math.pow(Math.sin(Math.PI * k), 1.25), w = width * body, nr = normal(u), rows = Math.max(1, Math.ceil(w * WL * 1.6));
-        for (let j = 0; j <= rows; j++) { const v = j / rows, grain = PX.tileFbm(u * 16 - age * 5, v * 3.2 + seed, 0, 0, 31, 2), torn = 0.5 + 0.75 * PX.tileFbm(u * 8 + age * 2.5 + seed, 2.7, 0, 0, 31, 2) - endK * 0.9;
-          if (v > torn) break; const edge = 1 - v / Math.max(0.05, torn), a = strength * Math.pow(edge, 0.7) * clamp(0.6 + 0.95 * grain) * (1 - endK * endK);
-          if (a > 0.03) mark(toL(add(spine(u, off), mul(nr, -w * v))), a, strength < 1 ? (v < 0.4 ? 4 : 3) : v < 0.07 ? 7 : v < 0.16 ? 6 : v < 0.34 ? 5 : v < 0.68 ? 4 : 3); } } };
-    blade(-34 * g0, W * 0.3, 0.2, 0.86, 0.3); blade(-16 * g0, W * 0.42, 0.1, 0.94, 0.45); blade(0, W, 0, 1, 1); // 残像2本、本体
-    for (const o of hit.values()) { if (o.tone >= 5 && o.a > 0.55) p.px(o.x, o.y, C[o.tone]); else p.blend(o.x, o.y, C[o.tone], Math.min(0.9, o.a)); }
-    for (let m = 0; m < 14; m++) { const A = toL(spine((m + 0.5) / 14)), B = toL(spine((m + 1.5) / 14)); if (m < 13) p.glowLine(A.x, A.y, B.x, B.y, 7 * g0 * R.P.size, C[4], 0.3 * Math.sin(Math.PI * (m + 1) / 14) * fr * R.P.intensity); }
-    // 舞う葉
-    hCycle(age, life, 5, 0.4, 0.6, 67 + seed, (a2, l2, rnd) => { const k = a2 / l2, u = 0.15 + 0.7 * rnd(1), q = toL(sub(spine(u), mul(dir, 20 + k * 70))), spin = a2 * 18 + rnd(3) * 6; if (fr < 0.4) return; p.px(q.x, q.y, C[3]); p.px(q.x + Math.round(Math.cos(spin)), q.y + Math.round(Math.sin(spin)), C[4]); });
+    const dir = fromA(b.angle), c = add(b.from, mul(dir, r.blade_speed * age)), size = r.blade_size * R.P.size, d = Math.round((b.t - S.shots[0].t) / r.blade_interval) % 2 ? -1 : 1;
+    // 判定の半楕円の先端と両端を通る円の弧の上に描く
+    const Rw = size * 1.133, O = toL(sub(c, mul(dir, Rw - size * 0.6))), Rl = Rw * WL, span = 2.55, a0 = b.angle - d * span / 2, hot = Math.exp(-age / 0.1);
+    const U = span * (1 - Math.pow(2, -10 * age / 0.12)), T = span * smooth(life - 0.5, life, age), W = (R.P.bladeW ?? 30) * WL * R.P.size, sheet = 2.4, reach = W * (1 + sheet) + 2, shine = (age * 2.2) % 1.5 - 0.25;
+    if (U - T < 0.02) continue;
+    p.each(O.x - Rl - 3, O.y - Rl - 3, O.x + Rl + 3, O.y + Rl + 3, (x, y, sx, sy) => {
+      const dx = x - O.x, dy = y - O.y, rr = Math.hypot(dx, dy), e = Rl - rr; if (e < -1 || e > reach) return;
+      let u = angDiff(Math.atan2(dy, dx), a0) * d; if (u < -0.5) u += TAU; if (u < T || u > U) return;
+      const v = (u - T) / (U - T), w = W * Math.pow(Math.sin(Math.PI * Math.pow(v, 1.9)), 0.7); if (w < 0.25) return;
+      const q = e / w, tailFade = smooth(0, 0.14, v);
+      if (q > 0 && q <= 1) { const glint = Math.exp(-Math.pow((v - shine) / 0.16, 2)); p.blendPx(sx, sy, ramp(clamp(q * (1 - 0.45 * hot) - 0.22 * glint)), tailFade * (1 - smooth(0.6, 1, q) * 0.72)); }
+      else if (q > 1 && q <= 1 + sheet) { const k = 1 - (q - 1) / sheet; p.blendPx(sx, sy, C[3], tailFade * 0.28 * k * k); }
+      else if (q <= 0 && e > -1) p.blendPx(sx, sy, PX.WHITE, tailFade * (1 + e) * 0.5); // ふちのなめらかな境
+    });
+    for (let m = 0; m < 12; m++) { const v0 = m / 12, v1 = (m + 1) / 12, at = (v) => { const a = a0 + d * lerp(T, U, v), rad = Rl - W * 0.3; return { x: O.x + Math.cos(a) * rad, y: O.y + Math.sin(a) * rad }; }, A = at(v0), B = at(v1); p.glowLine(A.x, A.y, B.x, B.y, 6 * R.P.size + 3, C[4], 0.22 * Math.pow(Math.sin(Math.PI * Math.pow(v0, 1.9)), 0.7) * R.P.intensity); }
+    // ふちから飛ぶ風の粒
+    hCycle(age, life - 0.3, 9, 0.22, 0.4, 67 + b.t * 31, (a2, l2, rnd) => { const k = a2 / l2, an = a0 + d * lerp(T, U, 0.3 + 0.65 * rnd(1)), born = a2 * r.blade_speed * 0.75, out = Rl + 2 + (6 + 22 * rnd(2)) * k, q = { x: O.x + Math.cos(an) * out - dir.x * born * WL, y: O.y + Math.sin(an) * out - dir.y * born * WL }; p.blend(q.x, q.y, C[k < 0.4 ? 6 : 5], 1 - k); });
   }
 }
 // 瓦礫：予兆は首の瓦礫が口へ送られて噛み砕かれ、吐くと土煙と砂利の扇。岩は回りながら飛び、砂ぼこりの尾を引く
@@ -535,7 +539,7 @@ const H_DESC = {
   bite_thrust: '予兆：首をS字にためて頭を引き、目が赤く強まり、最後は震えて止まる → 一気に伸びて頭の形の光と両脇の空気の筋、目の光が通り道に残る → 上下の牙の鉤が口先へ寄り、前へ長い閃光と欠片・土ぼこり → 衝撃の波が首を根元へ抜ける',
   bite_sweep: '予兆：振りかぶる側へ首を弓なりにため、目が赤く強まって止まる → ゆっくり振り出し、真ん中で一気に速くなって頭が外へ突き出し、振る先を向いて噛みにいく。三日月の帯（先が白く後ろへ冷えて細る）と外へ削られる小石 → 振り切って少し行き過ぎて戻り、帯は後ろから崩れて消える。緩急と踏み込みは見た目だけで、判定は現行の円のまま',
   wind_band: '予兆：前から空気の筋が口へ吸い込まれ、頭がふくらんで止まる → 横倒しの竜巻を上から見た形：口から先へ広がる円錐の中を、ねじれた風の筋がらせんに回り（手前は明るく太く、奥は暗く細い）、輪のような風の弧が回りながら先へ流れ、軸に光の芯、葉がらせんに乗って運ばれる → 止むと根元から離れて流れ去る。本番との違い：本番の判定は幅180の一定の帯。円錐の太さ（つまみ）に判定を合わせるなら本番の変更が要る',
-  wind_blades: '予兆：口のまわりで空気が渦を巻いて縮む → 0.18秒ごとに首を振り抜いて、風の刃を3枚。刃は斬撃の三日月で、外側のふちが鋭く光り、内側へ緑に薄れてかすれ、両端は針のように細い。中を風の筋が弧に沿って流れ、後ろに細い残像が2本つく → 寿命の終わりに内側からかすれて消える',
+  wind_blades: '予兆：口のまわりで空気が渦を巻いて縮む → 0.18秒ごとに首を振り抜いて、風の刃を3枚。刃は斬撃で、ふちが一瞬で弧を走って開き、頭の側が太く尾の側へ長く細く伸びる。白から緑へなめらかに変わり、内側は空気の薄い膜へ溶ける。光が弧に沿って走り、ふちから風の粒が飛ぶ → 寿命の終わりに尾が頭へ追いついて閉じる',
   rubble_lump: '予兆：首の瓦礫が口へ送られ、口先で塊になる。頭を大きく引いて止まる → 頭を突き出して吐き、土煙と砂利。岩は回りながら飛んで砂ぼこりの尾を引く',
   rubble_fan: '予兆：首の瓦礫が口へ送られ、口で小石が暴れる → 頭を突き出して扇に吐き、広い土煙と砂利。小岩はそれぞれ砂ぼこりの尾',
   beam_fixed: '予兆：口から射線いっぱいへ流れる照準の光（白くしない）と口へ集まる光。頭がふくらんで止まる → 先が伸びる光線、口の閃光、縁からこぼれる光。頭は反動で押されて震える → 根元から消え、口に光が残って消える',
@@ -548,7 +552,7 @@ const H_PARAMS = [
   { k: 'windLen', label: '風の帯（竜巻）の長さ（見た目、判定は340）', type: 'range', min: 200, max: 600, step: 10, def: 340 },
   { k: 'windR0', label: '風の帯（竜巻）の口元の太さ（半径）', type: 'range', min: 10, max: 90, step: 1, def: 32 },
   { k: 'windR1', label: '風の帯（竜巻）の先の太さ（半径）', type: 'range', min: 60, max: 200, step: 1, def: 115 },
-  { k: 'bladeW', label: '三日月の風刃の太さ（見た目）', type: 'range', min: 10, max: 90, step: 1, def: 46 },
+  { k: 'bladeW', label: '三日月の風刃の太さ（見た目）', type: 'range', min: 8, max: 70, step: 1, def: 30 },
   { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'coil', label: 'ための首の曲がり', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'snap', label: '発動の勢い（反動・衝撃）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
