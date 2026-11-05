@@ -11,10 +11,12 @@ const COLOR_READY := Color("4ade80")
 const COLOR_ACTION := Color("f87171")
 const COLOR_WORKING := Color("facc15")
 const COLOR_NEUTRAL := Color("9ca3af")
+const COLOR_STATUS_TEXT := Color("111827")
 const STATE_STALE_TEXT := "C++ライブラリがソースより古いままです。"
 const STATE_MISSING_TEXT := "C++ライブラリがありません。「ビルド」を押すか、取得が終わるのを待ってください。"
 var _bar: HBoxContainer
 var _label: Label
+var _status_style: StyleBoxFlat
 var _build_button: Button
 var _fetcher: Fetcher
 var _panel: BuildPanel
@@ -33,6 +35,15 @@ func _enter_tree() -> void:
 	STATE.remove_retired()
 	_bar = HBoxContainer.new()
 	_label = Label.new()
+	_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	_label.add_theme_color_override("font_color",COLOR_STATUS_TEXT)
+	_status_style = StyleBoxFlat.new()
+	_status_style.set_corner_radius_all(4)
+	_status_style.content_margin_left = 10
+	_status_style.content_margin_right = 10
+	_status_style.content_margin_top = 3
+	_status_style.content_margin_bottom = 3
+	_label.add_theme_stylebox_override("normal",_status_style)
 	_bar.add_child(_label)
 	_build_button = Button.new()
 	_build_button.text = "ビルド"
@@ -95,7 +106,7 @@ func _show_state(state: STATE.State) -> void:
 
 func _set_status(text: String,color: Color) -> void:
 	_label.text = text
-	_label.add_theme_color_override("font_color",color)
+	_status_style.bg_color = color
 
 func _on_fetched(result: Fetcher.Result,detail: String) -> void:
 	if result == Fetcher.Result.NOT_PUBLISHED:
