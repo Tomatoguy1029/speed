@@ -42,22 +42,27 @@ function dStar(R, c, size, spin, a, pal) {
   for (let j = 0; j < 4; j++) { const an = spin + j * Math.PI / 2, L = size * (j % 2 ? 0.7 : 1); for (let d = 0.5; d <= L; d += 0.5) R.front.light(c.x + Math.cos(an) * d, c.y + Math.sin(an) * d, pal[d < L * 0.4 ? 4 : 3], a * (1 - d / (L + 0.5))); }
   R.front.glow(c.x, c.y, size * 1.4, pal[2], 0.35 * a * R.P.intensity);
 }
-// 星のブレス：口から広がる炎の塊。画素ごとに流れるノイズの濃さを求め、本当の半透明で重ねる。隕石で切れた所は手前で止まり、火花が散る
+// 星のブレス（pixelFX fire/fire-breath の作りを上から見た形へ）：炎の塊が口から吹き出され、減速しながらふくらんで紫へ冷え、煙になる。
+// 首を振っても塊は吹いた向きへ少し残るので、炎は手前から奥へしなる。隕石に当たった所は止まって横へ広がり、火花が散る。
+const D_FLAME = ['#ffffff', '#fbf4ff', '#e6d8ff', '#c9b0ff', '#a884ff', '#8259ee', '#5f3cc8', '#412a94', '#291c62'].map(hexc);
 function dBreathFx(S, R) {
-  if (!S.fan || S.B.mode !== 'active') return; const pal = dRamp(R), p = R.front, r = S.r, t = S.elapsed, n = S.fan.length - 1, a0 = S.fanAngle, ha = r.half_angle * 1.2, back = 70 * WL * R.P.size, M = toL(S.fan[0]), O = V(M.x - Math.cos(a0) * back, M.y - Math.sin(a0) * back); // 炎の根元を口の奥へ置き、口の幅から出す
-  const on = smooth(0, 0.14, t) * (1 - smooth(r.active - 0.3, r.active, t)), Lmax = r.reach * WL * R.P.size, reach = S.fan.slice(1).map(q => dist(S.fan[0], q) * WL * R.P.size), front = Lmax * smooth(0, 0.3, t);
-  const ramp = v => { const q = clamp(v) * 3, i = Math.min(2, Math.floor(q)); return PX.mix(pal[1 + i], pal[2 + i], q - i); };
-  const xs = [O.x, O.x + Math.cos(a0 - ha) * Lmax, O.x + Math.cos(a0 + ha) * Lmax, O.x + Math.cos(a0) * Lmax], ys = [O.y, O.y + Math.sin(a0 - ha) * Lmax, O.y + Math.sin(a0 + ha) * Lmax, O.y + Math.sin(a0) * Lmax];
-  p.each(Math.min(...xs) - 4, Math.min(...ys) - 4, Math.max(...xs) + 4, Math.max(...ys) + 4, (x, y, sx, sy) => {
-    const dx = x - O.x, dy = y - O.y, d = Math.hypot(dx, dy); if (d < back || d > front + back) return; const lat = angDiff(Math.atan2(dy, dx), a0) / ha; if (Math.abs(lat) > 1) return;
-    const lim = back + reach[Math.min(n - 1, Math.max(0, Math.round((lat * 0.83 + 1) * 0.5 * (n - 1))))]; if (d > lim) return;
-    const u = d / Lmax, flow = PX.tileFbm(d * 0.045 - t * 7, lat * 2.2 + Math.sin(d * 0.03 - t * 3) * 0.3, 0, 0, 23, 3), fine = PX.tileFbm(d * 0.12 - t * 12, lat * 6, 0, 0, 9, 2);
-    const edge = 1 - Math.pow(Math.abs(lat), 2.2) * (1.1 - 0.5 * flow), body = clamp(edge * (0.62 + 0.75 * flow + 0.25 * fine)), far = 1 - smooth(0.62, 1, u) * (0.95 - 0.6 * flow), stop = clamp((lim - d) / 6 + 0.2), a = clamp(body * 1.2) * far * stop * on;
-    if (a < 0.03) return; const heat = clamp(body * (1 - 0.7 * u) + (1 - Math.abs(lat) * 1.6) * 0.22 * (1 - u)); p.blendPx(sx, sy, ramp(heat), Math.min(0.96, a));
-    if (heat > 0.88 && a > 0.5) p.blendPx(sx, sy, pal[4], (heat - 0.88) * 3 * a); });
-  for (let i = 0; i < 14; i++) { const j = 1 + Math.floor(hash(i * 4.3) * n), dir = norm(sub(S.fan[j], S.fan[0])), s = ((t * 900 + hash(i * 6.6) * 1500) % dist(S.fan[0], S.fan[j])); dStar(R, toL(add(S.fan[0], mul(dir, s))), 1.5, t * 6 + i, on * 0.7, pal); }
-  for (let j = 1; j <= n; j += 3) { if (dist(S.fan[0], S.fan[j]) >= r.reach - 1) continue; const q = toL(S.fan[j]), back = a0 + Math.PI; for (let m = 0; m < 2; m++) { const a = back + (hash(j + m * 7 + Math.floor(t * 30)) - 0.5) * 2.4, dd = 2 + 7 * hash(j * m + 3 + Math.floor(t * 24)); p.blend(q.x + Math.cos(a) * dd, q.y + Math.sin(a) * dd, pal[4], on * 0.9); } }
-  p.glow(M.x, M.y, 6 * R.P.size, pal[3], 0.45 * on * R.P.intensity);
+  if (!S.fan || S.B.mode !== 'active') return; const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, r = S.r, e = S.elapsed, H = D_FLAME, NL = fire.noiseFor(1.5), N = (rate, seed = 0, off = 0) => NL(e, rate, seed, off), s = R.P.size;
+  const O = toL(S.fan[0]), Lmax = r.reach * WL * s, hw = r.half_angle * 1.15, n = S.fan.length - 1, angleAt = tb => S.axis + lerp(-r.sweep, r.sweep, smooth(0, 1, tb / r.active)), v0 = Lmax * 3.4, drag = 2.6, stopE = r.active - 0.2, rate = 460, live = [], smoke = [];
+  const limit = (lat) => dist(S.fan[0], S.fan[1 + Math.min(n - 1, Math.max(0, Math.round((lat * 0.5 + 0.5) * (n - 1))))]) * WL * s;
+  for (let i = Math.max(0, Math.floor((e - 1.1) * rate)); i / rate < Math.min(e, stopE); i++) { const tb = i / rate, age = e - tb, rnd = k => hash(i * 7.31 + k * 3.17), lat = rnd(1) * 2 - 1, fl = lerp(0.45, 0.85, rnd(2)) * (1 - 0.3 * Math.abs(lat)), sm = rnd(3) < 0.25 + 0.4 * Math.abs(lat), sl = lerp(0.3, 0.5, rnd(4));
+    if (age > fl + (sm ? sl : 0)) continue; const way = e > 0 ? angDiff(angleAt(tb), S.fanAngle) : 0, a = S.fanAngle + clamp(way, -hw * 0.75, hw * 0.75) + lat * hw * (0.55 + 0.45 * smooth(0, 0.25, age)), d0 = v0 * lerp(0.75, 1.1, rnd(5)) / drag * (1 - Math.exp(-drag * age)), lim = limit(clamp(angDiff(a, S.fanAngle) / r.half_angle, -1, 1)), over = Math.max(0, d0 - lim), d = Math.min(d0, lim), side = over * 0.5 * (lat < 0 ? -1 : 1);
+    const ux = Math.cos(a), uy = Math.sin(a), q = { age, x: O.x + ux * d - uy * side + (rnd(8) - 0.5) * d * 0.05, y: O.y + uy * d + ux * side + (rnd(9) - 0.5) * d * 0.05, ux, uy, lat, fl: over > 0 ? fl * 0.6 : fl, sl, sm, size: lerp(4, 11, rnd(6) ** 1.6) * s, f: rnd(7) };
+    if (age < q.fl) live.push(q); else if (sm && age < q.fl + sl) smoke.push(q); }
+  for (const q of smoke) fire.smokePuff(p, q.x, q.y, 1 - (q.age - q.fl) / q.sl, q.size * 1.1, H[7], true, 0.4);
+  live.sort((x, y) => y.age - x.age);
+  for (const q of live) { const u = q.age / q.fl; fire.soft(p, q.x, q.y, q.size * (1.4 + 2.2 * u), H[u < 0.5 ? 4 : 6], 0.1 * (1 - u * 0.6)); }
+  for (const q of live) { const u = q.age / q.fl, edge = Math.abs(q.lat), size = q.size * (0.7 + 2 * u), heat = Math.min(0.999, Math.pow(u, 0.9) * (0.8 + 0.2 * edge) + 0.32 * edge * edge), tear = clamp((u - 0.3) / 0.2);
+    fire.firePuff(p, q.x, q.y, 1 - heat, size * (1 - 0.45 * tear), q.f, H, 0.04, -q.ux * 0.8, -q.uy * 0.8);
+    if (tear > 0 && q.f < 0.35) { const id = Math.floor(q.f * 1e5), len = size * (1.2 + 0.5 * N(4, id)) * tear, sway = N(2.5, id + 1) * 0.5 + q.lat * 0.5, cs = Math.cos(sway), sn = Math.sin(sway); fire.flameBlade(p, q.x, q.y, q.ux * cs - q.uy * sn, q.uy * cs + q.ux * sn, len, Math.min(4, size * 0.2), N(2.5, id + 2) * 2, N, id, H, heat < 0.5 ? fire.BACK_LAYERS : [[1, 1, 7], [0.72, 0.82, 6], [0.44, 0.58, 5]]); } }
+  const roar = 0.85 + 0.15 * N(3, 7), on = 1 - smooth(stopE - 0.12, stopE, e), ca = Math.cos(S.fanAngle), sa = Math.sin(S.fanAngle);
+  if (on > 0) { for (let i = 0; i < 4; i++) { const off = [0, -0.1, 0.1, 0][i], L = [30, 23, 23, 15][i] * s * roar * on, w = [3.6, 3.2, 3.2, 4][i] * s; fire.flameBlade(p, O.x, O.y, Math.cos(S.fanAngle + off), Math.sin(S.fanAngle + off), L, w, N(3, i + 3) * 3, N, 30 + i * 17, H, fire.LAYERS, 0.5, 1.5); } p.glow(O.x, O.y, 7 * s, H[3], 0.5 * on * R.P.intensity); }
+  for (let i = 0; i < 16; i++) { const j = 1 + Math.floor(hash(i * 4.3) * n), dir = norm(sub(S.fan[j], S.fan[0])), reach = dist(S.fan[0], S.fan[j]), at = (e * 1100 + hash(i * 6.6) * 1500) % reach; dStar(R, toL(add(S.fan[0], mul(dir, at))), 1.4, e * 6 + i, on * 0.65, FX.ramp(R.P.color)); }
+  for (let j = 1; j <= n; j += 2) { if (dist(S.fan[0], S.fan[j]) >= r.reach - 1) continue; const q = toL(S.fan[j]), back = S.fanAngle + Math.PI; for (let m = 0; m < 2; m++) { const seed = j * 3 + m * 7 + Math.floor(e * 26), an = back + (hash(seed) - 0.5) * 2.6, sp = 90 + 160 * hash(seed + 1), k = hash(seed + 2); fire.spark(p, q.x + Math.cos(an) * sp * 0.04, q.y + Math.sin(an) * sp * 0.04, Math.cos(an) * sp, Math.sin(an) * sp, k * on, [H[0], H[2], H[4], H[6]]); } }
 }
 // 空間の裂け目：爪の通った所に、ぎざぎざの細い割れ目が走る。芯は光り、両脇は暗い宇宙がのぞく。終わりは両端から閉じる（輪郭で囲まない）
 function dRiftFx(S, R) {
@@ -154,11 +159,10 @@ function dDraw(S, R) {
     for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dGroundTremble(S, R, q.at, r.radius, clamp((t - q.t - q.wait) / q.warn), 171);
   }
   if (R.proto) for (const q of S.projectiles) if (q.vel && q.t != null) { const sp = len(q.vel), dir = norm(q.vel), age = t - q.t; hRockComet(R, { from: sub(q.pos, mul(q.vel, age)), speed: sp, radius: q.radius, seed: q.seed || 1 }, age, dir); }
-  if (R.proto && S.rocks.length && B.mode === 'windup') S.rocks.forEach((q, i) => { const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / Math.max(0.01, r.warn), age = S.elapsed; hRockComet(R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, { stop: r.warn, pace: 0.6 }); });
-  if (R.proto && S.rocks.length && B.mode !== 'windup') S.rocks.forEach((q, i) => hDust(S, R, q.to, S.age - r.warn, 71 + i, 0, 1.4));
+  if (R.proto) S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / DR_FLIGHT; if (age < DR_FLIGHT + 0.3) hRockComet(R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, { stop: DR_FLIGHT }); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
   R.blitBack();
   for (const q of S.projectiles) { if (R.proto) { if (q.vel) hRockGhosts(q.pos, norm(q.vel), len(q.vel), q.seed + t, q.radius); drawImg('meteor_0', q.pos, q.seed + t, q.radius); } else D2.circle(q.pos, q.radius, '#8c704c'); }
-  for (const rock of S.rocks) drawImg('meteor_0', rock.pos, rock.seed * 1.7, rock.radius);
+  S.rocks.forEach((rock, i) => { const age = dRockAge(S, i); if (age < 0) return; const land = age - DR_FLIGHT, thud = land > 0 ? Math.exp(-land / 0.09) * Math.sin(Math.min(land, 0.3) * 30) : 0; drawImg('meteor_0', rock.pos, rock.seed * 1.7 + Math.min(age, DR_FLIGHT) * 11 + Math.max(0, thud) * 0.12, rock.radius * (1 + 0.08 * thud)); });
   if (id === 'clones' && B.mode === 'active') { const on = smooth(0, 0.45, S.elapsed), off = 1 - smooth(r.active - 0.9, r.active - 0.25, S.elapsed); for (const unit of S.units) drawDraco(R.proto ? dSwimPoints(unit.points, t + unit.index * 2, 0.8, unit.index) : unit.points, unit.face ?? unit.angle, unit.index > 0 ? 0.9 * on * off : 1); }
   else if (R.proto) drawDraco(pose.points, pose.facing, 1, pose.width || DP.body_width, pose.arms);
   else drawDraco(S.points, B.facing);
@@ -189,7 +193,9 @@ function dSwimAmount(S) {
   if (B.mode === 'active') return ['charge', 'leap'].includes(S.tech) ? 1 : ['breath', 'meteor', 'star_fan', 'inhale'].includes(S.tech) ? 0.25 : 0.35;
   if (B.mode === 'recovery') return 0.7 * smooth(0, 1, e / Math.max(0.01, r.recover)); return 0.7;
 }
+function dSpitKick(S) { if (!S.rocks.length || S.B.mode !== 'windup') return 0; let kick = 0; S.rocks.forEach((q, i) => { const t = dRockAge(S, i); if (t >= -0.16) kick += t < 0 ? -0.6 * smooth(-0.16, 0, t) : Math.exp(-t / 0.1) * (1 - Math.exp(-t / 0.02)) - 0.6 * Math.exp(-t / 0.02); }); return kick; }
 function dBodyAlive(S, R, pose) {
+  const kick = dSpitKick(S); if (kick) { const fw = fromA(pose.facing); pose = { ...pose, points: pose.points.map((p, i) => add(p, mul(fw, 46 * kick * (1 - smooth(0, 0.3, i / (pose.points.length - 1)))))) }; }
   const k = R.P.alive ?? 1, tail = ['tail_sweep', 'tail_slam'].includes(S.tech), swim = dSwimAmount(S) * k * (tail ? 0.3 : 1), points = dSwimPoints(pose.points, S.t, swim, 0, tail ? 0 : k), B = S.B;
   if (B.mode === 'windup' && (!S.staging || S.staging.phase === 'ready')) { const q = smooth(0.72, 1, S.elapsed / Math.max(0.01, S.r.warn)), shake = mul(orth(fromA(pose.facing)), Math.sin(S.t * 90) * 3 * q * k); if (q > 0) for (let i = 0; i <= 6; i++) points[i] = add(points[i], mul(shake, 1 - i / 7)); }
   return { ...pose, points, facing: pose.facing + Math.sin(S.t * 5.3) * 0.05 * swim };

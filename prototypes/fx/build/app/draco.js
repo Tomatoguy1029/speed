@@ -35,6 +35,9 @@ function dSettle(S, from, to, k) {
   S.override = dFit(from.map((p, i) => { const q = goal(i), d = dist(p, q) / far, w = smooth(0, 1, clamp(k * 1.4 - d * 0.4)), side = orth(norm(sub(from[Math.max(0, i - 1)], from[Math.min(N, i + 1)]))), wave = Math.sin(i / N * 9 - k * 9) * Math.sin(Math.PI * k) * Math.min(46, dist(p, q) * 0.14); return add(lerpV(p, q, w), mul(side, wave)); }), to);
   S.B.pos = S.override[0];
 }
+// 隕石：頭を突き出して1個ずつ吐き、速いまま飛んで、着いた所で勢いが止まる（なめらかに滑らせない）
+const DR_FLIGHT = 0.24, DR_ORDER = [1, 0, 2];
+function dRockAge(S, i) { if (S.B.mode !== 'windup') return S.r.warn + S.elapsed; return S.elapsed - S.r.warn * (0.2 + 0.24 * DR_ORDER[i % 3]); }
 function dPart(key, pos, angle, scale, offset = null, alpha = 1, flip = false) {
   const im = IMG['draco/' + key]; if (!im) return; g.save(); g.translate(pos.x, pos.y); g.rotate(angle); g.scale(scale * (flip ? -1 : 1), scale); g.globalAlpha *= alpha; g.drawImage(im, offset ? offset.x : -im.width / 2, offset ? offset.y : -im.height / 2); g.restore();
 }
@@ -142,7 +145,7 @@ function dWindup(S, dt) {
   else if (id === 'rifts') S.tell = S.paths || [];
   else if (id === 'tail_sweep') { dBlend(S, S.base, dTailPose(S, -r.half_angle), S.elapsed / r.warn); S.tell = [Array.from({ length: 33 }, (_, i) => add(S.origin, mul(fromA(S.axis + Math.PI - r.half_angle + r.half_angle * 2 * i / 32), r.reach)))]; }
   else if (id === 'tail_slam') { if (!S.locked) { S.target = dPredict(S, Math.max(0, r.warn - S.elapsed) + r.active * 0.65, r.lead_cap); if (dist(S.target, S.origin) > r.reach) S.target = add(S.origin, mul(norm(sub(S.target, S.origin)), r.reach)); S.lifted = dTailCurve(S, add(S.target, V(0, -180))); S.locked = S.elapsed >= Math.min(0.25, r.warn * 0.35); } dBlend(S, S.base, S.lifted, S.elapsed / r.warn); }
-  else if (['breath', 'meteor'].includes(id)) { for (const q of S.rocks) q.pos = lerpV(q.from, q.to, k); }
+  else if (['breath', 'meteor'].includes(id)) S.rocks.forEach((q, i) => { q.pos = lerpV(q.from, q.to, clamp(dRockAge(S, i) / DR_FLIGHT)); });
   else if (id === 'star_fan') { if (!S.locked) { let predicted = S.ship.pos; for (let i = 0; i < 8; i++) predicted = dPredict(S, Math.max(0, r.warn - S.elapsed) + Math.max(0, dist(B.pos, predicted) - r.radius) / r.speed, r.lead_cap); S.direction = norm(sub(predicted, B.pos)); B.facing = angOf(S.direction); S.starPositions = []; for (let i = 0; i < r.count; i++) { const a = B.facing + lerp(-r.arc, r.arc, i / Math.max(1, r.count - 1)); S.starPositions.push({ pos: add(B.pos, mul(fromA(a), r.radius)), a }); } S.locked = S.elapsed >= Math.min(0.25, r.warn * 0.35); } }
   else if (id === 'spiral') dSpiralWindup(S, dt);
 }
