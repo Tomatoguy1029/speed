@@ -414,17 +414,23 @@ function hRubbleWarn(S, R, n, pose, pts) {
   const m = toL(M), lump = S.tech === 'rubble_lump', rr = (lump ? 1 + 3 * u : 2.5) * R.P.size;
   for (let k = 0; k < (lump ? 24 : 16); k++) { const an = hash(k * 2.3) * TAU + S.age * (lump ? 2 : 9) * (hash(k) - 0.5), d = rr * Math.sqrt(hash(k * 5.9)), jit = Math.sin(S.age * 60 + k) * 0.6 * u; R.front.px(m.x + Math.cos(an) * d + jit, m.y + Math.sin(an) * d, H_STONE[d > rr * 0.6 ? 2 : 3]); }
 }
-// 塊投げの土煙：pixelFX nature/boulder の DUST の作り。岩が飛びながら落とす土ぼこりの玉が、その場で速度を失ってふくらみ、ふわっと薄れる。
-// 暖かい灰色の2色をやわらかい円で本当の半透明に重ね、ときどき小石がこぼれる。
+// 塊投げの尾：pixelFX nature/boulder の土ぼこりと速度線の作り。岩のすぐ後ろになめらかに細る土煙の尾、その場に置き去りになってふくらむ土ぼこりの玉、
+// 脇を後ろへ抜ける細い速度線。
 const H_DUST = ['#9a8f86', '#7a7068', '#b9aea2'].map(hexc);
 function hLumpDust(S, R, b, age, dir) {
-  const p = R.back, RATE = 34 * R.P.dust, side = orth(dir), scale = b.radius / 26 * R.P.size, timing = R.P.timing;
-  for (let i = Math.max(0, Math.floor((age - 0.75 * timing) * RATE)); i / RATE <= age; i++) { const born = i / RATE, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.35, 0.75, rnd(1)) * timing, a = age - born, k = 1 - a / life; if (k <= 0) continue;
-    const drift = 1 - Math.exp(-a * 7), at = add(add(b.from, mul(dir, b.speed * born - (b.radius * 0.6) + lerp(40, 110, rnd(2)) * drift)), mul(side, (rnd(3) - 0.5) * b.radius * 1.1 + (rnd(4) - 0.5) * 34 * drift * scale)), q = toL(at);
-    const size = lerp(2.2, 4.2, rnd(5)) * scale, rr = size * (0.6 + (1 - k) * 0.9) * 1.25, col = H_DUST[rnd(6) < 0.15 ? 2 : rnd(6) < 0.6 ? 0 : 1];
-    p.disc(q.x, q.y, rr, col, (d) => Math.pow(k, 1.3) * 0.62 * (1 - d * d)); }
-  for (let i = Math.max(0, Math.floor((age - 0.9) * 13)); i / 13 <= age; i++) { const born = i / 13, rnd = (k) => hash(i * 4.13 + k * 5.71 + b.seed + 9), a = age - born, life = lerp(0.5, 0.9, rnd(1)); if (a > life) continue;
-    const q = toL(add(add(b.from, mul(dir, b.speed * born + b.speed * 0.3 * (1 - Math.exp(-a * 4)) * 0.4)), mul(side, (rnd(2) - 0.5) * b.radius * 1.2 + (rnd(3) - 0.5) * 60 * a))); p.dot(q.x, q.y, H_STONE[rnd(4) > 0.5 ? 3 : 2], 1 - a / life); }
+  const p = R.back, RATE = 42 * R.P.dust, side = orth(dir), scale = b.radius / 26 * R.P.size, timing = R.P.timing, pos = add(b.from, mul(dir, b.speed * age)), head = toL(pos), rad = b.radius * WL * 1.05 * R.P.size, on = smooth(0, 0.08, age), L = Math.min(b.speed * age, b.speed * 0.2) * WL * R.P.dust, ux = dir.x, uy = dir.y;
+  // 土煙の尾：岩の太さから先へなめらかに細る
+  if (L > 2) p.each(Math.min(head.x, head.x - ux * L) - rad - 1, Math.min(head.y, head.y - uy * L) - rad - 1, Math.max(head.x, head.x - ux * L) + rad + 1, Math.max(head.y, head.y - uy * L) + rad + 1, (x, y, sx, sy) => {
+    const dx = x - head.x, dy = y - head.y, along = -(dx * ux + dy * uy), lat = Math.abs(dx * -uy + dy * ux), k = along / L; if (k < -0.05 || k > 1) return;
+    const w = rad * Math.pow(1 - clamp(k), 0.7); if (lat > w) return; const e = 1 - lat / w;
+    p.blendPx(sx, sy, PX.mix(H_DUST[2], H_DUST[1], clamp(k * 1.4)), on * smooth(0, 0.35, e) * Math.pow(1 - clamp(k), 1.6) * 0.62); });
+  // 置き去りの土ぼこりの玉
+  for (let i = Math.max(0, Math.floor((age - 0.5 * timing) * RATE)); i / RATE <= age; i++) { const born = i / RATE, rnd = (k) => hash(i * 7.31 + k * 3.17 + b.seed), life = lerp(0.2, 0.5, rnd(1)) * timing, a = age - born, k = 1 - a / life; if (k <= 0) continue;
+    const spread = 1 - Math.exp(-a * 8), at = add(add(b.from, mul(dir, b.speed * born - b.radius * 0.5)), mul(side, (rnd(3) - 0.5) * b.radius * 1.5 + (rnd(4) - 0.5) * 60 * spread * scale)), q = toL(at), rr = lerp(2, 3.8, rnd(5)) * scale * (0.7 + (1 - k) * 1.1) * 1.2, col = H_DUST[rnd(6) < 0.15 ? 2 : rnd(6) < 0.6 ? 0 : 1];
+    p.disc(q.x, q.y, rr, col, (d) => Math.pow(k, 1.3) * 0.5 * (1 - d * d)); }
+  // 脇を後ろへ抜ける速度線
+  for (let i = 0; i < 4; i++) { const life = 0.14, off = hash(i * 3.3 + b.seed) * life, c = Math.floor((age + off) / life), a = (age + off - c * life) / life, rnd = (k) => hash(i * 9.1 + c * 4.7 + k * 2.3), lat = (rnd(1) < 0.5 ? -1 : 1) * rad * lerp(0.75, 1.5, rnd(2)), start = rad * lerp(-0.6, 0.8, rnd(3)) + L * 0.9 * a, len = rad * lerp(2.6, 5.5, rnd(4)), fade = Math.sin(Math.PI * a) * on;
+    for (let d = 0; d < len; d += 0.5) { const t = d / len, x = head.x - ux * (start + d) - uy * lat, y = head.y - uy * (start + d) + ux * lat; p.blend(x, y, H_DUST[2], fade * (1 - t) * (1 - t) * 0.45); } }
 }
 function hRocks(S, R, back) {
   for (const b of S.shots) {
@@ -433,7 +439,7 @@ function hRocks(S, R, back) {
     if (back && R.proto) { for (let k = 1; k < 16; k++) { const tk = age - k * 0.03; if (tk < 0) break; const a = k * 0.03 / R.P.timing, p = add(b.from, mul(dir, b.speed * tk)), q = toL(p), rr = (1 + a * 7) * (b.radius / 26) * R.P.size * R.P.dust;
         for (let y = -rr; y <= rr; y++) for (let x = -rr; x <= rr; x++) { if (x * x + y * y > rr * rr || hash(b.seed * 31 + k * 7 + x * 3 + y * 11) < a * 1.9) continue; R.back.dot(q.x + x, q.y + y, H_STONE[a < 0.15 ? 3 : 2], (1 - a / 0.5) * 0.5); } } continue; }
     if (back) continue;
-    const spin = age * (3 + 3 * hash(b.seed)) * (hash(b.seed * 3) > 0.5 ? 1 : -1); drawImg('meteor_0', pos, spin, b.radius * 1.25);
+    const spin = age * (3 + 3 * hash(b.seed)) * (S.tech === 'rubble_lump' ? 2 : 1) * (hash(b.seed * 3) > 0.5 ? 1 : -1); drawImg('meteor_0', pos, spin, b.radius * 1.25);
   }
 }
 function hSpitBurst(S, R, n, pose) { // 吐いた瞬間：口から土煙と砂利の扇
