@@ -49,8 +49,28 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | common.to&#95;main&#95;menu | メインメニューに戻る | Back to Main Menu |
 | common.parts | 部品 {n} | Parts {n} |
 |  | ■ タイトル・メインメニュー |  |
-| intro.replay | はじまりを見直す | Replay opening |
+| intro.replay | もう一度イントロを見る | Replay opening |
 | intro.skip | スキップ | Skip |
+| intro.next | 次へ | Next |
+| intro.reveal | 全文を表示 | Show text |
+| intro.continue | クリック／決定で次へ | Click / confirm to continue |
+| intro.scene1.1 | 21XX年。 |  |
+| intro.scene1.2 | 人々は星々の光を道しるべに、広大な銀河を航海していた。 |  |
+| intro.scene1.3 | その日も、一隻の宇宙船が静かな星空を進んでいた。 |  |
+| intro.scene1-2.1 | そのとき、突如として巨大な影が現れた。 |  |
+| intro.scene1-2.2 | 影は北極星へと近づき、あろうことか、その光をひと呑みにしてしまった。 |  |
+| intro.scene1-2.3 | そして、何事もなかったかのように宇宙の闇へと泳ぎ去っていった。 |  |
+| intro.scene2.1 | パイロットはすぐさまその後を追う。だが、その前方で奇妙な出来事が起きていた。 |  |
+| intro.scene2.2 | 一つの星を中心に、周囲を漂う無数の瓦礫が次々と集まり始めたのだ。 |  |
+| intro.scene3.1 | 瓦礫はみるみるうちに巨大な怪物の姿を成し、追跡を阻むように宇宙船へと襲いかかった。 |  |
+| intro.scene4.1 | 激しい戦いの末、怪物はついに砕け散った。 |  |
+| intro.scene4.2 | その残骸からあふれ出した不思議な光は、吸い寄せられるように機体へと流れ込み、未知の力を宿した。 |  |
+| intro.scene5.1 | だが、異変はそれだけでは終わらなかった。 |  |
+| intro.scene5.2 | 銀河のあちこちで星が消え、怪物が次々に姿を現したのだ。 |  |
+| intro.scene6.1 | 行き交う船は襲われ、コロニーは破壊されていく。 |  |
+| intro.scene6.2 | かつて星々に導かれていた銀河は、もはや安全に旅することすら叶わない世界へと変わり果ててしまった。 |  |
+| intro.scene7.1 | それでも、あの日機体に宿った星の光は、今も消えていない。 |  |
+| intro.scene7.2 | 失われた星々を取り戻し、すべての元凶であるあの影を討つため、一人のパイロットが再び宇宙へと旅立った。 |  |
 | intro.draw | お手本の線に沿って描く（クリックで開始） | Follow the example path; click to begin |
 | intro.confirm | お手本をなぞり、もう一度クリックで突進 | Follow the example, then click again to dash |
 | intro.touch | 「描く」を押し、お手本の線をなぞる | Tap Draw, then follow the example path |

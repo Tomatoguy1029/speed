@@ -556,8 +556,8 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 - すべての UI は `Control` で作り、アンカーとコンテナで画面の大きさに合わせる。座標を決め打ちしない。
 - 色と文字の大きさは1つのテーマにまとめる。強化段階の色（仕様書 8）もテーマで管理する。
 - 3択・ポーズ・結果は、ラン中の状態を表示するだけにする。選んだ結果は RunManager に命令として渡す（4.2）。
-- 導入は `GameManager.Screen.INTRO` と `scenes/app/intro.tscn` が持つ。`scripts/runtime/intro_sequence.gd` が場面進行と操作待ち、`intro_practice.gd` が星・練習相手・見本線を管理する。`scripts/ui/intro_screen.gd` は状態を表示してセッションへ命令を渡し、`scripts/render/intro_visual.gd` が差し替え用の仮演出を描く。
-- 導入の練習は独立したRunSession・RunBridgeと本番の `run.tscn` を使う。専用に生成した `.content/run/intro/` を読み、導入シーケンスが練習用命令と固定更新を進める。場面の表示と操作待ちはGodot、練習相手・線・機体の戦闘状態はC++が持つ。`hud` オプションで最小UIに替え、配布版も生成済み定義を使う。
+- 導入は `GameManager.Screen.INTRO` と `scenes/app/intro.tscn` が持つ。`scripts/ui/intro_story.gd` が制作済みの画像参照と文章キーを再生順に保持し、`intro_screen.gd` が場面・段落・文字表示・星の消灯を進める。画像はシーンの依存から読み込み、ControlとTweenを導入画面の寿命で保持する。
+- Mainは通常起動時の視聴フラグから導入とタイトルを選ぶ。GameManagerは再視聴の入口と完了・スキップの出口を持ち、SaveManagerが視聴済みを保存する。シナリオの文章は共通の文言生成、Asepriteのレイヤー書き出しは制作時のLuaから実行し、実行時はPNGと翻訳キーを参照する。
 
 速度計はHUDがランの突進・ブースト保持・滑走と巡航速度超過を読み、`scripts/ui/speed_indicator.gd`へ表示状態を渡す。表示専用の乱数で時間間隔を持つ目標を選び、実秒の固定刻みで針の慣性と内部色を更新する。HUDが位相とオーバーレイに応じて更新を止め、速度計のNode・独立したShaderMaterial・画像参照をHUDの寿命で保持する。固定の画像とshaderは依存参照から取得し、shaderが元画像の内部色だけを現在の表示色へ置換する。輪郭とマスクは既存画像を使い、実行時の入力は表示状態・経過時間・表示用の乱数とする。
 
