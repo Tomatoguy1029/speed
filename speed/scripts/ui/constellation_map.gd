@@ -8,6 +8,7 @@ const CYAN := Color("5bc8db")
 const ORIGIN := Vector2(198, 195)
 const SYMBOL_ORBIT := Vector2(112, 84)
 const SYMBOL_OFFSET := Vector2(-1, -0.5)
+const INNER_ORBIT_RATE := 2.0
 const SELECTION_RECT := Rect2(141, 207, 112, 59)
 const SYMBOL_ANGLES := [90.0, 0.0, 270.0, 180.0]
 const DRAGON_INDEX := 4
@@ -485,7 +486,8 @@ func _apply_rotation(degrees: float) -> void:
 	rotation_changed.emit(radians)
 	_inner1.position = Vector2(0, -48).rotated(-radians)
 	_inner1.rotation = -radians * 5.0
-	_inner2.position = _inner1.position + Vector2(-40, 38).rotated(radians)
+	# 小円は大円の内側を別の速さで公転し、選択移動で接点を変える。
+	_inner2.position = _inner1.position + Vector2(-40, 38).rotated(radians * INNER_ORBIT_RATE)
 	_inner2.rotation = radians * 35.0 / 30.0
 	for i in _stars.size():
 		var angle := deg_to_rad(degrees + SYMBOL_ANGLES[i])
