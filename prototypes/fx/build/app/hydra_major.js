@@ -192,7 +192,7 @@ function hmRegister(id, ids, o, tick, draw, desc) {
 }
 hmRegister('tornado', ['H04', 'H08', 'H13'], { kinds: ['vortex', 'debris'], color: HM_COLORS.vortex, ship: V(520, 60) }, hmTornadoTick, hmTornadoDraw,
   '予兆：渦の首と瓦礫の首が左右へ開き、渦の首は目が光ってため、瓦礫の首は首の瓦礫を口へ送って噛み砕く → 風の首の口元にまわりの風が巻きながら集まり、小さな渦が少しずつ育つ。らせんの腕が中心へ巻き込み、緑の風の腕に瓦礫の砂ぼこりの腕が混ざる。育った渦へ瓦礫の首が岩をまっすぐ打ち込み、岩は土ぼこりを上げて捕まり、渦の中を回る。砂利と葉も外から巻き込まれる → 渦が機体の方向へ走り、通った跡に土ぼこりが残る → 寿命の終わりに岩が外へ放り出され、渦が薄れて消える');
-hmRegister('debris_shatter', ['H04', 'H08', 'H14'], { kinds: ['debris', 'beam'], color: HM_COLORS.beam, ship: V(860, 60) }, hmShatterTick, hmShatterDraw,
+hmRegister('debris_shatter', ['H04', 'H08', 'H14'], { kinds: ['debris', 'beam'], color: HM_COLORS.beam, ship: V(722, 60) }, hmShatterTick, hmShatterDraw,
   '予兆：瓦礫の首は吐く方向を向いて瓦礫を噛み砕き、ビームの首は目が光って口に光を集める → 岩6つを扇に吐き出し、勢いが落ちてから機体へゆっくり進む（土ぼこり）。ビームの首は振り始めの向きに照準の光（白くしない）→ 光線が弧を薙ぎ、当たった岩は閃光と欠片・土ぼこりを出して砕け、赤く熱い破片6つが尾を引いて飛び、冷えて石の色になる');
 hmRegister('beam_pincer', ['H04', 'H10', 'H15'], { kinds: ['beam', 'beam'], color: HM_COLORS.beam, ship: V(560, 0) }, hmPincerTick, hmPincerDraw,
   '予兆：2本のビームの首が目を光らせ、口へ光を集め、左右に開いた向きへ照準の光（白くしない）→ 2本の光線が左右から機体の方向へ閉じていく → 根元から消える');
