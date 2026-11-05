@@ -26,8 +26,9 @@ var _lighting: ShaderMaterial
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_lighting = ShaderMaterial.new()
-	_lighting.shader = SHADER
+	if _lighting == null:
+		_lighting = ShaderMaterial.new()
+		_lighting.shader = SHADER
 	_head = _sprite(&"head")
 	_head.z_index = 1
 	# The snout stays aligned with the existing mouth origin (120 * head_scale).
