@@ -5,13 +5,15 @@
 #include "../../systems/collision_query.h"
 #include "../../output/frame_builder.h"
 #include "../../output/event_builder.h"
+#include "../../state/loadout_state.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
-void SonicBehavior::refresh(RunRuntime &r) {auto &w=r.state.loadout.sonic;w.wave_speed=w.base_speed*1.82*r.content->config.character_scale*r.state.loadout.effects.area*(1+w.area_increment*double(r.state.loadout.post_area_stacks));w.life=w.base_life*(1+w.duration_increment*double(r.state.loadout.post_duration_stacks));}
-void SonicBehavior::launch(RunRuntime &r) {auto &w=r.state.loadout.sonic;if (!w.ready) return;w.active=true;w.hits.clear();w.last=r.state.ship.pos;w.distance=w.emission=0;}
+void SonicBehavior::refresh(RunRuntime &r) {auto &w=r.state.loadout->sonic;w.wave_speed=w.base_speed*1.82*r.content->config.character_scale*r.state.loadout->effects.area*(1+w.area_increment*double(r.state.loadout->post_area_stacks));w.life=w.base_life*(1+w.duration_increment*double(r.state.loadout->post_duration_stacks));}
+void SonicBehavior::launch(RunRuntime &r) {auto &w=r.state.loadout->sonic;if (!w.ready) return;w.active=true;w.hits.clear();w.last=r.state.ship.pos;w.distance=w.emission=0;}
 void SonicBehavior::step(RunRuntime &r,double dt) {
-    auto &s=r.state;auto &w=s.loadout.sonic;if (!w.ready || dt<=0) return;
+    auto &s=r.state;auto &w=s.loadout->sonic;if (!w.ready || dt<=0) return;
     const double scale=1.82*r.content->config.character_scale;const auto pos=s.ship.pos,forward=s.ship.heading,side=godot::Vector2(forward.y,-forward.x);const double move=w.last.distance_to(pos);
     for (auto &f:w.frames) f.age+=dt;w.frames.erase(std::remove_if(w.frames.begin(),w.frames.end(),[&](const auto &f){return f.age>=w.life;}),w.frames.end());
     w.visuals.erase(std::remove_if(w.visuals.begin(),w.visuals.end(),[&](const auto &v){return s.world_time-v.born>=(v.impact?0.26:0.07);}),w.visuals.end());

@@ -1,5 +1,7 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 class TechniqueRunner {
 public:
@@ -17,6 +19,7 @@ public:
     static void finish_scripted(RunRuntime &,BossBodyState &,const char *reason="finished");
     static bool owns(const RunRuntime &,EnemyHandle);
     static bool validate(const godot::RunState &,const ContentBundle &);
+    static godot::PackedVector2Array shape(const RunRuntime &,const TechniqueState &,bool warning=false);
     static godot::Array snapshot(const RunRuntime &);
 };
 }

@@ -1,0 +1,20 @@
+{
+  "records": [{
+    "name": "CanisRoarDefinition", "section": 364,
+    "fields": [
+      {"name":"id","type":"u32","min":1},
+      {"name":"technique","type":"u32","min":1,"ref":"BossTechniqueDefinition"},
+      {"name":"external_id","type":"string"},
+      {"name":"has_roar","type":"bool"},
+      {"name":"level","type":"u32","max":3},
+      {"name":"roar_time","type":"f64","min":0},
+      {"name":"timing","type":"f64","min":0},
+      {"name":"order_wait","type":"f64","min":0},
+      {"name":"hound_warn","type":"f64","min":0},
+      {"name":"has_hound_speed","type":"bool"},
+      {"name":"hound_speed","type":"f64","min":0},
+      {"name":"burst_duration","type":"f64","min":0}
+    ]
+  }],
+  "enums": {}
+}

@@ -1,5 +1,6 @@
 #pragma once
 #include "run_runtime.h"
+#include "../content/content_bundle.h"
 #include <unordered_map>
 
 namespace speed {

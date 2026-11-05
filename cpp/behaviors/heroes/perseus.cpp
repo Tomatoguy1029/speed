@@ -1,6 +1,7 @@
 #include "perseus.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attacks/bullet.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void PerseusBehavior::activate(RunRuntime &run,double duration) {
     auto &s=run.state;const godot::Rect2 view(s.view_center-s.view_half,s.view_half*2);

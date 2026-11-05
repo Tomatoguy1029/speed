@@ -23,11 +23,13 @@ var cpp_scope: ContentResourceScope
 var frame_view: Node2D
 var cpp_background: Node2D
 var pipeline: RenderPipeline
+var _roar_post: CanvasLayer
 var _camera: Camera2D
 var cam_center := Vector2.ZERO
 var cam_zoom := 1.0
 var view_override: Variant = null
 var shake := 0.0
+var bonus_visual: Node
 
 func _ready() -> void:
 	if bridge!=null:_ready_cpp()
@@ -35,12 +37,6 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	if bridge!=null:_present_cpp(delta)
 
-
-static func draw_warp(c: CanvasItem, position: Vector2, radius: float, now: float, pixel: float) -> void:
-	c.draw_circle(position,radius,Color(0.6,0.3,1.0,0.25))
-	for n in 3:
-		var start := now*(2.0+n)+n*2.1
-		c.draw_arc(position,radius*(0.5+0.2*n),start,start+PI*1.4,24,Color(0.85,0.7,1.0,0.8),pixel*3.0)
 
 ## 値型フレームの重力を描く。
 
@@ -140,6 +136,11 @@ func _ready_cpp() -> void:
 	var layer_count: int = cpp_resources.visuals.size()-3
 	pipeline.setup(get_node(world_path),_camera,[frame_view._layer(10),frame_view._layer(14)],layer_count)
 	frame_view.pipeline = pipeline
+	bonus_visual = preload("res://scripts/render/fx/bonus_stage_visual.gd").new()
+	add_child(bonus_visual)
+	bonus_visual.setup(pipeline,cpp_background)
+	_roar_post = preload("res://scripts/render/bosses/roar_post.gd").new()
+	add_child(_roar_post)
 	sync_canvas_layers()
 
 ## 外観の追加後も画面効果とHUDを全ての敵より手前に保つ。
@@ -148,6 +149,7 @@ func sync_canvas_layers() -> void:
 	for entry: Dictionary in cpp_resources.visuals:
 		overlay_layer = maxi(overlay_layer,int(entry.id)-3)
 	if pipeline!=null: pipeline.set_overlay_layer(overlay_layer)
+	if _roar_post!=null: _roar_post.layer = overlay_layer+2
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	if hud!=null: hud.layer = maxi(hud.layer,overlay_layer+3)
 	preload("res://scripts/ui/canvas_order.gd").world_changed(self,hud.layer if hud!=null else overlay_layer+3)
@@ -169,6 +171,7 @@ func _present_cpp(delta: float) -> void:
 	var render: Dictionary = bridge.read_render(Rect2(cam_center-half,half*2.0),1.0)
 	frame_view.build_us = Time.get_ticks_usec()-began
 	frame_view.boss_hit_feedback.tick(0.0 if frame_view.authoring_paused or frame.ui.get("presentation_frozen",false) else delta)
+	frame_view.prepare_reference_view(get_viewport().get_visible_rect().size,cam_center,cam_zoom)
 	if not render.ok or not frame_view.apply_frame(render.value):
 		frame_view.hide()
 		return
@@ -176,6 +179,7 @@ func _present_cpp(delta: float) -> void:
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	cpp_background.update_frame(frame.camera)
 	frame_view.update_effects(frame,delta)
+	frame_view.update_reference_effects(frame,delta)
 	shake=maxf(shake,frame_view.ruler_shake)
 	frame_view.ruler_shake=0.0
 	if frame_view.finish_shake>0.0:
@@ -194,11 +198,14 @@ func _present_cpp(delta: float) -> void:
 		shake = maxf(0.0,shake-delta*40.0)
 		_camera.offset = Vector2.ZERO if not view.is_empty() and not view.get("shake",false) else Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
 	else: _camera.offset = Vector2.ZERO
+	if _roar_post!=null: _roar_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center+_camera.offset,cam_zoom)
 	frame_view.perf.since(&"view_effects",effects_start)
 	var tail_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")
 	if hud!=null: hud.apply_snapshot(frame.ui)
-	pipeline.step(0.0 if frame.ui.get("presentation_frozen",not frame.ui.input_enabled) else delta,cam_center,cam_zoom)
+	var presentation_dt := 0.0 if frame.ui.get("presentation_frozen",not frame.ui.input_enabled) else delta
+	pipeline.step(presentation_dt,cam_center,cam_zoom)
+	bonus_visual.step(presentation_dt,frame.ui,frame_view._warp,cam_center,cam_zoom,frame_view._pixel)
 	frame_view.perf.since(&"view_tail",tail_start)
 
 ## 表示側も読む人ごとの窓で差分を取り、共有の累積値を消さない。

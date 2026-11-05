@@ -2,6 +2,8 @@
 #include "equipment.h"
 #include "../api/run_core.h"
 #include "../behaviors/weapons/forward.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -16,7 +18,7 @@ uint64_t count(const LoadoutState &s,const std::string &id) {
     auto &mutable_state=const_cast<LoadoutState &>(s);const auto *p=ProgressionSystem::post_stacks(mutable_state,id);return p?*p:0;
 }
 double baseline(const RunRuntime &r,const std::string &id) {
-    const auto &s=r.state;const auto &c=r.content->config;const auto &p=s.loadout;
+    const auto &s=r.state;const auto &c=r.content->config;const auto &p=*s.loadout;
     if (id=="max_speed") return s.ship_config.max_speed/(1+ProgressionSystem::post_amount(r,id));
     if (id=="max_hp") return c.ship_config_max_hp+p.hp_profile_add;
     if (id=="crit_chance") return s.combat_config.crit_chance-ProgressionSystem::post_effect(r,id);
@@ -55,7 +57,7 @@ Dictionary post_info(const RunRuntime &r,uint32_t effect) {
     out["total_after"]=fixed?b:id=="charge_time"?(1-b/baseline(r,id))*100:b*100;
     out["unit"]=id=="max_hp"?"HP":id=="crit_mult"?"×":id=="invulnerability"?"s":"%";
     Array intervals,targets;
-    for (const auto &weapon:r.state.loadout.weapons) {
+    for (const auto &weapon:r.state.loadout->weapons) {
         for (const auto &target:r.content->post_max_targets) if (target.equipment==weapon.definition && target.effect==effect && (id=="area" || id=="followup")) targets.append("postmax.target."+String::utf8(r.content->equipment[weapon.definition-1].external_id.c_str())+"."+String::utf8(id.c_str()));
         if (id!="weapon_interval") continue;
         for (const auto &v:r.content->post_max_intervals) if (v.equipment==weapon.definition && v.level==weapon.level) {
@@ -90,15 +92,15 @@ uint64_t *ProgressionSystem::post_stacks(LoadoutState &p,const std::string &id) 
     return nullptr;
 }
 double ProgressionSystem::post_amount(const RunRuntime &r,const std::string &id) {
-    const auto *d=post_definition(r,id);return d?d->increment*double(count(r.state.loadout,id)):0;
+    const auto *d=post_definition(r,id);return d?d->increment*double(count(*r.state.loadout,id)):0;
 }
 double ProgressionSystem::post_reduced(const RunRuntime &r,const std::string &id,double base,uint64_t extra) {
     const auto *d=post_definition(r,id);if (!d) return base;
-    return std::max(std::min(base,std::max(d->minimum_time,base*d->minimum_ratio)),base*(1-d->increment*(double(count(r.state.loadout,id))+double(extra))));
+    return std::max(std::min(base,std::max(d->minimum_time,base*d->minimum_ratio)),base*(1-d->increment*(double(count(*r.state.loadout,id))+double(extra))));
 }
 double ProgressionSystem::post_effect(const RunRuntime &r,const std::string &id,uint64_t extra) {
     const auto *d=post_definition(r,id);if (!d) return 0;
-    const double amount=d->increment*(double(count(r.state.loadout,id))+double(extra));
+    const double amount=d->increment*(double(count(*r.state.loadout,id))+double(extra));
     if (id=="crit_chance") {const auto &crit=r.content->post_crit;const double cap=std::min(1.0,crit.trait_maximum);return std::min(std::max(0.0,cap-std::min(cap,r.content->config.combat_crit_chance+crit.trained_bonus)),amount);}
     if (id=="invulnerability" || id=="repair") return std::min(std::max(0.0,d->maximum-baseline(r,id)),amount);
     if (id=="weapon_interval") return std::min(1-d->minimum_ratio,amount);
@@ -106,16 +108,16 @@ double ProgressionSystem::post_effect(const RunRuntime &r,const std::string &id,
     return amount;
 }
 bool ProgressionSystem::normal_complete(const RunRuntime &r) {
-    const auto &p=r.state.loadout;if (p.weapons.size()<r.content->progression.weapon_slots || p.traits.size()<r.content->progression.trait_slots) return false;
+    const auto &p=*r.state.loadout;if (p.weapons.size()<r.content->progression.weapon_slots || p.traits.size()<r.content->progression.trait_slots) return false;
     for (const auto *list:{&p.weapons,&p.traits}) for (const auto &e:*list) if (e.level<r.content->equipment[e.definition-1].maximum_level) return false;return true;
 }
 bool ProgressionSystem::post_eligible(const RunRuntime &r,uint32_t effect) {
     if (!effect || effect>r.content->post_max.size()) return false;const auto &d=r.content->post_max[effect-1];const auto &id=d.external_id;
-    if (d.increment<=0 || count(r.state.loadout,id)>=UINT32_MAX-1) return false;
+    if (d.increment<=0 || count(*r.state.loadout,id)>=UINT32_MAX-1) return false;
     if (id=="heal") return r.state.ship.hp<r.state.ship_config.max_hp;
     if (id=="weapon_interval" || id=="projectile_speed" || id=="duration" || id=="knockback" || id=="area" || id=="followup") {
         bool target=false;
-        for (const auto &w:r.state.loadout.weapons) for (const auto &v:r.content->post_max_targets) if (v.equipment==w.definition && v.effect==effect) {
+        for (const auto &w:r.state.loadout->weapons) for (const auto &v:r.content->post_max_targets) if (v.equipment==w.definition && v.effect==effect) {
             if (id!="weapon_interval") target=true;
             else for (const auto &base:r.content->post_max_intervals) if (base.equipment==w.definition && base.level==w.level && post_reduced(r,id,base.base,1)<post_reduced(r,id,base.base)-0.000001) target=true;
         }
@@ -134,19 +136,19 @@ uint32_t level_of(const std::vector<EquipmentLevel> &owned,uint32_t id) {
     return 0;
 }
 ResourceRequest *request_for(RunRuntime &run,int64_t candidate) {
-    for (auto &r:run.resource_workspace.requests) if (r.offer_id==run.state.loadout.offer_id && (r.candidate_id==candidate || (run.state.loadout.comet_weapon && r.candidate_id==1))) return &r;
+    for (auto &r:run.resource_workspace.requests) if (r.offer_id==run.state.loadout->offer_id && (r.candidate_id==candidate || (run.state.loadout->comet_weapon && r.candidate_id==1))) return &r;
     return nullptr;
 }
 const ResourceRequest *request_for(const RunRuntime &run,int64_t candidate) {
-    for (const auto &r:run.resource_workspace.requests) if (r.offer_id==run.state.loadout.offer_id && (r.candidate_id==candidate || (run.state.loadout.comet_weapon && r.candidate_id==1))) return &r;
+    for (const auto &r:run.resource_workspace.requests) if (r.offer_id==run.state.loadout->offer_id && (r.candidate_id==candidate || (run.state.loadout->comet_weapon && r.candidate_id==1))) return &r;
     return nullptr;
 }
 CardCandidate *candidate_for(RunRuntime &run,int64_t id) {
-    for (auto &c:run.state.loadout.candidates) if (c.id==id) return &c;
+    for (auto &c:run.state.loadout->candidates) if (c.id==id) return &c;
     return nullptr;
 }
 std::vector<CardCandidate> roll(RunRuntime &run,bool initial) {
-    auto &state=run.state.loadout;const auto &config=run.content->progression;
+    auto &state=*run.state.loadout;const auto &config=run.content->progression;
     struct Weighted {CardCandidate card;double weight;};std::vector<Weighted> pool;
     const bool enhanced=!initial && ProgressionSystem::normal_complete(run);
     if (enhanced) for (const auto &d:run.content->post_max) if (ProgressionSystem::post_eligible(run,d.id)) pool.push_back({{0,CardKind::PostMax,d.id,uint32_t(count(state,d.external_id)+1)},1.0});
@@ -173,13 +175,13 @@ std::vector<CardCandidate> roll(RunRuntime &run,bool initial) {
 }
 void issue(RunRuntime &run,const CardCandidate &card) {
     if (run.resource_workspace.next_id==INT64_MAX) return;
-    ResourceRequest request;request.id=run.resource_workspace.next_id++;request.offer_id=run.state.loadout.offer_id;request.candidate_id=card.id;
-    for (const auto &a:run.content->equipment_assets) if (card.kind!=CardKind::PostMax && a.equipment==(run.state.loadout.comet_weapon?run.state.loadout.comet_weapon:card.definition)) request.asset_keys.push_back(a.asset);
+    ResourceRequest request;request.id=run.resource_workspace.next_id++;request.offer_id=run.state.loadout->offer_id;request.candidate_id=card.id;
+    for (const auto &a:run.content->equipment_assets) if (card.kind!=CardKind::PostMax && a.equipment==(run.state.loadout->comet_weapon?run.state.loadout->comet_weapon:card.definition)) request.asset_keys.push_back(a.asset);
     if (card.kind==CardKind::PostMax) request.status=ResourceStatus::Ready;
     run.resource_workspace.requests.push_back(std::move(request));
 }
 void publish(RunRuntime &run,std::vector<CardCandidate> cards,bool initial) {
-    auto &p=run.state.loadout;
+    auto &p=*run.state.loadout;
     p.candidates=std::move(cards);p.initial_offer=initial;p.offer_id=p.next_offer_id++;p.selected_id=0;
     ProgressionSystem::rebuild_requests(run);run.state.phase=RunState::Phase::LevelUp;run.state.hitstop=0;
     Dictionary event;event["offer_id"]=p.offer_id;event["initial"]=initial;event["count"]=int64_t(p.candidates.size());FrameBuilder::append(run,"offer",event);
@@ -189,11 +191,11 @@ bool grant(RunRuntime &run,const CardCandidate &card) {
         if (!ProgressionSystem::normal_complete(run) || !ProgressionSystem::post_eligible(run,card.definition)) return false;
         const auto &d=run.content->post_max[card.definition-1];
         if (d.external_id=="heal") run.state.ship.hp=std::min(run.state.ship_config.max_hp,run.state.ship.hp+run.state.ship_config.max_hp*d.increment);
-        else {auto *stacks=ProgressionSystem::post_stacks(run.state.loadout,d.external_id);if (!stacks) return false;++*stacks;EquipmentSystem::refresh_effects(run);}
+        else {auto *stacks=ProgressionSystem::post_stacks(*run.state.loadout,d.external_id);if (!stacks) return false;++*stacks;EquipmentSystem::refresh_effects(run);}
         return true;
     }
     const auto *d=definition(run,card.definition);if (!d || card.level>d->maximum_level) return false;
-    const auto &owned=d->kind==0?run.state.loadout.weapons:run.state.loadout.traits;
+    const auto &owned=d->kind==0?run.state.loadout->weapons:run.state.loadout->traits;
     return level_of(owned,card.definition)+1==card.level && EquipmentSystem::grant(run,card.definition);
 
 }
@@ -201,8 +203,8 @@ Dictionary card_value(const RunRuntime &run,const CardCandidate &card) {
     Dictionary value;value["candidate_id"]=card.id;value["kind"]=symbol_name(card.kind);
     if (card.kind==CardKind::PostMax) {value["id"]=String::utf8(run.content->post_max[card.definition-1].external_id.c_str());value["level"]=int64_t(card.level);value["info"]=post_info(run,card.definition);value["request_id"]=0;return value;}
     const auto *d=definition(run,card.definition);value["id"]=String::utf8(d?d->external_id.c_str():"");value["level"]=card.level;
-    if (run.state.loadout.comet_weapon) {const auto &target=run.content->equipment[run.state.loadout.comet_weapon-1];value["new"]=String::utf8(target.external_id.c_str());value["resource_kind"]="weapon";value["resource_id"]=value["new"];value["resource_level"]=target.maximum_level;if (card.kind==CardKind::Keep) value["id"]="keep";}
-    if (run.state.loadout.initial_offer) value["start"]=true;
+    if (run.state.loadout->comet_weapon) {const auto &target=run.content->equipment[run.state.loadout->comet_weapon-1];value["new"]=String::utf8(target.external_id.c_str());value["resource_kind"]="weapon";value["resource_id"]=value["new"];value["resource_level"]=target.maximum_level;if (card.kind==CardKind::Keep) value["id"]="keep";}
+    if (run.state.loadout->initial_offer) value["start"]=true;
     const auto *r=request_for(run,card.id);value["request_id"]=r?r->id:0;return value;
 }
 void notify_grant(RunRuntime &run,const CardCandidate &card) {
@@ -211,7 +213,7 @@ void notify_grant(RunRuntime &run,const CardCandidate &card) {
 }
 }
 bool ProgressionSystem::development(SpeedRunCore &core,const String &kind,const Dictionary &data) {
-    auto &r=core.runtime;auto &p=r.state.loadout;
+    auto &r=core.runtime;auto &p=*r.state.loadout;
     if (kind=="comet_weapon") {
         if (data.size()!=1 || data.get("id",Variant()).get_type()!=Variant::STRING) return false;
         const String id=data["id"];for (const auto &d:r.content->equipment) if (d.comet_only && String::utf8(d.external_id.c_str())==id) {p.pending_comet_weapons.push_back(d.id);return true;}return false;
@@ -244,17 +246,17 @@ bool ProgressionSystem::development(SpeedRunCore &core,const String &kind,const 
     return false;
 }
 void ProgressionSystem::initialize(RunRuntime &run,bool initial) {
-    auto &p=run.state.loadout;const auto meta_levels=p.meta_levels;const double hp_add=p.hp_profile_add,xp_factor=p.xp_profile_factor,reroll_add=p.reroll_profile_add;const double charge_factor=p.charge_profile_factor,speed_factor=p.speed_profile_factor,attack_factor=p.attack_profile_factor,pickup_factor=p.pickup_profile_factor,length_factor=p.length_profile_factor;p={};p.charge_profile_factor=charge_factor;p.speed_profile_factor=speed_factor;p.attack_profile_factor=attack_factor;p.pickup_profile_factor=pickup_factor;p.length_profile_factor=length_factor;p.meta_levels=meta_levels;p.hp_profile_add=hp_add;p.xp_profile_factor=xp_factor;p.reroll_profile_add=reroll_add;p.ready=true;p.rerolls=run.content->progression.reroll_count+int64_t(std::llround(reroll_add));
+    auto &p=*run.state.loadout;const auto meta_levels=p.meta_levels;const double hp_add=p.hp_profile_add,xp_factor=p.xp_profile_factor,reroll_add=p.reroll_profile_add;const double charge_factor=p.charge_profile_factor,speed_factor=p.speed_profile_factor,attack_factor=p.attack_profile_factor,pickup_factor=p.pickup_profile_factor,length_factor=p.length_profile_factor;p={};p.charge_profile_factor=charge_factor;p.speed_profile_factor=speed_factor;p.attack_profile_factor=attack_factor;p.pickup_profile_factor=pickup_factor;p.length_profile_factor=length_factor;p.meta_levels=meta_levels;p.hp_profile_add=hp_add;p.xp_profile_factor=xp_factor;p.reroll_profile_add=reroll_add;p.ready=true;p.rerolls=run.content->progression.reroll_count+int64_t(std::llround(reroll_add));
     if (!initial) p.weapons.push_back({1,1});else run.state.forward.ready=false;
     EquipmentSystem::refresh_effects(run);
     run.resource_workspace.requests.clear();
 }
 double ProgressionSystem::next_xp(const RunRuntime &run) {
-    const auto &c=run.content->progression;const double level=run.state.loadout.level;
+    const auto &c=run.content->progression;const double level=run.state.loadout->level;
     return c.xp_base+c.xp_growth*level+c.xp_curve*level*level;
 }
 bool ProgressionSystem::add_experience(SpeedRunCore &core,double amount) {
-    auto &run=core.runtime;auto &p=run.state.loadout;
+    auto &run=core.runtime;auto &p=*run.state.loadout;
     if (!p.ready || !std::isfinite(amount) || amount<0 || !std::isfinite(p.xp+amount) || !std::isfinite(p.xp_gained+amount)) return false;
     p.xp+=amount;p.xp_gained+=amount;
     while (p.xp>=next_xp(run)) {
@@ -267,7 +269,7 @@ bool ProgressionSystem::add_experience(SpeedRunCore &core,double amount) {
     return true;
 }
 bool ProgressionSystem::open(SpeedRunCore &core,bool initial) {
-    auto &run=core.runtime;auto &p=run.state.loadout;
+    auto &run=core.runtime;auto &p=*run.state.loadout;
     if (!p.ready || run.state.phase!=RunState::Phase::Play || run.state.draw.drawing || run.state.draw.tracing || p.offer_id || p.next_offer_id==INT64_MAX) return false;
     if (!initial) while (!p.pending_comet_weapons.empty()) {
         const auto id=p.pending_comet_weapons.front();p.pending_comet_weapons.erase(p.pending_comet_weapons.begin());
@@ -283,42 +285,42 @@ bool ProgressionSystem::open(SpeedRunCore &core,bool initial) {
     publish(run,std::move(cards),initial);return true;
 }
 bool ProgressionSystem::choose(RunRuntime &run,int64_t offer,int64_t candidate) {
-    auto &p=run.state.loadout;
+    auto &p=*run.state.loadout;
     if (run.state.phase!=RunState::Phase::LevelUp || p.offer_id!=offer || !candidate_for(run,candidate)) return false;
     p.selected_id=candidate;return true;
 }
 bool ProgressionSystem::choose_swap(RunRuntime &run,int64_t offer,int64_t candidate,const String &replace) {
-    const auto *card=candidate_for(run,candidate);if (!card || card->kind!=CardKind::Swap || !run.state.loadout.comet_weapon) return false;
+    const auto *card=candidate_for(run,candidate);if (!card || card->kind!=CardKind::Swap || !run.state.loadout->comet_weapon) return false;
     const auto *d=definition(run,card->definition);return d && String::utf8(d->external_id.c_str())==replace && choose(run,offer,candidate);
 }
 bool ProgressionSystem::cancel(RunRuntime &run,int64_t offer) {
-    if (run.state.phase!=RunState::Phase::LevelUp || run.state.loadout.offer_id!=offer || !offer) return false;
-    run.state.loadout.selected_id=0;return true;
+    if (run.state.phase!=RunState::Phase::LevelUp || run.state.loadout->offer_id!=offer || !offer) return false;
+    run.state.loadout->selected_id=0;return true;
 }
 bool ProgressionSystem::reroll(SpeedRunCore &core,int64_t offer) {
-    auto &p=core.runtime.state.loadout;
+    auto &p=*core.runtime.state.loadout;
     if (core.runtime.state.phase!=RunState::Phase::LevelUp || p.offer_id!=offer || !offer || p.comet_weapon || p.rerolls<=0 || p.next_offer_id==INT64_MAX) return false;
     auto cards=roll(core.runtime,p.initial_offer);if (cards.empty()) return false;
     --p.rerolls;publish(core.runtime,std::move(cards),p.initial_offer);core.emit_event("reroll");return true;
 }
 bool ProgressionSystem::complete(RunRuntime &run,int64_t id,int status) {
     if (status!=1 && status!=-1 && status!=-2) return false;
-    for (auto &r:run.resource_workspace.requests) if (r.id==id && r.offer_id==run.state.loadout.offer_id && r.status==ResourceStatus::Pending) {r.status=ResourceStatus(status);return true;}
+    for (auto &r:run.resource_workspace.requests) if (r.id==id && r.offer_id==run.state.loadout->offer_id && r.status==ResourceStatus::Pending) {r.status=ResourceStatus(status);return true;}
     return false;
 }
 bool ProgressionSystem::retry(RunRuntime &run,int64_t id) {
     if (run.resource_workspace.next_id==INT64_MAX) return false;
-    for (auto &r:run.resource_workspace.requests) if (r.id==id && r.offer_id==run.state.loadout.offer_id && r.status==ResourceStatus::Failed) {
+    for (auto &r:run.resource_workspace.requests) if (r.id==id && r.offer_id==run.state.loadout->offer_id && r.status==ResourceStatus::Failed) {
         r.id=run.resource_workspace.next_id++;r.status=ResourceStatus::Pending;return true;
     }
     return false;
 }
 void ProgressionSystem::rebuild_requests(RunRuntime &run) {
     run.resource_workspace.requests.clear();
-    for (const auto &card:run.state.loadout.candidates) {issue(run,card);if (run.state.loadout.comet_weapon) break;}
+    for (const auto &card:run.state.loadout->candidates) {issue(run,card);if (run.state.loadout->comet_weapon) break;}
 }
 void ProgressionSystem::poll(SpeedRunCore &core) {
-    auto &run=core.runtime;auto &p=run.state.loadout;
+    auto &run=core.runtime;auto &p=*run.state.loadout;
     if (run.state.phase!=RunState::Phase::LevelUp || !p.selected_id) return;
     const auto *request=request_for(run,p.selected_id);const auto *selected=candidate_for(run,p.selected_id);
     if (!selected || (selected->kind!=CardKind::Keep && (!request || request->status!=ResourceStatus::Ready))) return;
@@ -355,7 +357,7 @@ void ProgressionSystem::poll(SpeedRunCore &core) {
     if (!initial) open(core);
 }
 Dictionary ProgressionSystem::ui(const RunRuntime &run) {
-    const auto &p=run.state.loadout;Dictionary out,cards;Array candidates,weapons,traits;
+    const auto &p=*run.state.loadout;Dictionary out,cards;Array candidates,weapons,traits;
     for (const auto &c:p.candidates) candidates.append(card_value(run,c));
     cards["offer_id"]=p.offer_id;cards["candidates"]=candidates;cards["selected_id"]=p.selected_id;cards["preparing"]=false;cards["error_code"]=0;cards["initial"]=p.initial_offer;cards["swap_pick"]=p.comet_weapon?String::utf8(run.content->equipment[p.comet_weapon-1].external_id.c_str()):String();cards["comet_direct"]=p.comet_direct;
     if (const auto *r=request_for(run,p.selected_id)) {cards["preparing"]=r->status==ResourceStatus::Pending;cards["error_code"]=int(r->status)<0?int(r->status):0;cards["request_id"]=r->id;}

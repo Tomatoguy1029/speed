@@ -12,6 +12,9 @@ import sys
 import tempfile
 import zipfile
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from runtime_id import runtime_id
+
 
 def run(command, env=None):
     subprocess.run([str(part) for part in command], check=True, env=env)
@@ -26,7 +29,8 @@ def build(root, lock, args, arch, output):
     run([args.scons, '-C', root / 'cpp', '-j', args.jobs,
          'godot_cpp_dir=' + str(args.sdk.resolve()), 'platform=' + args.platform,
          'arch=' + arch, 'target=template_release', 'precision=' + lock['precision'],
-         'output_dir=' + str(output), 'build_dir=' + str(args.build_dir.resolve())])
+         'output_dir=' + str(output), 'build_dir=' + str(args.build_dir.resolve()),
+         *(['cache_dir=' + str(args.cache_dir.resolve())] if args.cache_dir else [])])
 
 
 def prepare_verification(root, project):
@@ -155,6 +159,7 @@ def main():
     parser.add_argument('--arch', choices=['arm64', 'x86_64'], help='単体ビルドのCPU。配布時は対象CPUをすべて作る')
     parser.add_argument('--output', type=Path, help='単体ビルドの共有ライブラリ出力先')
     parser.add_argument('--build-dir', type=Path, default=Path(tempfile.gettempdir()) / 'speed-run-build' / hashlib.sha256(str(root).encode()).hexdigest()[:12], help='ソース外の中間object出力先')
+    parser.add_argument('--cache-dir', type=Path, help='内容で再利用するobjectの共有キャッシュ')
     parser.add_argument('--package-dir', type=Path, help='新しい独立作業先。ビルド・共通生成・exportを順に行う')
     parser.add_argument('--godot', help='dependencies.jsonと一致するGodot本体')
     parser.add_argument('--templates', type=Path, help='version.txtを持つ固定版export templateディレクトリ')
@@ -184,7 +189,11 @@ def main():
     if args.package_dir:
         package(root, lock, args)
     else:
-        build(root, lock, args, args.arch, (args.output or root / 'speed/extensions/run/bin').resolve())
+        output = (args.output or root / 'speed/extensions/run/bin').resolve()
+        build(root, lock, args, args.arch, output)
+        # 開発用プラグインが、配置済みライブラリとソースの対応を判定する記録。
+        record = output / (library_name(args.platform, args.arch) + '.json')
+        record.write_text(json.dumps({'runtime_id': runtime_id(root / 'cpp'), 'source': 'local'}))
     return 0
 
 

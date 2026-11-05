@@ -1,11 +1,14 @@
 #pragma once
 #include "../../runtime/run_runtime.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 struct SlashParams {
     godot::Vector2 position;
     double angle=0,speed=0,size=0,range=0,damage=0,side=1;
     EnemyHandle owner;
     BudgetToken budget;
+    uint32_t lynx_definition=0;
+    godot::Vector2 paw_offset;
 };
 class SlashSystem {
 public:

@@ -8,6 +8,7 @@
 #include "../../systems/attacks/friend_debris.h"
 #include "../../systems/attacks/zone.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 namespace {

@@ -1,6 +1,7 @@
 #include "population_system.h"
 #include "attack_budget.h"
 #include "../runtime/run_runtime.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 double PopulationSystem::sample_curve(const SpawnTimeline::Curve &curve, double at) {

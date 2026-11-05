@@ -4,11 +4,12 @@
 #include "../../systems/combat_resolver.h"
 #include "../../systems/attacks/friend_debris.h"
 #include "../../output/event_builder.h"
+#include "../../state/loadout_state.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 void KnockbackBehavior::defeated(RunRuntime &run,const DeathContext &death) {
-    auto &k=run.state.loadout.knockback;const auto &p=run.state.loadout;
+    auto &k=run.state.loadout->knockback;const auto &p=*run.state.loadout;
     const auto depth=death.request.shatter_depth;
     if (!k.ready || death.hull_used || !death.one_shot || depth<0 || uint32_t(depth)>k.chain_limit) return;
     if (run.state.control.rng.randf()>=k.chance*std::pow(0.5,depth)) return;
@@ -22,8 +23,8 @@ void KnockbackBehavior::defeated(RunRuntime &run,const DeathContext &death) {
     if (FriendDebrisSystem::scatter(run,scatter)) k.visuals.push_back({death.corpse.pos,++k.serial,false,run.state.world_time});
 }
 void KnockbackBehavior::step(RunRuntime &run,double) {
-    auto &k=run.state.loadout.knockback;
+    auto &k=run.state.loadout->knockback;
     k.visuals.erase(std::remove_if(k.visuals.begin(),k.visuals.end(),[&](const auto &v){return run.state.world_time-v.born_world_time>=(v.hit?0.3:0.8);}),k.visuals.end());
 }
-void KnockbackBehavior::hit(RunRuntime &run,godot::Vector2 position) {auto &k=run.state.loadout.knockback;if (k.ready) k.visuals.push_back({position,++k.serial,true,run.state.world_time});}
+void KnockbackBehavior::hit(RunRuntime &run,godot::Vector2 position) {auto &k=run.state.loadout->knockback;if (k.ready) k.visuals.push_back({position,++k.serial,true,run.state.world_time});}
 }

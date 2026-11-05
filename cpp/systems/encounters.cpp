@@ -6,6 +6,7 @@
 #include "combat_resolver.h"
 #include "../runtime/run_runtime.h"
 #include "../output/frame_builder.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {

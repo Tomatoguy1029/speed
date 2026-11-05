@@ -33,6 +33,7 @@ var _cpp_pending_result: Dictionary = {}
 var _cpp_published_result := 0
 var resources: ContentResourceScope
 var _loading: CanvasLayer
+var _fast_loading := false
 ## resource_wait_msは要求の投入と暗転中の経過を含む。ほかの区間と単純合算しない。
 var loading_timings: Dictionary = {}
 var _load_started_us := 0
@@ -91,6 +92,7 @@ func _process(_delta: float) -> void:
 		return
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PREDELETE:
+		_end_fast_loading()
 		# 受付停止後、記録・資源・表示・C++・登録の順に片付ける。
 		_cpp_accepting = false
 		if SaveManager.settings_changed.is_connected(_on_cpp_settings_changed): SaveManager.settings_changed.disconnect(_on_cpp_settings_changed)
@@ -153,8 +155,16 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 		resources = ContentResourceScope.new()
 		resources.warmup_complete = true
 	loading_timings["resource_request_ms"] = (Time.get_ticks_usec()-_load_started_us)/1000.0
+	if with_view and not (resources.is_ready() and resources.warmup_complete):
+		_fast_loading = true
+		ContentManager.begin_fast_loading()
 	_poll_cpp_loading()
 	return cpp_error
+
+func _end_fast_loading() -> void:
+	if not _fast_loading: return
+	_fast_loading = false
+	ContentManager.end_fast_loading()
 
 func _on_cpp_settings_changed() -> void:
 	_apply_cpp_settings.call_deferred()
@@ -195,6 +205,7 @@ func _poll_cpp_loading() -> void:
 		_fail_cpp_loading(ERR_INVALID_DATA)
 		return
 	loading_timings["simulation_initialize_ms"] = (Time.get_ticks_usec()-initialize_started)/1000.0
+	_end_fast_loading()
 	if _loading!=null:
 		_loading.queue_free()
 		_loading = null
@@ -237,9 +248,11 @@ func _poll_cpp_loading() -> void:
 		recorder.attach_cpp(self)
 	# 配布では開発用スクリプトを除くため、エディター実行時だけ取得する。
 	if OS.has_feature("editor"):
+		var identity_started := Time.get_ticks_usec()
 		var identity = load("res://scripts/dev/recording_identity.gd")
 		bridge.recording_origin["conditions"] = identity.capture(self)
 		bridge.recording_origin.merge(bridge.recording_origin.conditions.run_state,true)
+		loading_timings["recording_identity_ms"] = (Time.get_ticks_usec()-identity_started)/1000.0
 	started.emit()
 	_apply_cpp_settings()
 	var publish_started := Time.get_ticks_usec()
@@ -247,7 +260,17 @@ func _poll_cpp_loading() -> void:
 	loading_timings["initial_publish_ms"] = (Time.get_ticks_usec()-publish_started)/1000.0
 	# 総時間とresource_request_msは内包区間を持つ。項目を足して総時間にしない。
 	loading_timings["loading_total_ms"] = (Time.get_ticks_usec()-_start_started_us)/1000.0
+	if OS.is_debug_build() and with_view: _print_loading_timings()
 	if not delivered.ok: push_warning(delivered.message)
+
+## 出撃の読み込みの内訳を出力へ1行で出す。資源の待ちは要求を含み、合計は全区間を含む。
+func _print_loading_timings() -> void:
+	var t := loading_timings
+	var ms := func(key: String) -> String: return "%.0f" % float(t.get(key,0.0))
+	print("出撃の読み込み: 合計 %sms（データ読込 %s / C++設定 %s / 資源の待ち %s / shader準備 %s（%d件）/ 開始 %s / 画面の用意 %s / 記録の識別 %s / 最初の配信 %s）" % [
+		ms.call("loading_total_ms"), ms.call("bundle_read_ms"), ms.call("core_configure_ms"), ms.call("resource_wait_ms"),
+		ms.call("shader_warmup_ms"), resources.warm_materials.size() if resources!=null else 0, ms.call("simulation_initialize_ms"),
+		ms.call("presentation_setup_ms"), ms.call("recording_identity_ms"), ms.call("initial_publish_ms")])
 
 func _fail_cpp_loading(error: Error) -> void:
 	cpp_error = error
@@ -256,6 +279,7 @@ func _fail_cpp_loading(error: Error) -> void:
 	_pending_cpp.clear()
 	if resources!=null: resources.cancel()
 	cpp_resources = null
+	_end_fast_loading()
 	if _loading!=null:
 		_loading.queue_free()
 		_loading = null

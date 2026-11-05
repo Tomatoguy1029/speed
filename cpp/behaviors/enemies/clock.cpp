@@ -5,6 +5,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/attacks/wall.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void ClockBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     auto &s=r.state;auto &e=s.enemies[row];const auto &d=r.content->definitions[e.definition];const auto &p=r.content->clocks[d.clock_definition-1];const auto self=s.enemy_handles.at(row);

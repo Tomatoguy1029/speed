@@ -5,6 +5,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/attacks/zone.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -30,13 +31,19 @@ void CrabBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     if (e.mode!=EnemyMode::Move) admit();
     switch (e.mode) {
     case EnemyMode::Move: {
-        steer(r,row);const auto center=e.pos+walk(e)*(e.radius+p.reach*0.5);const double radius=p.reach*0.6;
+        const auto to=s.ship_pos-e.pos;const double distance=to.length(),min_distance=e.radius*std::abs(p.fx_reach_r-p.fx_hit_r),max_distance=e.radius*(p.fx_reach_r+p.fx_hit_r);
+        const TrackingPolicy tracking{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)};
+        if (!tracking.locked() && distance>0 && distance>=min_distance && distance<=max_distance && distance<=p.approach) {
+            const auto center=e.pos+godot::Vector2::from_angle(e.facing)*(e.radius*p.fx_reach_r);
+            if (center.distance_squared_to(s.ship_pos)>e.radius*e.radius*p.fx_hit_r*p.fx_hit_r) e.facing=to.angle();
+        } else steer(r,row);
+        const auto center=e.pos+godot::Vector2::from_angle(e.facing)*(e.radius*p.fx_reach_r);const double radius=e.radius*p.fx_hit_r;
         if (center.distance_squared_to(s.ship_pos)<=radius*radius && e.pos.distance_squared_to(s.ship_pos)<=p.approach*p.approach) {e.vel={};if (admit()) {e.mode=EnemyMode::Windup;e.timer=std::max(0.01,p.telegraph);e.charge=0;}}
         else {e.vel=walk(e)*e.speed;budget.cancel_wait(owner,e.id);}break;
     }
     case EnemyMode::Windup:
         e.vel={};e.timer=std::max(0.0,e.timer-dt);e.charge=std::clamp(1.0-e.timer/std::max(0.01,p.telegraph),0.0,1.0);
-        if (e.timer<=0) {ZoneParams zone;zone.position=e.pos+walk(e)*(e.radius+p.reach*0.5);zone.radius=p.reach*0.6;zone.damage=p.damage;zone.color=d.color.lightened(0.3);zone.owner=self;zone.attached=true;if (e.attack_managed) zone.budget.value=budget.token(owner);std::get<CrabState>(e.behavior_state).sweep=ZoneSystem::emit(r,zone);e.mode=EnemyMode::Recover;e.timer=std::max(0.01,p.open_time);e.charge=0;}break;
+        if (e.timer<=0) {ZoneParams zone;zone.position=e.pos+godot::Vector2::from_angle(e.facing)*(e.radius*p.fx_reach_r);zone.radius=e.radius*p.fx_hit_r;zone.damage=p.damage;zone.color=d.color.lightened(0.3);zone.owner=self;zone.attached=true;if (e.attack_managed) zone.budget.value=budget.token(owner);std::get<CrabState>(e.behavior_state).sweep=ZoneSystem::emit(r,zone);e.mode=EnemyMode::Recover;e.timer=std::max(0.01,p.open_time);e.charge=0;}break;
     case EnemyMode::Recover:
         e.vel={};e.timer-=dt;if (e.timer<=0) {clear(r,self);e.mode=EnemyMode::Move;}break;
     default:break;

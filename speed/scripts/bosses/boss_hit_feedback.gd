@@ -4,6 +4,12 @@ const DURATION := 0.12
 const MAX_WHITE := 0.28
 const MAX_OFFSET := 2.5
 const MAX_ANGLE := 0.0035
+const PHASE_RATE := 86.0
+const SEED_MODULO := 23
+const SEED_RATE := 0.71
+const Y_RATE := 1.17
+const ANGLE_RATE := 0.83
+const OFFSET_SCALE := 0.70710678
 var clock := 0.0
 var remaining: Dictionary = {}
 
@@ -18,10 +24,10 @@ func tick(real_dt: float) -> void:
 
 func sample(enemy_id: int) -> Dictionary:
 	var strength := float(remaining.get(enemy_id, 0.0)) / DURATION
-	var phase := clock * 86.0 + float(enemy_id % 23) * 0.71
+	var phase := clock * PHASE_RATE + float(enemy_id % SEED_MODULO) * SEED_RATE
 	return {"white": MAX_WHITE * strength,
-		"offset": Vector2(sin(phase), cos(phase * 1.17)) * MAX_OFFSET * strength * 0.70710678,
-		"angle": sin(phase * 0.83) * MAX_ANGLE * strength}
+		"offset": Vector2(sin(phase), cos(phase * Y_RATE)) * MAX_OFFSET * strength * OFFSET_SCALE,
+		"angle": sin(phase * ANGLE_RATE) * MAX_ANGLE * strength}
 
 func clear() -> void:
 	remaining.clear()

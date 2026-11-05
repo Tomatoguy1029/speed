@@ -1024,6 +1024,30 @@
       ]
     },
     {
+      "name": "CanisNovaHullPoint",
+      "section": 354,
+      "fields": [
+        {"name": "id", "type": "u32", "min": 1},
+        {"name": "x", "type": "f64"},
+        {"name": "y", "type": "f64"}
+      ]
+    },
+    {
+      "name": "CanisNovaFxDefinition",
+      "section": 355,
+      "fields": [
+        {"name": "id", "type": "u32", "min": 1},
+        {"name": "source_width", "type": "u32", "min": 1},
+        {"name": "source_height", "type": "u32", "min": 1},
+        {"name": "gather_time", "type": "f64", "min": 0},
+        {"name": "hound_delay", "type": "f64", "min": 0},
+        {"name": "flash_delay", "type": "f64", "min": 0},
+        {"name": "roar_level", "type": "u32", "min": 1, "max": 3},
+        {"name": "roar_time", "type": "f64", "min": 0},
+        {"name": "timing", "type": "f64", "min": 0}
+      ]
+    },
+    {
       "name": "CanisSiriusFlameDefinition",
       "section": 353,
       "fields": [

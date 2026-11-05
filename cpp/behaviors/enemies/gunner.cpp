@@ -5,6 +5,7 @@
 #include "../../systems/attack_budget.h"
 #include "../../systems/attacks/bullet.h"
 #include "pursuit.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 bool GunnerTiming::advance(double &remaining,double &charge,double dt,double warn,double interval) {
     RemainingTimer timer{remaining};timer.advance(dt);remaining=timer.remaining;

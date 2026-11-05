@@ -1,4 +1,5 @@
 #include "../api/run_core.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>

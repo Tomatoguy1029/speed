@@ -1,11 +1,21 @@
 ## 利用するmaterialを専用の小さなViewportで描き、戦闘の前に描画パイプラインを準備する。
 extends SubViewport
+const COLLECT_BUDGET_US := 4000
+## 1回に並べるmaterialの上限。並べた回の最も長いフレームが GROW_SECONDS 未満なら倍にし、SHRINK_SECONDS を超えたら半分にする。
+const MAX_BATCH := 64
+const GROW_SECONDS := 1.0 / 30.0
+const SHRINK_SECONDS := 0.1
 var _scope: ContentResourceScope
 var _frames := 0
 var _material_index := 0
+var _batch := 1
+var _batch_count := 0
+var _batch_longest := 0.0
 var _layers: Array[CanvasLayer] = []
 var _texture: Texture2D
 var _lit_texture: CanvasTexture
+var _sources: Array = []
+var _source_index := 0
 func prepare(scope: ContentResourceScope) -> void:
 	_scope = scope
 	scope.warming = true
@@ -34,13 +44,8 @@ func prepare(scope: ContentResourceScope) -> void:
 	var unshaded := CanvasItemMaterial.new()
 	unshaded.light_mode = CanvasItemMaterial.LIGHT_MODE_UNSHADED
 	materials.append(unshaded)
-	for resource in scope.resources.values():
-		if resource is Shader and resource.get_mode() == Shader.MODE_CANVAS_ITEM:
-			var material := ShaderMaterial.new()
-			material.shader = resource
-			materials.append(material)
-		elif resource is ShaderMaterial: materials.append(resource)
 	scope.warm_materials = materials
+	_sources = scope.resources.values()
 	for lit in [false, true]:
 		var layer := CanvasLayer.new()
 		layer.layer = 1 if lit else 0
@@ -107,31 +112,53 @@ func _geometry(parent: Node, material: Material, texture: Texture2D) -> void:
 		batch.add(Vector2(8, 8), 0.0, 4.0, Color.WHITE)
 		batch.end()
 		parent.add_child(batch)
-func _process(_dt: float) -> void:
+## materialの作成も主スレッドを止めるので、1フレーム分ずつ進める。
+func _collect_materials() -> void:
+	var began := Time.get_ticks_usec()
+	while _source_index < _sources.size() and Time.get_ticks_usec()-began < COLLECT_BUDGET_US:
+		var resource: Variant = _sources[_source_index]
+		_source_index += 1
+		if resource is Shader and resource.get_mode() == Shader.MODE_CANVAS_ITEM:
+			var material := ShaderMaterial.new()
+			material.shader = resource
+			_scope.warm_materials.append(material)
+		elif resource is ShaderMaterial: _scope.warm_materials.append(resource)
+
+func _process(delta: float) -> void:
 	if _scope == null: return
 	if _scope.cancelled:
 		_scope.warming = false
 		_scope = null
 		queue_free()
 		return
+	if _source_index < _sources.size():
+		_collect_materials()
+		return
 	# 一度に全materialを投入すると、最初の描画だけでロード表示まで止まる。
-	# 同じ幾何と照明の組をmaterialごとに描き、各組の描画を終えてから次へ進む。
+	# 同じ幾何と照明の組を数個のmaterialずつ描き、各組の描画を終えてから次へ進む。
+	# 並べる数はフレームの長さを見て増減し、ロード表示を止めない範囲でまとめる。
 	if _frames > 0:
 		_frames += 1
+		_batch_longest = maxf(_batch_longest, delta)
 		if _frames < 3: return
 		for layer in _layers:
 			for child in layer.get_children():
 				if child is DirectionalLight2D: continue
 				layer.remove_child(child)
 				child.queue_free()
-		_material_index += 1
+		_material_index += _batch_count
+		if _batch_longest < GROW_SECONDS: _batch = mini(_batch * 2, MAX_BATCH)
+		elif _batch_longest > SHRINK_SECONDS: _batch = maxi(_batch >> 1, 1)
 		_frames = 0
 		_scope.warmup_progress = float(_material_index) / _scope.warm_materials.size()
-	if _material_index == _scope.warm_materials.size():
+	if _material_index >= _scope.warm_materials.size():
 		_finish()
 		return
-	for index in _layers.size():
-		_geometry(_layers[index], _scope.warm_materials[_material_index], _lit_texture if index == 1 else _texture)
+	_batch_count = mini(_batch, _scope.warm_materials.size() - _material_index)
+	for offset in _batch_count:
+		for index in _layers.size():
+			_geometry(_layers[index], _scope.warm_materials[_material_index + offset], _lit_texture if index == 1 else _texture)
+	_batch_longest = 0.0
 	_frames = 1
 func _finish() -> void:
 	_scope.warmup_complete = true

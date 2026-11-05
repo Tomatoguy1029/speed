@@ -1,5 +1,8 @@
 #include "strike_shape.h"
 #include "../../systems/combat_resolver.h"
+#include "../../systems/boss_contact.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 namespace speed {
 void MonocerosStrike::damage(RunRuntime &r,TechniqueState &t,const godot::PackedVector2Array &before,const godot::PackedVector2Array &points,double width) {
     if (t.hit || t.stage!=TechniqueStage::Active) return;
@@ -7,6 +10,6 @@ void MonocerosStrike::damage(RunRuntime &r,TechniqueState &t,const godot::Packed
     if (!r.state.observations.check(t.observation_id,CollisionQuery::touches(shape,{t.previous_ship,r.state.ship_pos,r.state.ship_config.ship_radius},{true,true}))) return;
     ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=r.content->boss_techniques[t.definition-1].damage;request.scale=DamageScale::AtkScale;request.cause=Cause::Horn;
     request.source=r.state.enemies[t.actor.slot].definition+1;request.technique=t.definition;
-    CombatResolver::ship_damage(r,request);t.hit=true;
+    CombatResolver::ship_damage(r,request);BossContactSystem::knock_back(r,t.actor);t.hit=true;
 }
 }

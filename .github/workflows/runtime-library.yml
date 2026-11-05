@@ -1,0 +1,120 @@
+name: 開発用ライブラリ
+
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/runtime-library.yml, cpp/**, tools/build/**]
+
+concurrency:
+  group: runtime-library-${{ github.ref }}
+
+permissions:
+  contents: write
+
+env:
+  PYTHONUTF8: '1'
+  RELEASE_TAG: runtime-library
+  RETENTION_DAYS: '30'
+
+jobs:
+  identify:
+    name: 配布の要否を判定
+    runs-on: ubuntu-24.04
+    outputs:
+      runtime_id: ${{ steps.identify.outputs.runtime_id }}
+      targets: ${{ steps.identify.outputs.targets }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 公開先を用意し、未配布の対象を選ぶ
+        id: identify
+        run: |
+          gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" \
+            --prerelease --latest=false --target "$GITHUB_SHA" --title '開発用ライブラリ' \
+            --notes 'Godotの開発用プラグインが取得するC++ライブラリの置き場所です。ゲームの配布物ではありません。'
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json, subprocess, sys
+          sys.path.insert(0, 'tools/build')
+          from runtime_id import runtime_id
+          identifier = runtime_id('cpp')
+          data = json.loads(subprocess.check_output(['gh', 'release', 'view', 'runtime-library', '--json', 'assets']))
+          present = {asset['name'] for asset in data['assets']}
+          every = [
+              {'os': 'macos-14', 'platform': 'macos', 'arch': 'arm64', 'file': 'libspeed_runtime.macos.template_release.arm64.dylib'},
+              {'os': 'macos-14', 'platform': 'macos', 'arch': 'x86_64', 'file': 'libspeed_runtime.macos.template_release.x86_64.dylib'},
+              {'os': 'windows-2022', 'platform': 'windows', 'arch': 'x86_64', 'file': 'speed_runtime.windows.template_release.x86_64.dll'},
+          ]
+          missing = [row for row in every if f'{identifier}-{row["file"]}.sha256' not in present]
+          print('runtime_id=' + identifier)
+          print('targets=' + json.dumps(missing))
+          PY
+
+  build:
+    name: '${{ matrix.target.platform }} ${{ matrix.target.arch }}'
+    needs: identify
+    if: needs.identify.outputs.targets != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.identify.outputs.targets) }}
+    runs-on: ${{ matrix.target.os }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUNTIME_ID: ${{ needs.identify.outputs.runtime_id }}
+      LIBRARY: ${{ matrix.target.file }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 固定SDKとSConsを準備
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, subprocess, sys
+          lock = json.loads(pathlib.Path('cpp/dependencies.json').read_text())
+          sdk = pathlib.Path(os.environ['RUNNER_TEMP']) / 'godot-cpp'
+          subprocess.run(['git', 'init', str(sdk)], check=True)
+          subprocess.run(['git', '-C', str(sdk), 'remote', 'add', 'origin', lock['godot_cpp']['url']], check=True)
+          subprocess.run(['git', '-C', str(sdk), 'fetch', '--depth=1', 'origin', lock['godot_cpp']['commit']], check=True)
+          subprocess.run(['git', '-C', str(sdk), 'checkout', '--detach', 'FETCH_HEAD'], check=True)
+          subprocess.run([sys.executable, '-m', 'pip', 'install', 'scons==' + lock['scons']], check=True)
+          PY
+      - name: 中間ファイルのキャッシュを復元
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/objects-shared
+          key: objects-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ github.sha }}
+          restore-keys: objects-${{ matrix.target.platform }}-${{ matrix.target.arch }}-
+      - name: ライブラリをビルド
+        run: |
+          python tools/build/build_run.py --sdk "$RUNNER_TEMP/godot-cpp" \
+            --platform '${{ matrix.target.platform }}' --arch '${{ matrix.target.arch }}' \
+            --output "$RUNNER_TEMP/library" --build-dir "$RUNNER_TEMP/objects" \
+            --cache-dir "$RUNNER_TEMP/objects-shared" --jobs 4
+      - name: 公開
+        run: |
+          cd "$RUNNER_TEMP/library"
+          cp "$LIBRARY" "$RUNTIME_ID-$LIBRARY"
+          python -c "import hashlib,sys;print(hashlib.sha256(open(sys.argv[1],'rb').read()).hexdigest())" "$LIBRARY" > "$RUNTIME_ID-$LIBRARY.sha256"
+          # sha256を後に置き、見えた時点で本体が揃っているようにする。
+          gh release upload "$RELEASE_TAG" "$RUNTIME_ID-$LIBRARY" --clobber --repo "$GITHUB_REPOSITORY"
+          gh release upload "$RELEASE_TAG" "$RUNTIME_ID-$LIBRARY.sha256" --clobber --repo "$GITHUB_REPOSITORY"
+
+  prune:
+    name: 古いライブラリを削除
+    needs: [identify, build]
+    if: always() && needs.identify.result == 'success' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      RUNTIME_ID: ${{ needs.identify.outputs.runtime_id }}
+    steps:
+      - name: 保持期間を過ぎたものを消す
+        run: |
+          limit=$(date -u -d "$RETENTION_DAYS days ago" +%Y-%m-%dT%H:%M:%SZ)
+          gh api --paginate "repos/$GITHUB_REPOSITORY/releases/tags/$RELEASE_TAG" \
+            --jq ".assets[] | select(.created_at < \"$limit\" and (.name | startswith(\"$RUNTIME_ID\") | not)) | .id" |
+          while read -r asset; do
+            gh api -X DELETE "repos/$GITHUB_REPOSITORY/releases/assets/$asset"
+          done

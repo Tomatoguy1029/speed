@@ -5,6 +5,7 @@
 #include "../../systems/group_system.h"
 #include "../../systems/attack_budget.h"
 #include "../../output/frame_builder.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <array>
 namespace speed {
@@ -35,7 +36,7 @@ void reform(RunRuntime &r,EnemyHandle king,const CepheusDefinition &p) {
     auto members=soldiers(r,king);uint32_t k=0;
     for (auto member:members) {if (k>=tiers[v.tier-1]) break;SoldierBehavior::configure(r,member,king,k++,f,true);}
     auto &marks=s.groups.summon_marks;marks.erase(std::remove_if(marks.begin(),marks.end(),[&](const auto &m){return m.age>=m.life;}),marks.end());
-    for (;k<tiers[v.tier-1];++k) {const auto at=slot(e,f,k).first;marks.push_back({at,e.pos,r.content->definitions[e.definition].color,0,p.summon_time});godot::Dictionary event;event["pos"]=at;event["king"]=e.pos;event["life"]=p.summon_time;event["color"]=r.content->definitions[e.definition].color;FrameBuilder::append(r,"summon_mark",event);}
+    for (;k<tiers[v.tier-1];++k) {const auto target=slot(e,f,k);const auto at=target.first;const auto &soldier=r.content->definitions[p.soldier-1];double radius=soldier.radius;if (soldier.scaling.ready) {const auto &sc=soldier.scaling;radius=sc.radius*(sc.fixed_sprite?1.0:(e.elite?1.25:1.0))*sc.character*sc.visual*sc.collision;}CepheusMark mark{at,e.pos,r.content->definitions[e.definition].color,0,p.summon_time};mark.visual_owner=e.id;mark.visual_tick=s.control.tick;mark.visual_slot=k;mark.visual_id=soldier.visual_id;mark.visual_angle=target.second;mark.visual_radius=radius;mark.visual_sprite_radius=radius*soldier.sprite_scale;marks.push_back(mark);godot::Dictionary event;event["pos"]=at;event["king"]=e.pos;event["life"]=p.summon_time;event["color"]=r.content->definitions[e.definition].color;FrameBuilder::append(r,"summon_mark",event);}
     e.mode=EnemyMode::Windup;e.timer=p.summon_time;
 }
 }

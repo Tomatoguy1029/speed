@@ -3,17 +3,19 @@
 #include "../../systems/combat_resolver.h"
 #include "../../output/event_builder.h"
 #include "../../output/frame_builder.h"
+#include "../../state/loadout_state.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 namespace speed {
 void VortexBehavior::end(RunRuntime &run) {
-    auto &v=run.state.loadout.vortex;if (!v.ready) return;
+    auto &v=run.state.loadout->vortex;if (!v.ready) return;
     const double duration=v.charge+v.hold+v.collapse;
-    VortexInstance instance;instance.id=++v.serial;instance.pos=run.state.ship.pos;instance.radius=v.radius*run.state.loadout.effects.area;instance.damage=CombatResolver::attack_power(run)*v.damage;instance.duration=duration;v.items.push_back(instance);
+    VortexInstance instance;instance.id=++v.serial;instance.pos=run.state.ship.pos;instance.radius=v.radius*run.state.loadout->effects.area;instance.damage=CombatResolver::attack_power(run)*v.damage;instance.duration=duration;v.items.push_back(instance);
     VortexVisual visual;visual.id=instance.id;visual.pos=instance.pos;visual.life=duration+0.38;v.visuals.push_back(visual);
     godot::Dictionary event;event["pos"]=instance.pos;event["life"]=duration;FrameBuilder::append(run,"end_hole",event);
 }
 void VortexBehavior::step(RunRuntime &run,double dt) {
-    auto &v=run.state.loadout.vortex;if (!v.ready) return;
+    auto &v=run.state.loadout->vortex;if (!v.ready) return;
     for (auto &visual:v.visuals) visual.age+=dt;
     v.visuals.erase(std::remove_if(v.visuals.begin(),v.visuals.end(),[](const auto &visual){return visual.age>=visual.life;}),v.visuals.end());
     for (auto &instance:v.items) {

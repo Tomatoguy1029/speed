@@ -5,6 +5,10 @@ import subprocess
 import tempfile
 from pathlib import Path
 import SCons
+import sys
+
+sys.path.insert(0, str(Path(Dir('.').abspath).parent / 'tools/build'))
+from runtime_id import runtime_id
 
 here = Path(Dir('.').abspath)
 locked = json.loads((here / 'dependencies.json').read_text())
@@ -34,6 +38,9 @@ ARGUMENTS['api_version'] = api
 out = Path(ARGUMENTS.pop('output_dir', str(here / '../speed/extensions/run/bin'))).resolve()
 build = Path(ARGUMENTS.pop('build_dir', str(Path(tempfile.gettempdir()) / 'speed-run-build' / hashlib.sha256(str(here).encode()).hexdigest()[:12]))).resolve()
 SConsignFile(str(build / '.sconsign.dblite'))
+shared_cache = ARGUMENTS.pop('cache_dir', '')
+if shared_cache:
+    CacheDir(shared_cache)
 env = SConscript(str(sdk / 'SConstruct'))
 if env['platform'] not in ['macos', 'windows']:
     Exit('対応するビルド対象は macos と windows です')
@@ -43,24 +50,35 @@ if env.get('is_msvc', False):
 else:
     env.Append(CXXFLAGS=['-ffp-contract=off'])
 name = 'speed_runtime' + env['suffix'] + ('.dylib' if env['platform'] == 'macos' else '.dll')
-sources = Glob('api/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
+sources = Glob('api/*.cpp') + Glob('state/*.cpp') + Glob('systems/*.cpp') + Glob('systems/attacks/*.cpp') + Glob('content/*.cpp') + Glob('runtime/*.cpp') + Glob('output/*.cpp') + Glob('behaviors/heroes/*.cpp') + Glob('behaviors/weapons/*.cpp') + Glob('behaviors/traits/*.cpp') + Glob('behaviors/enemies/*.cpp') + Glob('bosses/flow/*.cpp') + Glob('bosses/monoceros/*.cpp') + Glob('bosses/centaurus/*.cpp') + Glob('bosses/canis_major/*.cpp') + Glob('bosses/hydra/*.cpp') + Glob('bosses/draco/*.cpp')
 objects = []
-# ロード済みC++の実装を、録画時にソース全体を走査せず識別する。
-implementation = hashlib.sha256()
-for path in sorted([here / 'SConstruct', here / 'dependencies.json'] + list(here.rglob('*.h')) + list(here.rglob('*.cpp'))):
-    if sdk == path or sdk in path.parents:
-        continue
-    implementation.update(str(path.relative_to(here)).encode())
-    implementation.update(b'\0')
-    implementation.update(path.read_bytes())
-    implementation.update(b'\0')
+# 外部ヘッダーの解析結果を全ファイルで使い回す。SDKのビルドには影響させない。
+run_env = env.Clone()
+if env.get('is_msvc', False):
+    run_env.Append(CPPPATH=[str(here)], CXXFLAGS=['/FIpch.h'])
+    run_env['PCHSTOP'] = 'pch.h'
+    precompiled = run_env.PCH(str(build / env['platform'] / env['arch'] / 'pch.pch'), 'pch.cpp')
+    run_env['PCH'] = precompiled[0]
+    objects.append(precompiled[1])
+else:
+    pch_file = build / env['platform'] / env['arch'] / 'pch.h.pch'
+    precompiled = env.Command(str(pch_file), 'pch.h', '$SHCXX -x c++-header -Xclang -fno-pch-timestamp $SHCXXFLAGS $SHCCFLAGS $_CCCOMCOM -o $TARGET $SOURCE')
+    # 別のworktreeのビルドがSDKの生成ヘッダーを書き直すので、更新時刻ではなく内容で照合する。
+    run_env.Append(CXXFLAGS=['$(', '-include-pch', str(pch_file), '-fpch-validate-input-files-content', '$)'])
+# ロード済みC++の実装を、録画時と配布時にソース全体を走査せず識別する。
+implementation = runtime_id(here)
+# 識別子を小さい生成ファイルへ閉じ込め、C++を変えても既存のobjectを再コンパイルしない。
+identity_source = build / 'generated' / 'build_identity.cpp'
+identity_source.parent.mkdir(parents=True, exist_ok=True)
+identity_text = 'namespace speed {const char *implementation_sha256() {return "' + implementation + '";}}\n'
+if not identity_source.is_file() or identity_source.read_text() != identity_text:
+    identity_source.write_text(identity_text)
 for source in sources:
     relative = Path(source.abspath).relative_to(here.parent)
     target = build / env['platform'] / env['arch'] / relative.with_suffix('')
-    object_env = env
-    if relative == Path('cpp/output/metrics_builder.cpp'):
-        object_env = env.Clone()
-        object_env.Append(CPPDEFINES=[('SPEED_IMPLEMENTATION_SHA256', '\\"' + implementation.hexdigest() + '\\"')])
-    objects.extend(object_env.SharedObject(str(target), source))
+    objects.extend(run_env.SharedObject(str(target), source))
+objects.extend(run_env.SharedObject(str(build / env['platform'] / env['arch'] / 'generated' / 'build_identity'), str(identity_source)))
+if not env.get('is_msvc', False):
+    Depends(objects, precompiled)
 library = env.SharedLibrary(str(out / name), objects)
 Default(library)

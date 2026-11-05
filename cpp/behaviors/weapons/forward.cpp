@@ -6,6 +6,7 @@
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attacks/friend_shot.h"
 #include "../../output/frame_builder.h"
+#include "../../state/loadout_state.h"
 namespace speed {
 bool ForwardBehavior::advance(godot::RunState::ForwardWeapon &state,double dt,bool busy) {
     state.recoil=remaining_time(state.recoil,dt);
@@ -20,7 +21,7 @@ void ForwardBehavior::set_interval(godot::RunState::ForwardWeapon &state,double 
 void ForwardBehavior::step(RunRuntime &run,double dt) {
     auto &state=run.state;auto &forward=state.forward;
     if (!forward.ready || dt<=0 || state.controls_locked || state.phase!=godot::RunState::Phase::Play) return;
-    const auto &effects=state.loadout.effects;
+    const auto &effects=state.loadout->effects;
     const double rate=state.draw.gauge<1?1:1+effects.full_gauge_rate*state.draw.gauge;
     const double interval=ProgressionSystem::post_reduced(run,"weapon_interval",forward.base_interval)/rate;
     forward.fire.remaining+=interval-forward.interval;forward.interval=interval;

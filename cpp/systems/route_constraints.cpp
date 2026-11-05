@@ -3,6 +3,8 @@
 #include "combat_resolver.h"
 #include "attack_system.h"
 #include "../runtime/run_runtime.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -11,9 +13,9 @@ RouteContext RouteConstraints::context(const RunRuntime &run) {
     c.ship_radius=ship.ship_radius;c.field_radius=ship.field_radius;c.point_step=d.point_step;c.zoom=s.control.camera_zoom;c.gauge=s.draw.gauge;c.capacity=d.capacity;c.min_charge=d.min_charge;
     c.draw_length=d.length;c.max_speed=ship.max_speed;c.base_speed=ship.base_max_speed;c.length_mult=d.length_mult;c.confirm_delay=d.confirm_delay;c.run_time=d.run_time;c.hitstop_cap=s.combat_config.kill_hitstop_cap;
     c.time_scale=d.time_scale;c.scale_min=d.scale_min;c.pending_world=s.control.world_dt_accum;c.attack=CombatResolver::attack_power(run);
-    c.window_attack=s.combat_config.base_attack*s.combat_config.atk_scale*std::min(1.0,s.combat_config.attack_mult)*std::min(1.0,s.loadout.effects.burst_power);
+    c.window_attack=s.combat_config.base_attack*s.combat_config.atk_scale*std::min(1.0,s.combat_config.attack_mult)*std::min(1.0,s.loadout->effects.burst_power);
     c.body_speed=s.field.body_speed_max;c.comet_time=s.field.ready?s.field.comet_t:std::numeric_limits<double>::infinity();c.rock_count=s.field.rocks.size();c.well_count=s.field.wells.size();
-    c.tick=s.control.tick;c.equipment_count=s.loadout.weapons.size()+s.loadout.traits.size();c.auto_spawn=s.population.frame_enabled && !s.population.blocked;
+    c.tick=s.control.tick;c.equipment_count=s.loadout->weapons.size()+s.loadout->traits.size();c.auto_spawn=s.population.frame_enabled && !s.population.blocked;
     for (const auto &body:s.field.bodies) c.bodies.push_back({body.position,body.radius});
     for (const auto &e:s.enemies) if (e.alive && !e.dead) {
         const auto &def=run.content->definitions[e.definition];const bool simple=def.kind==EnemyDefinition::Kind::Chase || def.kind==EnemyDefinition::Kind::Drift;

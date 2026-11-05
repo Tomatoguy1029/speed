@@ -6,11 +6,21 @@
 #include "generated/run_schema.h"
 #include "population_data.h"
 #include "encounter_data.h"
+#include "boss_image_data.h"
+#include "boss_image_pose_data.h"
 
 namespace speed {
 // ランと保持したランで共有する読み取り専用の定義。
 struct CoronaAmmunition {uint32_t definition=0;double weight=0,damage=0;};
 struct ContentBundle {
+    std::vector<BossImageMask> boss_image_masks;
+    CentaurusImagePoseData centaurus_image_pose;
+    MonocerosImagePoseData monoceros_image_pose;
+    BossImageFeedback boss_image_feedback;
+    CentaurusReferenceFxDefinition centaurus_fx;
+    std::vector<CanisImagePartDefinition> canis_image_parts;
+    std::vector<CanisRoarDefinition> canis_roars;
+    std::vector<CanisFireFxDefinition> canis_fire_fx;
     std::vector<DracoFinaleDefinition> draco_finales;
     std::vector<DracoFlowGateDefinition> draco_flow_gates;
     std::array<uint8_t,32> input_sha256{}, payload_sha256{};
@@ -126,6 +136,8 @@ struct ContentBundle {
     std::vector<CanisHuntDefinition> canis_hunts;
     std::vector<CanisHuntPounceDefinition> canis_hunt_pounces;
     std::vector<CanisNovaDefinition> canis_novas;
+    std::vector<CanisNovaHullPoint> canis_nova_hull;
+    std::vector<CanisNovaFxDefinition> canis_nova_fx;
     std::vector<CanisRelayDefinition> canis_relays;
     std::vector<CanisSiriusFlameDefinition> canis_sirius_flames;
     std::vector<CanisFlameDefinition> canis_flames;

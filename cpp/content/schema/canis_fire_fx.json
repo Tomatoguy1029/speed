@@ -1,0 +1,23 @@
+{
+  "records": [{
+    "name": "CanisFireFxDefinition", "section": 365,
+    "fields": [
+      {"name":"id","type":"u32","min":1},
+      {"name":"technique","type":"u32","min":1,"ref":"BossTechniqueDefinition"},
+      {"name":"external_id","type":"string"},
+      {"name":"size","type":"f64","min":0},
+      {"name":"intensity","type":"f64","min":0},
+      {"name":"timing","type":"f64","min":0},
+      {"name":"jet_length","type":"f64","min":0},
+      {"name":"jet_width","type":"f64","min":0},
+      {"name":"jet_spikes","type":"f64","min":0},
+      {"name":"ember_delay","type":"f64","min":0},
+      {"name":"has_hound_jet","type":"bool"},
+      {"name":"hound_jet_length","type":"f64","min":0},
+      {"name":"hound_jet_width","type":"f64","min":0},
+      {"name":"has_hound_speed","type":"bool"},
+      {"name":"hound_speed","type":"f64","min":0}
+    ]
+  }],
+  "enums": {}
+}

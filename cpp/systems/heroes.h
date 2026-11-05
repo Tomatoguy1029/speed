@@ -1,5 +1,6 @@
 #pragma once
 #include "../runtime/run_runtime.h"
+#include "../content/content_bundle.h"
 namespace speed {
 class HeroesSystem {
 public:

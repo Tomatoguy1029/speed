@@ -1,3 +1,4 @@
+#include "boss_contact.h"
 #include "heroes.h"
 #include "../api/run_core.h"
 #include "attacks/wall.h"
@@ -8,7 +9,12 @@
 #include "field.h"
 #include "geometry.h"
 #include "combat_resolver.h"
+#include "boss_ram.h"
+#include "boss_image.h"
 #include "../output/event_builder.h"
+#include "../state/boss_states.h"
+#include "../state/loadout_state.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/templates/sort_array.hpp>
 #include <algorithm>
 #include <cmath>
@@ -85,19 +91,38 @@ void SpeedRunCore::kill_enemy(size_t row,bool crit,StringName cause,Vector2 dire
 bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.combat_ready || !from.is_finite() || !std::isfinite(radius) || radius < 0) return false;
     if (speed::WallSystem::bounce_ship(runtime,from)) return true;
+    speed::BossImageSystem::refresh(runtime);
+    if (speed::BossContactSystem::resolve(runtime,from,runtime.state.ship.pos,runtime.state.ship_config.ship_radius)) return true;
     const auto &c = runtime.state.combat_config;
     const Vector2 to = runtime.state.ship.pos;
     const double padding = radius + std::max(c.max_enemy_radius, runtime.state.grid.max_radius);
     const Vector2 pad(padding, padding);
-    struct Hit { double time; size_t row; };
+    struct Hit { double time; size_t row; bool image=false; speed::BossImageCut cut; };
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
-    for (size_t row : query_enemy_rows(from.min(to) - pad, from.max(to) + pad)) {
+    auto candidates=query_enemy_rows(from.min(to) - pad, from.max(to) + pad);
+    for (const auto &body:runtime.state.bosses->bodies) {
+        if (runtime.state.enemy_handles.contains(body.actor) && speed::BossImageSystem::available(runtime,body.actor) && std::find(candidates.begin(),candidates.end(),body.actor.slot)==candidates.end()) candidates.push_back(body.actor.slot);
+    }
+    for (size_t row : candidates) {
         const auto &enemy = runtime.state.enemies[row];
         const auto target=speed::CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));if (!runtime.state.enemy_handles.contains(target)) continue;const auto &health=runtime.state.enemies[target.slot];
-        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(health.id) > 0 : (health.hit_cd > 0 && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
-        const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
-        if (t >= 0) hits.push_back({t, row});
+        const bool normal_boss=enemy.is_boss && !runtime.state.draw.tracing && !runtime.state.ship.glide && runtime.state.ship.vel.length()<runtime.state.ship_config.max_speed*c.ram_speed_ratio;
+        if (runtime.state.draw.tracing ? runtime.state.draw.inside.count(health.id) > 0 : (health.hit_cd > 0 && !normal_boss && !runtime.state.field.rock_handles.contains(enemy.rock) && runtime.content->definitions[enemy.definition].kind != speed::EnemyDefinition::Kind::Shield)) continue;
+        const auto handle=runtime.state.enemy_handles.at(uint32_t(row));
+        if (enemy.is_boss && !normal_boss && speed::BossImageSystem::available(runtime,handle)) {
+            const auto delta=to-from;
+            const double length=delta.length();
+            if (length<=0) continue;
+            const auto direction=delta/length;
+            speed::BossImageCut cut;
+            if (!speed::BossImageSystem::cut(runtime,handle,from,direction,cut,length+radius)) continue;
+            const double distance=(cut.enter-direction*radius-from).dot(direction);
+            if (distance<=length) hits.push_back({std::max(0.0,distance/length),row,true,cut});
+        } else {
+            const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
+            if (t >= 0) hits.push_back({t, row});
+        }
     }
     SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
     for (const auto &hit : hits) {
@@ -111,6 +136,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (runtime.state.draw.tracing) speed::FullChargeBehavior::prepare(runtime,from.distance_to(position));
         const double attack = speed::CombatResolver::attack_power(runtime)*speed::RunUpBehavior::multiplier(runtime,from.distance_to(position));
         const bool fast = runtime.state.draw.tracing || runtime.state.ship.glide || speed >= runtime.state.ship_config.max_speed * c.ram_speed_ratio;
+        if (!fast && enemy.is_boss) {speed::BossContactSystem::normal_contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position);return true;}
         const bool front = blocks_front(hit.row, position, direction);
         if (front && (!fast || (!runtime.state.draw.tracing && health.hit_cd > 0))) {
             Vector2 normal = position - enemy.pos;
@@ -158,13 +184,14 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         speed::DamageRequest gate_request;gate_request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));gate_request.cause=speed::Cause::Ram;gate_request.direction=direction;gate_request.impact=position;gate_request.has_impact=true;
         const auto gate=speed::CombatResolver::gate(runtime,gate_request.struck,gate_request);
         if (gate==speed::GateResult::Pass) {health.hit_cd=c.contact_cooldown;if (runtime.state.draw.tracing) runtime.state.draw.inside[health.id]=target.slot;continue;}
-        if (gate==speed::GateResult::Allow && (runtime.state.loadout.effects.ignore_armor || (runtime.state.draw.tracing && speed::HeroesSystem::trace_width(runtime)>1.0) || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
+        if (gate==speed::GateResult::Allow && (runtime.state.loadout->effects.ignore_armor || (runtime.state.draw.tracing && speed::HeroesSystem::trace_width(runtime)>1.0) || attack >= enemy.armor * (crit ? c.crit_armor : 1.0))) {
             double damage = attack * (crit ? c.crit_mult : 1.0);
             if (def.kind == speed::EnemyDefinition::Kind::Shield && rear) {
                 speed::ShieldBehavior::steal(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
                 damage = std::max(damage, enemy.hp);
             }
             speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));request.amount=damage;request.cause=speed::Cause::Ram;request.crit=crit;request.direction=direction;request.impact=position;request.has_impact=true;
+            request.boss_ram_visual=hit.image;
             const auto result=speed::CombatResolver::damage_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
             health.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) {
@@ -183,6 +210,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             }
             speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,result.applied);
             speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
+            if (hit.image && result.applied>0 && speed::BossRamSystem::begin(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),hit.cut,direction,radius)) return true;
             continue;
         }
         runtime.state.ship.glide = false;

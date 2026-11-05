@@ -2,6 +2,8 @@
 #include "../attack_system.h"
 #include "../field.h"
 #include "../../output/frame_builder.h"
+#include "../../state/boss_states.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -13,7 +15,7 @@ AttackHandle WallSystem::emit(RunRuntime &run,const WallParams &p) {
     for (float v:{p.color.r,p.color.g,p.color.b,p.color.a}) if (!std::isfinite(v)) return {};
     HazardState hazard;hazard.pos=p.position;hazard.delay=p.delay;hazard.duration=p.active;hazard.damage=p.damage;hazard.color=p.color;
     hazard.shape=WallHazard{float(p.angle),float(p.length),float(p.half_width),1,uint32_t(p.style),p.blocking};
-    AttackSpec spec;spec.cause=Cause::Wall;spec.technique=p.technique;if (run.state.bosses.handles.contains(p.technique)) spec.source_technique=run.state.bosses.techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.attached;spec.owner.budget=p.budget;
+    AttackSpec spec;spec.cause=Cause::Wall;spec.technique=p.technique;if (run.state.bosses->handles.contains(p.technique)) spec.source_technique=run.state.bosses->techniques[p.technique.slot].definition;spec.owner.live_source=p.owner;spec.owner.attached=p.attached;spec.owner.budget=p.budget;
     spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBonus;
     if (p.attached) spec.policies|=policy(EndPolicy::CancelWithParticipant);
     if (!AttackSystem::configure_contact(*run.content,run.content->walls.front().contact,spec)) return {};
@@ -78,6 +80,9 @@ void WallSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,god
     const double k=std::clamp(double(h.time)/std::max(0.001,double(h.delay)),0.0,1.0),left=double(h.delay)+h.duration-h.time;
     Color col=w->style==uint32_t(WallStyle::Lightning)?Color::html("e1f7ff"):h.color;
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::Polyline);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
+    if (w->trail_visual_owner>0) shape["reference_auriga"]=true;
+    const auto source=record->spec.owner.source_definition;
+    if (source && source<=run.content->definitions.size() && run.content->definitions[source-1].kind==EnemyDefinition::Kind::Ruler) shape["reference_ruler"]=true;
     PackedVector2Array points;PackedInt32Array offsets;PackedFloat32Array widths;PackedColorArray colors;offsets.push_back(0);
     const auto to=h.pos+Vector2::from_angle(w->angle)*w->length;
     const auto line=[&](double size,Color color) {points.push_back(h.pos);points.push_back(to);offsets.push_back(points.size());widths.push_back(size);colors.push_back(color);};

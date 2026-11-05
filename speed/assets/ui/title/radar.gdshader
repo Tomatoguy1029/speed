@@ -7,6 +7,7 @@ uniform float elapsed = 0.0;
 uniform bool panel_open = false;
 uniform float map_progress = 0.0;
 uniform sampler2D map_ring_texture : filter_nearest, repeat_disable;
+uniform float map_scroll = 0.0;
 uniform float map_angle = 0.0;
 uniform sampler2D menu_stars_texture : filter_nearest, repeat_disable;
 uniform float upgrade_progress = 0.0;
@@ -16,7 +17,7 @@ uniform float increments_alpha = 0.0;
 void fragment() {
 	vec2 canvas = vec2(640.0, 360.0);
 	vec2 center = vec2(462.0, 176.0);
-	vec2 map_center = mix(center, vec2(198.0, 195.0), map_progress);
+	vec2 map_center = mix(center, vec2(198.0, 195.0 - map_scroll), map_progress);
 	vec2 offset = (UV * canvas - map_center) / vec2(1.0, mix(1.0, 0.5, map_progress));
 	vec2 radar_uv = (offset + center) / canvas;
 	float rotation = elapsed * TAU / 16.0;

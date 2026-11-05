@@ -17,6 +17,9 @@
 #include "../bosses/canis_major/flames.h"
 #include "../bosses/canis_major/hound_lunge.h"
 #include "../systems/attack_system.h"
+#include "../state/boss_states.h"
+#include "../content/content_bundle.h"
+#include "../bosses/draco/state.h"
 #include <algorithm>
 #include <cmath>
 using namespace godot;
@@ -62,9 +65,9 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         if (operation=="spawn" && p.size()==4 && p.get("source",Variant()).get_type()==Variant::STRING && p.get("position",Variant()).get_type()==Variant::VECTOR2 && Vector2(p["position"]).is_finite()) {
             for (uint32_t j=0;j<runtime.content->definitions.size();++j) if (runtime.content->definitions[j].id==StringName(String(p["source"]))) {const auto h=speed::DracoPicaro::spawn(runtime,*body,j+1,p["position"]);return result(runtime.state.enemy_handles.contains(h),runtime.state.enemy_handles.entity_id(h));}return result(false);
         }
-        if (operation=="inhale_stars" && p.size()==3 && p.get("stars",Variant()).get_type()==Variant::INT && int64_t(p["stars"])>=0 && int64_t(p["stars"])<=100000) {body->draco.lab_inhale_stars=uint32_t(int64_t(p["stars"]));return result(true);}
+        if (operation=="inhale_stars" && p.size()==3 && p.get("stars",Variant()).get_type()==Variant::INT && int64_t(p["stars"])>=0 && int64_t(p["stars"])<=100000) {body->draco->lab_inhale_stars=uint32_t(int64_t(p["stars"]));return result(true);}
         if (operation=="pause" && p.size()==3 && p.get("cancel",Variant()).get_type()==Variant::BOOL) {speed::DracoPicaro::pause(runtime,*body,p["cancel"]);return result(true);}
-        if (operation=="attack" && p.size()==2) {body->draco.picaro_attacking=true;return result(true);}
+        if (operation=="attack" && p.size()==2) {body->draco->picaro_attacking=true;return result(true);}
         if (operation=="clear" && p.size()==2) {speed::DracoPicaro::clear(runtime,*body);return result(true);}
         return result(false);
     }
@@ -72,11 +75,11 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         if (p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("operation",Variant()).get_type()!=Variant::STRING) return result(false);
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));if (found==runtime.state.rows_by_id.end()) return result(false);auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));if (!body || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=4 || body->mode>=speed::BossMode::Defeated) return result(false);
         const String operation=p["operation"];
-        if (operation=="placed_meteors" && p.size()==4 && p.get("definition",Variant()).get_type()==Variant::INT && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const int64_t definition=p["definition"];const PackedVector2Array points=p["points"];if (definition<1 || uint64_t(definition)>runtime.content->definitions.size() || runtime.content->definitions[definition-1].kind!=speed::EnemyDefinition::Kind::Meteor || points.size()>2048) return result(false);for (auto point:points) if (!point.is_finite()) return result(false);for (auto point:points) {const auto rock=speed::DracoTechnique::spawn_rock(runtime,uint32_t(definition),point);if (!runtime.state.field.rock_handles.contains(rock)) return result(false);body->draco.placed_meteors.push_back(rock);}return result(true);}
+        if (operation=="placed_meteors" && p.size()==4 && p.get("definition",Variant()).get_type()==Variant::INT && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const int64_t definition=p["definition"];const PackedVector2Array points=p["points"];if (definition<1 || uint64_t(definition)>runtime.content->definitions.size() || runtime.content->definitions[definition-1].kind!=speed::EnemyDefinition::Kind::Meteor || points.size()>2048) return result(false);for (auto point:points) if (!point.is_finite()) return result(false);for (auto point:points) {const auto rock=speed::DracoTechnique::spawn_rock(runtime,uint32_t(definition),point);if (!runtime.state.field.rock_handles.contains(rock)) return result(false);body->draco->placed_meteors.push_back(rock);}return result(true);}
         if (operation=="reset" && p.size()==2) {speed::DracoPose::reset(runtime,*body);return result(true);}
         if (operation=="depth" && p.size()==4) {for (const char *key:{"depth","alpha"}) if ((p.get(key,Variant()).get_type()!=Variant::FLOAT && p.get(key,Variant()).get_type()!=Variant::INT) || !std::isfinite(double(p[key]))) return result(false);speed::DracoPose::depth(runtime,*body,p["depth"],p["alpha"]);return result(true);}
         if (operation=="contains" && p.size()==4 && p.get("point",Variant()).get_type()==Variant::VECTOR2 && Vector2(p["point"]).is_finite() && (p.get("radius",Variant()).get_type()==Variant::FLOAT || p.get("radius",Variant()).get_type()==Variant::INT) && std::isfinite(double(p["radius"])) && double(p["radius"])>=0) return result(true,speed::DracoPose::contains(runtime,*body,p["point"],p["radius"]));
-        if (operation=="override" && p.size()==3 && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const PackedVector2Array points=p["points"];if (points.size()<2 || points.size()>4096) return result(false);for (auto v:points) if (!v.is_finite()) return result(false);body->draco.override_points.clear();for (auto v:points) body->draco.override_points.push_back(v);runtime.state.enemies[body->actor.slot].pos=points[0];speed::DracoPose::update(runtime,*body);return result(true);}
+        if (operation=="override" && p.size()==3 && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const PackedVector2Array points=p["points"];if (points.size()<2 || points.size()>4096) return result(false);for (auto v:points) if (!v.is_finite()) return result(false);body->draco->override_points.clear();for (auto v:points) body->draco->override_points.push_back(v);runtime.state.enemies[body->actor.slot].pos=points[0];speed::DracoPose::update(runtime,*body);return result(true);}
         return result(false);
     }
     if (kind=="dev_hydra_grid_plan") {
@@ -118,7 +121,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
     if (kind=="dev_boss_flow_state") return result(p.is_empty(),speed::FlowRunner::snapshot(runtime));
     if (kind=="dev_cancel_flow") {
         if (p.size()!=1 || p.get("entity_id",Variant()).get_type()!=Variant::INT) return result(false);
-        for (auto &flow:runtime.state.bosses.flows) if (runtime.state.enemy_handles.entity_id(flow.actor)==int64_t(p["entity_id"])) {speed::FlowRunner::cancel(runtime,flow);flow.selection_enabled=false;return result(true);}
+        for (auto &flow:runtime.state.bosses->flows) if (runtime.state.enemy_handles.entity_id(flow.actor)==int64_t(p["entity_id"])) {speed::FlowRunner::cancel(runtime,flow);flow.selection_enabled=false;return result(true);}
         return result(false);
     }
     if (kind=="dev_boss_flow") {
@@ -133,7 +136,7 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));const int64_t definition=p["definition"];
         if (found==runtime.state.rows_by_id.end() || definition<=0 || uint64_t(definition)>runtime.content->boss_techniques.size()) return result(false);
         const auto handle=speed::TechniqueRunner::begin(runtime,runtime.state.enemy_handles.at(found->second),uint32_t(definition));
-        if (!runtime.state.bosses.handles.contains(handle)) return result(false);
+        if (!runtime.state.bosses->handles.contains(handle)) return result(false);
         PackedInt64Array ticket;ticket.push_back(handle.slot);ticket.push_back(handle.generation);return result(true,ticket);
     }
     if (p.size()!=1 || p.get("ticket",Variant()).get_type()!=Variant::PACKED_INT64_ARRAY) return result(false);

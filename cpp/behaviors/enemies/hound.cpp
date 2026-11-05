@@ -2,6 +2,7 @@
 #include "pursuit.h"
 #include "../../systems/group_system.h"
 #include "../../systems/tracking_policy.h"
+#include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -52,6 +53,7 @@ bool HoundBehavior::ordered_move(RunRuntime &run,uint32_t row,double dt,const Tr
     if (o->steer) {
         if (o->steer_until>run.state.world_time) {
             const auto &c=o->steering;const auto to=o->steer_goal-e.pos;const double distance=to.length();
+            if (c.speed_rate!=1.0) o->speed=e.vel.length()/c.speed_rate;
             if (tracking.locked()) o->heading=e.facing;
             if (distance<c.arrive) {
                 o->speed=move_toward(o->speed,0,c.decel*dt);
@@ -61,7 +63,7 @@ bool HoundBehavior::ordered_move(RunRuntime &run,uint32_t row,double dt,const Tr
                 const double target=std::min(c.max_speed,distance*2.2)*std::max(0.25,std::cos(o->heading-to.angle()));
                 o->speed=move_toward(o->speed,target,(target>o->speed?c.accel:c.decel)*dt);
             }
-            e.vel=godot::Vector2::from_angle(o->heading)*o->speed;e.facing=o->heading;e.mode=godot::RunState::EnemyMode::Move;e.charge=0;return true;
+            e.vel=godot::Vector2::from_angle(o->heading)*o->speed*c.speed_rate;e.facing=o->heading;e.mode=godot::RunState::EnemyMode::Move;e.charge=0;return true;
         }
         o->steer=false;
     }

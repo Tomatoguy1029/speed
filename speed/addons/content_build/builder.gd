@@ -20,6 +20,17 @@ static func signature() -> String:
 	files.append("res://tools/art/bake_elite_death.py")
 	files.append("res://tools/art/elite_contacts.py")
 	files.append("res://tools/art/bake_elite_crackle.py")
+	for name in ["bake_phoenix_fx", "bake_centaurus_contact_masks", "bake_canis_fx"]: files.append("res://tools/art/"+name+".py")
+	files.append_array(preload("res://tools/content/build_canis_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_boss_image_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_image_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_monoceros_image_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_roar_fx.gd").input_paths())
+	files.append_array(preload("res://tools/content/build_canis_fire_fx.gd").input_paths())
+	files.append("res://tools/art/bake_canis_hound_edges.py")
+	for name in ["bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
+	files.append("res://tools/art/bake_canis_contact_masks.py")
+	files.append("res://tools/art/bake_monoceros_contact_masks.py")
 	for path in preload("res://tools/content/build_attack_visuals.gd").input_paths():
 		if not path in files and FileAccess.file_exists(path): files.append(path)
 	return _file_signature(files)
@@ -43,13 +54,15 @@ const STAGES := preload("res://tools/content/build_stage_bundle.gd")
 static var last_build_report: Array[Dictionary] = []
 const EDITOR_RESULT_PREFIX := "SPEED_CONTENT_BUILD_RESULT:"
 
+static func editor_arguments() -> PackedStringArray:
+	return PackedStringArray(["--headless","--path",ProjectSettings.globalize_path("res://"),"--quit-after","1",
+		"--script","res://tools/content/build_all.gd","--","--editor-build-report"])
+
 ## エディターが保持した古いC++拡張・Resourceを、生成に使わない。
 static func build_for_editor() -> Error:
 	last_build_report = []
 	var output := []
-	var args := PackedStringArray(["--headless","--path",ProjectSettings.globalize_path("res://"),"--quit-after","1",
-		"--script","res://tools/content/build_all.gd","--","--editor-build-report"])
-	var exit_code := OS.execute(OS.get_executable_path(),args,output,true)
+	var exit_code := OS.execute(OS.get_executable_path(),editor_arguments(),output,true)
 	var result_error: Error = FAILED
 	for chunk: String in output:
 		for line: String in chunk.split("\n"):
@@ -117,6 +130,29 @@ static func _refresh_source_signature(path: String, input_signature: String) -> 
 	file.close()
 	return DirAccess.rename_absolute(path+".pending",path)
 
+static func _source_files() -> PackedStringArray:
+	var files := PackedStringArray()
+	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
+	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle","bake_phoenix_fx","bake_centaurus_contact_masks","bake_canis_fx","bake_canis_contact_masks","bake_monoceros_contact_masks","bake_reference_edges","bake_roar_textures"]: files.append("res://tools/art/"+name+".py")
+	return files
+
+static func _all_inputs(files: PackedStringArray) -> PackedStringArray:
+	var all_inputs := files.duplicate()
+	var boss_inputs := PackedStringArray()
+	preload("res://addons/content_build/incremental.gd").files("res://data/bosses",boss_inputs)
+	for path in boss_inputs:
+		if not path in all_inputs: all_inputs.append(path)
+	return all_inputs
+
+static func _unchanged(output: String, input_fingerprint: String) -> bool:
+	var stamp_path := output.path_join("stamp.json")
+	var saved = JSON.parse_string(FileAccess.get_file_as_string(stamp_path)) if FileAccess.file_exists(stamp_path) else null
+	return saved is Dictionary and saved.get("input_fingerprint","") == input_fingerprint and not saved.get("outputs",[]).is_empty() and saved.outputs.all(func(path): return FileAccess.file_exists(path)) and FileAccess.file_exists(output.path_join("dev/build_cache.json"))
+
+## 別プロセスを起動せず、全編集元と出力の照合だけを行う。
+static func is_unchanged(output := ROOT) -> bool:
+	return _unchanged(output,_file_signature(_all_inputs(_source_files())))
+
 static func build_all(force := false, output := ROOT) -> Error:
 	var resources = preload("res://tools/content/build_run_resources.gd")
 	resources.begin_batch()
@@ -130,19 +166,11 @@ static func _build_units(force: bool, output: String) -> Error:
 	var cache := preload("res://addons/content_build/incremental.gd").new()
 	cache.open(output.path_join("dev/build_cache.json"))
 	last_build_report = cache.report
-	var files := PackedStringArray()
-	for directory in ["res://data","res://scripts","res://scenes","res://addons","res://tools/content","res://shaders","res://assets"]: _files(directory,files)
-	for name in ["bake_burst_noise","bake_burst_profiles","bake_pump_shell","bake_landmark_masks","bake_elite_death","elite_contacts","bake_elite_crackle"]: files.append("res://tools/art/"+name+".py")
+	var files := _source_files()
 	# 全編集元を内容で照合し、変更も出力欠落もなければResourceの読込前に返す。
-	var all_inputs := files.duplicate()
-	var boss_inputs := PackedStringArray()
-	cache.files("res://data/bosses",boss_inputs)
-	for path in boss_inputs:
-		if not path in all_inputs: all_inputs.append(path)
+	var all_inputs := _all_inputs(files)
 	var input_fingerprint := _file_signature(all_inputs)
-	var stamp_path := output.path_join("stamp.json")
-	var saved = JSON.parse_string(FileAccess.get_file_as_string(stamp_path)) if FileAccess.file_exists(stamp_path) else null
-	if not force and saved is Dictionary and saved.get("input_fingerprint","") == input_fingerprint and not saved.get("outputs",[]).is_empty() and saved.outputs.all(func(path): return FileAccess.file_exists(path)) and FileAccess.file_exists(output.path_join("dev/build_cache.json")):
+	if not force and _unchanged(output,input_fingerprint):
 		last_build_report.append({"unit":"all","rebuilt":false})
 		return OK
 	# 変更がないときは技のResourceを読み込まず、依存の内容だけを照合する。
@@ -173,6 +201,7 @@ static func _build_units(force: bool, output: String) -> Error:
 		if unit[0] == "attacks": inputs.append_array(preload("res://tools/content/build_attack_visuals.gd").input_paths())
 		var error: Error = cache.run(unit[0],inputs,unit[2],force)
 		if error != OK: return error
+	preload("res://tools/content/build_run_resources.gd").hold_definitions()
 	var input_signature := signature()
 	for name in DirAccess.get_files_at("res://data/stages"):
 		if not name.ends_with(".tres"): continue

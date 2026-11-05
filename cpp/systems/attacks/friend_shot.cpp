@@ -1,6 +1,7 @@
 #include "friend_shot.h"
 #include "../../behaviors/traits/duplicator.h"
 #include "../attack_system.h"
+#include "../../content/content_bundle.h"
 #include <cmath>
 namespace speed {
 AttackHandle FriendShotSystem::emit(RunRuntime &run,godot::RunState::Friendly shot) {

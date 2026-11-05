@@ -2,7 +2,7 @@
 ##
 ## セーブ（user://save.json）には、部品・強化の段階・ステージの解放・伝説のモジュール・
 ## 図鑑・記録・エンドレスのハイスコアを持つ。版番号を持たせ、版が変わったら変換する。
-## 設定（user://settings.cfg）には、音量・画面の揺れ・ヒットストップ・画面モード・言語・キー設定を持つ。
+## 設定（user://settings.cfg）には、音量・画面の揺れ・ヒットストップ・画面モード・キー設定を持つ。
 extends Node
 
 signal save_changed
@@ -10,8 +10,6 @@ signal settings_changed
 
 const SAVE_PATH := "user://save.json"
 const SETTINGS_PATH := "user://settings.cfg"
-## 選べる言語。文章は res://data/text/strings.csv の同じ名前の列。
-const LANGUAGES := ["ja", "en"]
 const SAVE_VERSION := 1
 
 var data: Dictionary = {}
@@ -205,7 +203,6 @@ func default_settings() -> Dictionary:
 		"window_mode": "windowed",
 		"screen_shake": 1.0,
 		"hitstop": true,
-		"language": "ja" if OS.get_locale_language() == "ja" else "en",
 		"bindings": {},
 	}
 
@@ -222,7 +219,7 @@ func set_binding(action: StringName, keycode: int) -> void:
 func apply_settings() -> void:
 	InputActions.register_defaults()
 	InputActions.apply_bindings(settings.bindings)
-	TranslationServer.set_locale(settings.language if settings.language in LANGUAGES else "en")
+	TranslationServer.set_locale("ja")
 	_apply_window_mode()
 	settings_changed.emit()
 

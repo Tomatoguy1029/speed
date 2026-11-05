@@ -1,6 +1,21 @@
 ## 出撃では保存済みの索引と生成物だけを読む。生成器は呼ばない。
 extends RefCounted
 const ResourceList = preload("res://scripts/data_types/run_resources.gd")
+static var _hashes := {}
+static var _hash_lock := Mutex.new()
+
+## 全ステージが同じ依存を持つので、更新時刻が同じファイルは計算し直さない。
+static func _sha256(path: String) -> String:
+	var modified := FileAccess.get_modified_time(path)
+	_hash_lock.lock()
+	var known: Array = _hashes.get(path,[])
+	_hash_lock.unlock()
+	if not known.is_empty() and known[0]==modified: return known[1]
+	var value := FileAccess.get_sha256(path)
+	_hash_lock.lock()
+	_hashes[path] = [modified,value]
+	_hash_lock.unlock()
+	return value
 
 static func read_bundle(index_path: String, expected_input: String) -> Dictionary:
 	if expected_input.length()!=64 or not FileAccess.file_exists(index_path): return {}
@@ -17,7 +32,7 @@ static func read_bundle(index_path: String, expected_input: String) -> Dictionar
 	if resources.dependencies.is_empty(): return {}
 	for path in resources.dependencies:
 		if not path is String or not resources.dependencies[path] is String: return {}
-		if OS.has_feature("editor") and FileAccess.get_sha256(path)!=resources.dependencies[path]: return {}
+		if OS.has_feature("editor") and _sha256(path)!=resources.dependencies[path]: return {}
 	for key in resources.keys:
 		if not key is int or key<=0 or not resources.keys[key] is String or not ResourceLoader.exists(resources.keys[key]): return {}
 		if not resources.keys[key] in resources.order or not resources.signatures.has(resources.keys[key]): return {}
