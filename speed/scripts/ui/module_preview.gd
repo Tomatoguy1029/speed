@@ -121,14 +121,7 @@ func _build(animation: Resource = null) -> void:
 		else:
 			_icon = Sprite2D.new()
 			_icon.position = Vector2(150,74)
-			if definition.id in [&"T34",&"T35"]:
-				var placeholder := Label.new()
-				placeholder.text = "◇\n？"
-				placeholder.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-				placeholder.add_theme_font_size_override("font_size",32)
-				placeholder.position = Vector2(120,30)
-				_viewport.add_child(placeholder)
-			else: _icon.texture = ICONS.texture_for(definition)
+			_icon.texture = ICONS.texture_for(definition)
 			_icon.scale = Vector2.ONE*2.0
 			_viewport.add_child(_icon)
 	_holo = ShaderMaterial.new()
