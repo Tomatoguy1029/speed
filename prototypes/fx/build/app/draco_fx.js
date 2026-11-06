@@ -120,16 +120,16 @@ function dBreathFx(S, R) {
   if (on > 0) { for (let i = 0; i < 4; i++) { const off = [0, -0.1, 0.1, 0][i], L = [30, 23, 23, 15][i] * s * roar * on, w = [3.6, 3.2, 3.2, 4][i] * s; fire.flameBlade(p, O.x, O.y, Math.cos(S.fanAngle + off), Math.sin(S.fanAngle + off), L, w, N(3, i + 3) * 3, N, 30 + i * 17, H, fire.LAYERS, 0.5, 1.5); } p.glow(O.x, O.y, 7 * s, H[3], 0.5 * on * R.P.intensity); }
   for (let i = 0; i < 16; i++) { const j = 1 + Math.floor(hash(i * 4.3) * n), dir = norm(sub(S.fan[j], S.fan[0])), reach = dist(S.fan[0], S.fan[j]), at = (e * 1100 + hash(i * 6.6) * 1500) % reach; dStar(R, toL(add(S.fan[0], mul(dir, at))), 1.4, e * 6 + i, on * 0.65, FX.ramp(R.P.color)); }
 }
-// 安全な範囲：首を振っても炎が届かない、壁の裏の場所を薄い光で見せる。首の振りの両端と中央のどの位置から見ても隕石に隠れる画素だけを塗る
-function dSafeMask(S) {
-  if (S.safeMask) return S.safeMask; const r = S.r, mouths = [-r.sweep, 0, r.sweep].map(o => add(S.B.pos, mul(fromA(S.axis + o), 120 * DP.head_scale))), hit = (m, p) => S.rocks.some(q => { const d = sub(p, m), f = sub(q.to, m), l2 = d.x * d.x + d.y * d.y, u = clamp((f.x * d.x + f.y * d.y) / l2); return u > 0 && u < 1 && dist(add(m, mul(d, u)), q.to) < q.radius * 0.97 && dist(p, q.to) > q.radius; }), on = new Uint8Array(LW * LH), base = S.camBase || cam;
-  for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const p = V((x - LW / 2) / WL + base.x, (y - LH / 2) / WL + base.y); if (mouths.every(m => hit(m, p))) on[y * LW + x] = 1; }
-  const list = []; for (let y = 1; y < LH - 1; y++) for (let x = 1; x < LW - 1; x++) { const i = y * LW + x; if (on[i]) list.push({ x, y, edge: !(on[i - 1] && on[i + 1] && on[i - LW] && on[i + LW]) }); }
-  return (S.safeMask = list);
+// ためた光が口から強く広がり、隕石の裏に本物の影が落ちる。首を振っても炎が届かない場所だけが影になり、線では囲まない
+function dLightMask(S) {
+  if (S.lightMask) return S.lightMask; const r = S.r, mouths = [-r.sweep, 0, r.sweep].map(o => add(S.B.pos, mul(fromA(S.axis + o), 120 * DP.head_scale))), hit = (m, p) => S.rocks.some(q => { const d = sub(p, m), f = sub(q.to, m), l2 = d.x * d.x + d.y * d.y, u = clamp((f.x * d.x + f.y * d.y) / l2); return u > 0 && u < 1 && dist(add(m, mul(d, u)), q.to) < q.radius * 0.97 && dist(p, q.to) > q.radius; }), base = S.camBase || cam, far = r.reach, list = [];
+  for (let y = 0; y < LH; y++) for (let x = 0; x < LW; x++) { const p = V((x - LW / 2) / WL + base.x, (y - LH / 2) / WL + base.y), d = dist(p, S.mouth); if (d > far || mouths.every(m => hit(m, p))) continue; list.push({ x, y, fall: Math.pow(1 - d / far, 1.4) }); }
+  return (S.lightMask = list);
 }
-function dSafeFx(S, R) {
-  if (S.tech !== 'breath' || !S.rocks.length) return; const r = S.r, last = r.warn * (0.18 + 0.22 * 2) + DR_FLIGHT, on = S.B.mode === 'windup' ? smooth(last - 0.1, last + 0.25, S.elapsed) : S.B.mode === 'active' ? 1 - smooth(r.active - 0.25, r.active, S.elapsed) : 0; if (on <= 0) return;
-  const tint = hexc('#8fe6ff'), pulse = 0.85 + 0.15 * Math.sin(S.t * 5), p = R.back, ox = (cam.x - (S.camBase?.x ?? cam.x)) * WL, oy = (cam.y - (S.camBase?.y ?? cam.y)) * WL; for (const q of dSafeMask(S)) p.blend(q.x - ox, q.y - oy, tint, (q.edge ? 0.55 : 0.1) * on * pulse);
+function dSafeFx(S, R, pose) {
+  if (S.tech !== 'breath' || !S.rocks.length) return; const r = S.r, last = 1.6 * 0.62 + DR_FLIGHT, charge = S.B.mode === 'windup' ? smooth(last, r.warn - 0.1, S.elapsed) : S.B.mode === 'active' ? 1 - smooth(0.2, r.active, S.elapsed) * 0.55 : 0; if (charge <= 0) return;
+  const H = D_FLAME, p = R.back, ox = (cam.x - (S.camBase?.x ?? cam.x)) * WL, oy = (cam.y - (S.camBase?.y ?? cam.y)) * WL, pulse = 0.88 + 0.12 * Math.sin(S.t * 14), c = toL(pose.mouth); for (const q of dLightMask(S)) p.blend(q.x - ox, q.y - oy, H[4], 0.5 * q.fall * charge * pulse);
+  if (S.B.mode === 'windup') { R.front.glow(c.x, c.y, 34 * R.P.size, H[3], 0.85 * charge * R.P.intensity); R.front.disc(c.x, c.y, 4 * R.P.size * charge, H[0], 1); }
 }
 // 炎に耐える隕石：当たっている間にひびが広がって熱を持ち、欠片がこぼれて震える。ブレスが終わると耐えきれず砕ける（破片は演出で、当たりはない）
 function dRockHeat(S, q) { return clamp((q.burn || 0) / (S.r.active * 0.28)); }
@@ -141,8 +141,8 @@ function dMeteorDraw(S, R, q, i) {
   R.front.glow(c.x + u.x * rr * 0.7, c.y + u.y * rr * 0.7, rr * 1.2, H[4], 0.45 * on * R.P.intensity);
 }
 // 飛ぶ隕石：通った道に尾が伸び、前で焼けた炎が後ろへ流れて冷え、煙と火の粉になる。遅くても勢いが見えるよう、尾の中を炎が走る
-function dMeteorTrail(S, R, q, age, i) {
-  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.back, H = D_FLAME, s = R.P.size, u = q.dir, nx = -u.y, ny = u.x, c = toL(q.pos), rad = q.radius * WL * s, L = Math.min(age * DM.speed, 760) * WL * s, seed = i * 13.7 + 3; if (L < 2) return;
+function dMeteorTrail(S, R, q, age, i, speed = DM.speed, gone = 0) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.back, H = D_FLAME, s = R.P.size, u = q.dir, nx = -u.y, ny = u.x, c = toL(q.pos), rad = q.radius * WL * s, L = Math.min(age * speed, 760) * WL * s * (1 - gone), seed = i * 13.7 + 3; if (L < 2) return; age += gone;
   for (let d = 0; d < L; d += 0.75) { const f = d / L, w = rad * 1.05 * Math.pow(1 - f, 0.75) * (1 + 0.12 * Math.sin(d * 0.14 - age * 9 + seed)); for (let o = -w; o <= w; o += 0.75) { const e = Math.abs(o) / Math.max(1, w), heat = clamp((1 - f) * (1.15 - e) * (0.75 + 0.5 * (0.5 + 0.5 * PX.tileNoise(d * 0.05 - age * 5, o * 0.12 + seed, 0, 0, 5)))); if (heat > 0.05) p.blend(c.x - u.x * d + nx * o, c.y - u.y * d + ny * o, H[Math.min(7, Math.round(lerp(7, 3, heat)))], Math.min(0.85, heat * 1.15)); } }
   for (let n = 0; n < 12; n++) { const h = k => hash(n * 7.31 + k * 3.17 + seed), ph = (age * lerp(0.35, 0.6, h(1)) + h(2)) % 1, d = L * (0.55 + 0.6 * ph), lat = (h(3) - 0.5) * rad * (1.4 + ph * 1.6); fire.smokePuff(p, c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, 1 - ph, rad * 0.4, H[7], true, 0.5); }
   for (let n = 0; n < 34; n++) { const h = k => hash(n * 4.19 + k * 2.71 + seed), ph = (age * lerp(0.9, 1.6, h(1)) + h(2)) % 1, d = ph * L * 0.8 + rad * 0.2, lat = (h(3) - 0.5) * rad * 1.7 * (1 - ph * 0.5) + Math.sin(ph * 7 + n) * rad * 0.12; fire.firePuff(p, c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, 1 - ph, rad * lerp(0.14, 0.32, h(4)) * (1 - 0.35 * ph), h(5), H, 0.03, -u.x * 0.8, -u.y * 0.8); }
@@ -310,11 +310,11 @@ function dDraw(S, R) {
     if (id === 'picaro_wall') dDarkMuzzle(S, R, pose);
     if (id === 'star_fan') dStarBlast(S, R, pose);
     dSweepWake(S, R, pose);
-    dSafeFx(S, R);
+    dSafeFx(S, R, pose);
   }
   if (R.proto) for (const q of S.projectiles) if (q.vel && q.t != null) { const sp = len(q.vel), dir = norm(q.vel), age = t - q.t; dRockTrail(S, R, { from: sub(q.pos, mul(q.vel, age)), speed: sp, radius: q.radius, seed: q.seed || 1 }, age, dir, Infinity); }
   if (R.proto && id === 'meteor') S.rocks.forEach((q, i) => { if (q.born != null) dMeteorTrail(S, R, q, t - q.born, i); });
-  if (R.proto && id === 'breath') S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / DR_FLIGHT; if (age < DR_FLIGHT + 0.5) dRockTrail(S, R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, DR_FLIGHT); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
+  if (R.proto && id === 'breath') S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), speed = dist(q.from, q.to) / DR_FLIGHT, fly = Math.min(age, DR_FLIGHT); q.dir = d; if (age < DR_FLIGHT + 0.5) dMeteorTrail(S, R, q, fly, i, speed, smooth(DR_FLIGHT, DR_FLIGHT + 0.45, age)); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
   R.blitBack();
   for (const q of S.projectiles) { if (R.proto) { if (q.vel) hRockGhosts(q.pos, norm(q.vel), len(q.vel), q.seed + t, q.radius); drawImg('meteor_0', q.pos, q.seed + t, q.radius); } else D2.circle(q.pos, q.radius, '#8c704c'); }
   S.rocks.forEach((rock, i) => { dRockDraw(S, R, rock, i); dRockBreak(S, R, rock, i); });

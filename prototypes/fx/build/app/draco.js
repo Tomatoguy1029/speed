@@ -36,7 +36,7 @@ function dSettle(S, from, to, k) {
   S.B.pos = S.override[0];
 }
 // 隕石：頭を突き出して1個ずつ吐き、速いまま飛んで、着いた所で勢いが止まる（なめらかに滑らせない）
-const DB_WARN = 1.6, DB_ACTIVE = 3.9; // 試作の値：ブレスの予兆と吐く長さ
+const DB_WARN = 2.5, DB_ACTIVE = 3.9; // 試作の値：ブレスの予兆と吐く長さ
 // 試作の値：三本爪。自機の位置へ予兆を出し、竜の正面を横向き（少し斜め）に切り裂く
 const DS = { first: 0.6, gap: 0.62, count: 4, tell: 0.5, open: 0.16, hold: 1.5, close: 0.55, tilt: 0.3, length: 1250, width: 84, space: 170, active: 4.8 };
 // 試作の値：ピカロを作るときは上を向いて咆哮し、咆哮の間にピカロが現れる
@@ -46,7 +46,7 @@ const DA_SPEED = 1500; // 試作の値：闇の矢の速さ
 const DM = { speed: 430, spread: 0.5, scale: 1.3, active: 3.6 }; // 試作の値：隕石投射。遅くて大きい弾が間隔をあけて飛び続ける
 const DR_SPACING = 150; // 試作の値：隕石を隙間なく並べて壁にする（半径78）
 const DR_FLIGHT = 0.42, DR_ORDER = [1, 0, 2];
-function dRockAge(S, i) { if (S.B.mode !== 'windup') return S.r.warn + S.elapsed; return S.elapsed - S.r.warn * (0.18 + 0.22 * DR_ORDER[i % 3]); }
+function dRockAge(S, i) { if (S.B.mode !== 'windup') return S.r.warn + S.elapsed; return S.elapsed - Math.min(S.r.warn, 1.6) * (0.18 + 0.22 * DR_ORDER[i % 3]); }
 // 吐く隕石の方へ頭を向ける：次に吐く隕石へ先に向いて、吐いたあとも飛ぶ間は向けたまま
 function dRockAim(S, dt) { const next = S.rocks.map((q, i) => ({ q, age: dRockAge(S, i) })).filter(v => v.age < DR_FLIGHT * 0.5).sort((x, y) => y.age - x.age)[0]; if (!next) return; const want = angOf(sub(next.q.to, S.B.pos)); S.rockAim = (S.rockAim ?? S.axis) + angDiff(want, S.rockAim ?? S.axis) * (1 - Math.exp(-12 * dt)); }
 let dPicaroBody = null; // 全身複製を描く間だけ { t, seed } を入れ、部位の絵をピカロの見た目に塗り直す
