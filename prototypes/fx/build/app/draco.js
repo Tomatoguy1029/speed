@@ -41,6 +41,7 @@ const DB_WARN = 1.6, DB_ACTIVE = 3.9; // 試作の値：ブレスの予兆と吐
 const DS = { first: 0.6, gap: 0.62, count: 4, tell: 0.5, open: 0.16, hold: 1.5, close: 0.55, tilt: 0.3, length: 1250, width: 84, space: 170, active: 4.8 };
 // 試作の値：ピカロを作るときは上を向いて咆哮し、咆哮の間にピカロが現れる
 const DP_WARN = 2.6, DP_CUE = 0.5;
+const DW = { warn: 1.2, active: 1.25, recover: 2.1 }; // 試作の値：尻尾の薙ぎ払いの長さ。戻りは特にゆっくり
 const DA_SPEED = 1500; // 試作の値：闇の矢の速さ
 const DR_SPACING = 150; // 試作の値：隕石を隙間なく並べて壁にする（半径78）
 const DR_FLIGHT = 0.42, DR_ORDER = [1, 0, 2];
@@ -117,12 +118,13 @@ function dCurl(head, heading, curl) { const seg = DP.body_length / DCOUNT, point
 function dBaseAngles(S) { const b = S.base; return (S.baseAngles ||= Array.from({ length: DCOUNT }, (_, i) => angOf(sub(b[i + 1], b[i])))); }
 function dWaveBody(S, turn, head, flat = 0) { const straight = S.axis + Math.PI, base = dBaseAngles(S).map(a => a + angDiff(straight, a) * flat), seg = DP.body_length / DCOUNT, pts = [{ ...head }]; let at = head, bend = Array.from({ length: DCOUNT }, (_, i) => turn(i / (DCOUNT - 1))); for (let pass = 0; pass < 8; pass++) bend = bend.map((v, i) => i === 0 || i === DCOUNT - 1 ? v : (bend[i - 1] + 2 * v + bend[i + 1]) / 4); /* 折れ目を作らず、なめらかな弧にする */ for (let i = 0; i < DCOUNT; i++) { at = add(at, mul(fromA(base[i] + bend[i]), seg)); pts.push(at); } S.B.facing = S.axis + turn(0); return pts; } // turn：元の姿勢からどれだけ向きを変えるか。首の付け根から尾の先まで全身が同じように曲がる
 // ブレークダウン：ポーズAからBへ動く途中で、根元はもうBに近く、先端はまだAに残る。根元が先に動き終え、先端が遅れて追いつく
-const dBreakQ = (x, u) => clamp((clamp(x) - 0.55 * u) / 0.45);
-function dBreak(x, u) { const q = dBreakQ(x, u); return lerp(smooth(0, 1, q), 1 + 2.2 * (q - 1) ** 3 + 1.2 * (q - 1) ** 2, u * u); } // 先端は行き過ぎてから戻る
+const dSoft = q => q * q * q * (q * (q * 6 - 15) + 10); // 始まりと終わりがさらになめらかな緩急
+const dBreakQ = (x, u) => clamp((clamp(x) - 0.36 * u) / 0.64);
+function dBreak(x, u) { const q = dBreakQ(x, u); return lerp(dSoft(q), 1 + 1.7 * (q - 1) ** 3 + 0.7 * (q - 1) ** 2, 0.5 * u * u); } // 先端は行き過ぎてから戻る
 function dBreakHit(x, u) { const q = dBreakQ(x, u); return lerp(smooth(0, 1, q), q * q, u); } // 先端は最後まで加速して止まる（叩きつけ）
-function dSweepTurn(S, t, u) { const r = S.r; if (t < r.warn) return -dBreak(t / r.warn, u); t -= r.warn; if (t < r.active) return -1 + 2 * dBreak(t / r.active, u); return 1 - dBreak((t - r.active - 0.18) / (r.recover - 0.18), u); }
+function dSweepTurn(S, t, u) { const r = S.r; if (t < r.warn) return -dBreak(t / r.warn, u); t -= r.warn; if (t < r.active) return -1 + 2 * dBreak(t / r.active, u); return 1 - dBreak((t - r.active) / r.recover, u); }
 // 尾の先のしなり：振り始めは勢いに引きずられて遅れ、体が止まっても勢いで振り抜かれて先まで伸びる
-function dSweepFlick(S, t) { const r = S.r; if (t < r.warn) return -0.7 * Math.sin(Math.PI * clamp(t / r.warn)); const s = (t - r.warn) / r.active; return -1.1 * Math.sin(Math.PI * clamp(s / 0.5)) + 1.2 * Math.sin(Math.PI * clamp((s - 0.42) / 0.95)); }
+function dSweepFlick(S, t) { const r = S.r, bump = x => Math.sin(Math.PI * clamp(x)) ** 2; if (t < r.warn) return -0.5 * bump(t / r.warn); const s = (t - r.warn) / r.active; return -0.9 * bump(s / 0.6) + 1.2 * bump((s - 0.35) / 1.3); } // 始まりも終わりも速さ0からなめらかに
 // 構えは胸から上へふくらんで尾の先が下へ巻く弧、振り終わりは下へふくらんで尾の先が上から手前へ巻く弧
 function dSweepShape(w, u) { return w < 0 ? w * (-0.35 + 2.1 * u) : w * 3 * u ** 1.15; }
 function dSweepBody(S, clock) { const side = orth(fromA(S.axis)), flick = dSweepFlick(S, clock), flat = smooth(0, 0.4, Math.abs(dSweepTurn(S, clock, 0.3))); return dWaveBody(S, u => dSweepShape(dSweepTurn(S, clock, u), u) + flick * smooth(0.5, 1, u) ** 2, add(S.origin, mul(side, -dSweepTurn(S, clock, 0) * 90)), flat); }
@@ -145,7 +147,7 @@ function dSetup(S, id) {
   if (id === 'rifts') S.r.active = DS.active;
   if (id === 'star_fan') S.r.warn = 1.5;
   if (id === 'tail_slam') { S.r.warn = 1.1; S.r.active = 0.75; }
-  if (id === 'tail_sweep') S.r.active = 0.8;
+  if (id === 'tail_sweep') { S.r.warn = DW.warn; S.r.active = DW.active; S.r.recover = DW.recover; }
   if (['picaro_wall', 'clones'].includes(id)) S.r.warn = DP_WARN;
   if (id === 'spiral') dSpiralBegin(S);
 }
@@ -373,7 +375,7 @@ function dDraw(S, R) {
 }
 for (const id of Object.keys(DRACO.moves)) {
   const r = bossRule('draco', id);
-  DEMOS.push({ id: 'D-' + id, ids: id === 'inhale' ? ['D03', 'D04'] : ['D04'], cat: 'りゅう座（D）', group: 'りゅう座', title: r.display_name, duration: id === 'tail_slam' ? 1.1 + 0.75 + r.recover + 1.2 : id === 'breath' ? DB_WARN + DB_ACTIVE + r.recover + 1.2 : id === 'spiral' ? 17 : id === 'rifts' ? r.warn + DS.active + r.recover + 6 : ['charge', 'leap', 'rifts', 'inhale'].includes(id) ? r.warn + r.active + r.recover + 6 : r.warn + r.active + r.recover + 1.2, color: '#ab9cff',
+  DEMOS.push({ id: 'D-' + id, ids: id === 'inhale' ? ['D03', 'D04'] : ['D04'], cat: 'りゅう座（D）', group: 'りゅう座', title: r.display_name, duration: id === 'tail_sweep' ? DW.warn + DW.active + DW.recover + 1.2 : id === 'tail_slam' ? 1.1 + 0.75 + r.recover + 1.2 : id === 'breath' ? DB_WARN + DB_ACTIVE + r.recover + 1.2 : id === 'spiral' ? 17 : id === 'rifts' ? r.warn + DS.active + r.recover + 6 : ['charge', 'leap', 'rifts', 'inhale'].includes(id) ? r.warn + r.active + r.recover + 6 : r.warn + r.active + r.recover + 1.2, color: '#ab9cff',
     params: id === 'inhale' ? [{ k: 'stars', label: '実験場：吸い込んだ星の数', type: 'range', min: 0, max: 12, step: 1, def: 12 }] : [],
     status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '全身': '現行画像と節長を保ち、胸と首を縮めて溜め、発動で解放する。腕と爪は一緒に振り、頭と首の向きをつなぐ', '動作': '技の時刻・射数・範囲・速度は現行値。退場と再登場を含めて再生。単独の比較場面で共通AIの自然選択は省略', '未決・保留': id === 'spiral' ? 'D01の新しい挙動案は入れず、現行の2周・収縮・退出を再現。カメラも現行の0.82倍まで引く' : id === 'inhale' ? '本番のactiveは6秒。吸引3秒→予告1秒のあと、残りの攻撃時間内だけ照射する現行の時間関係を維持。D02の移動仕様変更は保留' : id === 'clones' ? '現行の3体と各技を独立再生。D05のGodot実験場エラーは、このHTMLの再生成功で解決扱いにしない' : 'D01・D02の本番の移動仕様、D05の実験場不具合は未変更。ピカロの通常AIと地形への干渉は比較対象外' },
     refs: ['scripts/bosses/draco_parts.gd・draco_form.gd（全身のパーツと経路追従）', 'scripts/bosses/draco_attack_motion.gd・draco_screen_staging.gd（首・尾・退場）', 'data/bosses/draco_moves/' + id + '.tres・scripts/bosses/draco/techniques/' + id + '.gd', 'scripts/bosses/draco/technique_visual.gd（現行の予告・着弾）', 'pixelFX原本 fire/fire-breath の青いスプライト、冷える斬撃・光粒の手法、SPEEDの現行画像'],
