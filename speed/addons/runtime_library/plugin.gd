@@ -37,13 +37,7 @@ func _enter_tree() -> void:
 	_label = Label.new()
 	_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
 	_label.add_theme_color_override("font_color",COLOR_STATUS_TEXT)
-	_status_style = StyleBoxFlat.new()
-	_status_style.set_corner_radius_all(4)
-	_status_style.content_margin_left = 10
-	_status_style.content_margin_right = 10
-	_status_style.content_margin_top = 3
-	_status_style.content_margin_bottom = 3
-	_label.add_theme_stylebox_override("normal",_status_style)
+	_make_status_style()
 	_bar.add_child(_label)
 	_build_button = Button.new()
 	_build_button.text = "ビルド"
@@ -104,7 +98,18 @@ func _show_state(state: STATE.State) -> void:
 	else:
 		_set_status("C++: ソースなし",COLOR_NEUTRAL)
 
+## スクリプトの再読み込みで実行中の値が消えても、次の表示で作り直す。
+func _make_status_style() -> void:
+	_status_style = StyleBoxFlat.new()
+	_status_style.set_corner_radius_all(4)
+	_status_style.content_margin_left = 10
+	_status_style.content_margin_right = 10
+	_status_style.content_margin_top = 3
+	_status_style.content_margin_bottom = 3
+	_label.add_theme_stylebox_override("normal",_status_style)
+
 func _set_status(text: String,color: Color) -> void:
+	if _status_style == null: _make_status_style()
 	_label.text = text
 	_status_style.bg_color = color
 
