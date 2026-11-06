@@ -913,14 +913,18 @@
 
 | 画面の欄（内部キー） | 作用・単位 |
 |---|---|
+| back (`back`) | 当たり判定の体が機体から後ろへのびる長さ（距離） |
 | boss_stun (`boss_stun`) | ボスを行動不能にする時間（秒） |
 | burn_power (`burn_power`) | 燃焼のダメージ量 |
 | burn_time (`burn_time`) | 燃焼が続く時間（秒） |
 | fall_time (`fall_time`) | 落下にかかる時間（秒） |
+| front (`front`) | 当たり判定の体が機体から前へのびる長さ（距離） |
+| hit_interval (`hit_interval`) | 同じ敵へ続けて当たるまでの間隔（秒） |
 | interval (`interval`) | 効果を繰り返す間隔（秒） |
 | power (`power`) | 力の強さ |
 | radius (`radius`) | 効果が届く半径（距離） |
-| width_mult (`width_mult`) | 効果の幅に掛ける倍率 |
+| speed (`speed`) | 移動の速さ（距離／秒） |
+| turn_mult (`turn_mult`) | 曲がる速さに掛ける倍率 |
 
 
 ### 特性

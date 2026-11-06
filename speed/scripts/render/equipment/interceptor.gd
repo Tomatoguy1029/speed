@@ -20,6 +20,8 @@ func setup_frame(parent: Node2D, effect_parent: Node2D, pixel: float, scale_valu
 	_painter.setup_painter(pixel)
 	effect_parent.add_child(_painter)
 func frame_tick(values: Array, dt: float) -> void:
+	# ふたご座の影のドローンは、影の粒が集まって形になるまで描かない（集まる粒は gemini_twins.gd が描く）
+	values = values.filter(func(d): return not (d.get("twin", false) and float(d.get("appear", 1.0)) < 1.0))
 	_frame = values
 	_objects.drones = values
 	_objects.queue_redraw()

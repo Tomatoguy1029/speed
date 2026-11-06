@@ -96,7 +96,6 @@ void HeroesSystem::place(RunRuntime &run,uint32_t id) {
     const std::pair<double,double> windows[]={{cfg.first_min,cfg.first_max},{cfg.second_min,cfg.second_max}};
     for (size_t i=0;i<2;++i) {const auto first=int64_t(std::ceil(windows[i].first)),last=std::max(first,int64_t(std::ceil(windows[i].second))-1);h.landmark_times[i]=origin+*rng.randi_range(first,last);}
 }
-double HeroesSystem::trace_width(const RunRuntime &run) {return LeoBehavior::trace_width(run);}
 bool HeroesSystem::captive(const RunRuntime &run) {const auto &h=run.state.heroes;return h.hero && std::find(h.lit.begin(),h.lit.end(),0)!=h.lit.end();}
 void HeroesSystem::step(RunRuntime &run,double real_dt,double world_dt) {
     auto &s=run.state;auto &h=s.heroes;const auto &cfg=run.content->hero_config;
@@ -131,14 +130,17 @@ void HeroesSystem::recovered(RunRuntime &run,EnemyHandle enemy) {
 }
 void HeroesSystem::select_power(RunRuntime &run,uint32_t id) {run.state.heroes.power=id;run.state.heroes.active=0;}
 void HeroesSystem::activate(RunRuntime &run) {
-    auto &h=run.state.heroes;if (!h.power || h.cooldown>0) return;const auto &d=run.content->heroes[h.power-1].definition;h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);
+    auto &h=run.state.heroes;if (!h.power || h.cooldown>0) return;const auto &d=run.content->heroes[h.power-1].definition;
+    // しし座はなぞりを止める力なので、描画中・なぞり中には発動しない
+    if (d.external_id=="leo" && (run.state.draw.drawing || run.state.draw.tracing)) return;
+    h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);
     if (d.external_id=="perseus") PerseusBehavior::activate(run);
 }
 Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
-    const auto &h=run.state.heroes;Dictionary out;out["trace_width"]=trace_width(run);out["trace_radius"]=run.state.trace_radius*trace_width(run);out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
+    const auto &h=run.state.heroes;Dictionary out;out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
     Dictionary fire;godot::PackedFloat64Array falls,burns;for (const auto &v:h.hercules.falls) {falls.push_back(v.position.x);falls.push_back(v.position.y);falls.push_back(v.remaining);}for (const auto &v:h.hercules.burns) {burns.push_back(v.position.x);burns.push_back(v.position.y);burns.push_back(v.remaining);}fire["falls"]=falls;fire["burns"]=burns;fire["fire_time"]=h.hercules.fire_time;fire["burn_tick"]=h.hercules.burn_tick;out["hercules"]=fire;
-    Dictionary twin;godot::PackedVector2Array first,path;for (auto p:h.twin.first) first.push_back(p);for (auto p:h.twin.path) path.push_back(p);
-    twin["first"]=first;twin["path"]=path;twin["position"]=h.twin.position;twin["tracing"]=h.twin.tracing;twin["rate"]=h.twin.rate;twin["segment"]=int64_t(h.twin.segment);twin["segment_position"]=h.twin.segment_position;out["twin"]=twin;
+    Dictionary twin;godot::PackedVector2Array path;for (auto p:h.twin.path) path.push_back(p);
+    twin["path"]=path;twin["position"]=h.twin.position;twin["tracing"]=h.twin.tracing;twin["rate"]=h.twin.rate;twin["segment"]=int64_t(h.twin.segment);twin["segment_position"]=h.twin.segment_position;out["twin"]=twin;
     godot::PackedVector2Array stars,landmarks;godot::PackedByteArray lit,done;godot::PackedInt32Array links;godot::PackedInt64Array ids;godot::PackedFloat64Array times;
     for (auto p:h.stars) stars.push_back(p);for (auto p:h.landmarks) landmarks.push_back(p);for (auto v:h.lit) lit.push_back(v);
     if (h.hero) for (auto [a,b]:run.content->heroes[h.hero-1].links) {links.push_back(a);links.push_back(b);}
@@ -151,7 +153,7 @@ bool HeroesSystem::validate(const godot::RunState &s,const ContentBundle &c) {
     if (!std::isfinite(h.hercules.fire_time) || !std::isfinite(h.hercules.burn_tick)) return false;
     for (const auto *items:{&h.hercules.falls,&h.hercules.burns}) for (const auto &v:*items) if (!v.position.is_finite() || !std::isfinite(v.remaining) || v.remaining<0) return false;
     const auto &t=h.twin;if (!t.position.is_finite() || !std::isfinite(t.rate) || t.rate<0 || !std::isfinite(t.segment_position) || t.segment_position<0 || (t.tracing && (t.path.size()<2 || t.segment>=t.path.size()-1))) return false;
-    for (auto p:t.first) if (!p.is_finite()) return false;for (auto p:t.path) if (!p.is_finite()) return false;for (auto id:t.inside) if (id<=0) return false;
+    for (auto p:t.path) if (!p.is_finite()) return false;for (auto id:t.inside) if (id<=0) return false;
     for (auto p:h.stars) if (!p.is_finite()) return false;for (auto p:h.landmarks) if (!p.is_finite()) return false;for (auto v:h.lit) if (v>1) return false;
     for (size_t i=0;i<2;++i) if (!std::isfinite(h.landmark_times[i]) || h.carrier_ids[i]<0 || (s.enemy_handles.contains(h.carriers[i]) && s.enemy_handles.entity_id(h.carriers[i])!=h.carrier_ids[i])) return false;return true;
 }

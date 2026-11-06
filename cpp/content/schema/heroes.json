@@ -169,7 +169,37 @@
           "ref": "HeroDefinition"
         },
         {
-          "name": "width_mult",
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_mult",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "front",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
           "type": "f64",
           "min": 0
         }
@@ -188,6 +218,11 @@
           "name": "hero",
           "type": "u32",
           "ref": "HeroDefinition"
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
         }
       ]
     },

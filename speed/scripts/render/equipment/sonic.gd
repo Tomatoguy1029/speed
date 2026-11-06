@@ -75,10 +75,12 @@ func _draw_rings(r: PixelShapes) -> void:
 	var ship_pos: Vector2 = _ship.ship_pos
 	var heading: Vector2 = _ship.ship_heading
 	var nose: Vector2 = ship_pos+heading*float(_frame.nose)*r.px
+	# ふたご座の影が出した輪は、影の機首に届くところで消す
+	var twin_nose: Vector2 = Vector2(_frame.get("twin_pos", ship_pos))+Vector2(_frame.get("twin_heading", heading))*float(_frame.nose)*r.px
 	for f in (_frame.frames):
 		var radius := speed * float(f.age) / r.px
 		if radius < 1.0: continue
-		var gap: float = nose.distance_to(f.pos) / r.px - radius
+		var gap: float = (twin_nose if f.get("twin", false) else nose).distance_to(f.pos) / r.px - radius
 		if gap <= 0.0: continue
 		var alpha := 0.24 * (1.0 - float(f.age) / life) * minf(1.0, gap / 6.0)
 		r.add_ring(f.pos, radius, Color(C_RING, alpha), 0.7)

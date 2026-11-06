@@ -2,6 +2,8 @@
 #include "field.h"
 #include "boss_contact_feedback.h"
 #include "geometry.h"
+#include "../behaviors/heroes/leo.h"
+#include "../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
 #include <cmath>
@@ -34,12 +36,19 @@ bool SpeedRunCore::configure_ship(const Dictionary &config, const Dictionary &st
 
 void SpeedRunCore::steer_ship(double want, double dt) {
     const auto &c = runtime.state.ship_config;
+    // しし座の獅子は速く曲がり、一定の速さで駆ける（速さは move_ship が保つ）
+    const auto *lion = speed::LeoBehavior::active(runtime);
+    const double turn_rate = lion ? c.turn_rate * lion->turn_mult : c.turn_rate;
     const double sp = runtime.state.ship.vel.length();
     if (sp > 1) {
         const double difference = want - double(runtime.state.ship.vel.angle());
         const double wrapped = speed::angle_difference(difference);
-        const double turn = std::clamp(wrapped, -c.turn_rate * dt, c.turn_rate * dt);
+        const double turn = std::clamp(wrapped, -turn_rate * dt, turn_rate * dt);
         runtime.state.ship.vel = runtime.state.ship.vel.rotated(turn);
+    }
+    if (lion) {
+        if (runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.vel = Vector2::from_angle(want) * lion->speed;
+        return;
     }
     const double cruise = c.max_speed * c.steer_cruise;
     if (sp < cruise) runtime.state.ship.vel += Vector2::from_angle(want) * std::min(c.acceleration * dt, cruise - sp);
@@ -48,6 +57,17 @@ void SpeedRunCore::steer_ship(double want, double dt) {
 
 void SpeedRunCore::move_ship(double dt, Vector2 accel) {
     const auto &c = runtime.state.ship_config;
+    // しし座の獅子：勢いや減速はかけず、場の境界の押し戻しだけ受けて、いつも定義の速さで駆ける
+    if (const auto *lion = speed::LeoBehavior::active(runtime)) {
+        auto &ship = runtime.state.ship;
+        ship.glide = false; ship.boost_t = 0; ship.fade_t = 0;
+        Vector2 vel = ship.vel + accel * dt;
+        if (vel.is_zero_approx()) vel = ship.heading.is_zero_approx() ? Vector2(1, 0) : ship.heading;
+        ship.vel = vel.normalized() * lion->speed;
+        ship.pos += ship.vel * dt;
+        ship.heading = ship.vel.normalized();
+        return;
+    }
     if (runtime.state.ship.glide) {
         runtime.state.ship.glide_t += dt;
         const double cruise = c.max_speed * c.steer_cruise;
@@ -116,7 +136,9 @@ bool SpeedRunCore::step_ship_input(double real_dt, double world_dt, const speed:
     const Vector2 accel=speed::FieldSystem::boundary_accel(runtime,runtime.state.ship.pos);
     const Vector2 from = runtime.state.ship.pos;
     move_ship(world_dt, accel);
-    if (runtime.state.combat_ready) collide_ship(from, c.ship_radius);
+    // しし座の獅子は弾かれず、獅子の体で当たる
+    if (speed::LeoBehavior::active(runtime)) { if (runtime.state.combat_ready) speed::LeoBehavior::contact(runtime, from, runtime.state.ship.pos); }
+    else if (runtime.state.combat_ready) collide_ship(from, c.ship_radius);
     if (runtime.state.phase!=Phase::Play) return true;
     speed::FieldSystem::collide_ship(runtime);
     if (!runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.heading = runtime.state.ship.vel.normalized();

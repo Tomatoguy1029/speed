@@ -3048,14 +3048,28 @@ inline bool read(BinaryReader &input, LeoDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.hero)) return false;
-    if (!input.read_f64(out.width_mult)) return false;
-    if (out.width_mult < 0) return false;
+    if (!input.read_f64(out.speed)) return false;
+    if (out.speed < 0) return false;
+    if (!input.read_f64(out.turn_mult)) return false;
+    if (out.turn_mult < 0) return false;
+    if (!input.read_f64(out.power)) return false;
+    if (out.power < 0) return false;
+    if (!input.read_f64(out.hit_interval)) return false;
+    if (out.hit_interval < 0) return false;
+    if (!input.read_f64(out.front)) return false;
+    if (out.front < 0) return false;
+    if (!input.read_f64(out.back)) return false;
+    if (out.back < 0) return false;
+    if (!input.read_f64(out.radius)) return false;
+    if (out.radius < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, GeminiDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.hero)) return false;
+    if (!input.read_f64(out.power)) return false;
+    if (out.power < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, HerculesDefinition &out) {
@@ -5878,13 +5892,13 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 284: {
         if (version != 1) return false;
-        if (count > input.remaining()/16) return false;
+        if (count > input.remaining()/64) return false;
         for (uint32_t i=0; i<count; ++i) { LeoDefinition row; if (!read(input,row)) return false; out.LeoDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 285: {
         if (version != 1) return false;
-        if (count > input.remaining()/8) return false;
+        if (count > input.remaining()/16) return false;
         for (uint32_t i=0; i<count; ++i) { GeminiDefinition row; if (!read(input,row)) return false; out.GeminiDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }

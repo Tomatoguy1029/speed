@@ -10,7 +10,7 @@ stage = 4
 stars = PackedVector2Array(0, 0, -20, 100, 80, 120, 100, 10, -90, 200, -110, 320, 160, 220, 200, -80, -80, -110)
 links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 0, 1, 4, 4, 5, 2, 6, 3, 7, 0, 8)
 cooldown = 50.0
-duration = 10.0
+duration = 15.0
 params = {
 "burn_power": 0.3,
 "burn_time": 3.0,

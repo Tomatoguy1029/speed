@@ -32,7 +32,7 @@ void HerculesBehavior::step(RunRuntime &r,double dt) {
     for (const auto &p:r.content->hercules) {
         if (h.power==p.hero && h.active>0) {fire.fire_time-=dt;if (fire.fire_time<=0) {fire.fire_time=p.interval;fire.falls.push_back({target(r),float(p.fall_time)});}}
         const double damage=CombatResolver::attack_power(r)*p.power;
-        for (size_t i=fire.falls.size();i-->0;) {auto &f=fire.falls[i];f.remaining=float(f.remaining-dt);if (f.remaining>0) continue;const auto at=f.position;fire.falls.erase(fire.falls.begin()+i);burn(r,at,p.radius,damage);godot::Dictionary event;event["pos"]=at;event["radius"]=p.radius;event["cause"]=godot::StringName("fire");event["color"]=godot::Color::html("ff7a2e");event["life"]=0.45;EventBuilder::flush_combat(r);FrameBuilder::append(r,"explode",event);fire.burns.push_back({at,float(p.burn_time)});}
+        for (size_t i=fire.falls.size();i-->0;) {auto &f=fire.falls[i];f.remaining=float(f.remaining-dt);if (f.remaining>0) continue;const auto at=f.position;fire.falls.erase(fire.falls.begin()+i);burn(r,at,p.radius,damage);godot::Dictionary event;event["pos"]=at;event["radius"]=p.radius;EventBuilder::flush_combat(r);FrameBuilder::append(r,"meteor_impact",event);fire.burns.push_back({at,float(p.burn_time)});}
         fire.burn_tick-=dt;const bool tick=fire.burn_tick<=0;if (tick) fire.burn_tick=0.25;
         for (size_t i=fire.burns.size();i-->0;) {auto &b=fire.burns[i];b.remaining=float(b.remaining-dt);if (b.remaining<=0) {fire.burns.erase(fire.burns.begin()+i);continue;}if (tick) burn(r,b.position,p.radius*0.8,damage*p.burn_power);}
     }

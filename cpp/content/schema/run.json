@@ -2159,8 +2159,8 @@
         "value": "landmark"
       },
       {
-        "name": "TwinFirst",
-        "value": "twin_first"
+        "name": "MeteorImpact",
+        "value": "meteor_impact"
       },
       {
         "name": "CentaurusCue",
@@ -3121,7 +3121,10 @@
     "landmark": [
       "pos"
     ],
-    "twin_first": [],
+    "meteor_impact": [
+      "pos",
+      "radius"
+    ],
     "centaurus_cue": [
       "id",
       "technique",

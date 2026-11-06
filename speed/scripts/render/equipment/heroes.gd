@@ -1,6 +1,9 @@
 ## 英雄の力の表示。C++から受けた値と出来事だけを描く。
 ## ペルセウス座は、機体の手前に開くメドゥーサの目（hero_medusa）、開ききった瞬間の画面のブラーと闇のオーラ（hero_medusa_screen）、
 ## 石の敵が砕ける破片（StoneShards）を出す。石になった敵の色は、敵のベースと装甲の shader が描く（hero_stone.gdshaderinc）。
+## しし座は、効いている間、機体の代わりに星の獅子（leo_lion.gd）を機体の位置と向きで描く（機体は run_frame_view が隠す）。
+## ふたご座は光と影の兄弟（gemini_twins.gd）。描いている線を左右反転した影の経路を、線の下へ薄く予告する。
+## ヘルクレス座は火の隕石群（hercules_meteors.gd）。
 extends Node2D
 
 const MEDUSA := preload("res://shaders/hero_medusa.gdshader")
@@ -8,6 +11,21 @@ const MEDUSA_SCREEN := preload("res://shaders/hero_medusa_screen.gdshader")
 const NOISE := preload("res://assets/effects/build/burst_noise.tres")
 const SHARDS := preload("res://scripts/render/fx/stone_shards.gd")
 const PERSEUS: HeroDef = preload("res://data/heroes/perseus.tres")
+const LEO: HeroDef = preload("res://data/heroes/leo.tres")
+const LION := preload("res://scripts/render/equipment/leo_lion.gd")
+const TWINS := preload("res://scripts/render/equipment/gemini_twins.gd")
+const METEORS := preload("res://scripts/render/equipment/hercules_meteors.gd")
+## ふたご座の線の粉の色。影は深紫から明るい紫、光は橙金から白
+const TWIN_SHADOW_POWDER := [Color(0.07, 0.02, 0.13), Color(0.2, 0.07, 0.34), Color(0.36, 0.15, 0.6), Color(0.55, 0.3, 0.88), Color(0.13, 0.04, 0.22)]
+const TWIN_LIGHT_POWDER := [Color(0.98, 0.6, 0.16), Color(1.0, 0.8, 0.32), Color(1.0, 0.9, 0.55), Color(1.0, 0.72, 0.25)]
+const TWIN_LIGHT_SPARK := Color(1.0, 1.0, 0.95)
+## 線が消えたあとの跡が薄れる秒
+const TWIN_LIGHT_FADE := 0.6
+const TWIN_SHADOW_FADE := 1.6
+## 獅子が現れる・消える秒
+const LION_FADE := 0.3
+## 獅子の駆け足の速さの割合が 1 になる機体の速さ
+const LION_STRIDE_SPEED := 350.0
 ## 目の横幅の半分のドット数。まぶたの縁や虹彩の筋をドット単位で描くので、ドット数で形を決める
 const EYE_CELLS := 42.0
 var petrified := PackedFloat32Array()
@@ -21,9 +39,18 @@ var _screen: ColorRect
 var _screen_material: ShaderMaterial
 var _shards: StoneShards
 var _last_stone := PackedFloat32Array()
+var _lion: Node2D
+var _twins: Node2D
+var _meteors: Node2D
+## ふたご座の線：drawing なら描いている線（light）と機体の位置・向き、突進中なら本体と影の経路（light・shadow）
+var twin_preview := {}
+var _twin_trails: Array[Dictionary] = []
+var _twin_last := {}
+## 画面全体の歪み（RenderPipeline）。しし座の変身の波に使う
+var pipeline: Object
 
-## sky は敵より上の親。cell は1ドットの世界での幅。
-func setup(cell: float, sky: Node2D) -> void:
+## sky は敵より上の親、ground は敵より下の親。cell は1ドットの世界での幅。
+func setup(cell: float, sky: Node2D, ground: Node2D) -> void:
 	px = cell
 	_eye = MeshInstance2D.new()
 	_eye.mesh = FireBursts._mesh()
@@ -63,11 +90,24 @@ func setup(cell: float, sky: Node2D) -> void:
 	eye_layer.follow_viewport_enabled = true
 	add_child(eye_layer)
 	eye_layer.add_child(_eye)
+	# 獅子は敵より上に描き、画面全体の演出は世界より上・HUD より下へ重ねる
+	_lion = LION.new()
+	sky.add_child(_lion)
+	_lion.setup(px, layer.layer)
+	_lion.visible = false
+	_twins = TWINS.new()
+	sky.add_child(_twins)
+	_twins.setup()
+	_meteors = METEORS.new()
+	sky.add_child(_meteors)
+	_meteors.setup(px, ground)
 
 ## 石だった敵の kill なら破片を出して true を返す（通常の撃破の火花は出さない）。
 func frame_event(event: Dictionary) -> bool:
 	if event.type == &"hero_power" and StringName(event.get("id", &"")) == &"perseus":
 		_eye_material.set_shader_parameter("seed", randf() * 9.0)
+	elif event.type == &"meteor_impact":
+		_meteors.impact(event.pos, float(event.get("radius", 110.0)))
 	elif event.type == &"kill":
 		for i in range(0, _last_stone.size(), 3):
 			if Vector2(_last_stone[i], _last_stone[i + 1]).distance_to(event.pos) <= _last_stone[i + 2] + 4.0:
@@ -75,13 +115,23 @@ func frame_event(event: Dictionary) -> bool:
 				return true
 	return false
 
+## しし座が効いていて、機体の代わりに獅子を描くか。
+static func lion_active(hero: Dictionary) -> bool:
+	return StringName(hero.get("power", &"")) == &"leo" and float(hero.get("active", 0.0)) > 0.0
+
 ## dt は演出の秒、ship は機体の表示位置、hero は C++ の英雄の値。目の進みは効いている時間の残りから求める。
-func frame_tick(dt: float, ship: Vector2, hero: Dictionary) -> void:
+## heading と velocity は機体の向きと速さ（獅子の向きと駆け足に使う）。ship_xf は機体の絵の変形（ふたご座の影に使う）。
+## escort の drones は外に付ける武器のドローン（エスコートウィングと迎撃ドローン）。影に付くものを、影の粒が集まって形づくる演出に使う。
+func frame_tick(dt: float, ship: Vector2, hero: Dictionary, heading := Vector2.RIGHT, velocity := Vector2.ZERO, ship_xf := Transform2D.IDENTITY, escort := {}) -> void:
 	_last_stone = petrified
 	var hdr := get_viewport().use_hdr_2d
 	for mat: ShaderMaterial in [_eye_material, _screen_material, _shards.material]:
 		mat.set_shader_parameter("linear_output", hdr)
 	_shards.step(dt)
+	_tick_lion(dt, ship, hero, heading, velocity)
+	_twins.tick(dt, ship_xf, hero, Array(escort.get("drones", [])).filter(func(d): return d.get("twin", false)))
+	_tick_twin_trails(dt)
+	_meteors.tick(dt, hero.get("hercules", {}))
 	var active := float(hero.get("active", 0.0))
 	if StringName(hero.get("power", &"")) != &"perseus" or active <= 0.0:
 		_eye.hide()
@@ -101,14 +151,121 @@ func frame_tick(dt: float, ship: Vector2, hero: Dictionary) -> void:
 		_screen_material.set_shader_parameter("cell_px", px * canvas.get_scale().x)
 		_screen_material.set_shader_parameter("center", (canvas * ship) / size)
 
+## 獅子は効き始めに変身して現れ（leo_lion.gd）、終わりに LION_FADE 秒でふっと消える。駆け足は機体の速さに合わせる。
+func _tick_lion(dt: float, ship: Vector2, hero: Dictionary, heading: Vector2, velocity: Vector2) -> void:
+	if not lion_active(hero):
+		_lion.visible = false
+		return
+	var active := float(hero.get("active", 0.0))
+	var strength := clampf(active / LION_FADE, 0.0, 1.0)
+	var stride := clampf(velocity.length() / LION_STRIDE_SPEED, 0.3, 1.2)
+	var direction := heading if heading.length_squared() > 0.0 else Vector2.RIGHT
+	_lion.pipeline = pipeline
+	_lion.tick(dt, ship, direction.angle(), strength, stride, LEO.duration - active)
+
+## ふたご座の光の機体の濃さ（0〜1）。0.5 を超えると本物の機体を隠す。
+func twin_light() -> float:
+	return _twins.light
+
+## ふたご座の光と影の線は、帯ではなく機体からこぼれた粉で描く。影は暗い紫の粉、光は金の光の粒がまたたく。
+## 描いている間は、描いた線（光）とそれを機体の位置・向きで反転した影の経路を、薄い粉で予告する。
+## 突進中は、それぞれの機体が通ったところまでに粉を撒く。線が消えたあとも粉は少しずつ外へ漂い、一粒ずつ消えていく（影の粉は長く残る）。
 func draw_fire(canvas: CanvasItem) -> void:
-	var falls: PackedFloat64Array = fire.get("falls",PackedFloat64Array())
-	var burns: PackedFloat64Array = fire.get("burns",PackedFloat64Array())
-	for i in range(0,falls.size(),3):
-		var k := clampf(1.0-falls[i+2]/0.6,0.0,1.0)
-		var at := Vector2(falls[i],falls[i+1])
-		canvas.draw_circle(at,30.0+60.0*k,Color(1.0,0.4,0.1,0.12+0.25*k))
-		canvas.draw_circle(at-Vector2(-0.6,1.0)*500.0*(1.0-k),22.0,Color("#ffb060"))
-	for i in range(0,burns.size(),3):
-		var flick := 0.8+0.2*sin(world_time*18.0+burns[i])
-		canvas.draw_circle(Vector2(burns[i],burns[i+1]),80.0*flick,Color(1.0,0.45,0.1,0.22*minf(1.0,burns[i+2])))
+	var width: float = twin_preview.get("width", 16.0)
+	for line in _twin_trails:
+		var k: float = 1.0 - line.age / line.life
+		_draw_powder(canvas, line.points, width, k, line.age, line.light, line.seed)
+	var lines := _twin_lines()
+	if lines.is_empty(): return
+	var preview: bool = lines.preview
+	_draw_powder(canvas, lines.shadow, width, 0.45 if preview else 1.0, 0.0, false, 0.0)
+	_draw_powder(canvas, lines.light, width, 0.45 if preview else 1.0, 0.0, true, 0.0)
+
+## いま出す光と影の線（どちらも2点以上）。突進中は機体が通ったところまでに切る。出さないときは空
+func _twin_lines() -> Dictionary:
+	if twin_preview.is_empty(): return {}
+	var light: PackedVector2Array = twin_preview.get("light", PackedVector2Array())
+	var shadow: PackedVector2Array = twin_preview.get("shadow", PackedVector2Array())
+	var preview: bool = twin_preview.get("drawing", false)
+	if preview and light.size() >= 1:
+		var origin: Vector2 = twin_preview.ship
+		var axis: Vector2 = twin_preview.heading.normalized()
+		light = PackedVector2Array([origin]) + light
+		shadow = PackedVector2Array()
+		for p in light:
+			var d := p - origin
+			shadow.append(origin + axis * d.dot(axis) * 2.0 - d)
+	elif not preview:
+		light = _cut(light, twin_preview.get("ship", Vector2.INF))
+		shadow = _cut(shadow, twin_preview.get("twin", Vector2.INF))
+	if light.size() < 2 or shadow.size() < 2: return {}
+	return {"light": light, "shadow": shadow, "preview": preview}
+
+## 線を、at にいちばん近い点までで切る
+static func _cut(points: PackedVector2Array, at: Vector2) -> PackedVector2Array:
+	if points.size() < 2 or not at.is_finite(): return points
+	var best := INF
+	var best_i := 1
+	var best_p := points[0]
+	for i in range(1, points.size()):
+		var p := Geometry2D.get_closest_point_to_segment(at, points[i - 1], points[i])
+		var d := p.distance_squared_to(at)
+		if d < best:
+			best = d
+			best_i = i
+			best_p = p
+	var out := points.slice(0, best_i)
+	out.append(best_p)
+	return out
+
+## 線が消えたら、最後の形を粉の跡として残す
+func _tick_twin_trails(dt: float) -> void:
+	for line in _twin_trails: line.age += dt
+	_twin_trails = _twin_trails.filter(func(l): return l.age < l.life)
+	var lines := _twin_lines()
+	if lines.is_empty() and not _twin_last.is_empty() and not _twin_last.preview:
+		_twin_trails.append({"points": _twin_last.light, "light": true, "age": 0.0, "life": TWIN_LIGHT_FADE, "seed": 0.0})
+		_twin_trails.append({"points": _twin_last.shadow, "light": false, "age": 0.0, "life": TWIN_SHADOW_FADE, "seed": 0.0})
+	_twin_last = lines
+
+static func _hash(x: float) -> float:
+	var v := sin(x * 12.9898) * 43758.5453
+	return v - floorf(v)
+
+## 線に沿って粉を撒く。k（0〜1）が下がると粒が一つずつ消え、age（秒）とともに粒が線から外へ漂う。
+## 粒の位置と色は線上の位置ごとに決まった乱数で選ぶので、コマごとにちらつかない
+func _draw_powder(canvas: CanvasItem, points: PackedVector2Array, width: float, k: float, age: float, light: bool, seed: float) -> void:
+	if k <= 0.0 or points.size() < 2: return
+	var colors: Array = TWIN_LIGHT_POWDER if light else TWIN_SHADOW_POWDER
+	var step := px * (1.4 if light else 1.1)
+	var along := 0.0
+	var i := 0
+	for s in range(1, points.size()):
+		var a := points[s - 1]
+		var b := points[s]
+		var length := a.distance_to(b)
+		if length < 0.001: continue
+		var u := (b - a) / length
+		var normal := u.orthogonal()
+		while along <= length:
+			var base := a + u * along
+			for j in 3:
+				var h := float(i * 3 + j) + seed * 101.0
+				var h1 := _hash(h)
+				var h2 := _hash(h + 0.37)
+				var h3 := _hash(h + 0.71)
+				if h3 > k: continue
+				# 中心ほど密に、外ほどまばらに
+				var side := (h1 * 2.0 - 1.0)
+				side = side * absf(side) * width * (0.7 if light else 0.85)
+				# 消える前の粉は外へ漂い、少し後ろへ流れる
+				var drift := normal * signf(side) * age * px * (4.0 + 10.0 * h2) - u * age * px * 3.0 * h1
+				var c: Color = colors[int(h2 * colors.size()) % colors.size()]
+				var size := px * (2.0 if h1 * h3 > 0.62 else 1.0)
+				if light and sin(world_time * 11.0 + h * 1.7) > 0.86:
+					c = TWIN_LIGHT_SPARK
+					size = px * 2.0
+				canvas.draw_rect(Rect2(((base + normal * side + drift) / px).floor() * px, Vector2.ONE * size), Color(c, c.a * (0.55 + 0.45 * k)))
+			i += 1
+			along += step
+		along -= length

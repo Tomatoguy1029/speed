@@ -88,11 +88,11 @@ struct InterceptorState {bool ready=false;uint32_t definition=0,count=0,burst=0,
 struct BipolarPending {godot::Vector2 from,to;uint64_t id=0;double delay=0;};
 struct BipolarBeam {godot::Vector2 from,to;uint64_t id=0;double age=0,width_scale=1;};
 struct BipolarState {bool ready=false,active=false;uint32_t definition=0,color=0;godot::Vector2 origin;uint64_t next_id=1;double started=0,damage=0,width=0,radius_factor=1,life=0,knock=0,min_length=0,delay=0,visual_life=0,area_increment=0,knockback_increment=0;std::vector<BipolarPending> pending;std::vector<BipolarBeam> beams;};
-struct TowCargo {godot::Vector2 pos,relative;double radius=0,angle=0;uint32_t definition=0;int64_t source_id=0;bool ready=false;};
+struct TowCargo {godot::Vector2 pos,relative;double radius=0,angle=0;uint32_t definition=0;int64_t source_id=0;bool ready=false,twin=false;};
 struct MassTowState {bool ready=false;uint32_t definition=0;IntervalTimer fire;double capture_radius=0,hold=0,follow=0,interval=0,shot_speed=0,damage=0,size_ref=1,life=0,knock=0,clump_spacing=0,projectile_increment=0,duration_increment=0,knockback_increment=0,area_increment=0,interval_increment=0,minimum_ratio=0,minimum_interval=0;uint32_t visible=1;std::vector<TowCargo> cargo;};
 struct ContactArcVisual {uint64_t id=0;double age=0;std::vector<godot::Vector2> segments;};
 struct ContactArcState {bool ready=false;uint32_t definition=0,chains=0,branches=0;double ready_at=0,damage=0,range=0,cooldown=0,knock=0,area_increment=0,knockback_increment=0,visual_life=0;uint64_t next_visual=1;std::vector<ContactArcVisual> visuals;};
-struct SonicRing {godot::Vector2 pos;double age=0;};
+struct SonicRing {godot::Vector2 pos;double age=0;bool twin=false;};
 struct SonicPending {EnemyHandle target;int64_t id=0;double delay=0,age=0,damage=0;godot::Vector2 velocity;bool hit=false;};
 struct SonicVisual {uint64_t id=0;int64_t target=0;godot::Vector2 pos,direction;double born=0;bool impact=false,dead=false;};
 struct SonicState {
@@ -170,7 +170,11 @@ struct LoadoutState {
     MassTowState mass_tow;
     BipolarState bipolar;
     InterceptorState interceptor;
+    // ふたご座の影に付く迎撃ドローン（ドローン・時計・狙い直しの待ちは機ごとに要るので、影がいる間だけ機体の設定を写して使う）
+    InterceptorState twin_interceptor;
     DashRangeDroneState escort;
+    // ふたご座の影に付くエスコートウィング（編隊・展開・命中の状態は機ごとに要るので、影がいる間だけ機体の設定を写して使う）
+    DashRangeDroneState twin_escort;
     AfterimageState afterimage;
     FlashSlashState flash_slash;
     CritBeamState crit_beam;

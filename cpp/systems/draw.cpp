@@ -1,4 +1,5 @@
 #include "../behaviors/heroes/gemini.h"
+#include "../behaviors/heroes/leo.h"
 #include "heroes.h"
 #include "../behaviors/weapons/bipolar.h"
 #include "../behaviors/weapons/dashRangeDrone.h"
@@ -94,14 +95,13 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 }
 
 void SpeedRunCore::commit_draw() {
-    if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear();runtime.state.heroes.twin.first.clear(); return; }
-    if (speed::GeminiBehavior::capture_first(runtime)) return;
-    const bool twin=speed::GeminiBehavior::swap_paths(runtime);
-    if (!twin) runtime.state.draw.gauge = std::max(0.0, runtime.state.draw.gauge - runtime.state.draw.start_charge * std::min(1.0, runtime.state.draw.length / runtime.state.draw.limit));
+    if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
+    runtime.state.draw.gauge = std::max(0.0, runtime.state.draw.gauge - runtime.state.draw.start_charge * std::min(1.0, runtime.state.draw.length / runtime.state.draw.limit));
     if (runtime.state.control.bonus_remaining>0) runtime.state.draw.gauge=1;
     auto points = runtime.state.draw.points;
     if (runtime.state.ship.pos.distance_to(points[0]) > 1) points.insert(0, runtime.state.ship.pos);
     const Vector2 dir = (points[1] - points[0]).normalized();
+    const Vector2 axis = runtime.state.ship.heading;
     const double sp = runtime.state.ship.vel.length();
     const double along = sp > 0 ? std::max(0.0, double(runtime.state.ship.vel.dot(dir)) / sp) : 0.0;
     const double carried = sp * runtime.state.draw_config.carry * along;
@@ -129,7 +129,7 @@ void SpeedRunCore::commit_draw() {
     runtime.state.draw.seg_pos = 0;
     runtime.state.draw.drawing = false;
     runtime.state.draw.tracing = true;
-    if (twin) speed::GeminiBehavior::launch(runtime);
+    speed::GeminiBehavior::launch(runtime, points[0], axis);
     speed::RunUpBehavior::launch(runtime);
     speed::FullChargeBehavior::launch(runtime);
     speed::RampageBehavior::launch(runtime);
@@ -158,13 +158,15 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
     const bool touch = input.touch, release = input.pen_release;
     const Vector2 pen = input.pen;
     if (!runtime.state.draw.drawing && !runtime.state.draw.tracing) {
+        // しし座の獅子の間は、なぞり（ブースト）を始められない
+        if (speed::LeoBehavior::active(runtime)) return true;
         if ((press || alt) && runtime.state.draw_config.capacity * runtime.state.draw.gauge >= runtime.state.draw_config.min_charge) begin_draw(press, pen, clock_msec);
         return true;
     }
     if (!runtime.state.draw.drawing) return true;
     if (!runtime.state.draw.started) {
         if (press) { runtime.state.draw.started = true; runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
-        else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear();runtime.state.heroes.twin.first.clear(); }
+        else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); }
         return true;
     }
     if (bool(input.has_cursor)) extend_draw(pen, camera_zoom);
@@ -237,9 +239,9 @@ bool SpeedRunCore::step_draw(double real_dt) {
         const Vector2 from = runtime.state.ship.pos;
         for (auto it = runtime.state.draw.inside.begin(); it != runtime.state.draw.inside.end();) {
             const auto &enemy = runtime.state.enemies[it->second];
-            const double radius = enemy.radius + runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime) + 2.0;
+            const double radius = enemy.radius + runtime.state.trace_radius + 2.0;
             bool inside=enemy.pos.distance_squared_to(from)<=radius*radius;
-            if (enemy.alive && !enemy.dead && enemy.id==it->first) {const auto *boss=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(uint32_t(it->second)));if (boss && runtime.content->bosses[runtime.content->boss_bodies[boss->definition-1].boss-1].kind==4) inside=speed::DracoPose::contains(runtime,*boss,from,runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime)+2.0);}
+            if (enemy.alive && !enemy.dead && enemy.id==it->first) {const auto *boss=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(uint32_t(it->second)));if (boss && runtime.content->bosses[runtime.content->boss_bodies[boss->definition-1].boss-1].kind==4) inside=speed::DracoPose::contains(runtime,*boss,from,runtime.state.trace_radius+2.0);}
             if (!enemy.alive || enemy.dead || enemy.id != it->first || !inside) it = runtime.state.draw.inside.erase(it);
             else ++it;
         }
@@ -248,7 +250,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
         runtime.state.ship.pos = a + u * runtime.state.draw.seg_pos;
         runtime.state.ship.vel = u * runtime.state.draw.speed;
         runtime.state.ship.heading = u;
-        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius*speed::HeroesSystem::trace_width(runtime))) {trail(from);end_trace(false);speed::GeminiBehavior::step(runtime,real_dt);return true;}
+        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {trail(from);end_trace(false);speed::GeminiBehavior::step(runtime,real_dt);return true;}
         trail(from);
         if (runtime.state.phase!=RunState::Phase::Play) return true;
         const double speed = runtime.state.ship.vel.length();

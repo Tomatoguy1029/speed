@@ -1710,11 +1710,18 @@ struct PerseusDefinition {
 struct LeoDefinition {
     uint32_t id{};
     uint32_t hero{};
-    double width_mult{};
+    double speed{};
+    double turn_mult{};
+    double power{};
+    double hit_interval{};
+    double front{};
+    double back{};
+    double radius{};
 };
 struct GeminiDefinition {
     uint32_t id{};
     uint32_t hero{};
+    double power{};
 };
 struct HerculesDefinition {
     uint32_t id{};
