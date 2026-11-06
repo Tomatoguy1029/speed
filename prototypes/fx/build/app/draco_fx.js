@@ -306,7 +306,7 @@ function dDraw(S, R) {
     if (S.exhale && B.mode === 'active') { const e = S.exhale, age = t - e.t, end = add(e.at, mul(fromA(e.a), r.reach)); if (age < r.beam_warn) D2.line(e.at, end, rgba('#d4bbff', 0.35), 4); else D2.line(e.at, add(e.at, mul(fromA(e.a), r.reach * clamp((age - r.beam_warn) / r.beam_extend))), '#d4bbff', r.width); }
     for (const q of S.rifts) if (q) D2.line(q.a, q.b, '#34224d', r.width);
   } else { dBreathFx(S, R); dRiftFx(S, R); dInhaleFx(S, R); dExhaleFx(S, R); dRushFx(S, R, pose); dCloneFx(S, R);
-    if (id === 'bite') dBiteTear(S, R, pose);
+    if (['bite', 'leap'].includes(id)) dBiteTear(S, R, pose);
     for (const impact of S.impacts) { const age = t - impact.t, seed = 83 + Math.floor(impact.t * 10); if (impact.big) { dImpactFx(S, R, impact.at, age, impact.radius * 2.6, seed); dDarkBlast(S, R, impact.at, age, impact.radius * 1.5, seed, D_FLAME); for (let m = 0; m < 6; m++) hDust(S, R, impact.at, age - m * 0.02, seed + m, m * TAU / 6, 2.4); } else (impact.dark ? dDarkBlast : dImpactFx)(S, R, impact.at, age, impact.radius, seed); }
     for (const q of S.arrowImpacts || []) if (q.at && !q.hit) dDarkFall(S, R, q);
     if (id === 'picaro_wall') dDarkMuzzle(S, R, pose);
