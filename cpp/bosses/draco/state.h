@@ -88,6 +88,8 @@ struct DracoBodyState {
     std::vector<DracoClosingWall> closing_walls;
     std::vector<RockHandle> placed_meteors;
     std::vector<DracoFlyingMeteor> meteors;
+    godot::Vector2 roar_mouth;
+    double roar_at=-1;
     std::vector<DracoImpact> impacts;
     DracoCycleState cycle;
     DracoIntroState intro;
