@@ -26,6 +26,7 @@ const PRESENT := preload("res://scripts/render/bosses/hydra_present.gd")
 var _memory := {}
 var _heads := {}
 var _masks := {}
+var _ferns := {}
 const LIGHT := preload("res://scripts/render/enemies/aquila_lightning.gd")
 var _light = LIGHT.new()
 const HIDDEN_LINES := ["beam","wind","wind_blade","rubble","bolt","bite"]
@@ -103,6 +104,11 @@ func draw_reference(canvas, _real_dt: float) -> void:
 				rocks[id] = {"at":points[0],"angle":angle,"speed":speed}
 				if speed>0.0: _raster_back.rock_comet(points[0],angle,speed,float(effect.age),float(effect.width)*0.5,float(id%97),1.0 if speed>300.0 else 0.4)
 	_rock_last = rocks
+	if heavy and state.has("tornado_rocks"):
+		var seed_rock := 1.0
+		for rock: Dictionary in state.tornado_rocks:
+			if float(rock.progress)<1.0: _raster_back.rock_comet(rock.position,float(rock.aim),float(rock.speed),float(rock.age),float(rock.size),seed_rock*3.0+1.0,1.0)
+			seed_rock += 1.0
 	if heavy:
 		canvas.front.colors = _raster.take_colors()
 		canvas.front.lights = _raster.take_lights()
@@ -112,6 +118,13 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		canvas.front.has_light = true
 		canvas.back.has_color = true
 		canvas.back.has_light = true
+	if state.has("tornado_rocks"):
+		for effect: Dictionary in effects_now:
+			if String(effect.kind) in ["tornado","tornado_charge"]:
+				var points: PackedVector2Array = effect.points
+				var center: Vector2 = points[0].lerp(points[1],0.5) if String(effect.kind)=="tornado" else points[0]
+				for rock: Dictionary in state.tornado_rocks:
+					if float(rock.progress)>=1.0: FX.tornado_rock(canvas,center,rock,float(state.tornado_fade),1.0)
 	for effect: Dictionary in effects_now:
 		var points: PackedVector2Array = effect.points
 		if points.size()<2: continue
@@ -126,7 +139,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 					DRACO_FX.gather(canvas,points[0],46.0,k,t,float(effect.id),beam_color)
 				else: FX.beam(canvas,points[0],end,float(effect.width),beam_color,t,clampf((e-(life-0.1))/0.1,0.0,1.0),clampf(e/0.07,0.0,1.0))
 			"bite":
-				FX.fangs(canvas,points[-1],(points[-1]-points[0]).angle(),e,float(effect.width),float(effect.id),FX.COLORS.bite)
+				if not state.has("necks"): FX.fangs(canvas,points[-1],(points[-1]-points[0]).angle(),e,float(effect.width),float(effect.id),FX.COLORS.bite)
 			"lightning":
 				if points[0].distance_to(points[-1])<1.0 and e>=0.0:
 					FX.bolt_strike(canvas,_light,canvas.to_logical(points[0]),float(effect.width)*0.5*float(canvas.world_scale),e,int(effect.id)%97+1,ramp,canvas.to_logical(position))
@@ -144,24 +157,40 @@ func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[C
 	var active := float(pose.active)
 	var id := int(neck.id)
 	var glow := float(neck.get("glow",0.0))
+	var trail: Array = _heads.get(id,[])
 	if String(pose.type)=="major":
-		var k := pow(glow,0.7) if pose.get("lunge",false) else glow
-		if pose.get("lunge",false) and not neck.locked: k = clampf(float(neck.get("major_time",0.0))/warn,0.0,1.0)
+		var lunge: bool = pose.get("lunge",false)
+		var k := clampf(float(neck.get("major_time",0.0))/warn,0.0,1.0) if mode!="grid" else glow
 		if rel<0.0:
-			if kind=="bite": FX.bite_eyes(canvas,head,facing,k,color,t,factor)
+			if kind=="bite": FX.bite_eyes(canvas,head,facing,pow(k,0.7),color,t,factor)
 			else: FX.eyes(canvas,head,facing,k,color,factor)
 			if mode in ["curve","beam_pincer","debris_shatter","grid"] and kind in ["beam","vortex","thunder"]: DRACO_FX.gather(canvas,mouth,42.0,k,t,float(id),color)
-			if kind=="debris": FX.rubble_warn(canvas,neck.points,mouth,k,t,false)
+			if kind=="debris" and mode in ["tornado","debris_shatter"]: FX.rubble_warn(canvas,neck.points,mouth,k,t,false)
+			if lunge: FX.rail(canvas,mouth,neck.target,0.4+0.6*k,color,t,60.0+id,false)
+		elif lunge:
+			var flight := float(pose.get("flight",0.25))
+			var radius := float(neck.get("bite_radius",70.0))
+			if rel<flight+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,flight,color)
+			if rel<flight: _ghost(canvas,neck,5,0.2,color,factor,id*7.0)
+			var bite := rel-flight+0.03
+			var to: Vector2 = neck.target
+			var way := (to-Vector2(neck.strike_from)).normalized()
+			var at := to+way*11.5*factor
+			FX.fangs(canvas,at,way.angle(),bite,radius,float(id)*23.0,color)
+			DRACO_FX.dust(canvas,at+way*0.3*radius,bite-0.05,41.0+id*23.0,way.angle(),0.8)
 		return
 	var age := float(neck.elapsed)
 	var u := clampf(age/warn,0.0,1.0)
 	var pts: PackedVector2Array = neck.points
 	FX.grit(canvas,pts,age,warn)
 	var mem: Dictionary = _memory.get(id,{})
+	var thunder_range: float = float(neck.get("thunder_radius",170.0))*float(canvas.world_scale)
 	if mode=="thunder_headbutt":
 		FX.eye_charge(canvas,_light,head,facing,pow(u,1.1) if rel<0.0 else exp(-maxf(0.0,rel-active)/0.12),t,rel<0.0,factor,ramp)
 	elif rel<0.0 and kind=="bite": FX.bite_eyes(canvas,head,facing,pow(u,0.8),color,t,factor)
-	else: FX.eyes(canvas,head,facing,pow(u,1.4) if rel<0.0 else exp(-rel/0.25),color,factor)
+	else:
+		FX.eyes(canvas,head,facing,pow(u,1.4) if rel<0.0 else exp(-rel/0.25),color,factor)
+		FX.eye_trail(canvas,trail,rel,color,factor)
 	if rel<0.0:
 		if mode=="wind_band" or mode=="wind_blades": FX.wind_inhale(canvas,mouth,facing,u,age,mode=="wind_band",FX.COLORS.vortex)
 		if kind=="debris": FX.rubble_warn(canvas,pts,mouth,u,age,mode=="rubble_lump")
@@ -169,12 +198,18 @@ func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[C
 		if mode=="beam_fixed": FX.rail(canvas,mouth,mouth+Vector2.from_angle(facing)*1400.0,u,color,t,float(id))
 		if mode=="thunder_drop":
 			FX.crackle(canvas,_light,head,34.0,pow(u,1.2),t,3,ramp)
-			FX.drop_warn(canvas,_light,mouth,neck.target,float(canvas.world_scale)*170.0,u,t,ramp)
+			FX.drop_warn(canvas,_light,mouth,neck.target,thunder_range,u,t,ramp)
 		return
+	if mode=="beam_fixed" and rel<=active: FX.beam_spill(canvas,mouth,facing,rel,1400.0,40.0,color)
+	if mode=="beam_fixed" and rel>active and rel<active+0.25:
+		var m: Vector2 = canvas.to_logical(mouth)
+		canvas.front.glow(m.x,m.y,6.0,PRIM.ramp(color)[2],0.4*(1.0-(rel-active)/0.25))
 	if mode=="bite_sweep":
-		FX.sweep_trail(canvas,neck,rel,float(mem.get("fire_angle",facing)),PRESENT,70.0,color)
+		FX.sweep_trail(canvas,neck,rel,float(mem.get("fire_angle",facing)),PRESENT,float(neck.get("bite_radius",70.0)),color)
 		if rel>=active: DRACO_FX.dust(canvas,head,rel-active,77.0,facing+PI*0.5,0.8)
-	if mode=="bite_thrust" and rel<=active+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,active,color)
+	if mode=="bite_thrust":
+		if rel<=active+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,active,color)
+		FX.fangs(canvas,head+Vector2.from_angle(facing)*11.5*factor,facing,rel-active+0.03,float(neck.get("bite_radius",70.0)),0.0,color)
 	if String(pose.type)=="lunge" and rel<=active+0.06: _ghosts(canvas,neck,rel,active,color,factor)
 	if kind=="debris": FX.spit_burst(canvas,mouth,facing,rel,mode=="rubble_fan",0.6 if mode=="rubble_fan" else 0.35)
 	if mode=="beam_bolt" and rel<0.12: PRIM.flare(canvas.front,canvas.to_logical(mouth),2.5,color,t,1.0-rel/0.12,4)
@@ -185,7 +220,17 @@ func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[C
 			var from: Vector2 = canvas.to_logical(neck.strike_from)
 			var to: Vector2 = canvas.to_logical(head)
 			if from.distance_to(to)>6.0: _light.ink(canvas.back,_light.zigzag(rng,from,to,0.3,0.3),0.7*exp(-maxf(0.0,rel-active)/0.1),ramp,1.0,true,0.4)
-		if rel>=active: FX.zap(canvas,_light,canvas.to_logical(head),float(canvas.world_scale)*170.0,rel-active,facing,ramp)
+		if rel>=active:
+			var key := roundi(thunder_range)
+			if not _ferns.has(key): _ferns[key] = FX.fern(thunder_range)
+			FX.zap(canvas,_light,canvas.to_logical(neck.target),thunder_range,rel-active,facing,ramp,_ferns[key])
+
+func _ghost(canvas, neck: Dictionary, back: int, strength: float, color: Color, factor: float, seed: float) -> void:
+	var mask := _head_mask(String(neck.kind))
+	var trail: Array = _heads.get(int(neck.id),[])
+	if mask.is_empty() or trail.size()<=back: return
+	var old: Dictionary = trail[trail.size()-1-back]
+	FX.silhouette(canvas,mask,old.pos,float(old.angle),PRIM.ramp(color)[2],strength,factor,seed)
 
 func _ghosts(canvas, neck: Dictionary, rel: float, active: float, color: Color, factor: float) -> void:
 	var mask := _head_mask(String(neck.kind))
@@ -231,7 +276,7 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 	for neck: Dictionary in state.get("necks",[]):
 		var trail: Array = _heads.get(int(neck.id),[])
 		trail.append({"pos":neck.position,"angle":neck.facing})
-		if trail.size()>12: trail.pop_front()
+		if trail.size()>16: trail.pop_front()
 		_heads[int(neck.id)] = trail
 	queue_redraw()
 	position = body.position

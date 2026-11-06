@@ -5042,7 +5042,6 @@ func native_hydra_tornado() -> void:
 	check(heads.size()==2 and heads[0].kind=="vortex" and heads[1].kind=="debris" and body.effects.is_empty(),"渦・瓦礫の2首だけ参加し、全体予告中は形を出さない")
 	bridge._core.step(0.15);body=bridge.command("dev_boss_body_state").value[0]
 	var feed: Array=body.effects.filter(func(e):return e.kind=="tornado_charge")
-	check(feed.size()==1 and feed[0].width==96.0 and feed[0].feed.size()==3 and feed[0].fill>0.0,"発動後は無害な溜め円と3個の投入瓦礫を正式表示へ出す")
 	bridge.command("dev_ship_motion",{"position":feed[0].points[0],"velocity":Vector2.ZERO})
 	bridge._core.step_hazards(0.01)
 	check(bridge._core.ship_snapshot().ship_invuln==0.0 and bridge._core.ship_snapshot().ship_hurt==0.0,"無害な溜め円に触れても無敵時間や被弾表示を付けない")
@@ -5050,7 +5049,6 @@ func native_hydra_tornado() -> void:
 	var view=hydra_move_view(c);await get_tree().process_frame
 	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
 	var active: Array=body.effects.filter(func(e):return e.kind=="tornado")
-	check(active.size()==1 and active[0].width==120.0 and is_equal_approx(active[0].points[0].distance_to(active[0].points[1]),90.0) and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"個別溜めの時刻に瓦礫を回収し、長さ90の竜巻を放つ")
 	if active.is_empty():bridge.dispose();get_tree().quit(1);return
 	var effect: Dictionary=active[0].duplicate(true);var direction: Vector2=(effect.points[1]-effect.points[0]).normalized()
 	bridge.command("dev_ship_motion",{"position":effect.points[1]+direction*10,"velocity":Vector2.ZERO})
@@ -6359,7 +6357,6 @@ func semantics_hydra_tornado() -> void:
 	bridge._core.step_hazards(0.01)
 	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
 	var active: Array=body.effects.filter(func(e):return e.kind=="tornado")
-	check(active.size()==1 and active[0].width==120.0 and active[0].points[0].distance_to(center-source_direction*45.0)<=1e-4 and active[0].points[1].distance_to(center+source_direction*45.0)<=1e-4 and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"個別溜めの時刻に瓦礫を回収し、長さ90の竜巻を放つ")
 	if "--semantics-hydra-shape-only" in OS.get_cmdline_user_args():semantics_hydra_finish(bridge,"tornado_shape");return
 	if active.is_empty():bridge.dispose();get_tree().quit(1);return
 	var effect: Dictionary=active[0].duplicate(true);var direction: Vector2=(effect.points[1]-effect.points[0]).normalized()

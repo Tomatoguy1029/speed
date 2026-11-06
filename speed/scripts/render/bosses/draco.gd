@@ -26,6 +26,7 @@ var _bite := {}
 var _shout_clock := -1.0
 var _crack_rows := {}
 var _shot_born := {}
+var _shot_times: Array[float] = []
 var _raster := SpeedFxRaster.new()
 var _raster_under := SpeedFxRaster.new()
 var _fire: Node2D
@@ -79,7 +80,10 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 		parts.visible=not body.get("cinematic_hide_enemies",false)
 		var posed := PackedVector2Array()
 		for point: Vector2 in clone.points:posed.append((point-clone.position).rotated(-float(clone.angle)))
-		parts.pose(posed,float(body.body_width),float(body.head_scale),1.0,true,float(clone_feedback.white))
+		var clone_time := float(current.get("stage_time",0.0))
+		var clone_active := float(current.get("active_time",7.5))
+		var fade_in := _smooth(0.0,0.45,clone_time)*(1.0-_smooth(clone_active-0.9,clone_active-0.25,clone_time))
+		parts.pose(_swim(posed,float(body.clock)+float(clone.id)*2.0,0.8,1.0,float(clone.id)),float(body.body_width),float(body.head_scale),fade_in,true,float(clone_feedback.white))
 	for id in _clones.keys():
 		if not live.has(id):_clones[id].queue_free();_clones.erase(id)
 	if _field!=null:_field.apply_frame(body)
@@ -160,6 +164,30 @@ func _present(points: PackedVector2Array, body: Dictionary, current: Dictionary)
 	elif stage==1: swim = 1.0 if tech in ["charge","leap"] else 0.25 if tech in ["breath","meteor","star_fan","inhale"] else 0.35
 	else: swim = 0.7*_smooth(0.0,1.0,st/recover)
 	if tail: swim *= 0.3
+	var roar := _exhale_life(st-float(current.get("inhale_time",0.0))-float(current.get("beam_warn",0.0)),st) if tech=="inhale" and stage==1 and current.get("spent",false) else 0.0
+	if roar>0.0:
+		var last := float(out.size()-1)
+		for i in out.size(): out[i] += (Vector2.RIGHT*-26.0*minf(1.4,roar)+Vector2.DOWN*sin(t*74.0)*4.0*roar)*(1.0-_smooth(0.0,0.35,i/last))
+	var kick := _spit_kick(t,current,stage)
+	if kick!=0.0:
+		var last := float(out.size()-1)
+		for i in out.size(): out[i] += Vector2.RIGHT*46.0*kick*(1.0-_smooth(0.0,0.3,i/last))
+	if tech=="spiral":
+		var coil := float(current.get("coil_time",1.2))
+		var shrink_at := coil+float(current.get("pause_time",2.8))
+		swim = 1.0 if stage!=1 or st<coil else 0.35 if st<shrink_at else 0.7
+		var last := float(out.size()-1)
+		var along := 0.0
+		var waved := PackedVector2Array()
+		for i in out.size():
+			if i>0: along += out[i-1].distance_to(out[i])
+			var delta := (out[i]-out[i-1]) if i>0 else (out[1]-out[0])
+			var normal := Vector2(-delta.y,delta.x).normalized()
+			waved.append(out[i]+normal*_live_wave(along,t*1.15)*34.0*swim*(0.15+0.85*_smooth(0.0,0.35,i/last)))
+		out = waved
+		if stage==1 and st>=coil and st<shrink_at+0.15:
+			var pull := _smooth(shrink_at-0.45,shrink_at-0.05,st)*(1.0-_smooth(shrink_at,shrink_at+0.12,st))
+			for i in 7: out[i] += (Vector2.RIGHT*-48.0*pull+Vector2.DOWN*sin(t*90.0)*3.0*pull)*(1.0-i/7.0)
 	if tech!="spiral":
 		out = _swim(out,t,swim,0.0 if tail else 1.0)
 		if windup and ready:
@@ -167,7 +195,7 @@ func _present(points: PackedVector2Array, body: Dictionary, current: Dictionary)
 			var shake := Vector2.DOWN*sin(t*90.0)*3.0*q
 			if q>0.0:
 				for i in 7: out[i] += shake*(1.0-i/7.0)
-	var turn := sin(t*5.3)*0.05*swim
+	var turn := sin(t*5.3)*(0.07 if tech=="spiral" else 0.05)*swim
 	for i in 4: arms[i] = (1.0 if i%2 else -1.0)*charge*(0.42 if i<2 else 0.16)
 	if tech=="rifts" and ready and stage<=1:
 		var swipes: Array = current.get("rift_swipes",[])
@@ -195,9 +223,39 @@ func _present(points: PackedVector2Array, body: Dictionary, current: Dictionary)
 			var want := rise+wrapf(strike-rise,-PI,PI)*reach
 			want += wrapf(rise-want,-PI,PI)*lift
 			arms[i] = wrapf(want-base,-PI,PI)*(k if windup else maxf(1.0-settle if local>=0.0 else 1.0,lift))
-	return {"points":out,"facing":world_facing+turn,"arms":arms,"charge":charge}
+	return {"points":out,"facing":world_facing+turn,"arms":arms,"charge":charge,"claws":_claws(out,float(body.body_width),arms)}
 
-func _swim(pts: PackedVector2Array, t: float, swim: float, bow: float) -> PackedVector2Array:
+## 爪先の位置。腕の根元と手首の長さは絵の画素から求める。
+func _claws(pts: PackedVector2Array, width: float, arms: Array) -> PackedVector2Array:
+	var total := FORM.length(pts)
+	var out := PackedVector2Array()
+	var distance := minf(total,width*0.9)
+	var fraction := distance/maxf(1.0,total)
+	var at := FORM.sample(pts,fraction)
+	var tangent := (FORM.sample(pts,minf(1.0,fraction+2.0/maxf(1.0,total)))-at).normalized()
+	var normal := tangent.orthogonal()
+	var w := width*FORM.taper(fraction)
+	for i in 2:
+		var side := -1.0 if i==0 else 1.0
+		var direction := (normal*side-tangent*0.3).normalized().rotated(float(arms[i]))
+		out.append(at+normal*side*w*0.32+direction*w/57.0*32.25)
+	return out
+
+## 吐くたびの反動：頭と首が短く引かれてから突き出る。
+func _spit_kick(t: float, current: Dictionary, stage: int) -> float:
+	var kick := 0.0
+	if String(current.get("technique","")) in ["picaro_wall","star_fan"]:
+		for at: float in _shot_times:
+			var a := t-at
+			if a>=0.0: kick -= 1.1*exp(-a/0.12)*(1.0-exp(-a/0.015))
+		return kick
+	if stage!=0: return 0.0
+	for q: Dictionary in current.get("rocks",[]):
+		var a := float(q.age)
+		if a>=0.0: kick += exp(-a/0.1)*(1.0-exp(-a/0.02))-0.6*exp(-a/0.02)
+	return kick
+
+func _swim(pts: PackedVector2Array, t: float, swim: float, bow: float, seed := 0.0) -> PackedVector2Array:
 	var last := pts.size()-1
 	var s := 0.0
 	var out := PackedVector2Array()
@@ -207,8 +265,8 @@ func _swim(pts: PackedVector2Array, t: float, swim: float, bow: float) -> Packed
 		var along := (pts[mini(last,i+8)]-pts[maxi(0,i-8)]).normalized()
 		var normal := Vector2(-along.y,along.x)
 		var amp := 30.0*swim*_smooth(0.04,0.4,u)
-		var arch := bow*70.0*_smooth(0.06,0.32,u)*sin(u*PI*1.35+0.5)
-		out.append(pts[i]+normal*(_live_wave(s,t)*amp+arch*swim))
+		var arch := bow*70.0*_smooth(0.06,0.32,u)*sin(u*PI*1.35+0.5+seed)
+		out.append(pts[i]+normal*(_live_wave(s,t,seed)*amp+arch*swim))
 	return _fit(out,pts)
 
 func draw_reference(canvas, _real_dt: float) -> void:
@@ -241,7 +299,10 @@ func draw_reference(canvas, _real_dt: float) -> void:
 			var e := FX._smooth(0.62,1.0,k)
 			if e>0.0: FX.dark_gather(canvas,mouth,e,t)
 		elif tech=="rifts":
-			FX.gather(canvas,chest,66.0,k,t,191.0)
+			for i in 2:
+				var claw: Vector2 = to_global(_pose.claws[i])
+				FX.gather(canvas,claw,66.0,k,t,191.0+i)
+				FX.supply(canvas,chest,claw,k,t,211.0+i,32.0 if i else -32.0)
 		elif tech in ["breath","meteor","star_fan","inhale"]:
 			FX.gather(canvas,mouth,85.0,k,t,191.0)
 			FX.supply(canvas,chest,mouth,k,t,215.0,30.0)
@@ -261,7 +322,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		var bite_time := (st if stage==1 else active+st)-active*0.7
 		if bite_time>=0.0:
 			if _bite.is_empty(): _bite = {"at":mouth,"angle":world_facing}
-			FX.bite_tear(canvas,_bite.at,_bite.angle,bite_time,70.0,float(attack.get("recover_time",1.0)),t)
+			FX.bite_tear(canvas,_bite.at,_bite.angle,bite_time,float(attack.get("attack_width",96.0)),float(attack.get("recover_time",1.0)),t)
 	else: _bite = {}
 	if tech=="tail_sweep" and stage==1:
 		var last := world_points.size()-1
@@ -271,11 +332,35 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		if stage!=1 and not _wake.is_empty() and t-float(_wake[-1].t)>0.4: _wake.clear()
 	if tech=="inhale" and stage==1:
 		var hold := float(attack.get("inhale_time",3.0))
-		if st<hold: FX.inhale(canvas,mouth,1500.0,_smooth(0.0,0.4,st)*(1.0-_smooth(hold-0.3,hold,st)),t)
+		if st<hold: FX.inhale(canvas,mouth,float(attack.get("pull_range",1500.0)),_smooth(0.0,0.4,st)*(1.0-_smooth(hold-0.3,hold,st)),t)
+		elif attack.get("spent",false) and st-hold<float(attack.beam_warn):
+			var warn_k := clampf((st-hold)/float(attack.beam_warn),0.0,1.0)
+			var from: Vector2 = attack.beam_from
+			FX.gather(canvas,from,150.0,warn_k,t,21.0)
+			PRIM.warn_rail(canvas.front,canvas.to_logical(from),canvas.to_logical(from+Vector2(attack.beam_direction)*float(attack.beam_reach)),{"color":FX.BASE,"k":warn_k,"time":t,"seed":5,"maxLv":2,"intensity":1.0})
 	if tech=="spiral" and stage==1:
 		var coil := float(attack.get("coil_time",1.2))
 		var pause := float(attack.get("pause_time",2.8))
-		if st>=coil and st<coil+pause+0.1: FX.spiral_countdown(canvas,world_points,clampf((st-coil)/pause,0.0,1.0),t)
+		if st>=coil and st<coil+pause+0.1:
+			var q := clampf((st-coil)/pause,0.0,1.0)
+			FX.spiral_countdown(canvas,world_points,q,t)
+			FX.gather(canvas,mouth,120.0,q,t,88.0)
+			var last_look := _smooth(0.85,1.0,q)
+			if last_look>0.0: FX.eyes(canvas,head,world_facing,last_look,FX.BASE,t)
+	if tech=="picaro_wall":
+		var shots := int(attack.get("shots",0))
+		while _shot_times.size()<shots: _shot_times.append(t)
+		for at: float in _shot_times: FX.dark_muzzle(canvas,mouth,world_facing,t-at)
+	elif tech=="star_fan":
+		if stage==1 and _shot_times.is_empty(): _shot_times.append(t)
+		if not _shot_times.is_empty():
+			var since := t-float(_shot_times[0])
+			if since<0.35:
+				var m: Vector2 = canvas.to_logical(mouth)
+				var left := 1.0-since/0.35
+				canvas.front.glow(m.x,m.y,11.0,FX.FLAME[4],0.55*left)
+				canvas.front.disc(m.x,m.y,2.5*left,FX.FLAME[1],1.0)
+	else: _shot_times.clear()
 	for impact: Dictionary in attack.get("arrow_impacts",[]):
 		if impact.locked: FX.dark_fall(canvas,impact.position,float(impact.age)-float(impact.wait),float(impact.warn),float(attack.get("impact_radius",85.0)),t)
 	for effect: Dictionary in state.get("impacts",[]):
@@ -319,6 +404,14 @@ func _draw_heavy(canvas, t: float, st: float, stage: int, tech: String, mouth: V
 		drew = true
 	for id in _shot_born.keys():
 		if not live.has(id): _shot_born.erase(id)
+	for impact: Dictionary in attack.get("arrow_impacts",[]):
+		if not impact.locked: continue
+		var age := float(impact.age)-float(impact.wait)
+		var warn := float(impact.warn)
+		var drop := clampf((age-(warn-0.14))/0.14,0.0,1.0)
+		if drop>0.0:
+			_raster.dark_shot(Vector2(impact.position)+Vector2(0.0,-900.0*(1.0-drop)),PI*0.5,age,float(impact.wait))
+			drew = true
 	front.colors = _raster.take_colors()
 	front.lights = _raster.take_lights()
 	if drew:

@@ -10,7 +10,8 @@
 namespace speed {
 struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattered=false;};
 struct HydraShatterState {bool initialized=false,faced=false;double aim=0,face=0;std::vector<HydraShatterStone> rubble;};
-struct HydraTornadoState {bool initialized=false,launched=false;godot::Vector2 center,direction,from;AttackHandle vortex;std::vector<EnemyHandle> rubble;};
+struct HydraTornadoRock {EnemyHandle actor;godot::Vector2 world,aim;double progress=0,settle=0,spin=0,orbit=0,size=0,flight=0,duration=0;};
+struct HydraTornadoState {bool initialized=false,launched=false;godot::Vector2 center,direction,from;double launch_time=0,radius=0,fade=1;AttackHandle vortex;std::vector<EnemyHandle> rubble;std::vector<HydraTornadoRock> rocks;};
 struct HydraCurveState {};
 struct HydraSequenceState {};
 struct HydraSwarmState {std::vector<godot::Vector2> slots;std::vector<bool> arrived;double position_elapsed=0;bool positioning=true;};

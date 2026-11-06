@@ -1,5 +1,6 @@
 ## うみへびの首の見た目。戦闘の点列と判定は変えず、溜め・発動・戻りの動きを絵の位置と向きへ足す。
 extends RefCounted
+const PRIM := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 const COIL := 1.0
 const SNAP := 1.0
 const LIVE := 1.2
@@ -7,6 +8,8 @@ const TYPES := {"bite_thrust":"lunge","bite_sweep":"sweep","wind_band":"breath",
 const LUNGES := ["north","sequence","swarm"]
 const CURVE_TILT := 0.6108652381980153
 
+static func _hash(n: float) -> float:
+	return PRIM.hash_value(n)
 static func _smooth(a: float, b: float, x: float) -> float:
 	return smoothstep(a,b,x)
 static func _orth(v: Vector2) -> Vector2:
@@ -139,11 +142,13 @@ static func _major(neck: Dictionary, mem: Dictionary, clock: float) -> Dictionar
 			if not mem.has("lock_at"): mem.lock_at = clock
 			var rel := clock-float(mem.lock_at)
 			out.rel = rel
-			if rel<0.25:
-				out.sy = 1.0+0.14*sin(PI*rel/0.25)
-				out.sx = 1.0-0.06*sin(PI*rel/0.25)
+			var flight := maxf(0.01,float(neck.get("lunge_time",0.25)))
+			out.flight = flight
+			if rel<flight:
+				out.sy = 1.0+0.14*sin(PI*rel/flight)
+				out.sx = 1.0-0.06*sin(PI*rel/flight)
 			else:
-				var a := rel-0.25
+				var a := rel-flight
 				out.head = at+fw*9.0*exp(-a/0.07)*sin(minf(1.0,a/0.05)*PI)*SNAP
 		return out
 	var delay: float = float(neck.get("curve_delay",0.8)) if mode=="curve" else 0.0
@@ -205,16 +210,16 @@ static func _recover(neck: Dictionary, mem: Dictionary, clock: float, copy: Dict
 		copy.points = out
 		return
 	if not mem.get("wave",false): return
-	var tau := clock-float(mem.idle_at)-0.14
-	var length := 1.0
+	var tau := clock-float(mem.idle_at)-float(mem.wave_delay)
+	var length := float(mem.wave_time)
 	if tau>length:
 		mem.wave = false
 		return
 	if tau<=0.0: return
 	var amp := 34.0*pow(1.0-tau/length,0.7)*_smooth(0.0,0.15,tau)
-	var ph := float(neck.id)*7.7
+	var ph := float(mem.wave_phase)
 	var side := _orth((pts[last]-pts[0]).normalized())
-	var sign_value := 1.0 if int(neck.id)%2 else -1.0
+	var sign_value := float(mem.wave_side)
 	var out := PackedVector2Array()
 	for i in pts.size():
 		var u := float(i)/last
@@ -236,7 +241,13 @@ static func apply(body: Dictionary, memory: Dictionary) -> Dictionary:
 		if mode=="idle":
 			if mem.mode!="idle":
 				mem.idle_at = clock
-				mem.wave = str(mem.mode) in LUNGES
+				# 伸びていた首だけ、ずらした時間でうねりながら戻る。
+				var i := necks.size()-1
+				mem.wave = str(mem.mode) in LUNGES and Vector2(neck.position).distance_to(neck.base)>float(body.get("neck_rest",200.0))*1.3
+				mem.wave_delay = i*0.14+_hash(i*3.3)*0.08
+				mem.wave_time = 0.85+0.25*_hash(i*5.1)
+				mem.wave_phase = _hash(i*7.7)*TAU
+				mem.wave_side = -1.0 if _hash(i*2.9)<0.5 else 1.0
 			mem.mode = mode
 			_recover(neck,mem,clock,copy)
 			continue

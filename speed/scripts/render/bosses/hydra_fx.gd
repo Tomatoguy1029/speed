@@ -42,14 +42,14 @@ static func beam(canvas, a: Vector2, b: Vector2, width: float, color: Color, tim
 static func rail(canvas, a: Vector2, b: Vector2, k: float, color: Color, time: float, seed: float, front := true) -> void:
 	PRIM.warn_rail(canvas.front if front else canvas.back,canvas.to_logical(a),canvas.to_logical(b),{"color":color,"k":k,"time":time,"seed":seed,"maxLv":2,"intensity":1.0})
 
-## 噛む衝撃：上下の牙の鉤が口先へ寄り、閃光が前へ走る。
+## 噛む衝撃：上下の牙の軌跡が口先で閉じ、ひしゃげた閃光と欠片が前へ散る。
 static func fangs(canvas, mouth: Vector2, angle: float, t: float, radius: float, seed: float, color: Color) -> void:
-	if t<0.0 or t>0.5: return
+	if t<0.0 or t>0.6: return
 	var pal := PRIM.ramp(color)
 	var fw := Vector2.from_angle(angle)
 	var sd := Vector2(-fw.y,fw.x)
-	var p := clampf(t/0.06,0.0,1.0)
-	var out := clampf((t-0.06)/0.2,0.0,1.0)
+	var p := clampf(t/0.05,0.0,1.0)
+	var out := clampf((t-0.05)/0.16,0.0,1.0)
 	for side: float in [-1.0,1.0]:
 		var P0 := mouth+sd*side*radius*0.8+fw*0.1*radius
 		var C := mouth+sd*side*radius*0.72+fw*0.72*radius
@@ -60,22 +60,45 @@ static func fangs(canvas, mouth: Vector2, angle: float, t: float, radius: float,
 			if u>p or u<out: continue
 			if out>0.3 and DRACO_FX._hash(i*7.0+side*3.0+seed+floorf(t*40.0))>(1.0-out)*1.6: continue
 			var q: Vector2 = canvas.to_logical(P0.lerp(C,u).lerp(C.lerp(P1,u),u))
-			var w := (0.4+1.6*pow(sin(PI*u),0.7))*(1.0-out*0.6)
+			var w := (0.3+1.3*pow(sin(PI*u),0.7))*(1.0-out*0.6)
+			var lead := p-u
 			var o := -w
 			while o<=w:
 				var e := absf(o)/maxf(0.3,w)
-				canvas.front.px(q.x+sd.x*o*side,q.y+sd.y*o*side,pal[4 if (p-u<0.25 or e<0.35) and out<0.5 else 3 if e<0.7 else 2])
+				canvas.front.px(q.x+sd.x*o*side,q.y+sd.y*o*side,pal[4 if (lead<0.25 or e<0.35) and out<0.5 else 3 if e<0.7 else 2])
 				o += 0.5
-	var hit: Vector2 = canvas.to_logical(mouth+fw*0.45*radius)
-	if t>0.04:
-		var fl := exp(-maxf(0.0,t-0.05)/0.07)
-		for row: Array in [[fw,16.0],[-fw,5.0],[sd,8.0],[-sd,7.0]]:
+			if i%2==0: canvas.front.light(q.x,q.y,pal[2],0.45*(1.0-out))
+	var center := mouth+fw*0.45*radius
+	var hit: Vector2 = canvas.to_logical(center)
+	var fl := exp(-maxf(0.0,t-0.04)/0.06)
+	if t>0.03 and fl>0.05:
+		for row: Array in [[fw,13.0],[-fw,4.0],[sd,6.0],[-sd,5.0]]:
 			var reach: float = float(row[1])*fl
 			var d := 0.0
 			while d<=reach:
-				canvas.front.light(hit.x+row[0].x*d,hit.y+row[0].y*d,pal[3],(1.0-d/(reach+0.01))*0.9)
+				var a := 1.0-d/(reach+0.01)
+				canvas.front.light(hit.x+row[0].x*d,hit.y+row[0].y*d,pal[4 if a>0.6 else 3],a*0.9)
 				d += 0.5
 		canvas.front.px(hit.x,hit.y,pal[4])
+		canvas.front.px(hit.x+1.0,hit.y,pal[4])
+		canvas.front.px(hit.x,hit.y+1.0,pal[4])
+		canvas.front.glow(hit.x,hit.y,7.0*fl,pal[2],0.5*fl)
+	if t>0.04:
+		for i in 16:
+			var a := t-0.04
+			var life := 0.25+0.3*DRACO_FX._hash(i*3.3)
+			if a>life: continue
+			var an := angle+(DRACO_FX._hash(i*5.1)-0.5)*2.0
+			var q: Vector2 = canvas.to_logical(center+Vector2.from_angle(an)*(180.0+320.0*DRACO_FX._hash(i*2.7))*0.11*(1.0-exp(-a/0.11)))
+			var k := a/life
+			var stone := DRACO_FX._hash(i*9.9)>0.45
+			var tail := maxf(0.0,3.0*exp(-a/0.05))
+			var u := Vector2.from_angle(an)
+			var s := 0.0
+			while s<=tail:
+				canvas.front.px(q.x-u.x*s,q.y-u.y*s,STONE[4 if k<0.5 else 3] if stone else pal[4 if k<0.3 else 3 if k<0.6 else 2])
+				s += 0.5
+			if not stone: canvas.front.light(q.x,q.y,pal[2],(1.0-k)*0.35)
 
 ## 先回り落雷の着弾：太い稲妻が上から叩きつけられ、同じ通り道を3回打ち直して点滅する。pixelFX lightning/lightning-strike の作り。
 static func bolt_strike(canvas, light, L: Vector2, rr: float, a: float, seed: int, C: Array[Color], src: Vector2) -> void:
@@ -339,9 +362,48 @@ static func drop_warn(canvas, light, mouth: Vector2, target: Vector2, rr: float,
 		var mid: Vector2 = M.lerp(L,rng.between(0.25,0.55))+Vector2(rng.between(-6.0,6.0),rng.between(-6.0,6.0))
 		light.ink(canvas.front,light.zigzag(rng,M,mid,0.4,0.2),0.6*k,C,1.0,true,0.3)
 
-## 帯電頭突きの命中：当たった点が細かい放電の塊になり、火花がジグザグに跳ね、光が点滅して消える。
-static func zap(canvas, light, L: Vector2, rr: float, a: float, direction: float, C: Array[Color]) -> void:
+## シダのように枝分かれする焼け跡。形は半径ごとに一度だけ作る。
+static func fern(rr: float) -> Array:
+	var out: Array = []
+	var rng = JET.Rng.new(3)
+	for i in 7:
+		_fern_grow(rng,out,Vector2.ZERO,i/7.0*TAU+rng.between(-0.35,0.35),rr*rng.between(0.6,1.0),1.0,0.0,0)
+	return out
+
+static func _fern_grow(rng, out: Array, at: Vector2, an: float, length: float, w: float, d: float, depth: int) -> void:
+	var points: Array = [[at.x,at.y,d]]
+	var side := 1.0 if rng.next()<0.5 else -1.0
+	var s := 0.0
+	while s<length:
+		an += rng.between(-0.3,0.3)
+		at += Vector2.from_angle(an)*1.4
+		d += 1.4
+		points.append([at.x,at.y,d])
+		if depth<2 and s>2.0 and rng.next()<0.24:
+			side = -side
+			_fern_grow(rng,out,at,an+side*rng.between(0.55,1.05),(length-s)*rng.between(0.3,0.55),w*0.6,d,depth+1)
+		s += 1.4
+	out.append({"pts":points,"w":w})
+
+## 帯電頭突きの命中：当たった点が細かい放電の塊になり、シダ状の焼け跡が外へ広がって冷え、火花がジグザグに跳ね、オゾンの煙が上がる。
+static func zap(canvas, light, L: Vector2, rr: float, a: float, direction: float, C: Array[Color], fern_rows: Array) -> void:
 	var f := floori(a*30.0+0.0001)
+	var cool := smoothstep(0.3,0.7,a)
+	var fade := 1.0-smoothstep(0.62,0.75,a)
+	if fade>0.0:
+		for row: Dictionary in fern_rows:
+			var pts: Array = row.pts
+			for i in range(1,pts.size()):
+				var p0: Array = pts[i-1]
+				var p1: Array = pts[i]
+				var d := float(p1[2])
+				var age := a-d/260.0
+				if age<0.0: break
+				var k := exp(-age/0.2)-cool*0.3
+				var c: Color = Color.WHITE if k>0.75 else C[6] if k>0.45 else C[5] if k>0.25 else C[4] if k>0.1 else C[2] if k>-0.05 else C[1]
+				canvas.back.line(L.x+p0[0],L.y+p0[1],L.x+p1[0],L.y+p1[1],c,fade)
+				if float(row.w)>=1.0 and d<7.0: canvas.back.line(L.x+p0[0]+1.0,L.y+p0[1],L.x+p1[0]+1.0,L.y+p1[1],C[5] if k>0.45 else C[2],fade)
+				if (i&3)==0 and k>0.0: canvas.back.glow(L.x+p1[0],L.y+p1[1],4.0,C[5],0.3*k*fade)
 	if a<0.4:
 		var u := a/0.4
 		var r0 := rr*0.32*(1.0-u*0.6)
@@ -355,24 +417,79 @@ static func zap(canvas, light, L: Vector2, rr: float, a: float, direction: float
 		canvas.front.disc(L.x,L.y,3.0*(1.0-u)+1.0,C[5],1.0)
 		canvas.front.disc(L.x,L.y,2.0*(1.0-u)+0.5,Color.WHITE,1.0)
 		canvas.front.glow(L.x,L.y,rr*0.5,C[4],0.5*(1.0-u))
+		if a<0.07: canvas.front.glow(L.x,L.y,rr*0.28,Color.WHITE,0.5)
 	for j in 14:
 		var rng = JET.Rng.new(j*19+11)
 		var life: float = rng.between(0.2,0.38)
 		if a>=life: continue
 		var at := Vector2.ZERO
-		var an: float = direction+rng.between(-1.3,1.3)+(0.0 if (rng.next()<0.75) else PI)
+		var an: float = direction+rng.between(-1.3,1.3)+(0.0 if rng.next()<0.75 else PI)
 		var speed: float = rng.between(45.0,80.0)
 		var t := 0.0
+		var path: Array[Vector2] = [Vector2.ZERO]
 		while t<a:
 			var dt: float = minf(a-t,rng.between(0.025,0.055))
 			at += Vector2.from_angle(an)*speed*dt
 			speed *= 1.0-3.0*dt
 			t += dt
-			an += (1.0 if (rng.next()<0.5) else -1.0)*rng.between(0.6,1.3)
+			path.append(at)
+			an += (1.0 if rng.next()<0.5 else -1.0)*rng.between(0.6,1.3)
 		var k: float = 1.0-a/life
+		var tail := path.slice(maxi(0,path.size()-5))
+		for i in tail.size()-1:
+			canvas.front.line(L.x+tail[i].x,L.y+tail[i].y,L.x+tail[i+1].x,L.y+tail[i+1].y,(Color.WHITE if k>0.5 else C[6]) if i==tail.size()-2 else (C[5] if k>0.5 else C[4]),0.6+0.4*i/tail.size())
 		canvas.front.px(L.x+at.x,L.y+at.y,Color.WHITE if k>0.4 else C[5])
 		canvas.front.glow(L.x+at.x,L.y+at.y,3.0,C[5],0.35*k)
+	var u := clampf(a/0.7,0.0,1.0)
+	if u<1.0:
+		for j in 3:
+			var q1 := DRACO_FX._hash(j*3.3+1.9+4.0)
+			var q2 := DRACO_FX._hash(j*3.3+3.8+4.0)
+			var q3 := DRACO_FX._hash(j*3.3+5.7+4.0)
+			canvas.back.disc(L.x+(q1-0.5)*8.0,L.y+(q2-0.5)*6.0-12.0*u,(2.4+q3*1.4)*(0.8+u),Color("#6a6680"),(1.0-u)*0.25)
 	if a<0.85: canvas.back.glow(L.x,L.y,rr*0.95*(1.0-a/0.85),C[3],0.45*exp(-a*5.0)*(0.7 if f%2 else 1.0))
+
+## 目の光が通り道に赤く残る。
+static func eye_trail(canvas, trail: Array, rel: float, color: Color, factor: float) -> void:
+	if rel<0.0 or rel>=0.3: return
+	var pal := PRIM.ramp(color)
+	for j in range(1,mini(15,trail.size())):
+		var old: Dictionary = trail[trail.size()-1-j]
+		var fade := (1.0-j/15.0)*exp(-rel/0.12)
+		for sx: float in [-8.5,8.5]:
+			var e: Vector2 = canvas.to_logical(head_local(old.pos,float(old.angle),sx,-9.5,factor))
+			canvas.front.light(e.x,e.y,pal[3],fade*0.5)
+
+## 固定照射：縁からこぼれる光の粒。
+static func beam_spill(canvas, mouth: Vector2, angle: float, e: float, reach: float, width: float, color: Color) -> void:
+	var pal := PRIM.ramp(color)
+	var dir := Vector2.from_angle(angle)
+	var side := Vector2(-dir.y,dir.x)
+	var to := clampf(e/0.07,0.0,1.0)
+	for i in 18:
+		var ph := fposmod(e*(2.0+DRACO_FX._hash(i))+DRACO_FX._hash(i*3.0),1.0)
+		var sign_value := 1.0 if DRACO_FX._hash(i*5.0)>0.5 else -1.0
+		var q: Vector2 = canvas.to_logical(mouth+dir*ph*to*reach*0.6+side*sign_value*(width*0.5+ph*40.0))
+		canvas.front.dot(q.x,q.y,pal[3 if ph<0.3 else 2],(1.0-ph)*0.8)
+
+## 打ち込まれた岩：土ぼこりと砂利、渦の中を引きずる尾。
+static func tornado_rock(canvas, center: Vector2, rock: Dictionary, fade: float, seed: float) -> void:
+	var dust_colors := [Color("#9a8f86"),Color("#c9bfb2")]
+	var size := float(rock.size)
+	var L: Vector2 = canvas.to_logical(center)
+	var orbit: float = float(rock.orbit)*canvas.world_scale
+	for m in range(1,15):
+		var th := float(rock.spin)+m*0.09
+		var f := 1.0-m/15.0
+		canvas.back.disc(L.x+cos(th)*orbit,L.y+sin(th)*orbit,1.6*f+0.6,dust_colors[0],f*f*0.35*fade)
+	var u := float(rock.settle)/0.28
+	if u>=1.0: return
+	var q: Vector2 = canvas.to_logical(rock.position)
+	canvas.back.disc(q.x,q.y,3.0+5.0*u,dust_colors[1],(1.0-u)*0.4)
+	for m in 8:
+		var an := m*TAU/8.0+float(rock.spin)
+		var r0 := (2.0+9.0*u)*(0.8+0.4*DRACO_FX._hash(m*2.3+size))
+		canvas.back.blend(q.x+cos(an)*r0,q.y+sin(an)*r0,STONE[3],1.0-u)
 
 ## 着地点の予告：牙の形の光が小さくちらつき、狙いが決まると止まって強まる。
 static func mark(canvas, at: Vector2, direction: float, k: float, locked: bool, radius: float, color: Color, seed: float, time: float) -> void:
