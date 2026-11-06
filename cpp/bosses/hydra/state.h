@@ -16,8 +16,9 @@ struct HydraSequenceState {};
 struct HydraSwarmState {std::vector<godot::Vector2> slots;std::vector<bool> arrived;double position_elapsed=0;bool positioning=true;};
 struct HydraNorthState {bool aiming=true,burst=false,followed=false;godot::Vector2 target;};
 struct HydraPincerState {std::vector<double> aims;};
-struct HydraGridPlan {uint32_t layout=0,region=0;std::vector<godot::Vector2> starts,ends,path;godot::Vector2 bearer;double length=0;};
-struct HydraGridState {HydraGridPlan plan;std::vector<bool> arrived;double position_elapsed=0;bool positioning=true;};
+struct HydraGridOrbit {double angle=0,radius=0,speed=0;};
+struct HydraGridShot {EnemyHandle actor;double fire_at=0;godot::Vector2 end;bool locked=false;};
+struct HydraGridState {std::vector<HydraGridOrbit> orbit;std::vector<HydraGridShot> shots;godot::Vector2 bearer,center;double elapsed=0,finish_at=0;uint32_t fired=0;};
 struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState,HydraGridState,HydraPincerState,HydraTornadoState,HydraShatterState,HydraNorthState,HydraSequenceState,HydraSwarmState> move;};
 enum class HydraSquadRole : uint32_t {Close,Front,Attack,Block,Bearer};
 struct HydraSquadMotion {
