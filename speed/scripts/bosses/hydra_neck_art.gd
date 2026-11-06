@@ -9,7 +9,12 @@ extends Node2D
 @export var tail_taper: Texture2D
 @export var tail_tip: Texture2D
 @export var immortal: Texture2D
+## 合体中の首は当たらないので、本体より少し暗くする。
+@export var merged_neck_tint := Color(0.85,0.85,0.85)
+## 分離後は蛇ごとに色みを変え、1匹ずつ見分けられるようにする。
+@export var snake_tints: Array[Color] = [Color("#ffd9d0"),Color("#d6f0ff"),Color("#e0ffd6"),Color("#f4dcff"),Color("#fff2c8"),Color("#d0fff2"),Color("#ffd8ec"),Color("#dfe2ff")]
 const LIGHTING = preload("res://data/visuals/enemy_lighting.tres")
+var _tint := Color.WHITE
 var frame := {}
 var host: Node2D
 
@@ -44,14 +49,16 @@ func _draw() -> void:
 	var factor: float = float(frame.radius)*2.0/host.body_texture.get_width() if host.body_texture!=null else 1.0
 	for index in frame.necks.size():
 		var neck: Dictionary = frame.necks[index]
+		_tint = _snake_tint(neck) if _separated() else merged_neck_tint
 		if heads_only:
 			var texture: Texture2D = head_textures.get(StringName(neck.kind))
 			if neck.alive and texture!=null:
 				draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2.ONE*factor)
-				draw_texture(texture,-texture.get_size()*0.5)
+				draw_texture(texture,-texture.get_size()*0.5,_snake_tint(neck) if _separated() else Color.WHITE)
 		elif neck.alive or float(neck.length)>0.0: _chain(neck.points,factor,index,false)
 	if frame.has("bearer"):
 		var bearer: Dictionary = frame.bearer
+		_tint = Color.WHITE
 		if not heads_only: _chain(bearer.points,factor,frame.necks.size(),true)
 		elif bearer.alive:
 			var texture: Texture2D = head_textures.get(&"immortal")
@@ -59,6 +66,9 @@ func _draw() -> void:
 				draw_set_transform(bearer.position-frame.position,float(bearer.facing)-PI*0.5,Vector2.ONE*factor)
 				draw_texture(texture,-texture.get_size()*0.5)
 	draw_set_transform(Vector2.ZERO)
+
+func _snake_tint(neck: Dictionary) -> Color:
+	return snake_tints[posmod(int(neck.id),snake_tints.size())] if not snake_tints.is_empty() else Color.WHITE
 
 func _chain(points: PackedVector2Array, factor: float, variant: int, special: bool) -> void:
 	if points.size() < 2: return
@@ -95,6 +105,6 @@ func _stamp(texture: Texture2D, points: PackedVector2Array, distance: float, fac
 		if distance <= length or i == points.size() - 1:
 			var at := points[i - 1] + delta * clampf(distance / length, 0.0, 1.0)
 			draw_set_transform(at - _origin(), delta.angle() - PI * 0.5, Vector2.ONE * factor)
-			draw_texture(texture, -texture.get_size() * 0.5)
+			draw_texture(texture, -texture.get_size() * 0.5, _tint)
 			return
 		distance -= length
