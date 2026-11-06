@@ -196,7 +196,7 @@ function dActive(S, dt) {
   if (id === 'bite') dNeckPose(S, S.base, lerpV(S.retracted, S.destination, dBurst(t / r.active)));
   else if (id === 'charge') B.pos = lerpV(S.origin, S.destination, dBurst(t / r.active));
   else if (id === 'leap') B.pos = lerpV(S.takeoff, S.destination, dBurst(t / r.active));
-  else if (id === 'tail_sweep') { S.override = dSweepBody(S, r.warn + t); S.B.pos = S.override[0]; const N = S.override.length - 1; (S.wake ||= []).push({ t: S.t, a: { ...S.override[N] }, b: { ...S.override[Math.round(N * 0.74)] } }); }
+  else if (id === 'tail_sweep') { S.override = dSweepBody(S, r.warn + t); S.B.pos = S.override[0]; const N = S.override.length - 1; (S.wake ||= []).push({ t: S.t, a: { ...S.override[N] }, b: { ...S.override[Math.round(N * 0.82)] } }); }
   else if (id === 'tail_slam') { const x = t / (r.active * 0.65), drop = dSlam(x); S.override = dSlamBody(S, r.warn + t); S.B.pos = S.override[0]; if (drop >= 1 && !S.landed) { S.landed = true; S.impacts.push({ at: S.target, t: S.t, radius: r.radius, big: true }); } }
   else if (id === 'breath') { S.fanAngle = S.axis + lerp(-r.sweep, r.sweep, smooth(0, 1, t / r.active)); B.facing = S.fanAngle; S.override = S.base; S.fan = [dMouth(S)];
     for (let j = 0; j <= 64; j++) { const a = S.fanAngle - r.half_angle + r.half_angle * 2 * j / 64, u = fromA(a), origin = dMouth(S); let reach = r.reach;
