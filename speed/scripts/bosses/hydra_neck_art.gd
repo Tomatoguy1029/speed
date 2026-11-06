@@ -10,7 +10,7 @@ extends Node2D
 @export var tail_tip: Texture2D
 @export var immortal: Texture2D
 ## 合体中の首は当たらないので、本体より少し暗くする。
-@export var merged_neck_tint := Color(0.85,0.85,0.85)
+@export var merged_neck_tint := Color.WHITE
 ## 分離後は蛇ごとに色相をずらし、1匹ずつ見分けられるようにする（度／蛇1匹）。
 @export var snake_hue_step := 10.8
 @export var snake_saturation := 1.21
@@ -57,7 +57,7 @@ func _draw() -> void:
 		if heads_only:
 			var texture: Texture2D = head_textures.get(StringName(neck.kind))
 			if neck.alive and texture!=null:
-				draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2.ONE*factor)
+				draw_set_transform(neck.position-frame.position,float(neck.facing)-PI*0.5,Vector2(float(neck.get("sx",1.0)),float(neck.get("sy",1.0)))*factor)
 				draw_texture(texture,-texture.get_size()*0.5,_snake_tint(index,1.0) if _separated() else Color.WHITE)
 		elif neck.alive or float(neck.length)>0.0: _chain(neck.points,factor,index,false)
 	if frame.has("bearer"):

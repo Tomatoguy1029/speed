@@ -126,6 +126,9 @@ function hMouthDist(n) { return ((hHeadKey(n) === 'head2' ? 41 : 36) - 24.5) * H
 // 頭の中の位置（絵の画素、中心基準。+y が前）をワールドへ。
 function hLocal(center, angle, x, y, sx = 1, sy = 1) { return add(center, rotateV(V(x * H_F() * sx, y * H_F() * sy), angle - Math.PI / 2)); }
 function hDrawNeck(S, n, points, index) {
+  const bright = P().mergedNeck ?? 1; if (bright < 1) { g.save(); g.filter = `brightness(${bright})`; hDrawNeckRaw(S, n, points, index); g.restore(); return; } hDrawNeckRaw(S, n, points, index);
+}
+function hDrawNeckRaw(S, n, points, index) {
   const f = H_F(), total = pathLength(points); if (total < 0.1) return;
   for (let d = 0, tile = 0; d <= total; d += Math.max(1, 14 * f), tile++) { const q = pathAt(points, d); hStamp('neck', { x: ((index + tile) % 3) * 32, y: 0, w: 32, h: 32 }, q.pos, q.angle - Math.PI / 2, f); }
 }
@@ -610,7 +613,8 @@ const H_PARAMS = [
   { k: 'bladeW', label: '三日月の風刃の太さ（見た目）', type: 'range', min: 8, max: 90, step: 1, def: 46 },
   { k: 'bladeFur', label: '三日月の風刃の毛羽立ちの長さ', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'sweepCharge', label: '横薙ぎのため（秒）', type: 'range', min: 0.6, max: 1.8, step: 0.05, def: 1 },
-  { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 0.7 },
+  { k: 'mergedNeck', label: '合体中の首の明るさ（判定なしの首を暗くする）', type: 'range', min: 0.4, max: 1, step: 0.05, def: 1 },
+  { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 1.2 },
   { k: 'coil', label: 'ための首の曲がり', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'snap', label: '発動の勢い（反動・衝撃）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'dust', label: '小石・土ぼこりの量', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },

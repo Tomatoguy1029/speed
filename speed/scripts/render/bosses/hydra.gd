@@ -22,6 +22,10 @@ func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
 		if entry.has("hydra_move"): shot_scenes[entry.hydra_move] = scope.resources.get(entry.path)
 var white: Texture2D
 const FX := preload("res://scripts/render/bosses/hydra_fx.gd")
+const PRESENT := preload("res://scripts/render/bosses/hydra_present.gd")
+var _memory := {}
+var _heads := {}
+var _masks := {}
 const LIGHT := preload("res://scripts/render/enemies/aquila_lightning.gd")
 var _light = LIGHT.new()
 const HIDDEN_LINES := ["beam","wind","wind_blade","rubble","bolt","bite"]
@@ -36,19 +40,15 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	if state.is_empty(): return
 	var t := float(state.clock)
 	var factor := float(state.radius)*2.0/body_texture.get_width() if body_texture!=null and state.has("radius") else 1.0
+	var ramp: Array[Color] = _light.palette(FX.COLORS.thunder)
 	for neck: Dictionary in state.get("necks",[]):
-		if not neck.get("alive",false): continue
-		var mode: String = neck.get("mode","idle")
-		var glow := float(neck.get("glow",0.0))
-		if mode=="idle" or glow<=0.0: continue
-		var color: Color = FX.COLORS.get(String(neck.kind),FX.COLORS.bite)
-		var head: Vector2 = neck.position
-		var facing := float(neck.get("facing",neck.angle))
-		var mouth := head+Vector2.from_angle(facing)*(16.5 if String(neck.kind) in ["debris","beam"] else 11.5)*factor
-		if String(neck.kind)=="bite": FX.bite_eyes(canvas,head,facing,pow(glow,0.8),color,t,factor)
-		else: FX.eyes(canvas,head,facing,pow(glow,1.4),color,factor)
-		if String(neck.kind) in ["beam","debris"]: DRACO_FX.gather(canvas,mouth,42.0,glow,t,float(neck.id),color)
-		if mode=="beam_fixed" and int(neck.get("normal_phase",1))==0: FX.rail(canvas,mouth,mouth+Vector2.from_angle(facing)*1400.0,glow,color,t,float(neck.id))
+		if neck.get("alive",false) and neck.has("pose"): _draw_neck(canvas,neck,t,factor,ramp)
+	for target: Dictionary in state.get("north_targets",[]):
+		var from: Vector2 = target.from
+		var at: Vector2 = target.target
+		var k := 1.0 if target.locked else 0.5
+		FX.rail(canvas,from,at,k,FX.COLORS.bite,t,3.0,false)
+		FX.mark(canvas,at,(at-from).angle(),k,target.locked,float(target.radius),FX.COLORS.bite,7.0,t)
 	var beam_color: Color = FX.COLORS.beam
 	if state.has("grid_shots"):
 		var elapsed := float(state.grid_elapsed)
@@ -75,9 +75,13 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		var life := float(effect.life)
 		match String(effect.kind):
 			"tornado":
+				if float(effect.get("speed",0.0))>0.0:
+					var fade_wake := clampf((life-float(effect.age))/0.4,0.0,1.0)
+					FX.tornado_wake(canvas,points[0].lerp(points[1],0.5),(points[1]-points[0]).normalized(),float(effect.speed),float(effect.width),float(effect.age),fade_wake)
 				_raster_back.tornado(points[0].lerp(points[1],0.5),float(effect.width)*0.5*lerpf(0.8,1.0,smoothstep(0.0,0.15,float(effect.age))),clampf((life-float(effect.age))/0.4,0.0,1.0),1.0,t)
 			"tornado_charge":
 				var grow := pow(clampf(float(effect.age)/maxf(0.01,life),0.0,1.0),1.4)
+				FX.tornado_gather(canvas,points[0],float(effect.width)*0.5*lerpf(0.1,1.0,grow),grow,t)
 				_raster_back.tornado(points[0],float(effect.width)*0.5*lerpf(0.1,1.0,grow),1.0,grow,t)
 			"wind":
 				if e>=0.0: _raster.wind_band(points[0],(points[1]-points[0]).angle(),points[0].distance_to(points[1]),e,life)
@@ -125,8 +129,94 @@ func draw_reference(canvas, _real_dt: float) -> void:
 				FX.fangs(canvas,points[-1],(points[-1]-points[0]).angle(),e,float(effect.width),float(effect.id),FX.COLORS.bite)
 			"lightning":
 				if points[0].distance_to(points[-1])<1.0 and e>=0.0:
-					var ramp: Array[Color] = _light.palette(FX.COLORS.thunder)
 					FX.bolt_strike(canvas,_light,canvas.to_logical(points[0]),float(effect.width)*0.5*float(canvas.world_scale),e,int(effect.id)%97+1,ramp,canvas.to_logical(position))
+
+func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[Color]) -> void:
+	var pose: Dictionary = neck.pose
+	var kind := String(neck.kind)
+	var mode := String(neck.mode)
+	var color: Color = FX.COLORS.get(kind,FX.COLORS.bite)
+	var head: Vector2 = neck.position
+	var facing := float(neck.facing)
+	var mouth := head+Vector2.from_angle(facing)*(16.5 if kind in ["debris","beam"] else 11.5)*factor
+	var rel := float(pose.rel)
+	var warn := float(pose.warn)
+	var active := float(pose.active)
+	var id := int(neck.id)
+	var glow := float(neck.get("glow",0.0))
+	if String(pose.type)=="major":
+		var k := pow(glow,0.7) if pose.get("lunge",false) else glow
+		if pose.get("lunge",false) and not neck.locked: k = clampf(float(neck.get("major_time",0.0))/warn,0.0,1.0)
+		if rel<0.0:
+			if kind=="bite": FX.bite_eyes(canvas,head,facing,k,color,t,factor)
+			else: FX.eyes(canvas,head,facing,k,color,factor)
+			if mode in ["curve","beam_pincer","debris_shatter","grid"] and kind in ["beam","vortex","thunder"]: DRACO_FX.gather(canvas,mouth,42.0,k,t,float(id),color)
+			if kind=="debris": FX.rubble_warn(canvas,neck.points,mouth,k,t,false)
+		return
+	var age := float(neck.elapsed)
+	var u := clampf(age/warn,0.0,1.0)
+	var pts: PackedVector2Array = neck.points
+	FX.grit(canvas,pts,age,warn)
+	var mem: Dictionary = _memory.get(id,{})
+	if mode=="thunder_headbutt":
+		FX.eye_charge(canvas,_light,head,facing,pow(u,1.1) if rel<0.0 else exp(-maxf(0.0,rel-active)/0.12),t,rel<0.0,factor,ramp)
+	elif rel<0.0 and kind=="bite": FX.bite_eyes(canvas,head,facing,pow(u,0.8),color,t,factor)
+	else: FX.eyes(canvas,head,facing,pow(u,1.4) if rel<0.0 else exp(-rel/0.25),color,factor)
+	if rel<0.0:
+		if mode=="wind_band" or mode=="wind_blades": FX.wind_inhale(canvas,mouth,facing,u,age,mode=="wind_band",FX.COLORS.vortex)
+		if kind=="debris": FX.rubble_warn(canvas,pts,mouth,u,age,mode=="rubble_lump")
+		if kind=="beam": DRACO_FX.gather(canvas,mouth,46.0,u,t,float(id),color)
+		if mode=="beam_fixed": FX.rail(canvas,mouth,mouth+Vector2.from_angle(facing)*1400.0,u,color,t,float(id))
+		if mode=="thunder_drop":
+			FX.crackle(canvas,_light,head,34.0,pow(u,1.2),t,3,ramp)
+			FX.drop_warn(canvas,_light,mouth,neck.target,float(canvas.world_scale)*170.0,u,t,ramp)
+		return
+	if mode=="bite_sweep":
+		FX.sweep_trail(canvas,neck,rel,float(mem.get("fire_angle",facing)),PRESENT,70.0,color)
+		if rel>=active: DRACO_FX.dust(canvas,head,rel-active,77.0,facing+PI*0.5,0.8)
+	if mode=="bite_thrust" and rel<=active+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,active,color)
+	if String(pose.type)=="lunge" and rel<=active+0.06: _ghosts(canvas,neck,rel,active,color,factor)
+	if kind=="debris": FX.spit_burst(canvas,mouth,facing,rel,mode=="rubble_fan",0.6 if mode=="rubble_fan" else 0.35)
+	if mode=="beam_bolt" and rel<0.12: PRIM.flare(canvas.front,canvas.to_logical(mouth),2.5,color,t,1.0-rel/0.12,4)
+	if mode=="thunder_headbutt":
+		if rel<active+0.3:
+			var f := floori(t/0.05)
+			var rng = FX.JET.Rng.new(f*7+3)
+			var from: Vector2 = canvas.to_logical(neck.strike_from)
+			var to: Vector2 = canvas.to_logical(head)
+			if from.distance_to(to)>6.0: _light.ink(canvas.back,_light.zigzag(rng,from,to,0.3,0.3),0.7*exp(-maxf(0.0,rel-active)/0.1),ramp,1.0,true,0.4)
+		if rel>=active: FX.zap(canvas,_light,canvas.to_logical(head),float(canvas.world_scale)*170.0,rel-active,facing,ramp)
+
+func _ghosts(canvas, neck: Dictionary, rel: float, active: float, color: Color, factor: float) -> void:
+	var mask := _head_mask(String(neck.kind))
+	if mask.is_empty(): return
+	var trail: Array = _heads.get(int(neck.id),[])
+	var fade := exp(-maxf(0.0,rel-active)/0.03)
+	var pal := PRIM.ramp(color)
+	var j := 0
+	for row: Array in [[3,0.14],[6,0.26]]:
+		var back := int(row[0])
+		if trail.size()>back:
+			var old: Dictionary = trail[trail.size()-1-back]
+			if Vector2(old.pos).distance_to(neck.position)>=45.0: FX.silhouette(canvas,mask,old.pos,float(old.angle),pal[2],float(row[1])*fade,factor,j*31.0+5.0)
+		j += 1
+
+func _head_mask(kind: String) -> Dictionary:
+	if _masks.has(kind): return _masks[kind]
+	_masks[kind] = {}
+	var art := get_node_or_null("HeadArtwork")
+	if art==null: return {}
+	var texture: Texture2D = art.head_textures.get(StringName(kind))
+	if texture==null: return {}
+	var image := texture.get_image()
+	if image==null: return {}
+	if image.is_compressed(): image.decompress()
+	var data := PackedByteArray()
+	data.resize(image.get_width()*image.get_height())
+	for y in image.get_height():
+		for x in image.get_width(): data[y*image.get_width()+x] = 1 if image.get_pixel(x,y).a>0.5 else 0
+	_masks[kind] = {"w":image.get_width(),"h":image.get_height(),"m":data}
+	return _masks[kind]
 
 func _neck_by_key(key: int) -> Dictionary:
 	for neck: Dictionary in state.get("necks",[]):
@@ -137,7 +227,12 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 	var clock := float(body.clock)
 	_advance_bursts(maxf(0.0,clock-_burst_clock) if _burst_clock>=0.0 else 0.0)
 	_burst_clock = clock
-	state = body
+	state = PRESENT.apply(body,_memory)
+	for neck: Dictionary in state.get("necks",[]):
+		var trail: Array = _heads.get(int(neck.id),[])
+		trail.append({"pos":neck.position,"angle":neck.facing})
+		if trail.size()>12: trail.pop_front()
+		_heads[int(neck.id)] = trail
 	queue_redraw()
 	position = body.position
 	rotation = 0.0
@@ -145,7 +240,7 @@ func apply_frame(body: Dictionary, _attack: Dictionary = {}, _appearance: Dictio
 	hit = float(body.flash)
 	modulate = Color(1.5,1.5,1.5) if hit>0.0 else Color.WHITE
 	for child in get_children():
-		if child.has_method("apply_frame"): child.apply_frame(body)
+		if child.has_method("apply_frame"): child.apply_frame(state)
 	if arena==null and body.has("arena"):
 		arena = preload("res://scripts/bosses/hydra_arena.gd").new()
 		add_child(arena)
@@ -230,10 +325,3 @@ func _advance_bursts(dt: float) -> void:
 		if age>=duration and not ShaderTuning.previewing():
 			burst.sprite.queue_free()
 			_bursts.erase(burst)
-
-func _draw() -> void:
-	for target: Dictionary in state.get("north_targets",[]):
-		var color := Color("#fff2b0") if target.locked else Color("#ffd16c")
-		draw_line(target.from-position,target.target-position,Color(color,0.55),3.0,true)
-		draw_arc(target.target-position,target.radius,0.0,TAU,40,color,3.0,true)
-		draw_circle(target.target-position,6.0,color)
