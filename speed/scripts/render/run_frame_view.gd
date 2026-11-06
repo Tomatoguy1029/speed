@@ -13,6 +13,7 @@ var batches: Dictionary = {}
 var parts: Dictionary = {}
 var enemy_frames: Dictionary = {}
 var _layers: Dictionary = {}
+var _route_visual := preload("res://scripts/render/route_visual.gd").new()
 var _ship_layer_parent: Node2D
 var _lines: Array[Line2D] = []
 var _shape_displays: Dictionary = {}
@@ -301,6 +302,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 		for n in range(0, values.size(), 7):
 			COMET_VISUAL.draw(canvas, Vector2(values[n], values[n+1]), values[n+2], Vector2(values[n+3], values[n+4]), values[n+5] > 0.0, values[n+6])
 	_layer(8).add_child(_comet_canvas)
+	_layer(3).add_child(_route_visual)
 	_capsule_canvas = DrawLayer.new()
 	_capsule_canvas.z_index = 1
 	_capsule_canvas.draw_fn = func(canvas: CanvasItem):
@@ -839,9 +841,12 @@ func apply_frame(frame: Dictionary) -> bool:
 	for display: Node in _shell_displays.values(): display.hide()
 	for display: Dictionary in _flood_displays.values(): display.node.hide()
 	var flood_groups := {}
+	_route_visual.sync_shapes(frame.shapes, _pixel)
 	var line_index := 0
 	for row: Dictionary in frame.shapes:
 		if perf.active: packed_bytes+=row.points.size()*8+row.offsets.size()*4+row.widths.size()*4+row.colors.size()*16
+		if _route_visual.is_route_shape(row):
+			continue
 		var parent: Node2D = _layer(row.layer)
 		if row.kind==SHAPE_KIND.Shell:
 			var key := int(row.order)
@@ -1251,6 +1256,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if authoring_paused:
 			dt = 0.0
 			frame.ui.input_enabled = false
+	_route_visual.set_clock(float(frame.ui.world_time))
 	_finale_overlay={}
 	_finale_rect=Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0).grow(400.0)
 	for body: Dictionary in frame.ui.get("boss_bodies",[]):
