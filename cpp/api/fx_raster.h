@@ -43,5 +43,9 @@ public:
     void exhale(Vector2 at,double angle,double reach,double width,double beam_age,double extend,double life,double time);
     void comet(Vector2 pos,double angle,double age,double speed,double radius,double tail,double shine,double seed,bool with_star);
     void dark_shot(Vector2 pos,double angle,double age,double seed);
+    void wind_band(Vector2 mouth,double angle,double length,double elapsed,double active);
+    void wind_blade(Vector2 center,double angle,double age,double life,double size,double side,double seed);
+    void rock_comet(Vector2 head,double angle,double speed,double age,double radius,double seed,double pace);
+    void bolt_bar(Vector2 tail,double angle,double age,double life,double speed,double length,double width,Color color,double time);
 };
 }

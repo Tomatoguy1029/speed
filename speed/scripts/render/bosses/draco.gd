@@ -218,6 +218,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var stage := int(attack.get("stage",5))
 	var st := float(attack.get("stage_time",0.0))
 	_draw_under(canvas,t,st,stage,tech)
+	if _field!=null: _field.draw_reference(canvas,_real_dt)
 	var ready: bool = attack.get("staging_ready",true)
 	var scale_head := float(state.head_scale)*float(state.perspective_scale)
 	var head: Vector2 = to_global(_pose.points[0])

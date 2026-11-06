@@ -45,7 +45,7 @@ void HydraTechnique::grid(RunRuntime &r,TechniqueState &t,double dt) {
         if (shot==g.shots.end()) {auto &o=g.orbit[i];o.angle+=o.speed*dt;HydraSwim::steer(r,b,*n,g.center*0.7+ship*0.3+V(std::cos(o.angle)*o.radius*1.25,std::sin(o.angle)*o.radius*0.82),dt,0.9,true);}
         else if (g.elapsed<shot->fire_at-LOCK) {const double aim=(ship-n->free_pos).angle();n->angle+=angle_difference(aim-n->angle)*std::min(1.0,dt*10);n->look_angle=n->angle;}
         else if (!shot->locked) {auto d=(ship-n->free_pos).normalized();if (d.is_zero_approx()) d=V::from_angle(n->angle);n->angle=n->look_angle=d.angle();shot->end=ship+d*REACH;shot->locked=true;}
-        n->strike_pos=n->free_pos;r.state.enemies[n->actor.slot].pos=n->free_pos;
+        n->strike_pos=n->free_pos;r.state.enemies[n->actor.slot].pos=n->free_pos;if (shot!=g.shots.end()) r.state.enemies[n->actor.slot].facing=n->angle;
         if (shot!=g.shots.end()) n->glow=std::clamp(1+(g.elapsed-shot->fire_at)/STOP,0.0,1.0);
         if (shot==g.shots.end() || g.elapsed<shot->fire_at || n->emission.generation) continue;
         if (!v.playing) {v.playing=true;t.stage=TechniqueStage::Active;cue(r,b,"attack_started",t.definition);}
