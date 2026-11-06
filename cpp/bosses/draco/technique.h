@@ -12,10 +12,12 @@ namespace speed {class DracoTechnique {public:
     static godot::Dictionary snapshot(const RunRuntime &,const TechniqueState &);
     static RockHandle spawn_rock(RunRuntime &,uint32_t,godot::Vector2);
     static double smooth(double);
+    static double burst(double);
     static std::vector<godot::Vector2> neutral(const RunRuntime &,const BossBodyState &,godot::Vector2,double);
     static std::vector<godot::Vector2> fit(const std::vector<godot::Vector2> &,const std::vector<godot::Vector2> &,bool anchor_tip=false);
     static void neck(RunRuntime &,BossBodyState &,const std::vector<godot::Vector2> &,godot::Vector2);
     static void blend(RunRuntime &,BossBodyState &,const std::vector<godot::Vector2> &,const std::vector<godot::Vector2> &,double);
+    static void settle(RunRuntime &,BossBodyState &,const std::vector<godot::Vector2> &,const std::vector<godot::Vector2> &,double);
     static godot::Vector2 mouth(const RunRuntime &,const BossBodyState &);
     static godot::Vector2 predict(const RunRuntime &,EnemyHandle,double,double);
     static bool observe_contact(RunRuntime &,TechniqueState &,bool);

@@ -10,12 +10,13 @@
 #include <godot_cpp/variant/vector2.hpp>
 namespace speed {
 struct DracoBiteState {godot::Vector2 origin,retracted,strike;std::vector<godot::Vector2> base,landed;};
-struct DracoBreathState {std::vector<RockHandle> rocks;std::vector<godot::Vector2> destinations,base,recovering;godot::Vector2 mouth;double axis=0,fan_angle=0;bool reused=false;};
-struct DracoStagingState {uint8_t phase=0;bool enter=false;double side=1,height=0,exit_angle=0,away_angle=0,exit_time=0,entry_time=0;godot::Vector2 entry_from,entry_to;std::vector<godot::Vector2> trail,points;};
+struct DracoBreathState {std::vector<RockHandle> rocks;std::vector<godot::Vector2> destinations,base,recovering;std::vector<double> burn;std::vector<uint8_t> launched,broken;godot::Vector2 mouth;double axis=0,fan_angle=0,rock_aim=0;};
+struct DracoFlyingMeteor {RockHandle rock;godot::Vector2 direction;double born=0,life=0;};
+struct DracoStagingState {uint8_t phase=0;bool enter=false;double side=1,height=0,distance=0,exit_angle=0,away_angle=0,exit_time=0,entry_time=0;godot::Vector2 entry_from,entry_to;std::vector<godot::Vector2> trail,points;};
 struct DracoChargeState {DracoStagingState staging;godot::Vector2 origin,destination,settled;bool positioned=false;};
-struct DracoLeapState {DracoStagingState staging;godot::Vector2 origin,destination,takeoff,landed;bool positioned=false;};
-struct DracoTailSlamState {godot::Vector2 origin,target;std::vector<godot::Vector2> base,lifted,last;bool fired=false;};
-struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<godot::Vector2> base,last,prior,area;};
+struct DracoLeapState {DracoStagingState staging;godot::Vector2 origin,destination,takeoff,landed;std::vector<godot::Vector2> base;bool positioned=false;};
+struct DracoTailSlamState {godot::Vector2 origin,target;double axis=0,mirror=1;std::vector<godot::Vector2> base;bool fired=false;};
+struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<godot::Vector2> base,prior,area;};
 struct DracoStarFanState {std::vector<godot::Vector2> positions;std::vector<double> angles;bool fired=false;};
 struct DracoRiftsState {DracoStagingState staging;std::vector<std::vector<godot::Vector2>> paths;std::vector<AttackHandle> walls,slashes;godot::Vector2 center;uint32_t claws=3,sides=0;bool ended=false;};
 struct DracoArrowImpact {godot::Vector2 position;double wait=0,warn=0,age=0;bool locked=false;};
@@ -83,6 +84,7 @@ struct DracoBodyState {
     uint32_t lab_inhale_stars=12;
     std::vector<DracoClosingWall> closing_walls;
     std::vector<RockHandle> placed_meteors;
+    std::vector<DracoFlyingMeteor> meteors;
     std::vector<DracoImpact> impacts;
     DracoCycleState cycle;
     DracoIntroState intro;
