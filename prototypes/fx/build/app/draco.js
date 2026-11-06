@@ -115,13 +115,17 @@ function dCurl(head, heading, curl) { const seg = DP.body_length / DCOUNT, point
 // 蛇の動き：頭が先に向きを変え、その動きが波のように胴を伝わって、尾が最後についてくる。胴の中ほどを軸にするので、頭も尾も一緒に動く
 function dBaseAngles(S) { const b = S.base; return (S.baseAngles ||= Array.from({ length: DCOUNT }, (_, i) => angOf(sub(b[i + 1], b[i])))); }
 function dWaveBody(S, turn, center) { const base = dBaseAngles(S), seg = DP.body_length / DCOUNT, pts = [V(0, 0)]; let at = pts[0]; for (let i = 0; i < DCOUNT; i++) { at = add(at, mul(fromA(base[i] + turn(i / (DCOUNT - 1))), seg)); pts.push(at); } const mid = Math.round(DCOUNT * 0.42), off = sub(center, pts[mid]); S.B.facing = S.axis + turn(0); return pts.map(p => add(p, off)); } // turn：元の姿勢からどれだけ向きを変えるか。始まりの形からそのまま動き出す
-function dSweepTurn(S, t) { const r = S.r; return t < r.warn ? -smooth(0, 1, t / r.warn) : t < r.warn + r.active ? lerp(-1, 1, smooth(0, r.active * 0.72, t - r.warn)) : 1 - smooth(0, r.recover, t - r.warn - r.active); }
-function dSweepBody(S, clock) { const r = S.r, lag = 0.3, side = orth(fromA(S.axis)), mid = S.base[Math.round(DCOUNT * 0.42)]; return dWaveBody(S, u => dSweepTurn(S, clock + lag * (1 - u) - lag) * (0.8 + 1.2 * u * u), add(mid, mul(side, -dSweepTurn(S, clock) * 150))); }
+// ブレークダウン：ポーズAからBへ動く途中で、根元はもうBに近く、先端はまだAに残る。根元が先に動き終え、先端が遅れて追いつく
+const dBreakQ = (x, u) => clamp((clamp(x) - 0.55 * u) / 0.45);
+function dBreak(x, u) { const q = dBreakQ(x, u); return lerp(smooth(0, 1, q), 1 + 2.2 * (q - 1) ** 3 + 1.2 * (q - 1) ** 2, u * u); } // 先端は行き過ぎてから戻る
+function dBreakHit(x, u) { const q = dBreakQ(x, u); return lerp(smooth(0, 1, q), q * q, u); } // 先端は最後まで加速して止まる（叩きつけ）
+function dSweepTurn(S, t, u) { const r = S.r; if (t < r.warn) return -dBreak(t / r.warn, u); t -= r.warn; if (t < r.active) return -1 + 2 * dBreak(t / r.active, u); return 1 - dBreak((t - r.active) / r.recover, u); }
+function dSweepBody(S, clock) { const side = orth(fromA(S.axis)), mid = S.base[Math.round(DCOUNT * 0.42)]; return dWaveBody(S, u => dSweepTurn(S, clock, u) * (0.8 + 1.2 * u * u), add(mid, mul(side, -dSweepTurn(S, clock, 0.42) * 150))); }
 // 尻尾の叩きつけ：ためで体を逆へひねり、頭の側から順に振り戻して、尾の先が最後に遅れて落ちる。届かない分は体ごと踏み込む
 // 尾を相手へ向けるために体ごと回り込む。胸も頭も大きく動くので、胴は折れずにゆるく弧を描いたまま叩きつける
-const DT_LEAD = 0.14, DT_BACK = 0.8;
-function dSlamAngle(S, t) { const r = S.r, from = S.axis + Math.PI, way = S.slamWay, back = from - S.slamSide * DT_BACK; return t < r.warn ? lerp(from, back, smooth(0, 1, t / r.warn)) : back + way * clamp((t - r.warn) / (r.active * 0.65)) ** 2; }
-function dSlamBody(S, clock, step) { const mid = S.base[Math.round(DCOUNT * 0.42)]; return dWaveBody(S, u => { const t = clock + DT_LEAD * (1 - u), a = dSlamAngle(S, t) - (S.axis + Math.PI); return a + S.slamSide * 0.5 * u * u * clamp(Math.abs(a) / 0.8); }, add(mid, mul(S.slamShift || V(0, 0), step))); }
+const DT_BACK = 0.8;
+function dSlamAngle(S, t, u) { const r = S.r, T = r.active * 0.65, back = -S.slamSide * DT_BACK; return t < r.warn ? back * dBreak(t / r.warn, u) : back + S.slamWay * dBreakHit((t - r.warn) / T, u); }
+function dSlamBody(S, clock, step) { const mid = S.base[Math.round(DCOUNT * 0.42)]; return dWaveBody(S, u => { const a = dSlamAngle(S, clock, u); return a + S.slamSide * 0.5 * u * u * clamp(Math.abs(a) / DT_BACK); }, add(mid, mul(S.slamShift || V(0, 0), step))); }
 function dSetup(S, id) {
   S.tech = id; S.r = bossRule('draco', id); S.B = bossActor('draco', ['breath', 'meteor'].includes(id) ? V(-140, -90) : id === 'picaro_wall' ? V(-560, 110) : id === 'tail_slam' ? V(60, -140) : V(470, -80)); S.B.r = DRACO.def.radius * DP.head_scale; S.ship = shipState(V(720, 90), Math.PI / 2, 25); S.shipVel = V(0, 25); S.age = -0.5; S.elapsed = 0; S.origin = { ...S.B.pos }; S.axis = 0; S.direction = V(1, 0); S.points = dNeutral(S.B.pos, 0, 0); S.base = S.points; S.trail = S.points; S.tell = []; S.shots = []; S.rocks = []; S.impacts = []; S.rifts = []; S.effects = []; S.projectiles = []; S.units = []; S.shot = 0; S.shotTimes = []; S.swipes = []; S.shouts = []; S.target = dPredict(S, S.r.warn || 0);
   if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: id === 'inhale' ? -1 : S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
