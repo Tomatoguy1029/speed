@@ -97,7 +97,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
     const Vector2 to = runtime.state.ship.pos;
     const double padding = radius + std::max(c.max_enemy_radius, runtime.state.grid.max_radius);
     const Vector2 pad(padding, padding);
-    struct Hit { double time; size_t row; bool image=false; speed::BossImageCut cut; };
+    struct Hit { double time; size_t row; bool image=false; speed::BossImageCut cut; speed::EnemyHandle owner; };
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
     auto candidates=query_enemy_rows(from.min(to) - pad, from.max(to) + pad);
@@ -121,7 +121,16 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             if (distance<=length) hits.push_back({std::max(0.0,distance/length),row,true,cut});
         } else {
             const double t = segment_circle(from, to, enemy.pos, enemy.radius + radius);
-            if (t >= 0) hits.push_back({t, row});
+            if (t >= 0) {
+                Hit hit{t,row};
+                // 絵のマスクを持たない体でも、突進の入口と出口を体の円から求めて同じ接触の演出を出す。
+                const auto owner=enemy.is_boss && !normal_boss?speed::BossRamSystem::chain_owner(runtime,handle):speed::EnemyHandle{};
+                if (owner.generation && (to-from).length_squared()>0) {
+                    const auto direction=(to-from).normalized();const double along=(enemy.pos-from).dot(direction),off=std::abs((enemy.pos-from).cross(direction)),half=std::sqrt(std::max(0.0,double(enemy.radius)*enemy.radius-off*off));
+                    hit.image=true;hit.owner=owner;hit.cut.enter=from+direction*(along-half);hit.cut.exit=from+direction*(along+half);
+                }
+                hits.push_back(hit);
+            }
         }
     }
     SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
@@ -210,7 +219,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             }
             speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,result.applied);
             speed::RunUpBehavior::contact(runtime,position,direction,result.applied);
-            if (hit.image && result.applied>0 && speed::BossRamSystem::begin(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),hit.cut,direction,radius)) return true;
+            if (hit.image && result.applied>0 && speed::BossRamSystem::begin(runtime,hit.owner.generation?hit.owner:runtime.state.enemy_handles.at(uint32_t(hit.row)),hit.cut,direction,radius)) return true;
             continue;
         }
         runtime.state.ship.glide = false;
