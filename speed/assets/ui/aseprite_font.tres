@@ -10,4 +10,4 @@ disable_embedded_bitmaps = false
 hinting = 2
 subpixel_positioning = 0
 oversampling = 1.0
-allow_system_fallback = false
+allow_system_fallback = true
