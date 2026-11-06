@@ -41,8 +41,8 @@ jobs:
           data = json.loads(subprocess.check_output(['gh', 'release', 'view', 'runtime-library', '--json', 'assets']))
           present = {asset['name'] for asset in data['assets']}
           every = [
-              {'os': 'macos-14', 'platform': 'macos', 'arch': 'arm64', 'file': 'libspeed_runtime.macos.template_release.arm64.dylib'},
-              {'os': 'macos-14', 'platform': 'macos', 'arch': 'x86_64', 'file': 'libspeed_runtime.macos.template_release.x86_64.dylib'},
+              {'os': 'macos-15', 'platform': 'macos', 'arch': 'arm64', 'file': 'libspeed_runtime.macos.template_release.arm64.dylib'},
+              {'os': 'macos-15', 'platform': 'macos', 'arch': 'x86_64', 'file': 'libspeed_runtime.macos.template_release.x86_64.dylib'},
               {'os': 'windows-2022', 'platform': 'windows', 'arch': 'x86_64', 'file': 'speed_runtime.windows.template_release.x86_64.dll'},
           ]
           missing = [row for row in every if f'{identifier}-{row["file"]}.sha256' not in present]
