@@ -10,10 +10,20 @@ vec3 to_srgb(vec3 c) { return mix(c * 12.92, 1.055 * pow(max(c, vec3(0.0)), vec3
 vec3 to_linear(vec3 c) { return mix(c / 12.92, pow((max(c, vec3(0.0)) + 0.055) / 1.055, vec3(2.4)), step(vec3(0.04045), c)); }
 float lum(vec3 c) { return dot(c, vec3(0.3, 0.59, 0.11)); }
 
+// 明るさを保ったまま範囲へ収める。暗い場所は暗いまま残る。
+vec3 clip_color(vec3 c) {
+	float l = lum(c);
+	float low = min(c.r, min(c.g, c.b));
+	float high = max(c.r, max(c.g, c.b));
+	if (low < 0.0) { c = l + (c - l) * l / max(l - low, 0.0001); }
+	if (high > 1.0) { c = l + (c - l) * (1.0 - l) / max(high - l, 0.0001); }
+	return c;
+}
+
 void fragment() {
 	vec3 base = texture(screen_image, SCREEN_UV).rgb;
 	if (linear_output) { base = to_srgb(base); }
-	vec3 shifted = clamp(tint + (lum(base) - lum(tint)), 0.0, 1.0);
+	vec3 shifted = clip_color(tint + (lum(base) - lum(tint)));
 	vec3 result = mix(base, shifted, amount);
 	result = mix(result, vec3(0.02, 0.039, 0.133), amount * 0.34);
 	if (linear_output) { result = to_linear(result); }

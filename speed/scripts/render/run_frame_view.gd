@@ -1267,7 +1267,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if body.get("kind",-1)==4 and body.get("finale",{}).get("active",false):
 			if _finale_view==null:
 				_finale_view=preload("res://scripts/render/bosses/draco_finale_view.gd").new()
-				_layer(14).add_child(_finale_view)
+				_pulser_parent.add_child(_finale_view)
 				_finale_view.set_under_parent(_pulser_parent)
 				_finale_view.set_shake_hook(func(amount: float):ruler_shake=maxf(ruler_shake,amount))
 			finale_shown=true

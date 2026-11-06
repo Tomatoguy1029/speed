@@ -33,6 +33,7 @@ var view_rect := Rect2()
 var times := {}
 var _grade: Node2D
 var _dim: Node2D
+var _back: Node2D
 var _fx: Node2D
 var _hi: Node2D
 var _top: Node2D
@@ -63,10 +64,15 @@ var _charge: Array[Dictionary] = []
 var _shake_hook: Callable
 
 func _ready() -> void:
+	# りゅう本体より手前で色を変え、光と線を重ねる。
+	z_as_relative = false
+	z_index = 40
 	_grade = _canvas(-1,_draw_grade)
 	_grade_material = ShaderMaterial.new()
 	_grade_material.shader = preload("res://shaders/draco_finale_grade.gdshader")
 	_grade.material = _grade_material
+	_back = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_back)
+	_back.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_dim = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_dim)
 	_fx_port = _port(FX_SIZE)
 	_fx = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_fx,_fx_port)
@@ -120,6 +126,9 @@ func _port(size_: Vector2i, source: SubViewport = null) -> SubViewport:
 		copy.texture = source.get_texture()
 		copy.centered = false
 		copy.scale = Vector2(size_)/Vector2(source.size)
+		var copy_material := ShaderMaterial.new()
+		copy_material.shader = preload("res://shaders/draco_finale_copy.gdshader")
+		copy.material = copy_material
 		port.add_child(copy)
 	return port
 
@@ -269,7 +278,7 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_under.position = position
 		_under.queue_redraw()
 	_stage_shake()
-	for node: Node2D in [_grade,_dim,_fx,_hi,_mix,_top,_over]: node.queue_redraw()
+	for node: Node2D in [_grade,_back,_dim,_fx,_hi,_mix,_top,_over]: node.queue_redraw()
 
 func set_shake_offset(offset: Vector2) -> void:
 	_shake_offset = offset
@@ -345,7 +354,7 @@ func tone() -> Dictionary:
 		var impact := _impact()
 		if t<impact: return {"on":true,"gray":1.0,"lit":0.0}
 		return {"on":true,"gray":1.0-_smooth(impact,maxf(impact+0.01,_flash_total()-0.7),t),"lit":0.0,"gap":7.0,"center":center}
-	if stage=="sight": return {"on":true,"gray":0.0,"lit":_smooth(0.2,float(times.sight),t)*0.7,"gap":7.0,"center":center}
+	if stage=="sight": return {"on":true,"gray":0.0,"lit":pow(_smooth(0.2,float(times.sight),t)*0.7,1.6),"gap":7.0,"center":center}
 	return {}
 
 func _mono() -> float:
@@ -633,7 +642,13 @@ func _hi_rush(time: float) -> void:
 		var age := time-ghosts[row]
 		if age<0.0 or age>0.24: continue
 		_ship_shape(_hi,Vector2(ghosts[row+1],ghosts[row+2]),ghosts[row+3],Color(Color("#bfe0ff"),0.8*(1.0-age/0.24)),_ship_scale)
-	if time>=float(times.rush) or _sharp_hit(time)>=0: return
+	var sharp := _sharp_hit(time)
+	if sharp>=0:
+		var hits := RUSH.hits
+		var dir := Vector2(hits[sharp+5],hits[sharp+6])
+		_ship_shape(_hi,Vector2(hits[sharp+3],hits[sharp+4])-dir*64.0,dir.angle(),Color(Color("#bfe0ff"),0.16),1.45*_ship_scale)
+		return
+	if time>=float(times.rush): return
 	for k in 12:
 		var a := _path_at(time-k*0.0035)
 		var b := _path_at(time-k*0.0035-0.003)
@@ -723,14 +738,23 @@ func _fx_cut() -> void:
 	var q := _random(61)
 	var cuts := RUSH.cuts
 	var ray := Color("#cde6ff").lerp(Color("#ffd67d"),gold)
+	var far_ray := Color("#78afff").lerp(Color("#ffa541"),gold)
 	for row in range(0,cuts.size(),2):
 		for i in 9:
 			var side := 1.0 if i%2==1 else -1.0
 			var angle := (0.0 if side>0.0 else PI)+side*(q.randf()-0.5)*1.5+sin(clock*0.35+i)*0.02
 			var length := 520.0+q.randf()*760.0
-			var width := 10.0+q.randf()*34.0
+			var spread := 0.012+q.randf()*0.04
 			var origin := Vector2(_jag(cuts[row]),cuts[row]+(q.randf()-0.5)*cuts[row+1])
-			_streak(origin+Vector2.from_angle(angle)*length*0.5,angle,length*0.5,width,ray,a*rise*(0.5+q.randf()*0.5)*0.42)
+			var strength := a*rise*(0.5+q.randf()*0.5)
+			var end_a := origin+Vector2.from_angle(angle-spread)*length
+			var end_b := origin+Vector2.from_angle(angle+spread)*length
+			var mid_a := origin.lerp(end_a,0.4)
+			var mid_b := origin.lerp(end_b,0.4)
+			var root := Color(ray,0.3*strength)
+			var middle := Color(far_ray,0.07*strength)
+			_fx.draw_primitive(PackedVector2Array([origin,mid_a,mid_b]),PackedColorArray([root,middle,middle]),PackedVector2Array())
+			_fx.draw_primitive(PackedVector2Array([mid_a,end_a,end_b,mid_b]),PackedColorArray([middle,Color(far_ray,0.0),Color(far_ray,0.0),middle]),PackedVector2Array())
 	var age := (t if stage=="flash" else _flash_total()+t)-impact
 	var p := _random(19)
 	var chip := Color("#e9f4ff").lerp(Color("#ffdf96"),gold)
@@ -805,18 +829,27 @@ func _fx_explode() -> void:
 	var north := _smooth(5.0,6.6,t)
 	if north>0.0: _star(Vector2.ZERO,(70.0+9.0*sin(clock*2.2))*north,Color("#cfe8ff"),north)
 
-func _draw_piece(part: String, at: Vector2, angle: float, size_: float, squash: float, alpha: float) -> void:
+func _draw_piece(canvas: Node2D, part: String, at: Vector2, angle: float, size_: float, squash: float, alpha: float) -> void:
 	var row := LIT_PARTS.find(part)
 	var turn := posmod(roundi(angle/(TAU/LIT_TURNS)),LIT_TURNS)
-	_top.draw_set_transform(at,angle,Vector2(size_,size_*(0.25+0.75*absf(squash))))
-	_top.draw_texture_rect_region(LIT,Rect2(-LIT_CELL*0.5,LIT_CELL),Rect2(Vector2(turn,row)*LIT_CELL,LIT_CELL),Color(1,1,1,alpha))
+	canvas.draw_set_transform(at,angle,Vector2(size_,size_*(0.25+0.75*absf(squash))))
+	canvas.draw_texture_rect_region(LIT,Rect2(-LIT_CELL*0.5,LIT_CELL),Rect2(Vector2(turn,row)*LIT_CELL,LIT_CELL),Color(1,1,1,alpha))
+
+func _draw_back() -> void:
+	match stage:
+		"flash":
+			if t>=_impact(): _draw_rubble(t-_impact(),1.0)
+		"sight":
+			_draw_rubble(_flash_total()+t-_impact(),1.0)
+		"explode":
+			if t<0.6: _draw_rubble(_flash_total()+float(times.sight)+t-_impact(),1.0-t/0.6)
 
 func _draw_rubble(age: float, alpha: float) -> void:
 	var f2 := (1.0-exp(-age*0.75))/0.75
 	for piece: Dictionary in _rubble:
 		var rot := float(piece.rot)+float(piece.spin)*f2
-		_draw_piece(piece.part,piece.at+piece.v*f2,rot,float(piece.size),cos(float(piece.tum)+float(piece.spin)*f2*2.0),alpha)
-	_top.draw_set_transform(Vector2.ZERO)
+		_draw_piece(_back,piece.part,piece.at+piece.v*f2,rot,float(piece.size),cos(float(piece.tum)+float(piece.spin)*f2*2.0),alpha)
+	_back.draw_set_transform(Vector2.ZERO)
 
 func _ship_modules(at: Vector2, scale_: float, count: int) -> void:
 	var offsets := [Vector2(0,42),Vector2(-26,8),Vector2(26,8),Vector2(0,-16)]
@@ -848,24 +881,25 @@ func _draw_top() -> void:
 			_top.draw_set_transform(Vector2.ZERO)
 			_ship_full(_ship_at(),_ship_scale,_docked_count())
 		"pose","input":
-			_ship_modules(_ship_at(),_ship_scale,4)
+			_ship_full(_ship_at(),_ship_scale,4)
 		"strikes":
 			var row := _sharp_hit(t)
 			if row>=0:
 				var hits := RUSH.hits
 				var dir := Vector2(hits[row+5],hits[row+6])
-				_ship_shape(_top,Vector2(hits[row+3],hits[row+4])-dir*64.0,dir.angle(),Color.WHITE,1.45*_ship_scale)
+				var at := Vector2(hits[row+3],hits[row+4])-dir*64.0
+				_ship_shape(_top,at,dir.angle(),Color.WHITE,1.45*_ship_scale)
+				var offsets := [Vector2(0,42),Vector2(-26,8),Vector2(26,8),Vector2(0,-16)]
+				for i in 4:
+					_top.draw_set_transform(at+offsets[i].rotated(dir.angle()+PI*0.5)*1.45*_ship_scale,dir.angle()+PI*0.5,Vector2.ONE*0.29*_ship_scale)
+					MODULE.draw(_top,MODULES[i],GOLD_LIGHT)
+				_top.draw_set_transform(Vector2.ZERO)
 		"charge":
 			var charge := _charge_time()
 			var shaking := _smooth(0.0,charge,t)*(1.0-_smooth(charge,charge+0.04,t))
 			var at := _charge_ship()+Vector2(sin(clock*61.0)*1.8*shaking,cos(clock*53.0)*1.6*shaking)
 			_ship_full(at,1.5*_ship_scale,4)
-		"flash":
-			if t>=_impact(): _draw_rubble(t-_impact(),1.0)
-		"sight":
-			_draw_rubble(_flash_total()+t-_impact(),1.0)
 		"explode":
-			if t<0.6: _draw_rubble(_flash_total()+float(times.sight)+t-_impact(),1.0-t/0.6)
 			_draw_debris()
 
 func _hi_explode() -> void:
@@ -917,7 +951,6 @@ func _draw_hi() -> void:
 func _draw_over() -> void:
 	var white := 0.0
 	if stage=="flash": white = 0.14*_flash_state().b
-	if stage=="explode": white = 0.8*exp(-t*7.0)
 	if white>0.003: _over.draw_rect(view_rect,Color(1,1,1,pow(white,2.2)))
 
 func _draw_debris() -> void:
@@ -928,5 +961,5 @@ func _draw_debris() -> void:
 		if state.past: continue
 		var rot := float(piece.rot)+float(piece.spin)*(1.0-exp(-k*0.5))/0.5
 		var alpha := 1.0-_smooth(0.72,1.0,k/float(piece.life))
-		_draw_piece(piece.part,state.at,rot,float(piece.size)*float(state.scale),cos(float(piece.tum)+float(piece.ts)*k*0.5),alpha)
+		_draw_piece(_top,piece.part,state.at,rot,float(piece.size)*float(state.scale),cos(float(piece.tum)+float(piece.ts)*k*0.5),alpha)
 	_top.draw_set_transform(Vector2.ZERO)

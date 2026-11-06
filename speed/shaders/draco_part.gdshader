@@ -59,7 +59,7 @@ void fragment() {
 	}
 	if (finale_tone) {
 		float tone = clamp(dot(result, vec3(0.3, 0.59, 0.11)) * 255.0 / 150.0, 0.0, 1.0);
-		vec3 gray = mix(vec3(0.275, 0.345, 0.455), vec3(0.62, 0.667, 0.753), tone);
+		vec3 gray = mix(vec3(0.19, 0.24, 0.32), vec3(0.43, 0.47, 0.53), tone);
 		vec3 shadow = mix(vec3(0.02, 0.04, 0.094), gray, finale_gray);
 		result = mix(shadow, result, finale_lit);
 	}

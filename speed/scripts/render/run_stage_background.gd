@@ -42,7 +42,19 @@ func setup(scope: ContentResourceScope, metadata: Resource, at: Vector2) -> void
 		add_child(fire)
 		static_fires.append(fire)
 
-func update_frame(camera: Dictionary) -> void:
+var _held_view := {}
+
+## カットシーンの間は開始時の見え方を画面へ固定し、カメラの移動や寄り引きで背景を動かさない。
+func update_frame(live: Dictionary, held := false, roll := 0.0, push := 1.0) -> void:
+	var camera := live
+	if held:
+		if _held_view.is_empty(): _held_view = live.duplicate()
+		camera = _held_view
+		var factor := float(camera.zoom)/(float(live.zoom)*push)
+		transform = Transform2D(roll,Vector2.ONE*factor,0.0,live.center)*Transform2D(0.0,-Vector2(camera.center))
+	elif not _held_view.is_empty():
+		_held_view = {}
+		transform = Transform2D.IDENTITY
 	area = Rect2(camera.center-camera.half,camera.half*2.0).grow(200.0)
 	for row: Dictionary in sprites:
 		row.node.position = origin+row.placement.position_at(camera.center-origin)

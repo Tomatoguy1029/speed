@@ -741,7 +741,9 @@ func _draw_cpp() -> void:
 		var height:=size.y*0.1*bars
 		draw_rect(Rect2(Vector2.ZERO,Vector2(size.x,height)),Color.BLACK)
 		draw_rect(Rect2(Vector2(0,size.y-height),Vector2(size.x,height)),Color.BLACK)
-	if bars>0.0:return
+	if bars>0.0:
+		_draw_finale_text()
+		return
 	if _cpp_ui.get("boss_finish",{}).get("active",false):
 		_draw_banner()
 		return
@@ -777,7 +779,6 @@ func _draw_cpp() -> void:
 		_draw_edge_arrow_values(hero.center,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	if _hero_notice_t>0.0 and hero.get("guidance",false):
 		draw_string(_font,Vector2(12,110),tr("hud.hero_discovered"),HORIZONTAL_ALIGNMENT_CENTER,size.x-24,18,Color(1.0,0.91,0.63,minf(1.0,_hero_notice_t/0.4)))
-	_draw_finale_text()
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		if body.mode>=4 or not body.has("hp"): continue
 		var width := minf(520.0,size.x*0.6)
