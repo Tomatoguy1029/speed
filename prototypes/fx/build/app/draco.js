@@ -115,13 +115,15 @@ function dPredict(S, seconds, cap = DP.aim_lead_cap) { const lead = mul(S.shipVe
 function dCurl(head, heading, curl) { const seg = DP.body_length / DCOUNT, points = [{ ...head }]; let at = head; for (let i = 0; i < DCOUNT; i++) { at = add(at, mul(fromA(heading + curl(i / (DCOUNT - 1))), seg)); points.push(at); } return points; }
 // 蛇の動き：頭が先に向きを変え、その動きが波のように胴を伝わって、尾が最後についてくる。胴の中ほどを軸にするので、頭も尾も一緒に動く
 function dBaseAngles(S) { const b = S.base; return (S.baseAngles ||= Array.from({ length: DCOUNT }, (_, i) => angOf(sub(b[i + 1], b[i])))); }
-function dWaveBody(S, turn, head) { const base = dBaseAngles(S), seg = DP.body_length / DCOUNT, pts = [{ ...head }]; let at = head; for (let i = 0; i < DCOUNT; i++) { at = add(at, mul(fromA(base[i] + turn(i / (DCOUNT - 1))), seg)); pts.push(at); } S.B.facing = S.axis + turn(0); return pts; } // turn：元の姿勢からどれだけ向きを変えるか。首の付け根から尾の先まで全身が同じように曲がる
+function dWaveBody(S, turn, head) { const base = dBaseAngles(S), seg = DP.body_length / DCOUNT, pts = [{ ...head }]; let at = head, bend = Array.from({ length: DCOUNT }, (_, i) => turn(i / (DCOUNT - 1))); for (let pass = 0; pass < 8; pass++) bend = bend.map((v, i) => i === 0 || i === DCOUNT - 1 ? v : (bend[i - 1] + 2 * v + bend[i + 1]) / 4); /* 折れ目を作らず、なめらかな弧にする */ for (let i = 0; i < DCOUNT; i++) { at = add(at, mul(fromA(base[i] + bend[i]), seg)); pts.push(at); } S.B.facing = S.axis + turn(0); return pts; } // turn：元の姿勢からどれだけ向きを変えるか。首の付け根から尾の先まで全身が同じように曲がる
 // ブレークダウン：ポーズAからBへ動く途中で、根元はもうBに近く、先端はまだAに残る。根元が先に動き終え、先端が遅れて追いつく
 const dBreakQ = (x, u) => clamp((clamp(x) - 0.55 * u) / 0.45);
 function dBreak(x, u) { const q = dBreakQ(x, u); return lerp(smooth(0, 1, q), 1 + 2.2 * (q - 1) ** 3 + 1.2 * (q - 1) ** 2, u * u); } // 先端は行き過ぎてから戻る
 function dBreakHit(x, u) { const q = dBreakQ(x, u); return lerp(smooth(0, 1, q), q * q, u); } // 先端は最後まで加速して止まる（叩きつけ）
 function dSweepTurn(S, t, u) { const r = S.r; if (t < r.warn) return -dBreak(t / r.warn, u); t -= r.warn; if (t < r.active) return -1 + 2 * dBreak(t / r.active, u); return 1 - dBreak((t - r.active) / r.recover, u); }
-function dSweepBody(S, clock) { const side = orth(fromA(S.axis)); return dWaveBody(S, u => dSweepTurn(S, clock, u) * (-0.35 + 2.5 * u), add(S.origin, mul(side, -dSweepTurn(S, clock, 0) * 90))); }
+// 尾の先のしなり：振り始めは勢いに引きずられて遅れ、体が止まっても勢いで振り抜かれて先まで伸びる
+function dSweepFlick(S, t) { const r = S.r; if (t < r.warn) return -0.7 * Math.sin(Math.PI * clamp(t / r.warn)); const s = (t - r.warn) / r.active; return -1.1 * Math.sin(Math.PI * clamp(s / 0.5)) + 2 * Math.sin(Math.PI * clamp((s - 0.42) / 0.95)) ; }
+function dSweepBody(S, clock) { const side = orth(fromA(S.axis)), flick = dSweepFlick(S, clock); return dWaveBody(S, u => dSweepTurn(S, clock, u) * (-0.35 + 2.5 * u) + flick * smooth(0.5, 1, u) ** 2, add(S.origin, mul(side, -dSweepTurn(S, clock, 0) * 90))); }
 // 尻尾の叩きつけ：ためで体を逆へひねり、頭の側から順に振り戻して、尾の先が最後に遅れて落ちる。届かない分は体ごと踏み込む
 // 尾を相手へ向けるために体ごと回り込む。胸も頭も大きく動くので、胴は折れずにゆるく弧を描いたまま叩きつける
 // 尻尾の叩きつけ：薙ぎ払いと同じように全身を弧に曲げ、尾を逆の向きから体の前側へ回して地面へ落とす。その場から動かず、落ちる場所は構えた時に決まる
