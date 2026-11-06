@@ -2,6 +2,7 @@ extends Node
 # 検証用：本物のゲーム（HUD 込み）で英雄を救出して発動し、決まった操作を流して画面を 30fps の生の RGB で書き出す。
 # 一時作業場所の project.godot に autoload として足して使う（本体には入れない）。
 # 使い方：Godot --path <一時作業場所/speed> --resolution 1280x720 -- --hero-capture <出力フォルダ> <gemini|hercules> [ステージ] [秒]
+# 出力フォルダに - を渡すと画面を保存せず、0.5秒ごとに fps・処理時間・描画命令数を表示する（重さの計測用）。
 # ふたご座：並走のあと、斜めに曲がる線を2回描いて突進する（影は反転した経路を走る）。ヘルクレス座：まわりに敵を置いてゆっくり進む。
 const CRUISE := 240.0
 
@@ -39,7 +40,7 @@ func _ready() -> void:
 	# ふたご座で持たせる武器（コンマ区切り）
 	if at + 5 < args.size(): weapons = Array(args[at + 5].split(","))
 	frames = int(seconds * 30.0)
-	DirAccess.make_dir_recursive_absolute(out_dir)
+	if out_dir != "-": DirAccess.make_dir_recursive_absolute(out_dir)
 	RunManager.session_created.connect(func(s): session = s)
 	wait = 2.0
 
@@ -165,10 +166,10 @@ func _process(delta: float) -> void:
 			_spawn_around(pos, heading)
 			# 武器の複製を見られるように、弾を撃つ武器を持たせる
 			if hero_id == "gemini":
-				for id in weapons: session.bridge.command("dev_grant_equipment", {"id": id, "kind": "weapon", "levels": 3})
+				for id in weapons: session.bridge.command("dev_grant_equipment", {"id": id, "kind": "trait" if String(id).begins_with("T") else "weapon", "levels": 3})
 			var activated: Dictionary = session.bridge.command("dev_hero_activate", {})
 			print("[hero] activate ", activated.ok, " power ", _ui().get("hero", {}).get("power", ""))
-			_ensure_capture()
+			if out_dir != "-": _ensure_capture()
 			t = 0.0
 			phase = 3
 		3:
@@ -180,7 +181,11 @@ func _process(delta: float) -> void:
 					drawn += 1
 			if hero_id == "hercules" and frame_index % 60 == 30:
 				_spawn_around(pos, heading)
-			_save.call_deferred()
+			if out_dir != "-": _save.call_deferred()
+			else:
+				frame_index += 1
+				if frame_index % 30 == 0:
+					print("[perf] t=%.1f fps=%d process_ms=%.2f draw_calls=%d objects=%d tracing=%s holes=%d run_up_hits=%d" % [t, Engine.get_frames_per_second(), Performance.get_monitor(Performance.TIME_PROCESS) * 1000.0, Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME), Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME), _ui().get("draw", {}).get("tracing", false), Array(_ui().get("vortex", {}).get("visuals", [])).filter(func(v): return int(v.kind) == 0).size(), Array(_ui().get("run_up", {}).get("hits", [])).size()])
 			if frame_index >= frames:
 				print("[hero] frames ", frame_index)
 				get_tree().quit()

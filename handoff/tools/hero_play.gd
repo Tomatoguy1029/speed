@@ -2,7 +2,7 @@ extends Node
 # 検証用：本物のゲームをステージから始め、英雄を救出した状態にしてプレイヤーへ渡す（そのあとは何もしない）。
 # 武器選択の画面では 1 を押し、救出の演出などで操作できない間は3秒待ってから1秒おきに画面をクリックして閉じる。
 # 一時作業場所の project.godot に autoload として足して使う（本体には入れない）。
-# 使い方：Godot --path <一時作業場所/speed> -- --hero-play <gemini|hercules|leo|perseus> [ステージ] [持たせる武器,…]
+# 使い方：Godot --path <一時作業場所/speed> -- --hero-play <gemini|hercules|leo|perseus> [ステージ] [持たせる武器・特性,…]
 var hero_id := ""
 var stage := 3
 var session: Node
@@ -82,6 +82,8 @@ func _process(delta: float) -> void:
 			wait = 1.0
 		3:
 			if not _clear_screens(delta): return
-			for id in weapons: session.bridge.command("dev_grant_equipment", {"id": id, "kind": "weapon", "levels": 3})
+			for id in weapons:
+				var granted: Dictionary = session.bridge.command("dev_grant_equipment", {"id": id, "kind": "trait" if String(id).begins_with("T") else "weapon", "levels": 3})
+				print("[hero_play] grant %s ok=%s %s" % [id, granted.get("ok"), granted.get("message", "")])
 			print("[hero_play] %s を救出した。Q で発動" % hero_id)
 			set_process(false)

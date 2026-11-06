@@ -51,7 +51,7 @@
 - GIF はコマごとに色を選び直す `make_gif.py` を使う（共通パレットだと画面演出に色を取られて獅子の色が崩れる）。
 
 ### ふたご座（光と影の兄弟）— 試作実装済み・未コミット（ユーザーと見た目を調整中）
-- 力は仕様書 8.1 が正本。`power`（影の体当たりの倍率、仮で2.0）は `speed/data/heroes/gemini.tres`。旧「線を2本」（`twin.first`・`capture_first`・`swap_paths`）は削除。`TwinFirst` の通知は `MeteorImpact` に置き換えた。
+- 力は仕様書 8.1 が正本。影は本体の分身で、性能を本体と1ミリも変えない（ユーザーの指示）。影の体当たりは `draw.cpp` の `collide_ship` を影の位置・経路・中にいる敵の一覧で呼ぶ（`GeminiBehavior::step` の collide）。旧「線を2本」（`twin.first`・`capture_first`・`swap_paths`）は削除。`TwinFirst` の通知は `MeteorImpact` に置き換えた。
 - C++：`cpp/behaviors/heroes/gemini.{h,cpp}`。
   - `launch`：反転した経路を作る。
   - `follow`：並走中の影の位置。
