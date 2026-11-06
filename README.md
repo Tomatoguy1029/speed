@@ -74,13 +74,27 @@ godot-bg --editor --path speed
 
 `.godot/`・`.content/`・拡張の共有ライブラリは生成物としてGit管理から除外します。編集元の保存と、実行用データの生成を分けて扱います。エディタの実行前・CLI・exportは同じ生成入口を使います。
 
-配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。Macでは `godot-bg` をPATHへ用意します。importと共通生成はheadlessで行い、シェーダー事前変換を使うexportは `godot-bg` で行います。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。
+### 配布用ビルド
+
+GitHubで手動実行する入口は [Actions「C++配布確認」](https://github.com/Tomatoguy1029/speed/actions/workflows/cpp-runtime.yml) です。配布フローの修正は `fix/macos-distribution` ブランチにあり、mainへの統合前です。
+
+1. **Run workflow** を開き、**Use workflow from** で `fix/macos-distribution` を選びます。
+2. `ref` に `fix/macos-distribution`（版を固定するときは完全コミットSHA）、`platform` に **all** を指定します。片方だけ作る場合は `windows` または `macos` を選びます。mainの入力フォームが表示される場合も、`ref` と `platform=all` を明示します。
+3. **Run workflow** を押します。成功後は実行結果の **Summary → Artifacts** から `speed-windows-<run_id>` と `speed-macos-<run_id>` を取得します。`-logs-` を含む成果物は確認ログです。WindowsはダウンロードしたZIPを一式展開し、Macは中の `Speed.zip` を使います。
+
+CLIでも同じブランチ・対象を指定できます。
+
+```bash
+gh workflow run cpp-runtime.yml --repo Tomatoguy1029/speed --ref fix/macos-distribution -f ref=fix/macos-distribution -f platform=all
+```
+
+配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。MacのexportはGodot本体を直接使えます。手元の `godot-bg` がPATHにあれば、フォーカスを保つ補助として使います。importと共通生成はheadlessで行い、シェーダー事前変換を使うexportは描画付きで行います。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。
 
 ```bash
 python3 tools/build/build_run.py --sdk ~/.cache/speed-build/sdk/godot-cpp-e103d348c4b2 --scons ~/.cache/speed-build/scons-4.11.1/bin/scons --platform macos --package-dir <ソース外の新しい作業先> --godot godot --templates /path/to/4.7.2.stable
 ```
 
-この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると `godot-bg` で描画付きの確認を行います。`--verify-final` は隔離した保存先で通常出撃から自然な終了・結果保存・戻るを確認します。Macの出撃準備・初期装備・交換・取消の計測は `--verify-loading --verify-final --rendered` を使います。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
+この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると`verification/` 内の保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると描画付きの確認を行います。`--verify-final` は隔離した保存先で通常出撃から自然な終了・結果保存・戻るを確認します。Macの出撃準備・初期装備・交換・取消の計測は `--verify-loading --verify-final --rendered` を使います。配布するのは `export/` の成果物です。`package.json` はソースのコミット・成果物のSHA-256・確認範囲を持ちます。CIは配布物と確認ログを別々に保存します。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
 検査は一時作業場所で、変更に関係する既存の入口だけ使います。C++の人数・出現の確認は `res://tests/runtime/run_population.tscn`、制作・生成・UI・配布は `speed/tests/` の各対象を参照します。検査を行う範囲は [AGENTS.md](AGENTS.md#検証) に従います。
 

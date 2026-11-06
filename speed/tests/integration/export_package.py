@@ -105,9 +105,10 @@ def package(path: Path, platform: str, runtime: bool, script: Path, rendered=Fal
     environment = os.environ.copy()
     executable = str(engine)
     if rendered:
-        executable = shutil.which("godot-bg")
-        assert executable, "描画付きの確認にはgodot-bgが必要"
-        environment["GODOT"] = str(engine)
+        launcher = shutil.which("godot-bg")
+        if launcher:
+            executable = launcher
+            environment["GODOT"] = str(engine)
     if runtime:
         command = [executable, *([] if rendered else ["--headless"]), "--log-file", str(path.parent / "runtime.log"), "--"]
         result = subprocess.run([*command, "--package-runtime"], env=environment, text=True, encoding="utf-8", errors="replace", stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=180, cwd=path)

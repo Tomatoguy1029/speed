@@ -14,8 +14,8 @@ on:
         description: '確認する配布対象'
         required: true
         type: choice
-        default: windows
-        options: [windows, macos, all]
+        default: all
+        options: [all, windows, macos]
 
 env:
   PYTHONUTF8: '1'
@@ -40,6 +40,8 @@ jobs:
           ref: ${{ inputs.ref || github.sha }}
       - name: 文書を確認
         run: python tools/check_docs.py
+      - name: 配布用と検証用の分離を確認
+        run: python speed/tests/integration/test_build_package.py
       - name: 固定SDK・SCons・Godot・export templateを準備
         env:
           SPEED_PLATFORM: ${{ matrix.platform }}
@@ -80,12 +82,20 @@ jobs:
           python tools/build/build_run.py --sdk "$RUNNER_TEMP/godot-cpp" \
             --platform '${{ matrix.platform }}' --godot "$SPEED_GODOT" --templates "$SPEED_TEMPLATES" \
             --build-dir "$RUNNER_TEMP/run-objects" --package-dir "$RUNNER_TEMP/speed-package" --verify --verify-final
-      - name: 配布物と確認ログを保存
-        if: always()
+      - name: 配布物を保存
         uses: actions/upload-artifact@v4
         with:
           name: 'speed-${{ matrix.platform }}-${{ github.run_id }}'
           path: |
-            ${{ runner.temp }}/speed-package/export/
+            ${{ matrix.platform == 'macos' && format('{0}/speed-package/export/Speed.zip', runner.temp) || format('{0}/speed-package/export/', runner.temp) }}
+            ${{ runner.temp }}/speed-package/package.json
+          if-no-files-found: error
+      - name: 確認ログを保存
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'speed-${{ matrix.platform }}-logs-${{ github.run_id }}'
+          path: |
             ${{ runner.temp }}/speed-package/*.log
+            ${{ runner.temp }}/speed-package/verification/*.log
           if-no-files-found: warn

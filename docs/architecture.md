@@ -762,7 +762,7 @@ Godot本体・API・SDK・export template・SCons・精度は `cpp/dependencies.
 
 Macのexportは `shader_baker/enabled` を有効にし、描画デバイスを使って変換したshaderキャッシュをPCKへ含める。中間形式からMetal用ライブラリまで変換する場合はAppleのMetal Toolchainを使う。利用できる変換の範囲と警告を配布の確認ログへ残し、端末依存の描画パイプラインは[起動ロード](#81-定義データresource)で準備する。Macの配布対象は翻訳Resourceを含み、編集元の翻訳CSVと参照のない星環の実験シーンを除外する。
 
-`--verify` は隔離した保存先を持つ確認用パッケージで、配布エンジンによる最小ランとライブラリ欠落時の拒否を確認する。Macの `--rendered` は `--verify` と併用し、`godot-bg` で描画付きの起動を行う。性能や全種類の意味的な照合は別の確認範囲とする。
+配布物は通常の `user://` 保存先と本番の起動Scriptで `export/` へ出力する。`--verify`・`--verify-final` は `verification/` 内の独立コピーに隔離した保存先と確認用の起動Scriptを設定し、確認用パッケージで配布エンジンによる最小ランとライブラリ欠落時の拒否を確認する。Macの `--rendered` は `--verify` または `--verify-final` と併用し、描画付きの起動を行う。Macのexportと描画付き確認はGodot本体を直接使い、PATHに `godot-bg` があれば補助として使う。性能や全種類の意味的な照合は別の確認範囲とする。
 
 `speed/export_presets.cfg` は通常ラン・導入に必要なC++拡張、`.content/run/`、Godotの表示・入力・UI・保存・音を含める。制作元の戦闘定義・生成器・生成用スキーマ・`gyms/`・`tests/`・開発用計測・編集用addon・`.content/dev/` を除外し、実行時の共通IDは含める。配布検査の入口は `speed/tests/integration/export_package.py`。Macのローカル実行用パッケージはGodot組み込みのad-hoc署名を使う。製品向け証明書・公証・ストア公開の設定は未決。
 
