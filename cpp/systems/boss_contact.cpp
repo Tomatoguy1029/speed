@@ -86,6 +86,9 @@ void BossContactSystem::normal_contact(RunRuntime &r,EnemyHandle actor,godot::Ve
     request.source=r.state.enemies[actor.slot].definition+1;request.scale=DamageScale::None;
     CombatResolver::ship_damage(r,request);EventBuilder::flush_combat(r);
     push(r,actor,impact,impact);
+    // 重なったままだと次のコマも同じ接触点へ戻されて動けなくなるので、体の外まで押し出す。
+    auto &s=r.state;const auto &e=s.enemies[actor.slot];auto normal=s.ship.pos-e.pos;if (normal.length_squared()<0.0001) normal=godot::Vector2(1,0);const double reach=e.radius+s.ship_config.ship_radius+1;
+    if (normal.length()<reach) {s.ship.pos=e.pos+normal.normalized()*reach;s.ship_pos=s.ship.pos;}
 }
 bool boss_contact_white(const RunRuntime &r) {
     const auto &s=r.state;
