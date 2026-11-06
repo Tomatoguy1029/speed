@@ -4,6 +4,7 @@
 #include "../runtime/run_runtime.h"
 #include "../output/frame_builder.h"
 #include "../state/boss_states.h"
+#include "../bosses/hydra/state.h"
 #include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
