@@ -3068,8 +3068,6 @@ inline bool read(BinaryReader &input, GeminiDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.hero)) return false;
-    if (!input.read_f64(out.power)) return false;
-    if (out.power < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, HerculesDefinition &out) {
@@ -3080,6 +3078,8 @@ inline bool read(BinaryReader &input, HerculesDefinition &out) {
     if (out.interval < 0) return false;
     if (!input.read_f64(out.fall_time)) return false;
     if (out.fall_time < 0) return false;
+    if (!input.read_f64(out.start_delay)) return false;
+    if (out.start_delay < 0) return false;
     if (!input.read_f64(out.power)) return false;
     if (out.power < 0) return false;
     if (!input.read_f64(out.radius)) return false;
@@ -5898,13 +5898,13 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 285: {
         if (version != 1) return false;
-        if (count > input.remaining()/16) return false;
+        if (count > input.remaining()/8) return false;
         for (uint32_t i=0; i<count; ++i) { GeminiDefinition row; if (!read(input,row)) return false; out.GeminiDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 286: {
         if (version != 1) return false;
-        if (count > input.remaining()/56) return false;
+        if (count > input.remaining()/64) return false;
         for (uint32_t i=0; i<count; ++i) { HerculesDefinition row; if (!read(input,row)) return false; out.HerculesDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }

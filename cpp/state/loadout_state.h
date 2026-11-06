@@ -121,6 +121,8 @@ struct VortexInstance {
     uint64_t id=0,kills=0;
     double age=0,radius=0,damage=0,duration=0;
     std::unordered_set<int64_t> hits;
+    // ふたご座の影があけた穴（影に付いて動く）
+    bool twin=false;
 };
 struct VortexVisual {
     godot::Vector2 pos;
@@ -128,6 +130,8 @@ struct VortexVisual {
     uint64_t id=0;
     uint32_t kind=0,definition=0;
     double age=0,life=0,radius=0,facing=0,amount=0;
+    // ふたご座の影の穴の見た目（影の位置に描く）
+    bool twin=false;
 };
 struct VortexState {
     bool ready=false;

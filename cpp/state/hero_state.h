@@ -4,6 +4,7 @@
 #include <array>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 namespace speed {
 // 星座、目印二枠、力をランと一緒に値で保持する。
 struct HeroState {
@@ -12,7 +13,7 @@ struct HeroState {
     struct Twin {
         std::vector<godot::Vector2> path;
         godot::Vector2 position;
-        std::unordered_set<int64_t> inside;
+        std::unordered_map<int64_t,size_t> inside;
         double rate=0,segment_position=0;
         size_t segment=0;
         bool tracing=false;
@@ -22,6 +23,8 @@ struct HeroState {
         bool sonic_active=false;
         std::unordered_set<int64_t> sonic_hits;
         uint64_t afterimage_echo=0;
+        // 助走（T32）は突進の最初の命中だけを強めるので、影の最初の命中も影ごとに数える
+        bool run_up_first=false;
     } twin;
     uint32_t hero=0,power=0;
     godot::Vector2 center,previous;

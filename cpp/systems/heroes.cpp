@@ -135,6 +135,7 @@ void HeroesSystem::activate(RunRuntime &run) {
     if (d.external_id=="leo" && (run.state.draw.drawing || run.state.draw.tracing)) return;
     h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);
     if (d.external_id=="perseus") PerseusBehavior::activate(run);
+    if (d.external_id=="hercules") HerculesBehavior::activate(run);
 }
 Dictionary HeroesSystem::snapshot(const RunRuntime &run) {
     const auto &h=run.state.heroes;Dictionary out;out["boss_stun"]=h.boss_stun;out["id"]=name(run,h.hero);out["power"]=name(run,h.power);out["field_radius"]=run.state.ship_config.field_radius;out["center"]=h.center;out["previous"]=h.previous;out["cooldown"]=h.cooldown;out["active"]=h.active;out["next"]=h.next;out["seen"]=h.seen;out["announced"]=h.announced;out["guarded"]=h.guarded;out["captive"]=captive(run);out["revealed"]=h.hero && (h.seen || h.landmarks.size()>=2 || !captive(run));out["guidance"]=run.state.lifecycle.endless || !run.state.world.boss_spawned;
@@ -153,7 +154,7 @@ bool HeroesSystem::validate(const godot::RunState &s,const ContentBundle &c) {
     if (!std::isfinite(h.hercules.fire_time) || !std::isfinite(h.hercules.burn_tick)) return false;
     for (const auto *items:{&h.hercules.falls,&h.hercules.burns}) for (const auto &v:*items) if (!v.position.is_finite() || !std::isfinite(v.remaining) || v.remaining<0) return false;
     const auto &t=h.twin;if (!t.position.is_finite() || !std::isfinite(t.rate) || t.rate<0 || !std::isfinite(t.segment_position) || t.segment_position<0 || (t.tracing && (t.path.size()<2 || t.segment>=t.path.size()-1))) return false;
-    for (auto p:t.path) if (!p.is_finite()) return false;for (auto id:t.inside) if (id<=0) return false;
+    for (auto p:t.path) if (!p.is_finite()) return false;for (const auto &[id,row]:t.inside) if (id<=0 || row>=s.enemies.size()) return false;
     for (auto p:h.stars) if (!p.is_finite()) return false;for (auto p:h.landmarks) if (!p.is_finite()) return false;for (auto v:h.lit) if (v>1) return false;
     for (size_t i=0;i<2;++i) if (!std::isfinite(h.landmark_times[i]) || h.carrier_ids[i]<0 || (s.enemy_handles.contains(h.carriers[i]) && s.enemy_handles.entity_id(h.carriers[i])!=h.carrier_ids[i])) return false;return true;
 }

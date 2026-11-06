@@ -4,7 +4,6 @@
 #include "../../state/loadout_state.h"
 #include "../../content/content_bundle.h"
 #include "../../systems/attack_system.h"
-#include "../../systems/equipment.h"
 #include "../weapons/endBlast.h"
 #include "../weapons/mines.h"
 #include "../weapons/bipolar.h"
@@ -13,6 +12,9 @@
 #include "../weapons/massTow.h"
 #include "../weapons/sonic.h"
 #include "../weapons/interceptor.h"
+#include "../weapons/flashSlash.h"
+#include "../traits/vortex.h"
+#include "../traits/runUp.h"
 #include <algorithm>
 namespace speed {
 namespace {
@@ -27,7 +29,7 @@ void GeminiBehavior::launch(RunRuntime &r,godot::Vector2 origin,godot::Vector2 a
     const auto u=axis.normalized();t.path.clear();
     for (int64_t i=0;i<path.size();++i) {const auto d=path[i]-origin;t.path.push_back(origin+u*d.dot(u)*2.0-d);}
     t.position=t.path.front();t.rate=r.state.draw.rate;t.segment=0;t.segment_position=0;t.inside.clear();t.tracing=true;
-    t.afterimage_echo=0;t.sonic_active=true;t.sonic_hits.clear();t.sonic_last=t.position;t.sonic_distance=t.sonic_emission=0;
+    t.afterimage_echo=0;t.run_up_first=true;t.sonic_active=true;t.sonic_hits.clear();t.sonic_last=t.position;t.sonic_distance=t.sonic_emission=0;
 }
 bool GeminiBehavior::active(const RunRuntime &r) {return definition(r)!=nullptr;}
 namespace {
@@ -67,7 +69,7 @@ void GeminiBehavior::duplicate(RunRuntime &r,int64_t first_id) {
 bool GeminiBehavior::motion(const RunRuntime &r,godot::Vector2 &pos,godot::Vector2 &heading,godot::Vector2 &velocity) {
     const auto &s=r.state;const auto &t=s.heroes.twin;if (!definition(r) && !t.tracing) return false;
     pos=t.position;heading=s.ship.heading;velocity=s.ship.vel;
-    if (t.tracing && t.path.size()>=2) {const size_t seg=std::min(t.segment,t.path.size()-2);heading=(t.path[seg+1]-t.path[seg]).normalized();velocity=heading*t.rate;}
+    if (t.tracing && t.path.size()>=2) {const size_t seg=std::min(t.segment,t.path.size()-2);heading=(t.path[seg+1]-t.path[seg]).normalized();velocity=heading*s.draw.speed;}
     return true;
 }
 namespace {
@@ -125,28 +127,27 @@ void GeminiBehavior::weapons(RunRuntime &r,double dt) {
 }
 void GeminiBehavior::end(RunRuntime &r) {auto &t=r.state.heroes.twin;t.tracing=false;t.path.clear();t.inside.clear();t.segment=0;t.segment_position=t.rate=0;}
 namespace {
-void sweep(RunRuntime &r,godot::Vector2 from,godot::Vector2 to) {
-    auto &s=r.state;auto &t=s.heroes.twin;
+// 影が from から t.position まで進む間の体当たりは、機体の体当たりと同じ処理（collide）を影の位置・向き・経路で行う。
+// 同じ敵に続けて当たらないための「中にいる敵」の一覧と、助走（T32）の最初の命中は、影ごとに持つ。弾かれたら true
+bool sweep(RunRuntime &r,godot::Vector2 from,const GeminiBehavior::Collide &collide) {
+    auto &s=r.state;auto &t=s.heroes.twin;const auto to=t.position;
     // 影の経路にも、機体の突進に付いていく武器（ミラージュの残像、エスコートウィング）を走らせる
     if (owns(r,"W27")) with_twin_echo(r,[&]{if (!s.loadout->afterimage.current) AfterimageBehavior::launch(r);AfterimageBehavior::trail(r,from,to);});
-    if (s.phase!=godot::RunState::Phase::Play) return;
+    if (s.phase!=godot::RunState::Phase::Play) return false;
     if (owns(r,"W26") && elapsed(r)>=SPLIT_TIME) with_twin_escort(r,[&]{DashRangeDroneBehavior::trail(r,from,to);});
-    if (s.phase!=godot::RunState::Phase::Play) return;const double radius=s.trace_radius,padding=radius+std::max(s.combat_config.max_enemy_radius,s.grid.max_radius),power=CombatResolver::attack_power(r)*(definition(r)?definition(r)->power:1.0);const godot::Vector2 pad(padding,padding),direction=(to-from).normalized();
-    for (auto row:CollisionQuery::enemy_rows(s,from.min(to)-pad,from.max(to)+pad)) {
-        const auto &e=s.enemies[row];if (e.dead || s.field.rock_handles.contains(e.rock)) continue;const auto target=CombatResolver::damage_target(r,s.enemy_handles.at(row));if (!s.enemy_handles.contains(target)) continue;
-        const auto id=s.enemy_handles.entity_id(target);if (t.inside.count(id) || CollisionQuery::segment_circle_t(from,to,e.pos,e.radius+radius)<0) continue;t.inside.insert(id);
-        DamageRequest request;request.struck=s.enemy_handles.at(row);request.amount=power;request.cause=Cause::Ram;request.direction=direction;request.impact=to;request.has_impact=true;
-        if (e.stone>0) CombatResolver::kill_enemy(r,request);
-        // 影は装甲に弾かれずに貫く
-        else if (CombatResolver::gate(r,request.struck,request)==GateResult::Allow) {request.impact=e.pos;CombatResolver::damage_enemy(r,request);
-            // 影の体当たりにも、機体の体当たりと同じく接触で働く武器（接触波・閃光斬・電撃）が反応する
-            if (s.phase==godot::RunState::Phase::Play && s.enemy_handles.contains(request.struck)) EquipmentSystem::contact(r,request.struck,request.impact);}
-        if (s.phase!=godot::RunState::Phase::Play) return;
+    if (s.phase!=godot::RunState::Phase::Play) return false;
+    bool blocked=false;
+    {
+        AsTwin scope(r);auto &run_up=s.loadout->run_up;const bool first=run_up.first;run_up.first=t.run_up_first;std::swap(s.draw.inside,t.inside);
+        blocked=collide(from);
+        // 弾かれた位置も影のものとして受け取る
+        t.position=s.ship.pos;std::swap(s.draw.inside,t.inside);t.run_up_first=run_up.first;run_up.first=first;
     }
+    return blocked;
 }
 }
 namespace {
-// 影が走り終えたところで、機体の突進の終わりと同じ武器（終点の爆発・機雷・双極ビーム）を影の位置から使う。
+// 影が走り終えたところで、機体の突進の終わりと同じ武器（終点の爆発・機雷・閃光斬・双極ビーム）を影の位置から使う。
 // それぞれの武器は機体の位置・向き・経路を読むので、その間だけ影のものへ差し替えて戻す
 void finish(RunRuntime &r) {
     auto &s=r.state;auto &t=s.heroes.twin;if (t.path.size()<2) return;
@@ -158,7 +159,14 @@ void finish(RunRuntime &r) {
         const auto &id=r.content->equipment[owned.definition-1].external_id;
         if (id=="W29") EndBlastBehavior::end(r);
         else if (id=="W07") MinesBehavior::end(r);
+        // 閃光斬：影の経路にそって切り筋を走らせ、影が印を付けた敵を切る
+        else if (id=="W28") FlashSlashBehavior::end(r);
         else if (id=="W22") {auto &w=s.loadout->bipolar;const auto origin=w.origin;const bool active=w.active;w.origin=t.path.front();w.active=true;BipolarBehavior::end(r);w.origin=origin;w.active=active;}
+    }
+    // 特性の渦（T03）も、影が走り終えた所に穴をあける
+    for (const auto &owned:s.loadout->traits) if (s.phase==godot::RunState::Phase::Play && r.content->equipment[owned.definition-1].external_id=="T03") {
+        auto &v=s.loadout->vortex;const size_t items=v.items.size(),visuals=v.visuals.size();VortexBehavior::end(r);
+        for (size_t i=items;i<v.items.size();++i) v.items[i].twin=true;for (size_t i=visuals;i<v.visuals.size();++i) v.visuals[i].twin=true;
     }
     s.ship.pos=ship_pos;s.ship.heading=heading;s.draw.path=path;s.draw.segment=segment;
     if (owns(r,"W27")) with_twin_echo(r,[&]{AfterimageBehavior::end(r);});
@@ -166,11 +174,13 @@ void finish(RunRuntime &r) {
     for (auto &c:s.loadout->mass_tow.cargo) if (c.twin) c.ready=true;
 }
 }
-void GeminiBehavior::step(RunRuntime &r,double dt) {
+void GeminiBehavior::step(RunRuntime &r,double dt,const Collide &collide) {
     auto &s=r.state;auto &t=s.heroes.twin;if (!t.tracing || s.phase!=godot::RunState::Phase::Play) return;double distance=t.rate*dt;
     while (distance>1e-9 && t.segment<t.path.size()-1) {
         const auto a=t.path[t.segment],b=t.path[t.segment+1];const double length=a.distance_to(b),move=std::min(distance,length-t.segment_position);const auto from=t.position;
-        t.segment_position+=move;distance-=move;t.position=a+(b-a)/std::max(length,1e-6)*t.segment_position;sweep(r,from,t.position);
+        t.segment_position+=move;distance-=move;t.position=a+(b-a)/std::max(length,1e-6)*t.segment_position;
+        // 機体と同じく、弾かれたらそこで突進を終える
+        if (sweep(r,from,collide)) {if (s.phase!=godot::RunState::Phase::Play) return;finish(r);if (s.phase!=godot::RunState::Phase::Play) return;end(r);return;}
         if (s.phase!=godot::RunState::Phase::Play) return;
         if (t.segment_position>=length-1e-9) {++t.segment;t.segment_position=0;}
     }

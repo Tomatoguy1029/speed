@@ -1721,13 +1721,13 @@ struct LeoDefinition {
 struct GeminiDefinition {
     uint32_t id{};
     uint32_t hero{};
-    double power{};
 };
 struct HerculesDefinition {
     uint32_t id{};
     uint32_t hero{};
     double interval{};
     double fall_time{};
+    double start_delay{};
     double power{};
     double radius{};
     double burn_time{};

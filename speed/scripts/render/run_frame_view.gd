@@ -1517,6 +1517,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
 		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
 		if event.type==&"meteor_impact": ruler_shake = maxf(ruler_shake,5.0)
+		if event.type==&"hero_power" and StringName(event.get("id",&""))==&"hercules": ruler_shake = maxf(ruler_shake,8.0)
 		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
 		_boss_sword_visual.frame_event(event)
 		if event.type==&"draco_roar":
@@ -1753,7 +1754,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_vortex_world_time = ui.world_time if equipped_vortex else -1.0
 	if _vortex_visual!=null:
 		_vortex_visual.sync_frame(ui.vortex.visuals,vortex_dt)
-		_vortex_visual.frame_tick(vortex_dt,ui.ship.ship_pos)
+		_vortex_visual.frame_tick(vortex_dt,ui.ship.ship_pos,Vector2(ui.get("hero",{}).get("twin",{}).get("position",Vector2.INF)))
 	var mines_dt: float = 0.0 if _mines_world_time<0.0 else maxf(0.0,ui.world_time-_mines_world_time)
 	_mines_world_time = ui.world_time if equipped_mines else -1.0
 	if _mines_visual!=null:
@@ -1762,7 +1763,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var run_up_dt: float = 0.0 if _run_up_world_time<0.0 else maxf(0.0,ui.world_time-_run_up_world_time)
 	_run_up_world_time = ui.world_time if equipped_run_up else -1.0
 	if _run_up_visual!=null:
-		_run_up_visual.frame_tick(run_up_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance,ui.run_up.distance,ui.run_up.first,ui.draw.tracing,ui.world_time,_ship_visible)
+		_run_up_visual.frame_tick(run_up_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance,ui.run_up.distance,ui.run_up.first,ui.draw.tracing,ui.world_time,_ship_visible,ui.run_up)
 		_run_up_visual.sync_frame(ui.run_up.hits)
 	var end_blast_dt: float = 0.0 if _end_blast_world_time<0.0 else maxf(0.0,ui.world_time-_end_blast_world_time)
 	_end_blast_world_time = ui.world_time if equipped_end_blast else -1.0

@@ -27,6 +27,10 @@ void burn(RunRuntime &r,Vector2 center,double radius,double damage) {
     }
 }
 }
+// 発動の画面の熾火が燃え広がりきるまで（start_delay 実秒）待ってから、最初の隕石を出す
+void HerculesBehavior::activate(RunRuntime &r) {
+    auto &h=r.state.heroes;for (const auto &p:r.content->hercules) if (h.power==p.hero) h.hercules.fire_time=p.start_delay;
+}
 void HerculesBehavior::step(RunRuntime &r,double dt) {
     auto &s=r.state;auto &h=s.heroes;auto &fire=h.hercules;
     for (const auto &p:r.content->hercules) {

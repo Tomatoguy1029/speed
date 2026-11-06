@@ -1418,9 +1418,9 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
 		if definition_hero.id==&"hercules":
 			var fire := {"id":data.HerculesDefinition.size()+1,"hero":hero_id}
-			for key in ["interval","fall_time","power","radius","burn_time","burn_power"]: fire[key] = float(definition_hero.params[key])
+			for key in ["interval","fall_time","start_delay","power","radius","burn_time","burn_power"]: fire[key] = float(definition_hero.params[key])
 			data.HerculesDefinition.append(fire)
-		if definition_hero.id==&"gemini": data.GeminiDefinition.append({"id":data.GeminiDefinition.size()+1,"hero":hero_id,"power":float(definition_hero.params.power)})
+		if definition_hero.id==&"gemini": data.GeminiDefinition.append({"id":data.GeminiDefinition.size()+1,"hero":hero_id})
 		if definition_hero.id==&"leo":
 			var leo_record := {"id":data.LeoDefinition.size()+1,"hero":hero_id}
 			for key in ["speed","turn_mult","power","hit_interval","front","back","radius"]: leo_record[key] = float(definition_hero.params[key])

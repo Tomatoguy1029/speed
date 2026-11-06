@@ -218,11 +218,6 @@
           "name": "hero",
           "type": "u32",
           "ref": "HeroDefinition"
-        },
-        {
-          "name": "power",
-          "type": "f64",
-          "min": 0
         }
       ]
     },
@@ -247,6 +242,11 @@
         },
         {
           "name": "fall_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "start_delay",
           "type": "f64",
           "min": 0
         },

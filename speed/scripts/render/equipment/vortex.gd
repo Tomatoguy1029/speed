@@ -51,15 +51,18 @@ func sync_frame(values: Array, dt: float) -> void:
 				if value.age<CHARGE+HOLD+COLLAPSE:
 					on_event({"type":&"end_hole"})
 					holes[-1].age = age
-				else: pops.append({"age":age-CHARGE-HOLD-COLLAPSE})
+					holes[-1].twin = value.get("twin", false)
+				else: pops.append({"age":age-CHARGE-HOLD-COLLAPSE,"twin":value.get("twin", false)})
 			1:
 				var event: Dictionary = value.duplicate()
 				event.type = &"hole_capture"
 				on_event(event)
 				captures[-1].age = age
+				captures[-1].twin = value.get("twin", false)
 			2:
 				on_event({"type":&"hole_recover","amount":value.amount})
 				heals[-1].age = age-CRUSH
+				heals[-1].twin = value.get("twin", false)
 	_frame_seen = alive
 
 const LENS := preload("res://shaders/hole_lens.gdshader")
@@ -104,7 +107,9 @@ func on_event(ev: Dictionary) -> void:
 			for i in 14: dots.append({"a": randf() * TAU, "v": 14.0 + randf() * 26.0, "up": 10.0 + randf() * 22.0, "s": 1.2 + randf() * 1.6, "dl": randf() * 0.12})
 			heals.append({"age": -CRUSH, "dots": dots, "outer": _glow_rect(), "inner": _glow_rect()})
 
-func frame_tick(dt: float, center: Vector2) -> void:
+## center は機体の位置。ふたご座の影があけた穴（twin）は twin_center に描く
+func frame_tick(dt: float, center: Vector2, twin_center := Vector2.INF) -> void:
+	var at := func(entry: Dictionary) -> Vector2: return twin_center if entry.get("twin", false) and twin_center.is_finite() else center
 	var p: PixelPainter = _painter
 	if _add == null:
 		_add = PixelPainter.new()
@@ -117,24 +122,24 @@ func frame_tick(dt: float, center: Vector2) -> void:
 	_add.begin()
 	for h in holes:
 		h.age += dt
-		_hole(p, h, center)
+		_hole(p, h, at.call(h))
 	for h in holes:
 		if h.age >= CHARGE + HOLD + COLLAPSE:
 			_free_lens(h)
-			pops.append({"age": 0.0})
+			pops.append({"age": 0.0, "twin": h.get("twin", false)})
 	holes = holes.filter(func(h): return h.age < CHARGE + HOLD + COLLAPSE)
 	_lens_copy.visible = not holes.is_empty()
 	for c in captures:
 		c.age += dt
-		_capture(p, c, center)
+		_capture(p, c, at.call(c))
 	captures = captures.filter(func(c): return c.age < 0.6)
 	for g in pops:
 		g.age += dt
-		_pop(p, g.age, center)
+		_pop(p, g.age, at.call(g))
 	pops = pops.filter(func(g): return g.age < CRUSH + POP)
 	for g in heals:
 		g.age += dt
-		if g.age >= 0.0: _heal(p, g, center)
+		if g.age >= 0.0: _heal(p, g, at.call(g))
 	for g in heals:
 		if g.age >= 0.7:
 			g.outer.queue_free()

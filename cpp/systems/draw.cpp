@@ -210,15 +210,31 @@ void SpeedRunCore::end_trace(bool completed) {
     Dictionary event; event["completed"] = completed; emit_event("trace_end", event);
 }
 
+namespace {
+// なぞり中に「中にいる敵」から、from から離れた敵と倒れた敵を外す（外れた敵には、また体当たりで当たる）
+void leave_inside(speed::RunRuntime &runtime,Vector2 from) {
+        for (auto it = runtime.state.draw.inside.begin(); it != runtime.state.draw.inside.end();) {
+            const auto &enemy = runtime.state.enemies[it->second];
+            const double radius = enemy.radius + runtime.state.trace_radius + 2.0;
+            bool inside=enemy.pos.distance_squared_to(from)<=radius*radius;
+            if (enemy.alive && !enemy.dead && enemy.id==it->first) {const auto *boss=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(uint32_t(it->second)));if (boss && runtime.content->bosses[runtime.content->boss_bodies[boss->definition-1].boss-1].kind==4) inside=speed::DracoPose::contains(runtime,*boss,from,runtime.state.trace_radius+2.0);}
+            if (!enemy.alive || enemy.dead || enemy.id != it->first || !inside) it = runtime.state.draw.inside.erase(it);
+            else ++it;
+        }
+}
+}
+
 bool SpeedRunCore::step_draw(double real_dt) {
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !runtime.state.draw_ready || !std::isfinite(real_dt) || real_dt < 0) return false;
+    // ふたご座の影の体当たりは、機体の体当たりと同じ処理で解決する（影の位置・経路・中にいる敵の一覧は GeminiBehavior が差し替える）
+    const speed::GeminiBehavior::Collide twin_collide=[&](Vector2 from) {leave_inside(runtime,from);return runtime.state.combat_ready && collide_ship(from,runtime.state.trace_radius);};
     if (!runtime.state.draw.tracing) {
         if (!runtime.state.draw.drawing) {
             const double before = runtime.state.draw.gauge;
             runtime.state.draw.gauge = std::min(1.0, runtime.state.draw.gauge + real_dt / (runtime.state.draw_config.charge_time * runtime.state.draw_config.capacity));
             if (before < 1 && runtime.state.draw.gauge >= 1) emit_event("gauge_full");
         }
-        speed::GeminiBehavior::step(runtime,real_dt);
+        speed::GeminiBehavior::step(runtime,real_dt,twin_collide);
         return true;
     }
     const auto trail=[&](Vector2 from) {
@@ -237,20 +253,13 @@ bool SpeedRunCore::step_draw(double real_dt) {
         const Vector2 u = (b - a) / length;
         const double move = std::min(dist, length - runtime.state.draw.seg_pos);
         const Vector2 from = runtime.state.ship.pos;
-        for (auto it = runtime.state.draw.inside.begin(); it != runtime.state.draw.inside.end();) {
-            const auto &enemy = runtime.state.enemies[it->second];
-            const double radius = enemy.radius + runtime.state.trace_radius + 2.0;
-            bool inside=enemy.pos.distance_squared_to(from)<=radius*radius;
-            if (enemy.alive && !enemy.dead && enemy.id==it->first) {const auto *boss=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(uint32_t(it->second)));if (boss && runtime.content->bosses[runtime.content->boss_bodies[boss->definition-1].boss-1].kind==4) inside=speed::DracoPose::contains(runtime,*boss,from,runtime.state.trace_radius+2.0);}
-            if (!enemy.alive || enemy.dead || enemy.id != it->first || !inside) it = runtime.state.draw.inside.erase(it);
-            else ++it;
-        }
+        leave_inside(runtime,from);
         runtime.state.draw.seg_pos += move;
         dist -= move;
         runtime.state.ship.pos = a + u * runtime.state.draw.seg_pos;
         runtime.state.ship.vel = u * runtime.state.draw.speed;
         runtime.state.ship.heading = u;
-        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {trail(from);end_trace(false);speed::GeminiBehavior::step(runtime,real_dt);return true;}
+        if (runtime.state.combat_ready && collide_ship(from, runtime.state.trace_radius)) {trail(from);end_trace(false);speed::GeminiBehavior::step(runtime,real_dt,twin_collide);return true;}
         trail(from);
         if (runtime.state.phase!=RunState::Phase::Play) return true;
         const double speed = runtime.state.ship.vel.length();
@@ -259,7 +268,7 @@ bool SpeedRunCore::step_draw(double real_dt) {
     }
     runtime.state.draw.progress = std::clamp(double(runtime.state.draw.segment) / std::max(1.0, double(runtime.state.draw.path.size() - 1)), 0.0, 1.0);
     if (runtime.state.draw.segment >= runtime.state.draw.path.size() - 1) end_trace(true);
-    speed::GeminiBehavior::step(runtime,real_dt);
+    speed::GeminiBehavior::step(runtime,real_dt,twin_collide);
     runtime.state.ship_pos = runtime.state.ship.pos;
     return true;
 }
