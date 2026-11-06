@@ -1224,8 +1224,9 @@ static func end_package_memo() -> void:
 	_package_memo = null
 static func _memoized(kind: String, inputs: Array, make: Callable) -> Dictionary:
 	if _package_memo == null: return make.call()
+	# 編集中の行動データは Resource を含むので、文字列にせず実体のハッシュで見分ける。覚えるのは1回の作り直しの間だけ。
 	var key := kind
-	for value in inputs: key += "/"+(str(value.get_instance_id()) if value is Object else str(hash(var_to_str(value))))
+	for value in inputs: key += "/"+(str(value.get_instance_id()) if value is Object else str(value.hash()) if value is Dictionary else "-")
 	if not _package_memo.has(key): _package_memo[key] = make.call()
 	return _package_memo[key].duplicate(true)
 

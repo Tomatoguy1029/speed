@@ -153,6 +153,12 @@ func execute(id: String, phase: int, animate_split := false) -> bool:
 
 func finish() -> void:
 	if not active: return
+	if session.bridge==null:
+		active = false
+		_pending_start = false
+		_saved.clear()
+		requested = ""
+		return
 	if has_body():
 		var point: Vector2 = session.run.state.ship_pos
 		if prepare(_saved.phase,point,false,_saved.guard,_saved.steering_locked):

@@ -117,7 +117,9 @@ func reset(settings := {}) -> void:
 
 ## 作り直しのたびに全種類の生成を試すと遅いので、入力が同じあいだの結果をファイルにも覚えておく。
 func _supported(kind: String, id: String, edits: Variant, check: Callable) -> bool:
-	var key := "%s/%s/%d/%d/%d" % [kind,id,hash(var_to_str(edits)),hash(var_to_str(spec.get("config",{}))),int(spec.get("stage",1))]
+	# ボスの行動データは Resource を含むので、値の編集がないときだけ覚える。
+	if edits is Array and not edits[1].is_empty(): return check.call()
+	var key := "%s/%s/%d/%d/%d" % [kind,id,hash(var_to_str(edits[0] if edits is Array else edits)),hash(var_to_str(spec.get("config",{}))),int(spec.get("stage",1))]
 	if not _support_memo.has(key):
 		_support_memo[key] = check.call()
 		_support_dirty = true
