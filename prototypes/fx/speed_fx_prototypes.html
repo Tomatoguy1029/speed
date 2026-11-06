@@ -9004,10 +9004,10 @@ function dFireSprite(pos, angle, radius, time, alpha, over) {
   if (over) { const x = dFireFade.getContext('2d'); x.globalCompositeOperation = 'source-over'; x.clearRect(0, 0, 136, 56); x.imageSmoothingEnabled = false; x.drawImage(dFireSheet(), frame.x, frame.y, frame.w, frame.h, 0, 0, frame.w, frame.h); const mask = x.createLinearGradient(meta.pivot[0] - 11, 0, meta.pivot[0] + 1, 0); mask.addColorStop(0, 'rgba(0,0,0,1)'); mask.addColorStop(1, 'rgba(0,0,0,0)'); x.globalCompositeOperation = 'destination-in'; x.fillStyle = mask; x.fillRect(0, 0, 136, 56); g.drawImage(dFireFade, -meta.pivot[0], -meta.pivot[1]); }
   else g.drawImage(dFireSheet(), frame.x, frame.y, frame.w, frame.h, -meta.pivot[0], -meta.pivot[1], frame.w, frame.h); g.restore();
 }
-// 隕石の縁を回る炎：同じ連番を小さく、前の縁から輪郭に沿って後ろへ流す。隕石の下に敷くので隕石は隠さない
+// 隕石の縁から出る炎：同じ連番を小さく、縁の各所からすべて真後ろへ流す。隕石の下に敷くので隕石は隠さない
 function dFireRim(pos, angle, radius, time, alpha) {
-  const sheet = DATA.canis_fireball_sheet, meta = sheet.meta.pixelfx, frames = sheet.frames, sx = radius / 62, sy = radius / 20; if (alpha <= 0.01) return; g.imageSmoothingEnabled = false;
-  for (const side of [-1, 1]) for (const [ang, k] of [[0.12, 0], [0.62, 1], [1.12, 2], [1.62, 3]]) { const at = angle + side * ang, root = add(pos, mul(fromA(at), radius * 0.86)), frame = frames[Math.floor((time + k * 0.21 + (side + 1) * 0.3) * meta.fps) % frames.length].frame; g.save(); g.translate(root.x, root.y); g.rotate(at + side * (Math.PI / 2 + 0.3) - Math.PI); g.scale(sx, sy); g.globalAlpha = alpha; g.drawImage(dFireSheet(), frame.x, frame.y, frame.w, frame.h, -meta.pivot[0], -meta.pivot[1], frame.w, frame.h); g.restore(); }
+  const sheet = DATA.canis_fireball_sheet, meta = sheet.meta.pixelfx, frames = sheet.frames, sx = radius / 36, sy = radius / 22; if (alpha <= 0.01) return; g.imageSmoothingEnabled = false;
+  for (const side of [-1, 1]) for (const [ang, k] of [[0.35, 0], [0.8, 1], [1.25, 2], [1.7, 3]]) { const at = angle + side * ang, root = add(pos, mul(fromA(at), radius * 0.8)), frame = frames[Math.floor((time + k * 0.21 + (side + 1) * 0.3) * meta.fps) % frames.length].frame; g.save(); g.translate(root.x, root.y); g.rotate(angle - side * ang * 0.12); g.scale(sx, sy); g.globalAlpha = alpha; g.drawImage(dFireSheet(), frame.x, frame.y, frame.w, frame.h, -meta.pivot[0], -meta.pivot[1], frame.w, frame.h); g.restore(); }
 }
 function dMeteorTrail(S, R, q, age, i, speed = DM.speed, gone = 0) { const a = Math.atan2(q.dir.y, q.dir.x), on = smooth(0, 0.12, age) * (1 - gone), time = Math.abs(S.t + i * 0.37); dFireSprite(q.pos, a, q.radius, time, on, false); dFireRim(q.pos, a, q.radius, time, on); }
 function dRockDraw(S, R, rock, i) {
