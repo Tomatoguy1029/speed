@@ -136,30 +136,20 @@ function dSafeFx(S, R, pose) {
 }
 // 炎に耐える隕石：当たっている間にひびが広がって熱を持ち、欠片がこぼれて震える。ブレスが終わると耐えきれず砕ける（破片は演出で、当たりはない）
 function dRockHeat(S, q) { return clamp((q.burn || 0) / (S.r.active * 0.28)); }
-// 燃える隕石の後ろ半分：炎を隕石の上に重ねる。中ほどから後ろへ濃くなり、後ろの輪郭は炎に溶けて見えなくなる
-function dRockWrap(S, R, pos, u, radius, on, seed) {
-  const p = R.front, H = D_FLAME, c = toL(pos), rr = radius * WL * R.P.size, box = rr * 1.45, t = S.t, ramp = v => { const q = lerp(6, 3, clamp(v)), i = Math.min(6, Math.floor(q)); return PX.mix(H[i], H[i + 1], q - i); };
-  p.each(c.x - box, c.y - box, c.x + box, c.y + box, (x, y, sx, sy) => { const dx = x - c.x, dy = y - c.y, d = Math.hypot(dx, dy); if (d > box) return; const back = -(dx * u.x + dy * u.y) / rr, lat = (dy * u.x - dx * u.y) / rr, n = 0.5 + 0.5 * PX.tileFbm(lat * 2.6 + seed, back * 1.8 + t * 6, 0, 0, 23, 3), side = 1 - smooth(0.72, 1.12, Math.abs(lat) * (1.25 - 0.25 * smooth(0, 1, back))); let k = smooth(-0.25, 0.75, back + (n - 0.5) * 0.7) * side; k *= 1 - smooth(1.05, 1.45, d / rr) * (back > 0.9 ? 0.4 : 1); if (k < 0.03) return; p.blendPx(sx, sy, ramp(k * (0.75 + 0.5 * n)), Math.min(0.97, k * 1.25) * on); });
-}
-function dMeteorDraw(S, R, q, i) {
-  if (q.born == null) return; const age = S.t - q.born, on = smooth(0, 0.12, age); drawImg('meteor_0', q.pos, q.seed * 1.7 + age * 1.9, q.radius * (0.6 + 0.4 * on)); if (!R.proto) return;
-  const H = D_FLAME, c = toL(q.pos), rr = q.radius * WL * R.P.size, u = q.dir, flick = 0.8 + 0.2 * Math.sin(S.t * 17 + i);
-  for (const k of aqCracks(61 + i * 7, rr * 0.92)) for (const [x, y] of k.pts) R.front.blend(c.x + x, c.y + y, H[3], 0.55 * flick * on);
-  dRockWrap(S, R, q.pos, u, q.radius, on, i * 3.1);
-  for (let n = 0; n <= 40; n++) { const a = -1.25 + 2.5 * n / 40, e = 1 - Math.abs(a) / 1.25, x = c.x + Math.cos(Math.atan2(u.y, u.x) + a) * rr * 1.04, y = c.y + Math.sin(Math.atan2(u.y, u.x) + a) * rr * 1.04; R.front.blend(x, y, H[1], e * 0.95 * on); R.front.blend(x + u.x, y + u.y, H[3], e * 0.6 * on); }
-  R.front.glow(c.x + u.x * rr * 0.7, c.y + u.y * rr * 0.7, rr * 1.2, H[4], 0.45 * on * R.P.intensity);
-}
-// 飛ぶ隕石：通った道に尾が伸び、前で焼けた炎が後ろへ流れて冷え、煙と火の粉になる。遅くても勢いが見えるよう、尾の中を炎が走る
+function dMeteorDraw(S, R, q, i) { if (q.born != null) drawImg('meteor_0', q.pos, q.seed * 1.7 + (S.t - q.born) * 1.9, q.radius * (0.6 + 0.4 * smooth(0, 0.12, S.t - q.born))); }
+// 飛ぶ隕石：みなみのかんむり座の燃える弾と同じ作りを紫にして、隕石の大きさへ広げる。尾は隕石の中心から出て上に重なり、輪郭からも炎が後ろへなびく
+const D_BURN = ['#0e0628', '#2a1460', '#5a2fc0', '#8a5cff', '#b79aff', '#dcd0ff', '#f2ecff', '#ffffff'].map(hexc);
 function dMeteorTrail(S, R, q, age, i, speed = DM.speed, gone = 0) {
-  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.back, H = D_FLAME, s = R.P.size, u = q.dir, nx = -u.y, ny = u.x, c = toL(q.pos), rad = q.radius * WL * s, L = Math.min(age * speed, 760) * WL * s * (1 - gone), seed = i * 13.7 + 3; if (L < 2) return; age += gone;
-  for (let d = 0; d < L; d += 0.75) { const f = d / L, w = rad * 1.05 * Math.pow(1 - f, 0.75) * (1 + 0.12 * Math.sin(d * 0.14 - age * 9 + seed)); for (let o = -w; o <= w; o += 0.75) { const e = Math.abs(o) / Math.max(1, w), heat = clamp((1 - f) * (1.15 - e) * (0.75 + 0.5 * (0.5 + 0.5 * PX.tileNoise(d * 0.05 - age * 5, o * 0.12 + seed, 0, 0, 5)))); if (heat > 0.05) p.blend(c.x - u.x * d + nx * o, c.y - u.y * d + ny * o, H[Math.min(7, Math.round(lerp(7, 3, heat)))], Math.min(0.85, heat * 1.15)); } }
-  for (let n = 0; n < 12; n++) { const h = k => hash(n * 7.31 + k * 3.17 + seed), ph = (age * lerp(0.35, 0.6, h(1)) + h(2)) % 1, d = L * (0.55 + 0.6 * ph), lat = (h(3) - 0.5) * rad * (1.4 + ph * 1.6); fire.smokePuff(p, c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, 1 - ph, rad * 0.4, H[7], true, 0.5); }
-  for (let n = 0; n < 34; n++) { const h = k => hash(n * 4.19 + k * 2.71 + seed), ph = (age * lerp(0.9, 1.6, h(1)) + h(2)) % 1, d = ph * L * 0.8 + rad * 0.2, lat = (h(3) - 0.5) * rad * 1.7 * (1 - ph * 0.5) + Math.sin(ph * 7 + n) * rad * 0.12; fire.firePuff(p, c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, 1 - ph, rad * lerp(0.14, 0.32, h(4)) * (1 - 0.35 * ph), h(5), H, 0.03, -u.x * 0.8, -u.y * 0.8); }
-  for (let n = 0; n < 18; n++) { const h = k => hash(n * 9.13 + k * 1.9 + seed), ph = (age * lerp(0.7, 1.3, h(1)) + h(2)) % 1, d = ph * L * 1.1, lat = (h(3) - 0.5) * rad * (2 + 3 * ph); R.front.blend(c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, H[n % 2 ? 1 : 3], 1 - ph); }
+  const F = D_BURN, p = R.front, s = R.P.size, u = q.dir, L = toL(q.pos), rr = q.radius * WL * s, fade = 1 - gone, Lt = Math.min(age * speed, 720) * WL * s, fr = Math.floor(S.t * 30), seed = i * 9 + 1, heat = d => 1 - Math.pow(d / Math.max(Lt, 1), 0.8) + PX.tileNoise(d * 0.06 - S.t * 26, 3, 0, 0, seed) * 0.12; if (fade <= 0) return;
+  const LL = Math.min(Lt, rr * 5.5), tx = L.x - u.x * LL, ty = L.y - u.y * LL, pad = rr * 1.5, stops = [[0.1, F[2]], [0.34, F[3]], [0.6, F[4]], [0.85, F[5]], [1.25, F[7]]], ramp = v => { for (let n = 1; n < stops.length; n++) if (v < stops[n][0]) return PX.mix(stops[n - 1][1], stops[n][1], clamp((v - stops[n - 1][0]) / (stops[n][0] - stops[n - 1][0]))); return F[7]; };
+  p.each(Math.min(L.x, tx) - pad, Math.min(L.y, ty) - pad, Math.max(L.x, tx) + pad, Math.max(L.y, ty) + pad, (x, y, sx, sy) => { const dx = x - L.x, dy = y - L.y, along = -(dx * u.x + dy * u.y), lat = dy * u.x - dx * u.y; if (along < -rr * 0.3 || along > LL) return; const f = clamp(along / LL), w = rr * (1.05 - 0.25 * f) * (1 - 0.75 * f * f), e = Math.abs(lat) / w; if (e > 1.5) return; const n = 0.5 + 0.5 * PX.tileFbm(along * 0.035 - S.t * 9 + seed, lat * 0.075, 0, 0, 31, 3), I = (Math.pow(1 - f, 1.1) * (1 - e * e) * 1.35 + (n - 0.5) * 1.15) * smooth(-rr * 0.2, rr * 0.75, along); if (I < 0.06) return; p.blendPx(sx, sy, ramp(I), smooth(0.06, 0.4, I) * fade); });
+  PX.cycle(age, 0.4, 26, 23 + seed, rg => rg.range(0.1, 0.3), (ag, life, rg) => { const k = ag / life, back = rg.range(4, Lt * 0.5), side = rg.range(-1, 1) * (rr * 0.8 + 50 * ag), x = L.x - u.x * (back + 40 * ag * WL) - u.y * side, y = L.y - u.y * (back + 40 * ag * WL) + u.x * side; p.line(x + u.x * 2, y + u.y * 2, x, y, w => w > 0.5 ? F[7] : F[4], (1 - k) * fade); });
+  for (let d = Lt * 0.4; d < Lt; d += 1) { const x = L.x - u.x * d + Math.sin(d * 0.2 + S.t * 3) * 1.6 * -u.y, y = L.y - u.y * d + Math.sin(d * 0.2 + S.t * 3) * 1.6 * u.x; R.back.dot(x, y, F[1], 0.4 * fade * (1 - d / Lt)); }
+  p.glow(L.x - u.x * rr * 0.8, L.y - u.y * rr * 0.8, rr * 1.6, F[3], 0.3 * fade * R.P.intensity);
 }
 function dRockDraw(S, R, rock, i) {
   if (S.tech === 'meteor') return dMeteorDraw(S, R, rock, i);
-  const age = dRockAge(S, i); if (age < 0 || (rock.breakAt && S.t >= rock.breakAt)) return; if (R.proto && rock.dir && age < DR_FLIGHT + 0.3) dRockWrap(S, R, rock.pos, rock.dir, rock.radius, smooth(0, 0.05, age) * (1 - smooth(DR_FLIGHT, DR_FLIGHT + 0.3, age)), i * 3.1); const land = age - DR_FLIGHT, thud = land > 0 ? Math.exp(-land / 0.09) * Math.sin(Math.min(land, 0.3) * 30) : 0, k = dRockHeat(S, rock), shake = 5 * k * k, pos = add(rock.pos, V(Math.sin(S.t * 71 + i) * shake, Math.cos(S.t * 83 + i) * shake)), size = rock.radius * (1 + 0.08 * thud) * (1 - 0.1 * k);
+  const age = dRockAge(S, i); if (age < 0 || (rock.breakAt && S.t >= rock.breakAt)) return; const land = age - DR_FLIGHT, thud = land > 0 ? Math.exp(-land / 0.09) * Math.sin(Math.min(land, 0.3) * 30) : 0, k = dRockHeat(S, rock), shake = 5 * k * k, pos = add(rock.pos, V(Math.sin(S.t * 71 + i) * shake, Math.cos(S.t * 83 + i) * shake)), size = rock.radius * (1 + 0.08 * thud) * (1 - 0.1 * k);
   drawImg('meteor_0', pos, rock.seed * 1.7 + Math.min(age, DR_FLIGHT) * 11 + Math.max(0, thud) * 0.12, size);
   if (!R.proto || k <= 0) return; const pal = dRamp(R), c = toL(pos), rr = size * WL * R.P.size, cracks = aqCracks(61 + i * 7, rr);
   for (const q of cracks) { const show = Math.ceil(q.pts.length * k); for (let m = 0; m < show; m++) { const [x, y] = q.pts[m], h = k * (1 - 0.5 * m / q.pts.length); R.front.blend(c.x + x, c.y + y, pal[h > 0.6 ? 4 : 3], Math.min(1, 0.45 + h * 0.7)); } }
