@@ -1211,7 +1211,23 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
+## 同じ入力の生成を一度で済ませる。実験場の作り直しの間だけ使う。
+static var _package_memo = null
+static func begin_package_memo() -> void:
+	_package_memo = {}
+static func end_package_memo() -> void:
+	_package_memo = null
+static func _memoized(kind: String, inputs: Array, make: Callable) -> Dictionary:
+	if _package_memo == null: return make.call()
+	var key := kind
+	for value in inputs: key += "/"+(str(value.get_instance_id()) if value is Object else str(hash(var_to_str(value))))
+	if not _package_memo.has(key): _package_memo[key] = make.call()
+	return _package_memo[key].duplicate(true)
+
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
+	return _memoized("boss",[definition,config,stage,program],func(): return _boss_package(definition,config,stage,program))
+
+static func _boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"hydra",&"draco"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
@@ -1370,6 +1386,9 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 	return records
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
+	return _memoized("chase",[definition,config,stage],func(): return _chase_package(definition,config,stage))
+
+static func _chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
 	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}

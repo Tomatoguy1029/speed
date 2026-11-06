@@ -64,7 +64,10 @@ var _accumulator := 0.0
 var viewport: SubViewport
 ## 試遊中の本番の入力を返す（試遊していなければ null）。記録して再生すると同じ展開になる
 var live_input: Callable
+const SUPPORT_MEMO := "res://.content/dev/lab_support.json"
 var _support_memo := {}
+var _support_signature := ""
+var _support_dirty := false
 var _last_input := {}
 ## 描いたルートを本番の描画で描いている途中（点の列・描き終えるまでの回数・進んだ回数）。空なら描いていない
 var _route_play := {}
@@ -112,11 +115,28 @@ func reset(settings := {}) -> void:
 	_restore_seek_view()
 	changed.emit()
 
-## 作り直しのたびに全種類の生成を試すと遅いので、同じ条件の結果を覚えておく。
+## 作り直しのたびに全種類の生成を試すと遅いので、入力が同じあいだの結果をファイルにも覚えておく。
 func _supported(kind: String, id: String, edits: Variant, check: Callable) -> bool:
 	var key := "%s/%s/%d/%d/%d" % [kind,id,hash(var_to_str(edits)),hash(var_to_str(spec.get("config",{}))),int(spec.get("stage",1))]
-	if not _support_memo.has(key): _support_memo[key] = check.call()
+	if not _support_memo.has(key):
+		_support_memo[key] = check.call()
+		_support_dirty = true
 	return _support_memo[key]
+
+func _load_support_memo() -> void:
+	var signature: String = BUILDER.preparation_signature(_source,_config,{},[],{},{})
+	if signature==_support_signature: return
+	_support_signature = signature
+	_support_memo = {}
+	var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(SUPPORT_MEMO)) if FileAccess.file_exists(SUPPORT_MEMO) else null
+	if saved is Dictionary and saved.get("signature","")==signature: _support_memo = saved.results
+
+func _save_support_memo() -> void:
+	if not _support_dirty: return
+	_support_dirty = false
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SUPPORT_MEMO.get_base_dir()))
+	var file := FileAccess.open(SUPPORT_MEMO,FileAccess.WRITE)
+	if file!=null: file.store_string(JSON.stringify({"signature":_support_signature,"results":_support_memo}))
 
 func _rebuild() -> void:
 	revision += 1
@@ -143,6 +163,8 @@ func _rebuild() -> void:
 	_source = load("res://tools/content/build_runtime_stage.gd").compile(stage)
 	_source.resources = _source.resources.duplicate(true)
 	_source.resources.enemy_ids = PackedStringArray()
+	_load_support_memo()
+	BUILDER.begin_package_memo()
 	_definitions = {}
 	for id in _baseline_definitions:
 		var definition: EnemyDef = _baseline_definitions[id].duplicate(true)
@@ -164,6 +186,7 @@ func _rebuild() -> void:
 		if _supported("boss",String(id),[spec.get("boss_overrides",{}).get(String(id),{}),_boss_programs.get(String(id),{})],func(): return not BUILDER.boss_package(boss,_config,_source,_boss_programs.get(String(id),{})).is_empty()): _boss_definitions[id] = boss
 	for id in spec.get("boss_overrides",{}):
 		if not _boss_definitions.has(StringName(id)):
+			BUILDER.end_package_memo()
 			last_error = {"ok":false,"message":"このボスの編集はまだ移行していません: "+String(id)}
 			run = null
 			return
@@ -171,6 +194,8 @@ func _rebuild() -> void:
 	_formation_sources = []
 	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
 	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions,null,_boss_programs)
+	BUILDER.end_package_memo()
+	_save_support_memo()
 	if built!=OK:
 		last_error = {"ok":false,"message":"実験の定義を生成できません: "+error_string(built)}
 		run = null
