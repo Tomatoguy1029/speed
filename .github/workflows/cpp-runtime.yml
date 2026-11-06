@@ -30,7 +30,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: ${{ fromJSON(inputs.platform == 'all' && '["macos","windows"]' || inputs.platform == 'macos' && '["macos"]' || '["windows"]') }}
-    runs-on: ${{ matrix.platform == 'macos' && 'macos-14' || 'windows-2022' }}
+    runs-on: ${{ matrix.platform == 'macos' && 'macos-15' || 'windows-2022' }}
     defaults:
       run:
         shell: bash
