@@ -64,7 +64,7 @@ function dDarkFall(S, R, q) { // 着弾点：闇の染みが広がってから�
 }
 function dDarkBlast(S, R, at, age, radius, seed, H = D_DARK) {
   if (age < 0 || age > 1) return; const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.front, c = toL(at), rr = radius * WL * R.P.size * 1.3, flash = 1 - smooth(0, 0.14, age);
-  if (flash > 0) { p.glow(c.x, c.y, rr * 2, H[2], 0.9 * flash * R.P.intensity); fire.solid(p, c.x, c.y, rr * (0.3 + 0.5 * smooth(0, 0.1, age)) * flash, H[0]); }
+  if (flash > 0) { p.glow(c.x, c.y, rr * 2, H[2], 0.6 * flash * R.P.intensity); fire.solid(p, c.x, c.y, rr * (0.15 + 0.22 * smooth(0, 0.1, age)) * flash, H[0]); }
   for (let i = 0; i < 46; i++) { const rnd = k => hash(i * 5.3 + k * 2.1 + seed), life = lerp(0.35, 0.75, rnd(1)); if (age > life) continue; const a = rnd(2) * TAU, d = rr * lerp(0.5, 1.25, rnd(3)) * (1 - Math.exp(-age / 0.13)), x = c.x + Math.cos(a) * d, y = c.y + Math.sin(a) * d, k = 1 - age / life; fire.firePuff(p, x, y, k, Math.min(rr * lerp(0.18, 0.36, rnd(4)), 11 * R.P.size), rnd(5), H, 0.06, Math.cos(a) * 0.7, Math.sin(a) * 0.7); }
   for (let i = 0; i < 14; i++) { const rnd = k => hash(i * 9.1 + k * 3.7 + seed), life = lerp(0.6, 1, rnd(1)); if (age > life) continue; const a = rnd(2) * TAU, d = rr * 1.2 * (1 - Math.exp(-age / 0.22)); fire.smokePuff(p, c.x + Math.cos(a) * d, c.y + Math.sin(a) * d, 1 - age / life, rr * 0.4, H[5], true, 0.8); }
 }
@@ -315,7 +315,7 @@ function dLiveWave(s, t, seed = 0) {
 }
 function dSwimPoints(pts, t, swim, seed = 0, bow = 1) {
   const N = pts.length - 1; let s = 0;
-  return pts.map((p, i) => { if (i > 0) s += dist(pts[i - 1], p); const u = i / N, n = orth(norm(sub(pts[Math.min(N, i + 8)], pts[Math.max(0, i - 8)]))), amp = 30 * swim * smooth(0.04, 0.4, u), arch = bow * 70 * smooth(0.06, 0.32, u) * Math.sin(u * Math.PI * 1.35 + 0.5 + seed); return add(p, mul(n, dLiveWave(s, t, seed) * amp + arch)); });
+  return dFit(pts.map((p, i) => { if (i > 0) s += dist(pts[i - 1], p); const u = i / N, n = orth(norm(sub(pts[Math.min(N, i + 8)], pts[Math.max(0, i - 8)]))), amp = 30 * swim * smooth(0.04, 0.4, u), arch = bow * 70 * smooth(0.06, 0.32, u) * Math.sin(u * Math.PI * 1.35 + 0.5 + seed); return add(p, mul(n, dLiveWave(s, t, seed) * amp + arch)); }), pts);
 }
 // 静と動：予兆が進むほど波を止めて力をため、最後に震える。発動で一気に動き、戻りながら波が戻る
 function dSwimAmount(S) {
