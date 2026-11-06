@@ -370,8 +370,8 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 			records.CanisPounceDefinition.append(row)
 	return records
 
-static func canis_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var package := boss_body_package(definition,config)
+static func canis_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, body: Dictionary = {}) -> Dictionary:
+	var package := body.duplicate(true) if not body.is_empty() else boss_body_package(definition,config)
 	var records := canis_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	for key in records: package.records[key] = records[key]
@@ -418,13 +418,14 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 static func canis_set_package(definition: BossDef, moves: Array, config: GameConfig) -> Dictionary:
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
+	var body := package.duplicate(true)
 	var sources := []
 	var identities := {}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
 		seen[move.technique] = move
-		var part := canis_technique_package(definition,move,config)
+		var part := canis_technique_package(definition,move,config,body)
 		if part.is_empty(): return {}
 		sources.append({"move":String(move.technique),"package":part})
 		for original: Dictionary in part.records.BossTechniqueDefinition:
@@ -1143,10 +1144,11 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique, action
 		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"minimum":int(definition.params.grid_minimum)}]
 	return records
 
-static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, action_rules: Resource = null) -> Dictionary:
+static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, action_rules: Resource = null, body: Dictionary = {}) -> Dictionary:
 	var records := hydra_major_records(definition,move,action_rules) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence",&"swarm"] else hydra_normal_records(definition,move,action_rules)
 	if records.is_empty(): return {}
-	var package := boss_body_package(definition,config)
+	# 全技をまとめる生成では、作り済みの本体の写しを使う。
+	var package := body.duplicate(true) if not body.is_empty() else boss_body_package(definition,config)
 	if package.is_empty(): return {}
 	# 単独の確認用パッケージでは、本体の仮通常技を大技へ置き換える。
 	for record in Schema.SCHEMA.records:
@@ -1185,9 +1187,10 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 			if not String(record.name).begins_with("Hydra") or tables.has(record.name): continue
 			for field: Dictionary in record.fields:
 				if tables.has(field.get("ref","")): tables[record.name]=true;changed=true;break
+	var body := package.duplicate(true)
 	for name in tables: package.records[name]=[]
 	for move: BossTechnique in rules.techniques:
-		var part := hydra_technique_package(definition,move,config,rules)
+		var part := hydra_technique_package(definition,move,config,rules,body)
 		if part.is_empty(): return {}
 		var maps := {}
 		for record: Dictionary in Schema.SCHEMA.records:

@@ -64,6 +64,7 @@ var _accumulator := 0.0
 var viewport: SubViewport
 ## 試遊中の本番の入力を返す（試遊していなければ null）。記録して再生すると同じ展開になる
 var live_input: Callable
+var _support_memo := {}
 var _last_input := {}
 ## 描いたルートを本番の描画で描いている途中（点の列・描き終えるまでの回数・進んだ回数）。空なら描いていない
 var _route_play := {}
@@ -111,6 +112,12 @@ func reset(settings := {}) -> void:
 	_restore_seek_view()
 	changed.emit()
 
+## 作り直しのたびに全種類の生成を試すと遅いので、同じ条件の結果を覚えておく。
+func _supported(kind: String, id: String, edits: Variant, check: Callable) -> bool:
+	var key := "%s/%s/%d/%d/%d" % [kind,id,hash(var_to_str(edits)),hash(var_to_str(spec.get("config",{}))),int(spec.get("stage",1))]
+	if not _support_memo.has(key): _support_memo[key] = check.call()
+	return _support_memo[key]
+
 func _rebuild() -> void:
 	revision += 1
 	_epoch += 1
@@ -144,7 +151,7 @@ func _rebuild() -> void:
 			if key=="params":
 				for param in value: definition.params[param] = safe_parameter(param,value[param])
 			else: definition.set(key,value)
-		if not BUILDER.chase_package(definition,_config,_source).is_empty():
+		if _supported("enemy",String(id),spec.get("overrides",{}).get(String(id),{}),func(): return not BUILDER.chase_package(definition,_config,_source).is_empty()):
 			_definitions[id] = definition
 			_source.resources.enemy_ids.append(String(id))
 	_boss_definitions = {}
@@ -154,7 +161,7 @@ func _rebuild() -> void:
 			if key=="params":
 				for param in spec.boss_overrides[String(id)].params: boss.params[param] = safe_parameter(param,spec.boss_overrides[String(id)].params[param])
 			else: boss.set(key,spec.boss_overrides[String(id)][key])
-		if not BUILDER.boss_package(boss,_config,_source,_boss_programs.get(String(id),{})).is_empty(): _boss_definitions[id] = boss
+		if _supported("boss",String(id),[spec.get("boss_overrides",{}).get(String(id),{}),_boss_programs.get(String(id),{})],func(): return not BUILDER.boss_package(boss,_config,_source,_boss_programs.get(String(id),{})).is_empty()): _boss_definitions[id] = boss
 	for id in spec.get("boss_overrides",{}):
 		if not _boss_definitions.has(StringName(id)):
 			last_error = {"ok":false,"message":"このボスの編集はまだ移行していません: "+String(id)}
