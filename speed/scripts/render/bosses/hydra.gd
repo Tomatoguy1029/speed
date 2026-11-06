@@ -138,11 +138,9 @@ func draw_reference(canvas, _real_dt: float) -> void:
 					FX.rail(canvas,points[0],end,k,beam_color,t,float(effect.id))
 					DRACO_FX.gather(canvas,points[0],46.0,k,t,float(effect.id),beam_color)
 				else: FX.beam(canvas,points[0],end,float(effect.width),beam_color,t,clampf((e-(life-0.1))/0.1,0.0,1.0),clampf(e/0.07,0.0,1.0))
-			"bite":
-				if not state.has("necks"): FX.fangs(canvas,points[-1],(points[-1]-points[0]).angle(),e,float(effect.width),float(effect.id),FX.COLORS.bite)
 			"lightning":
 				if points[0].distance_to(points[-1])<1.0 and e>=0.0:
-					FX.bolt_strike(canvas,_light,canvas.to_logical(points[0]),float(effect.width)*0.5*float(canvas.world_scale),e,int(effect.id)%97+1,ramp,canvas.to_logical(position))
+					FX.bolt_strike(canvas,_light,canvas.to_logical(points[0]),float(effect.width)*0.5*float(canvas.world_scale),e,int(effect.id)%97+1,ramp,canvas.to_logical(effect.get("source",position)))
 
 func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[Color]) -> void:
 	var pose: Dictionary = neck.pose

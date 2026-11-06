@@ -2,6 +2,7 @@
 extends Node2D
 const SHEET := preload("res://assets/effects/reference/canis/fireball.png")
 const SHADER := preload("res://shaders/draco_meteor_fire.gdshader")
+const ROCK := preload("res://assets/pixel/meteor_0.png")
 const FRAME_SIZE := Vector2(136,56)
 const PIVOT := Vector2(112,28)
 const RIM := [[0.35,0],[0.8,1],[1.25,2],[1.7,3]]
@@ -9,6 +10,8 @@ var _under: ShaderMaterial
 var _over: ShaderMaterial
 var _pool: Array[Sprite2D] = []
 var _used := 0
+var _shards: Array[Sprite2D] = []
+var _shard_used := 0
 
 func _ready() -> void:
 	top_level = true
@@ -38,7 +41,29 @@ func _sprite(frame_time: float, material_used: ShaderMaterial, layer: int) -> Sp
 	sprite.visible = true
 	return sprite
 
-func apply_frame(rows: Array, clock: float) -> void:
+func _shard() -> Sprite2D:
+	if _shard_used>=_shards.size():
+		var made := Sprite2D.new()
+		made.texture = ROCK
+		made.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		made.z_as_relative = false
+		made.z_index = 5
+		add_child(made)
+		_shards.append(made)
+	var sprite := _shards[_shard_used]
+	_shard_used += 1
+	sprite.visible = true
+	return sprite
+
+func apply_frame(rows: Array, clock: float, shards: Array = []) -> void:
+	_shard_used = 0
+	for row: Dictionary in shards:
+		var sprite := _shard()
+		sprite.position = row.position
+		sprite.rotation = float(row.angle)
+		sprite.scale = Vector2.ONE*float(row.radius)*2.0/maxf(ROCK.get_width(),ROCK.get_height())
+		sprite.modulate.a = float(row.alpha)
+	for i in range(_shard_used,_shards.size()): _shards[i].visible = false
 	_used = 0
 	for row: Dictionary in rows:
 		var alpha := float(row.alpha)

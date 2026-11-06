@@ -100,37 +100,57 @@ static func fangs(canvas, mouth: Vector2, angle: float, t: float, radius: float,
 				s += 0.5
 			if not stone: canvas.front.light(q.x,q.y,pal[2],(1.0-k)*0.35)
 
-## 先回り落雷の着弾：太い稲妻が上から叩きつけられ、同じ通り道を3回打ち直して点滅する。pixelFX lightning/lightning-strike の作り。
+## 先回り落雷の着弾：太い稲妻が上から叩きつけられ、同じ通り道を3回打ち直して点滅し、残った通り道は冷えて崩れる。pixelFX lightning/lightning-strike の作り。
 static func bolt_strike(canvas, light, L: Vector2, rr: float, a: float, seed: int, C: Array[Color], src: Vector2) -> void:
 	var rng = JET.Rng.new(seed*3+1)
-	var side := 1.0 if (rng.next()<0.5) else -1.0
-	var top := Vector2(L.x+rng.between(10.0,24.0)*side,-10.0)
+	var drift: float = rng.between(10.0,24.0)
+	var top := Vector2(L.x+drift*(1.0 if rng.next()<0.5 else -1.0),-10.0)
 	var main: Array = light.zigzag(rng,top,L,0.13,0.5)
+	var trunk: Array = main[0].points
 	var f := floori(a*30.0+0.0001)
 	if a<0.1:
 		var flash = JET.Rng.new((f*31+seed)|1)
 		light.ink(canvas.front,light.zigzag(flash,src,top+Vector2(flash.between(-30.0,30.0),0.0),0.22,0.2),0.8,C,1.0,true,0.35)
-	var index := 0
-	for stroke: Array in STROKES:
-		var u := a-float(stroke[0])
-		if u>=0.0:
-			var slot := floori(u*30.0+0.0001)
-			var level: float = FLICK[slot] if slot<FLICK.size() else 0.0
-			if level>0.0: light.ink(canvas.front,main,level*float(stroke[1]),C,1.7,false,0.7)
-		index += 1
+	var cool := exp(-a/0.28)
+	for i in trunk.size():
+		var gone := 0.45+0.45*DRACO_FX._hash(i*2.7+seed)+0.1*(1.0-float(i)/trunk.size())
+		if a>gone: continue
+		var at: Vector2 = trunk[i]
+		canvas.front.px(at.x,at.y,C[6] if cool>0.6 else C[4] if cool>0.3 else C[2])
+		if cool>0.2 and i%5==0: canvas.front.glow(at.x,at.y,5.0,C[4],0.25*cool)
+	var bright: Array[Color] = []
+	for q in C.size(): bright.append(C[mini(7,q+2)])
+	for i in STROKES.size():
+		var u := a-float(STROKES[i][0])
+		if u<0.0: continue
+		var slot := floori(u*30.0+0.0001)
+		var level: float = FLICK[slot] if slot<FLICK.size() else 0.0
+		if level<=0.0: continue
+		var paths := main
+		if i>0:
+			var moved: Array[Vector2] = []
+			for at: Vector2 in trunk: moved.append(Vector2(at.x+i*2.5*sin(PI*(at.y-top.y)/maxf(1.0,L.y-top.y)),at.y))
+			paths = [{"points":moved,"width":1.0}]
+		light.ink(canvas.front,paths,level*float(STROKES[i][1]),bright if u<1.0/30.0 else C,1.7,false,0.7)
 	var burn := clampf(1.0-(a-0.15)/0.75,0.0,1.0)
 	if burn>0.0:
-		canvas.back.disc(L.x,L.y,rr*0.34,Color("#141020"),burn*0.6)
-		canvas.back.disc(L.x,L.y,rr*0.16,C[5],pow(burn,2.5)*0.6)
+		canvas.back.disc(L.x,L.y,rr*0.34,Color("#141020"),func(d): return burn*0.75*(1.0-d*d))
+		canvas.back.disc(L.x,L.y,rr*0.16,C[5],func(d): return pow(burn,2.5)*0.8*(1.0-d*d))
 	var k := a/0.42
 	if k<1.0:
 		var r0 := rr*(1.0-pow(1.0-k,3.0))
 		var w := 2.4*(1.0-k)+0.6
-		var steps := maxi(24,ceili(r0*6.0))
-		for i in steps:
-			var at := L+Vector2.from_angle(i*TAU/steps)*r0
-			canvas.front.blend(at.x,at.y,Color.WHITE.lerp(C[5],k),(1.0-k)*0.95)
-			if w>1.5: canvas.front.blend(at.x+cos(i*TAU/steps),at.y+sin(i*TAU/steps),C[5],(1.0-k)*0.5)
+		var ring := Color.WHITE.lerp(C[5],k)
+		var reach := ceili(r0+3.0)
+		for y in range(-reach,reach+1):
+			for x in range(-reach,reach+1):
+				var e := absf(Vector2(x+0.5,y+0.5).length()-r0)/w
+				if e<1.0: canvas.front.blend(L.x+x,L.y+y,ring,(1.0-k)*(1.0-e*e)*0.95)
+		var discharge = JET.Rng.new((floori(a/0.05)*23+seed)|1)
+		for i in 7:
+			var an: float = discharge.between(0.0,TAU)
+			var span: float = discharge.between(0.25,0.6)
+			light.ink(canvas.front,light.zigzag(discharge,L+Vector2.from_angle(an)*r0,L+Vector2.from_angle(an+span)*r0,0.35,0.1),(1.0-k)*0.9,C,1.0,true,0.25)
 	for j in 18:
 		var q = JET.Rng.new(seed*7+j+1)
 		var life: float = q.between(0.25,0.5)
@@ -143,6 +163,41 @@ static func bolt_strike(canvas, light, L: Vector2, rr: float, a: float, seed: in
 		canvas.front.glow(L.x,L.y,rr*0.5,Color.WHITE,(1.0-a/0.07)*0.8)
 		canvas.front.disc(L.x,L.y,4.0*(1.0-a/0.07)+1.0,Color.WHITE,1.0)
 	if a<0.6: canvas.back.glow(L.x,L.y,rr*0.8,C[3],0.42*exp(-a*5.0)*(0.7 if f%2 else 1.0))
+
+## 全身複製の噛みつき：口先で上下の牙の鉤が寄り、閃光。
+static func clone_fangs(canvas, mouth: Vector2, angle: float, t: float, radius: float, seed: float, color: Color) -> void:
+	if t<0.0 or t>0.5: return
+	var pal := PRIM.ramp(color)
+	var fw := Vector2.from_angle(angle)
+	var sd := Vector2(-fw.y,fw.x)
+	var p := clampf(t/0.06,0.0,1.0)
+	var out := clampf((t-0.06)/0.2,0.0,1.0)
+	for side: float in [-1.0,1.0]:
+		var P0 := mouth+sd*side*radius*0.8+fw*0.1*radius
+		var C := mouth+sd*side*radius*0.72+fw*0.72*radius
+		var P1 := mouth+fw*0.92*radius+sd*side*radius*0.14
+		var steps := ceili(radius*2.2*float(canvas.world_scale))
+		for i in steps+1:
+			var u := float(i)/steps
+			if u>p or u<out: continue
+			if out>0.3 and DRACO_FX._hash(i*7.0+side*3.0+seed+floorf(t*40.0))>(1.0-out)*1.6: continue
+			var q: Vector2 = canvas.to_logical(P0.lerp(C,u).lerp(C.lerp(P1,u),u))
+			var w := (0.4+1.6*pow(sin(PI*u),0.7))*(1.0-out*0.6)
+			var o := -w
+			while o<=w:
+				var e := absf(o)/maxf(0.3,w)
+				canvas.front.px(q.x+sd.x*o*side,q.y+sd.y*o*side,pal[4 if (p-u<0.25 or e<0.35) and out<0.5 else 3 if e<0.7 else 2])
+				o += 0.5
+	var hit: Vector2 = canvas.to_logical(mouth+fw*0.45*radius)
+	var fl := exp(-maxf(0.0,t-0.05)/0.07)
+	if t>0.04:
+		for row: Array in [[fw,16.0],[-fw,5.0],[sd,8.0],[-sd,7.0]]:
+			var reach: float = float(row[1])*fl
+			var d := 0.0
+			while d<=reach:
+				canvas.front.light(hit.x+row[0].x*d,hit.y+row[0].y*d,pal[3],(1.0-d/(reach+0.01))*0.9)
+				d += 0.5
+		canvas.front.px(hit.x,hit.y,pal[4])
 
 ## ためるとき、首の瓦礫がきしんで小石と粉がこぼれる。
 static func grit(canvas, pts: PackedVector2Array, age: float, warn: float) -> void:
@@ -446,7 +501,7 @@ static func zap(canvas, light, L: Vector2, rr: float, a: float, direction: float
 			var q1 := DRACO_FX._hash(j*3.3+1.9+4.0)
 			var q2 := DRACO_FX._hash(j*3.3+3.8+4.0)
 			var q3 := DRACO_FX._hash(j*3.3+5.7+4.0)
-			canvas.back.disc(L.x+(q1-0.5)*8.0,L.y+(q2-0.5)*6.0-12.0*u,(2.4+q3*1.4)*(0.8+u),Color("#6a6680"),(1.0-u)*0.25)
+			canvas.back.disc(L.x+(q1-0.5)*8.0,L.y+(q2-0.5)*6.0-12.0*u,(2.4+q3*1.4)*(0.8+u),Color("#6a6680"),func(d): return (1.0-u)*0.35*(1.0-d*d))
 	if a<0.85: canvas.back.glow(L.x,L.y,rr*0.95*(1.0-a/0.85),C[3],0.45*exp(-a*5.0)*(0.7 if f%2 else 1.0))
 
 ## 目の光が通り道に赤く残る。
@@ -481,11 +536,11 @@ static func tornado_rock(canvas, center: Vector2, rock: Dictionary, fade: float,
 	for m in range(1,15):
 		var th := float(rock.spin)+m*0.09
 		var f := 1.0-m/15.0
-		canvas.back.disc(L.x+cos(th)*orbit,L.y+sin(th)*orbit,1.6*f+0.6,dust_colors[0],f*f*0.35*fade)
+		canvas.back.disc(L.x+cos(th)*orbit,L.y+sin(th)*orbit,1.6*f+0.6,dust_colors[0],func(d): return f*f*0.5*(1.0-d*d)*fade)
 	var u := float(rock.settle)/0.28
 	if u>=1.0: return
 	var q: Vector2 = canvas.to_logical(rock.position)
-	canvas.back.disc(q.x,q.y,3.0+5.0*u,dust_colors[1],(1.0-u)*0.4)
+	canvas.back.disc(q.x,q.y,3.0+5.0*u,dust_colors[1],func(d): return (1.0-u)*0.6*(1.0-d*d))
 	for m in 8:
 		var an := m*TAU/8.0+float(rock.spin)
 		var r0 := (2.0+9.0*u)*(0.8+0.4*DRACO_FX._hash(m*2.3+size))
@@ -521,7 +576,7 @@ static func tornado_wake(canvas, center: Vector2, direction: Vector2, speed: flo
 		if k<=0.0: continue
 		var q: Vector2 = canvas.to_logical(center+direction*speed*(born-a)+side*(DRACO_FX._hash(i*6.1+5.8+17.0)-0.5)*width*0.8)
 		var rr := lerpf(2.0,3.6,DRACO_FX._hash(i*6.1+11.6+17.0))*(0.8+(1.0-k)*1.6)
-		canvas.back.disc(q.x,q.y,rr,dust_colors[0 if DRACO_FX._hash(i*6.1+14.5+17.0)<0.5 else 1],pow(k,1.3)*0.4*fade)
+		canvas.back.disc(q.x,q.y,rr,dust_colors[0 if DRACO_FX._hash(i*6.1+14.5+17.0)<0.5 else 1],func(d): return pow(k,1.3)*0.5*(1.0-d*d)*fade)
 
 ## 風の首の口元で風が集まる：まわりの空気が巻きながら渦へ吸い込まれる筋。
 static func tornado_gather(canvas, center: Vector2, radius: float, k: float, time: float) -> void:

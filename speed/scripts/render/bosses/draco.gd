@@ -31,6 +31,7 @@ var _raster := SpeedFxRaster.new()
 var _raster_under := SpeedFxRaster.new()
 var _fire: Node2D
 const FX := preload("res://scripts/render/bosses/draco_fx.gd")
+const HYDRA_FX := preload("res://scripts/render/bosses/hydra_fx.gd")
 const FORM := preload("res://scripts/bosses/draco_form.gd")
 const PRIM := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 func set_reference_canvas(canvas) -> void:
@@ -347,6 +348,19 @@ func draw_reference(canvas, _real_dt: float) -> void:
 			FX.gather(canvas,mouth,120.0,q,t,88.0)
 			var last_look := _smooth(0.85,1.0,q)
 			if last_look>0.0: FX.eyes(canvas,head,world_facing,last_look,FX.BASE,t)
+	if tech=="clones" and stage==1:
+		for unit: Dictionary in attack.get("clones",[]):
+			if not unit.alive: continue
+			var mode := String(unit.mode)
+			var time := float(unit.time)
+			var charge := maxf(0.01,float(unit.get("charge",0.6)))
+			if time<=0.0: continue
+			var kind: String = {"bite_thrust":"bite","wind_band":"vortex","rubble_fan":"debris","beam_fixed":"beam","thunder_drop":"thunder"}.get(mode,"bite")
+			var color: Color = HYDRA_FX.COLORS[kind]
+			var unit_mouth: Vector2 = Vector2(unit.position)+Vector2.from_angle(float(unit.angle))*120.0*float(state.head_scale)
+			var e := time-charge
+			if e<0.0: FX.gather(canvas,unit_mouth,70.0,time/charge,t,400.0+float(unit.index),color)
+			elif mode=="bite_thrust": HYDRA_FX.clone_fangs(canvas,unit_mouth,float(unit.angle),e-float(unit.get("active",0.2)),float(unit.get("bite_radius",70.0)),float(unit.index)*13.0,color)
 	if tech=="picaro_wall":
 		var shots := int(attack.get("shots",0))
 		while _shot_times.size()<shots: _shot_times.append(t)
@@ -474,7 +488,20 @@ func _draw_rocks(canvas, t: float, tech: String, stage: int) -> void:
 				FX.impact(canvas,q.destination,age-0.42,float(q.radius)*1.25,seed,_cracks(seed,float(q.radius)*1.25*float(canvas.world_scale)))
 			var k := clampf(float(q.burn)/(active*0.28),0.0,1.0)
 			if k>0.0: FX.rock_heat(canvas,q.position,float(q.radius),k,float(q.burn),active*0.28,int(q.order),_cracks(61.0+float(q.order)*7.0,float(q.radius)*float(canvas.world_scale)))
-	_fire.apply_frame(rows,t)
+	var shards: Array = []
+	for effect: Dictionary in state.get("impacts",[]):
+		var since := float(effect.age)
+		if effect.technique!="breath" or since>1.1: continue
+		var at: Vector2 = effect.position
+		var radius := float(effect.radius)
+		var seed := 91.0+posmod(int(at.x),3)*5.0
+		for m in 14:
+			var life := lerpf(0.45,0.85,FX._hash(m*7.3+3.1+seed))
+			if since>life: continue
+			var a := FX._hash(m*7.3+6.2+seed)*TAU
+			var f := since/life
+			shards.append({"position":at+Vector2.from_angle(a)*radius*(0.2+lerpf(0.9,1.9,FX._hash(m*7.3+9.3+seed))*(1.0-exp(-since/0.16))),"angle":FX._hash(m*7.3+12.4+seed)*6.0+since*lerpf(-5.0,5.0,FX._hash(m*7.3+15.5+seed)),"radius":radius*lerpf(0.14,0.36,FX._hash(m*7.3+18.6+seed))*(1.0-f*0.3),"alpha":1.0-f*f})
+	_fire.apply_frame(rows,t,shards)
 
 func _cracks(seed: float, radius: float) -> Array:
 	if not _crack_rows.has(seed):
