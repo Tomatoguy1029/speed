@@ -45,6 +45,8 @@ func _ready() -> void:
 		_claws.append(claw)
 
 ## 全身複製はピカロの一種なので、全部の部位を敵のピカロと同じシェーダーで描く。
+## 絵の腕だけを根元から回す量（ラジアン）。
+var arm_turns := [0.0,0.0,0.0,0.0]
 func use_picaro(seed: float) -> void:
 	var noise: Texture2D = PICARO_LOOK.noise_texture()
 	_lighting = ShaderMaterial.new()
@@ -121,7 +123,7 @@ func _pose_arms(points: PackedVector2Array, width: float, total: float, split_or
 		var arm := _arms[i]
 		var direction := (normal * side - tangent * 0.3).normalized()
 		var wrist := (ARM_WRIST - ARM_ROOT) * Vector2(-side, 1)
-		arm.rotation = direction.angle() - wrist.angle()
+		arm.rotation = direction.angle() - wrist.angle() + arm_turns[i]
 		arm.scale = Vector2(-side, 1) * unit
 		arm.position = _split(samples[1] + normal * side * width * FORM.taper(distance / maxf(1.0, total)) * 0.32, split_origin, split_axis)
 		var claw := _claws[i]

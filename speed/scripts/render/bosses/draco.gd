@@ -19,6 +19,17 @@ func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
 		add_child(_field);_field.top_level=true
 	_field.setup_effects(scope,entries)
 var _parts: Node2D
+var _reference_canvas
+var _pose := {}
+var _wake: Array = []
+var _bite := {}
+var _shout_clock := -1.0
+var _crack_rows := {}
+const FX := preload("res://scripts/render/bosses/draco_fx.gd")
+const FORM := preload("res://scripts/bosses/draco_form.gd")
+const PRIM := preload("res://scripts/render/fx/fx_reference_primitives.gd")
+func set_reference_canvas(canvas) -> void:
+	_reference_canvas = canvas
 func _ready() -> void:
 	z_index = 1
 	_parts = preload("res://scripts/bosses/draco_parts.gd").new()
@@ -41,6 +52,9 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	var points := PackedVector2Array()
 	for point: Vector2 in body.body_points: points.append(to_local(point))
 	var finale: Dictionary=body.get("finale",{})
+	_pose = _present(points,body,current)
+	points = _pose.points
+	_parts.arm_turns = _pose.arms
 	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" else float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
 	_parts.position = Vector2(feedback.offset).rotated(-float(body.facing))
 	_parts.rotation = float(feedback.angle)
@@ -67,13 +81,6 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 func _draw() -> void:
 	if state.is_empty() or not visible: return
 	_draw_rift()
-	_draw_technique()
-	_draw_impacts()
-	_draw_rift_walls()
-	_draw_picaro_arrivals()
-	_draw_arrow_impacts()
-	_draw_spiral_charge()
-	_draw_inhale()
 	_draw_finale()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
@@ -90,6 +97,170 @@ func _draw() -> void:
 	var pulse := 0.85+sin(float(state.clock)*3.0)*0.15
 	draw_circle(core,core_glow_radius*depth,Color(core_glow_color,core_glow_opacity*pulse*float(state.alpha)*glow))
 	preload("res://scripts/bosses/draco_form.gd").star(self,core,27.0*depth,Color(0.85,0.96,1.0,float(state.alpha)*glow))
+
+static func _smooth(a: float, b: float, x: float) -> float:
+	return smoothstep(a,b,x) if a<b else 1.0-smoothstep(b,a,x)
+
+## 長さと速さの違う波を重ね、胴の場所と時間で強さをむらにする。
+static func _live_wave(s: float, t: float, seed := 0.0) -> float:
+	var n := FX._noise(s*0.0016-t*0.55+t*0.37,seed+7.0)
+	var surge := pow(0.5+0.5*FX._noise(s*0.0009+t*0.9-t*0.23,seed+19.0),3.0)*2.6
+	return (0.62*sin(s*0.0071-t*3.3+1.4*n+seed)+0.42*sin(s*0.0029+t*1.7+seed*2.0)+0.3*sin(s*0.016-t*6.1+2.0*n))*(0.45+0.75*absf(n)+surge)
+
+static func _fit(desired: PackedVector2Array, reference: PackedVector2Array) -> PackedVector2Array:
+	var out := desired.duplicate()
+	for j in range(1,out.size()):
+		var delta := out[j]-out[j-1]
+		if delta.is_zero_approx(): delta = Vector2(-1,0)
+		out[j] = out[j-1]+delta.normalized()*reference[j-1].distance_to(reference[j])
+	return out
+
+## 当たりの点列は変えず、絵の動きだけに溜め・解放・うねりを足す。
+func _present(points: PackedVector2Array, body: Dictionary, current: Dictionary) -> Dictionary:
+	var tech: String = current.get("technique","")
+	var stage := int(current.get("stage",5))
+	var world_facing: float = float(body.facing)
+	var arms := [0.0,0.0,0.0,0.0]
+	if points.size()<2 or stage>2 or tech.is_empty(): return {"points":points,"facing":world_facing,"arms":arms,"charge":0.0}
+	var t := float(body.clock)
+	var st := float(current.get("stage_time",0.0))
+	var warn := maxf(0.01,float(current.get("warn_time",1.0)))
+	var active := float(current.get("active_time",0.0))
+	var recover := maxf(0.01,float(current.get("recover_time",1.0)))
+	var ready: bool = current.get("staging_ready",true)
+	var windup := stage==0
+	var releasing := stage==1 or stage==2
+	var release_time := st if stage==1 else active+st
+	var recoil := func(x: float) -> float: return (1.0-_smooth(0.0,0.1,x))-0.46*_smooth(0.025,0.075,x)*(1.0-_smooth(0.075,0.26,x))
+	var k := _smooth(0.05,maxf(0.06,warn*0.82),st) if windup and ready else 0.0
+	var charge: float = k if windup else recoil.call(release_time) if releasing else 0.0
+	var out := points
+	var tail := tech in ["tail_sweep","tail_slam"]
+	if ready and tech not in ["spiral","tail_sweep","tail_slam","clones"]:
+		var u := Vector2.RIGHT
+		var side := Vector2.DOWN
+		var weight := 0.3 if tech=="bite" else 1.0
+		var last := float(points.size()-1)
+		var desired := PackedVector2Array()
+		for i in points.size():
+			var s := i/last
+			var bend := _smooth(0.02,0.16,s)*(1.0-_smooth(0.3,0.73,s))
+			var strength: float = recoil.call(maxf(0.0,release_time-s*0.13)) if releasing else charge
+			desired.append(points[i]+(u*44.0*bend+side*64.0*bend)*strength*weight)
+		out = _fit(desired,points)
+	var swim := 0.0
+	if not ready: swim = 1.0
+	elif windup: swim = 0.7*(1.0-_smooth(0.1,0.8,st/warn))
+	elif stage==1: swim = 1.0 if tech in ["charge","leap"] else 0.25 if tech in ["breath","meteor","star_fan","inhale"] else 0.35
+	else: swim = 0.7*_smooth(0.0,1.0,st/recover)
+	if tail: swim *= 0.3
+	if tech!="spiral":
+		out = _swim(out,t,swim,0.0 if tail else 1.0)
+		if windup and ready:
+			var q := _smooth(0.72,1.0,st/warn)
+			var shake := Vector2.DOWN*sin(t*90.0)*3.0*q
+			if q>0.0:
+				for i in 7: out[i] += shake*(1.0-i/7.0)
+	var turn := sin(t*5.3)*0.05*swim
+	for i in 4: arms[i] = (1.0 if i%2 else -1.0)*charge*(0.42 if i<2 else 0.16)
+	return {"points":out,"facing":world_facing+turn,"arms":arms,"charge":charge}
+
+func _swim(pts: PackedVector2Array, t: float, swim: float, bow: float) -> PackedVector2Array:
+	var last := pts.size()-1
+	var s := 0.0
+	var out := PackedVector2Array()
+	for i in pts.size():
+		if i>0: s += pts[i-1].distance_to(pts[i])
+		var u := float(i)/last
+		var along := (pts[mini(last,i+8)]-pts[maxi(0,i-8)]).normalized()
+		var normal := Vector2(-along.y,along.x)
+		var amp := 30.0*swim*_smooth(0.04,0.4,u)
+		var arch := bow*70.0*_smooth(0.06,0.32,u)*sin(u*PI*1.35+0.5)
+		out.append(pts[i]+normal*(_live_wave(s,t)*amp+arch*swim))
+	return _fit(out,pts)
+
+func draw_reference(canvas, _real_dt: float) -> void:
+	if canvas!=_reference_canvas or state.is_empty() or _pose.is_empty(): return
+	var t := float(state.clock)
+	var tech: String = attack.get("technique","")
+	var stage := int(attack.get("stage",5))
+	var st := float(attack.get("stage_time",0.0))
+	var ready: bool = attack.get("staging_ready",true)
+	var scale_head := float(state.head_scale)*float(state.perspective_scale)
+	var head: Vector2 = to_global(_pose.points[0])
+	var body_angle := float(state.facing)
+	var world_facing := float(_pose.facing)
+	var mouth := head+Vector2.from_angle(world_facing)*120.0*scale_head
+	var k := clampf(float(attack.get("windup_progress",0.0)),0.0,1.0)
+	var world_points := PackedVector2Array()
+	for point: Vector2 in _pose.points: world_points.append(to_global(point))
+	var total := FORM.length(world_points)
+	var chest := FORM.sample(world_points,minf(1.0,float(state.body_width)*0.9/maxf(1.0,total)))
+	var tip := world_points[-1]
+	if stage==0 and ready:
+		if tech in ["bite","charge","leap","clones"]: FX.eyes(canvas,head,world_facing,FX._smooth(0.15,0.95,k),Color("#ff5470"),t)
+		elif tech in ["tail_sweep","tail_slam","rifts"]: FX.eyes(canvas,head,world_facing,0.45*FX._smooth(0.3,1.0,k),FX.BASE,t)
+		if tech in ["tail_sweep","tail_slam"]:
+			FX.gather(canvas,tip,100.0,k,t,193.0)
+			FX.supply(canvas,FORM.sample(world_points,0.72),tip,k,t,213.0)
+		elif tech=="picaro_wall":
+			var e := FX._smooth(0.62,1.0,k)
+			if e>0.0: FX.dark_gather(canvas,mouth,e,t)
+		elif tech=="rifts":
+			FX.gather(canvas,chest,66.0,k,t,191.0)
+		elif tech in ["breath","meteor","star_fan","inhale"]:
+			FX.gather(canvas,mouth,85.0,k,t,191.0)
+			FX.supply(canvas,chest,mouth,k,t,215.0,30.0)
+		if tech=="tail_slam" and attack.has("target"): FX.tremble(canvas,attack.target,float(attack.get("telegraph_radius",110.0)),k,t,121.0)
+		if tech=="leap" and not attack.get("telegraph_points",PackedVector2Array()).is_empty(): FX.tremble(canvas,attack.telegraph_points[0],170.0,FX._smooth(0.15,0.9,k),t,141.0)
+		if tech=="charge" and attack.get("warning",PackedVector2Array()).size()>=2:
+			var line: PackedVector2Array = attack.warning
+			PRIM.warn_rail(canvas.back,canvas.to_logical(line[0]),canvas.to_logical(line[-1]),{"color":FX.BASE,"k":0.3+0.7*k,"time":t,"seed":300,"maxLv":2,"intensity":1.0})
+		if tech=="star_fan":
+			var stars: PackedVector2Array = attack.get("telegraph_points",PackedVector2Array())
+			for i in stars.size():
+				FX.supply(canvas,mouth,stars[i],FX._smooth(0.1,0.75,k),t,230.0+i,(i-stars.size()*0.5)*7.0)
+				FX.star_charge(canvas,stars[i],i,FX._smooth(0.08+i*0.03,0.85,k),t)
+	if tech in ["charge","leap"] and stage==1: FX.rush(canvas,world_points,float(state.body_width),attack.get("takeoff",attack.get("origin",head)),float(body_angle),st,float(attack.active_time),FORM)
+	if tech in ["bite","leap"] and stage in [1,2]:
+		var active := float(attack.get("active_time",0.5))
+		var bite_time := (st if stage==1 else active+st)-active*0.7
+		if bite_time>=0.0:
+			if _bite.is_empty(): _bite = {"at":mouth,"angle":world_facing}
+			FX.bite_tear(canvas,_bite.at,_bite.angle,bite_time,70.0,float(attack.get("recover_time",1.0)),t)
+	else: _bite = {}
+	if tech=="tail_sweep" and stage==1:
+		var last := world_points.size()-1
+		_wake.append({"t":t,"a":world_points[last],"b":world_points[roundi(last*0.82)]})
+	if tech=="tail_sweep" or not _wake.is_empty():
+		FX.sweep_wake(canvas,_wake,t)
+		if stage!=1 and not _wake.is_empty() and t-float(_wake[-1].t)>0.4: _wake.clear()
+	if tech=="inhale" and stage==1:
+		var hold := float(attack.get("inhale_time",3.0))
+		if st<hold: FX.inhale(canvas,mouth,1500.0,_smooth(0.0,0.4,st)*(1.0-_smooth(hold-0.3,hold,st)),t)
+	if tech=="spiral" and stage==1:
+		var coil := float(attack.get("coil_time",1.2))
+		var pause := float(attack.get("pause_time",2.8))
+		if st>=coil and st<coil+pause+0.1: FX.spiral_countdown(canvas,world_points,clampf((st-coil)/pause,0.0,1.0),t)
+	for impact: Dictionary in attack.get("arrow_impacts",[]):
+		if impact.locked: FX.dark_fall(canvas,impact.position,float(impact.age)-float(impact.wait),float(impact.warn),float(attack.get("impact_radius",85.0)),t)
+	for effect: Dictionary in state.get("impacts",[]):
+		var age := float(effect.age)
+		var seed := 83.0+floorf((t-age)*10.0)
+		var radius := float(effect.radius)
+		if effect.technique=="tail_slam":
+			FX.impact(canvas,effect.position,age,radius*2.6,seed,_cracks(seed,radius*2.6*float(canvas.world_scale)))
+			FX.dark_blast(canvas,effect.position,age,radius*1.5,seed,FX.FLAME)
+			for m in 6: FX.dust(canvas,effect.position,age-m*0.02,seed+m,m*TAU/6.0,2.4)
+		elif effect.technique=="picaro_wall": FX.dark_blast(canvas,effect.position,age,radius,seed)
+		else: FX.impact(canvas,effect.position,age,radius*1.1,seed,_cracks(seed,radius*1.1*float(canvas.world_scale)))
+	canvas.front.glow(canvas.to_logical(chest).x,canvas.to_logical(chest).y,10.0,Color("#8dbdff"),0.35)
+
+func _cracks(seed: float, radius: float) -> Array:
+	if not _crack_rows.has(seed):
+		if _crack_rows.size()>16: _crack_rows.clear()
+		_crack_rows[seed] = FX.cracks(seed,radius)
+	return _crack_rows[seed]
 
 func _draw_rift() -> void:
 	var intro: Dictionary = state.get("intro",{})
@@ -110,146 +281,6 @@ func _draw_rift() -> void:
 			var at: Vector2 = to_local(center+axis.orthogonal()*side*65.0)
 			var offset := axis.rotated(-rotation)*12.0
 			draw_line(at-offset,at+offset,Color(1.0,0.1,0.3,float(intro.eyes)),8.0,false)
-
-func _draw_technique() -> void:
-	if attack.is_empty() or int(attack.get("stage",5))>=5 or _move_style.is_empty(): return
-	var progress: float = attack.get("windup_progress",0.0) if int(attack.get("stage",0))==0 else 1.0
-	var polygon: PackedVector2Array=attack.get("telegraph_polygon",PackedVector2Array())
-	if polygon.size()>=3:
-		var shape:=PackedVector2Array()
-		var center: Vector2=to_local(attack.telegraph_center)
-		var far:=0.0
-		for point in polygon:
-			var local:=to_local(point)
-			shape.append(local);far=maxf(far,local.distance_to(center))
-		draw_colored_polygon(shape,_move_style.base_color)
-		var circle:=PackedVector2Array()
-		for j in 64:circle.append(center+Vector2.from_angle(TAU*j/64.0)*far*progress)
-		if progress>0.0:
-			for part in Geometry2D.intersect_polygons(shape,circle):draw_colored_polygon(part,_move_style.progress_color)
-		var outline: Color=_move_style.outline_color
-		outline.a+=progress*0.4
-		draw_polyline(shape+PackedVector2Array([shape[0]]),outline,float(_move_style.outline_width),false)
-	# 尾の薙ぎは、旧専用Polygon2Dと同じ予告面だけを描く。
-	if attack.get("technique","")=="tail_sweep": return
-	var visual_kind := String(_move_style.get("visual_kind",attack.get("technique","")))
-	var paths: Array = attack.get("telegraph_paths",[])
-	if paths.is_empty() and not attack.get("warning",PackedVector2Array()).is_empty(): paths=[attack.warning]
-	for warning: PackedVector2Array in paths:
-		if warning.size()<2: continue
-		var width: float = attack.warning_width
-		var path := PackedVector2Array()
-		for point in warning: path.append(to_local(point))
-		draw_polyline(path,Color(1.0,0.61,0.25,0.09+progress*0.09),width*2.0,false)
-		for j in range(path.size()-1):
-			var normal := (path[j+1]-path[j]).normalized().orthogonal()*width
-			for side in [-1,1]: draw_line(path[j]+normal*side,path[j+1]+normal*side,Color(1.0,0.69,0.36,float(_move_style.telegraph_edge_opacity)+progress*0.4),float(_move_style.telegraph_line_width),false)
-		preload("res://scripts/bosses/draco_form.gd").star(self,path[-1],10.0,Color(1.0,0.86,0.6,0.7))
-	for target: Vector2 in attack.get("telegraph_points",PackedVector2Array()):
-		var at: Vector2 = to_local(target)
-		if visual_kind=="star_fan":
-			preload("res://scripts/bosses/draco_form.gd").star(self,at,8.0+progress*4.0,Color(1.0,0.78,0.48,0.85))
-			continue
-		var radius: float = attack.get("telegraph_radius",attack.warning_width)
-		draw_arc(at,radius,0,TAU,48,Color(1.0,0.7,0.35,0.8),float(_move_style.telegraph_line_width),false)
-		draw_arc(at,radius*(1.7-progress*0.7),-PI*0.5,TAU-PI*0.5,48,Color(1.0,0.77,0.5,0.8),4.0,false)
-		for side in [-1,1]:
-			draw_line(at+Vector2(side*(radius+10.0),0),at+Vector2(side*(radius+25.0),0),Color("#f8c879"),float(_move_style.telegraph_line_width),false)
-			draw_line(at+Vector2(0,side*(radius+10.0)),at+Vector2(0,side*(radius+25.0)),Color("#f8c879"),float(_move_style.telegraph_line_width),false)
-	var points: PackedVector2Array = attack.get("attack_points",PackedVector2Array())
-	if points.size()>=2:
-		var line := PackedVector2Array()
-		for point in points: line.append(to_local(point))
-		if visual_kind=="breath" and line.size()>3:
-			for j in range(1,line.size()-1):
-				if absf((line[j]-line[0]).cross(line[j+1]-line[0]))>0.1: draw_colored_polygon(PackedVector2Array([line[0],line[j],line[j+1]]),Color(0.34,0.46,1.0,0.5))
-			draw_polyline(line,Color(0.68,0.86,1.0,0.8),float(_move_style.active_line_width),false)
-		elif preload("res://scripts/bosses/draco_form.gd").length(line)>=8.0:
-			if visual_kind in ["bite","charge","leap","tail_slam","tail_sweep"]:
-				draw_polyline(line,Color(0.52,0.72,1.0,float(_move_style.motion_trail_opacity)),14.0,false)
-				draw_polyline(line,Color(0.86,0.95,1.0,0.7),float(_move_style.telegraph_line_width),false)
-			else:
-				var active: bool = int(attack.get("stage",5))==1
-				draw_polyline(line,Color(0.6,0.78,1.0,0.32) if active else Color(1.0,0.71,0.3,0.14),float(attack.attack_width)*2.0,false)
-				draw_polyline(line,Color("#e5f7ff") if active else Color("#efb56c"),float(_move_style.active_line_width),false)
-
-func _draw_impacts() -> void:
-	var form = preload("res://scripts/bosses/draco_form.gd")
-	for effect: Dictionary in state.get("impacts",[]):
-		var style: Dictionary = _styles.get(effect.technique,{})
-		if style.is_empty() or effect.age>=float(style.impact_lifetime): continue
-		var f := clampf(float(effect.age)/float(style.impact_lifetime),0.0,1.0)
-		var center: Vector2 = to_local(effect.position)
-		var radius: float = effect.radius
-		var size := radius*(0.35+f*1.4)
-		draw_arc(center,size,0,TAU,48,Color(0.42,0.55,1.0,(1.0-f)*0.6),maxf(2.0,12.0*(1.0-f)),false)
-		draw_arc(center,size*0.72,0,TAU,48,Color(0.72,0.87,1.0,(1.0-f)*0.8),float(style.telegraph_line_width),false)
-		form.star(self,center,radius*0.8*(1.0-f),Color(0.88,0.96,1.0,(1.0-f)*0.9))
-		for j in 8:
-			var direction := Vector2.from_angle(float(j)*TAU/8.0+0.2)
-			var at := center+direction*size
-			var cross := direction.orthogonal()*radius*0.07*(1.0-f)
-			form.quad(self,at-direction*radius*0.22,at+cross,at+direction*radius*0.1,at-cross,Color(0.56,0.62,1.0,1.0-f))
-
-
-## 亀裂の位置と修復中の幅は、戦闘側が出す壁の値だけを使う。
-func _draw_rift_walls() -> void:
-	var form=preload("res://scripts/bosses/draco_form.gd")
-	for wall: Dictionary in state.get("rift_walls",[]):
-		var length: float=wall.length
-		var width: float=wall.width
-		if length<1.0 or width<0.5:continue
-		var origin: Vector2=wall.position
-		var axis:=Vector2.from_angle(float(wall.angle))
-		var normal:=axis.orthogonal()
-		var left:=PackedVector2Array()
-		var right:=PackedVector2Array()
-		var count:=maxi(3,ceili(length/24.0))
-		for j in count+1:
-			var point:=origin+axis*length*float(j)/float(count)
-			var notch:=sin(float(j)*2.7+float(wall.index)*0.31)*width*0.13
-			left.append(to_local(point+normal*(width*0.34+notch)).snapped(Vector2(2,2)))
-			right.append(to_local(point-normal*(width*0.34-notch)).snapped(Vector2(2,2)))
-		for j in count:form.quad(self,left[j],left[j+1],right[j+1],right[j],Color("#050410"))
-		draw_polyline(left,Color("#8770cb"),3.0,false)
-		draw_polyline(right,Color("#40315f"),3.0,false)
-		for j in range(0,count,3):draw_line(left[j].lerp(right[j],0.25),left[j+1],Color(0.68,0.74,1.0,0.45),2.0,false)
-
-## ピカロの生成は run_frame_view.gd の共通表示（星を吸い込んで育つ塊）で描く。円と輪で囲む古い到着表示は出さない。
-func _draw_picaro_arrivals() -> void:
-	pass
-
-func _draw_arrow_impacts() -> void:
-	for impact: Dictionary in attack.get("arrow_impacts",[]):
-		if not impact.locked: continue
-		var progress:=clampf((float(impact.age)-float(impact.wait))/float(impact.warn),0.0,1.0)
-		var at:=to_local(impact.position)
-		var radius: float=attack.get("impact_radius",85.0)
-		draw_arc(at,radius*(1.8-progress*0.8),0,TAU,48,Color("#baa8ff"),3.0,false)
-		draw_line(to_local(impact.position+Vector2.UP*1200.0*(1.0-progress)),at,Color(0.6,0.75,1.0,progress*0.6),4.0)
-
-func _draw_spiral_charge() -> void:
-	if attack.get("technique","")!="spiral" or int(attack.get("stage",5))!=1: return
-	var coil: float=attack.coil_time
-	var time: float=attack.stage_time
-	if time<coil or time>=coil+float(attack.pause_time): return
-	var progress:=clampf((time-coil)/float(attack.pause_time),0.0,1.0)
-	var center:=to_local(attack.spiral_center)
-	var radius:=lerpf(minf(attack.spiral_horizontal,attack.spiral_extent)*0.56,float(state.body_width)*0.7,progress)
-	var warning:=Color(1.0,0.38,0.23,0.18+progress*0.6)
-	draw_arc(center,radius,0,TAU,64,warning,4.0+progress*4.0,false)
-	for j in 12:
-		var direction:=Vector2.from_angle(j*TAU/12.0)
-		draw_line(center+direction*(radius+20),center+direction*(radius+4),warning,3.0,false)
-	preload("res://scripts/bosses/draco_form.gd").star(self,center,7.0+progress*12.0,warning)
-
-func _draw_inhale() -> void:
-	if attack.get("technique","")!="inhale" or int(attack.get("stage",5))>=3 or attack.get("spent",false):return
-	var mouth:=to_local(state.position+Vector2.from_angle(state.facing)*120.0*float(state.head_scale)*float(state.perspective_scale))
-	for j in 24:
-		var k:=fmod(float(attack.stage_time)*0.7+j/24.0,1.0)
-		var at:=mouth+Vector2.from_angle(j*2.399963)*float(_move_style.get("pull_range",1500.0))*(1.0-k)
-		draw_line(at,at+(mouth-at).normalized()*25.0,Color(0.6,0.5,1.0,k*0.6),3.0)
 
 func _draw_finale() -> void:
 	var f: Dictionary=state.get("finale",{})
