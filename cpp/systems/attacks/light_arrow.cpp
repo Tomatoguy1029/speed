@@ -36,7 +36,7 @@ std::optional<double> LightArrowSystem::contact(RunRuntime &run,AttackHandle han
     return result.touching?std::optional<double>(arrival):std::nullopt;
 }
 void LightArrowSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,godot::Array &out) {
-    using namespace godot;const auto &s=run.state.hostiles[row];if (!s.alive || !s.arrow.definition || !view.has_point(s.pos)) return;
+    using namespace godot;const auto &s=run.state.hostiles[row];if (!s.alive || !s.arrow.definition || !view.has_point(s.pos) || s.kind==int64_t(HostileKind::CosmicArrow)) return;
     const auto *record=AttackSystem::get(run.state,s.attack);if (!record) return;const auto &d=run.content->light_arrows[s.arrow.definition-1];
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::LightArrow);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
     PackedVector2Array points;points.push_back(s.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(s.radius*d.flight_scale);PackedColorArray colors;colors.push_back(Color(d.tint_r,d.tint_g,d.tint_b,d.tint_a));

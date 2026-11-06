@@ -33,7 +33,7 @@ struct DracoSpiralState {
     std::vector<AttackHandle> walls;
 };
 struct DracoSideEntryState {godot::Vector2 origin,outside,inside;double angle=0,facing=0,side=1;};
-struct DracoInhaleState {DracoSideEntryState staging;uint32_t stars=0;bool spent=false,caught=false,spat=false;double release_at=0;AttackHandle beam;godot::Vector2 direction;};
+struct DracoInhaleState {DracoSideEntryState staging;uint32_t stars=0;bool spent=false,caught=false,spat=false;double release_at=0;AttackHandle beam;godot::Vector2 direction,beam_from;};
 struct DracoCloneUnit;
 struct DracoClonesState {std::vector<DracoCloneUnit> units;godot::Vector2 center;double axis=0;bool roared=false,ended=false;};
 struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState,DracoInhaleState,DracoSpiralState,DracoClonesState> move;};

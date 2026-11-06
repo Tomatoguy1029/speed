@@ -25,6 +25,10 @@ var _wake: Array = []
 var _bite := {}
 var _shout_clock := -1.0
 var _crack_rows := {}
+var _shot_born := {}
+var _raster := SpeedFxRaster.new()
+var _raster_under := SpeedFxRaster.new()
+var _fire: Node2D
 const FX := preload("res://scripts/render/bosses/draco_fx.gd")
 const FORM := preload("res://scripts/bosses/draco_form.gd")
 const PRIM := preload("res://scripts/render/fx/fx_reference_primitives.gd")
@@ -34,6 +38,8 @@ func _ready() -> void:
 	z_index = 1
 	_parts = preload("res://scripts/bosses/draco_parts.gd").new()
 	add_child(_parts)
+	_fire = preload("res://scripts/render/bosses/draco_meteor_fire.gd").new()
+	add_child(_fire)
 	EFFECT_SETTINGS.apply_key(self,"boss/body/draco")
 func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictionary = {}) -> void:
 	attack = current
@@ -163,6 +169,32 @@ func _present(points: PackedVector2Array, body: Dictionary, current: Dictionary)
 				for i in 7: out[i] += shake*(1.0-i/7.0)
 	var turn := sin(t*5.3)*0.05*swim
 	for i in 4: arms[i] = (1.0 if i%2 else -1.0)*charge*(0.42 if i<2 else 0.16)
+	if tech=="rifts" and ready and stage<=1:
+		var swipes: Array = current.get("rift_swipes",[])
+		var total := FORM.length(out)
+		var distance := minf(total,float(body.body_width)*0.9)
+		var at := FORM.sample(out,distance/maxf(1.0,total))
+		var tangent := (FORM.sample(out,minf(1.0,(distance+2.0)/maxf(1.0,total)))-at).normalized()
+		var normal := tangent.orthogonal()
+		for i in 2:
+			var side := -1.0 if i==0 else 1.0
+			var base := (normal*side-tangent*0.3).angle()
+			var out_side := Vector2(0,1)*(1.0 if sin(base)>=0.0 else -1.0)
+			var rise := (Vector2.RIGHT+out_side*0.7).angle()
+			var strike := (Vector2.RIGHT-out_side*0.45).angle()
+			var local := -1.0
+			var ahead := INF
+			for n in swipes.size():
+				if n%2!=i: continue
+				var age := float(swipes[n].age)
+				if age>=0.0: local = age
+				elif -age<ahead: ahead = -age
+			var reach := _smooth(0.0,0.16,local) if local>=0.0 else 0.0
+			var settle := _smooth(0.22,0.6,local) if local>=0.0 else 0.0
+			var lift := _smooth(0.42,0.12,ahead) if ahead<INF else 0.0
+			var want := rise+wrapf(strike-rise,-PI,PI)*reach
+			want += wrapf(rise-want,-PI,PI)*lift
+			arms[i] = wrapf(want-base,-PI,PI)*(k if windup else maxf(1.0-settle if local>=0.0 else 1.0,lift))
 	return {"points":out,"facing":world_facing+turn,"arms":arms,"charge":charge}
 
 func _swim(pts: PackedVector2Array, t: float, swim: float, bow: float) -> PackedVector2Array:
@@ -185,6 +217,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var tech: String = attack.get("technique","")
 	var stage := int(attack.get("stage",5))
 	var st := float(attack.get("stage_time",0.0))
+	_draw_under(canvas,t,st,stage,tech)
 	var ready: bool = attack.get("staging_ready",true)
 	var scale_head := float(state.head_scale)*float(state.perspective_scale)
 	var head: Vector2 = to_global(_pose.points[0])
@@ -255,6 +288,99 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		elif effect.technique=="picaro_wall": FX.dark_blast(canvas,effect.position,age,radius,seed)
 		else: FX.impact(canvas,effect.position,age,radius*1.1,seed,_cracks(seed,radius*1.1*float(canvas.world_scale)))
 	canvas.front.glow(canvas.to_logical(chest).x,canvas.to_logical(chest).y,10.0,Color("#8dbdff"),0.35)
+	_draw_heavy(canvas,t,st,stage,tech,mouth,world_facing)
+	if tech=="rifts": FX.rift_tells(canvas,attack.get("rift_tears",[]),float(attack.get("rift_tell",0.5)),float(attack.get("rift_open",0.16)),float(attack.get("rift_close",0.55)),t)
+	_draw_rocks(canvas,t,tech,stage)
+
+func _draw_heavy(canvas, t: float, st: float, stage: int, tech: String, mouth: Vector2, world_facing: float) -> void:
+	var front = canvas.front
+	_raster.begin(front.colors,front.lights,front.width,front.height,float(canvas.world_scale),canvas._camera_position)
+	var drew := false
+	if tech=="breath" and stage==1 and attack.get("attack_points",PackedVector2Array()).size()>=3:
+		_raster.breath(attack.attack_points,st,float(attack.active_time),float(attack.axis),float(attack.sweep),float(attack.half_angle),float(attack.reach),float(attack.fan_angle))
+		drew = true
+	if tech=="inhale" and stage==1 and attack.get("spent",false):
+		var warn := float(attack.beam_warn)
+		var age := st-float(attack.inhale_time)
+		if age>=warn:
+			_raster.exhale(attack.beam_from,Vector2(attack.beam_direction).angle(),float(attack.beam_reach),float(attack.beam_width),age-warn,float(attack.beam_extend),_exhale_life(age-warn,st),t)
+			drew = true
+	var live := {}
+	for shot: Dictionary in state.get("shots",[]):
+		live[shot.id] = true
+		if not _shot_born.has(shot.id): _shot_born[shot.id] = t
+		var age := t-float(_shot_born[shot.id])
+		var seed := float(shot.id)*0.37
+		match int(shot.style):
+			0: _raster.comet(shot.position,float(shot.angle),age,float(shot.speed),12.0,240.0,0.5,seed,false)
+			1: _raster.comet(shot.position,float(shot.angle),age,float(shot.speed),24.0,520.0,0.2,seed,true)
+			2: _raster.dark_shot(shot.position,float(shot.angle),age,seed)
+		drew = true
+	for id in _shot_born.keys():
+		if not live.has(id): _shot_born.erase(id)
+	front.colors = _raster.take_colors()
+	front.lights = _raster.take_lights()
+	if drew:
+		front.has_color = true
+		front.has_light = true
+
+func _exhale_life(age: float, st: float) -> float:
+	if age<0.0: return 0.0
+	var active := float(attack.active_time)
+	return _smooth(0.0,0.08,age)*(1.0-_smooth(active-0.45,active,st))*(1.0+0.5*exp(-age/0.16))
+
+## 体より奥の層：暗転と、ためた光の広がり。
+func _draw_under(canvas, t: float, st: float, stage: int, tech: String) -> void:
+	var dim := 0.0
+	var flash := 0.0
+	var k := clampf(float(attack.get("windup_progress",0.0)),0.0,1.0)
+	if tech=="star_fan":
+		var recover := maxf(0.01,float(attack.get("recover_time",1.0)))
+		dim = 0.5*_smooth(0.1,1.0,k) if stage==0 else 0.5 if stage==1 else 0.5*(1.0-_smooth(0.1,0.8,st/recover)) if stage==2 else 0.0
+		if stage==1: flash = exp(-st/0.08)*0.12
+	if tech=="inhale" and stage==1 and attack.get("spent",false):
+		var warn := float(attack.beam_warn)
+		var age := st-float(attack.inhale_time)
+		dim = 0.55*_smooth(0.1,warn,age) if age<warn else 0.62*clampf(_exhale_life(age-warn,st),0.0,1.0)
+		if age>=warn: flash = exp(-(age-warn)/0.07)*0.3
+	var breath: bool = tech=="breath" and stage<=1 and not attack.get("rocks",[]).is_empty()
+	if dim<=0.0 and flash<=0.0 and not breath:
+		if tech!="breath": _raster_under.light_mask_reset()
+		return
+	var back = canvas.back
+	_raster_under.begin(back.colors,back.lights,back.width,back.height,float(canvas.world_scale),canvas._camera_position)
+	_raster_under.dim(dim,flash)
+	if breath:
+		var last := 1.6*0.62+0.42
+		var warn := float(attack.warn_time)
+		var charge := _smooth(last,warn-0.1,st) if stage==0 else 1.0-_smooth(0.2,float(attack.active_time),st)*0.55
+		if charge>0.0:
+			_raster_under.light_mask(attack.mouth,120.0,position,120.0*float(state.head_scale),float(attack.axis),float(attack.sweep),float(attack.half_angle),float(attack.reach),attack.rock_destinations,float(attack.rock_radius),charge*(0.88+0.12*sin(t*14.0)))
+	back.colors = _raster_under.take_colors()
+	back.lights = _raster_under.take_lights()
+	back.has_color = true
+	back.has_light = true
+
+## 隕石：飛ぶ炎と、炎に耐えて広がるひび。
+func _draw_rocks(canvas, t: float, tech: String, stage: int) -> void:
+	var rows: Array = []
+	for q: Dictionary in state.get("meteors",[]):
+		rows.append({"position":q.position,"angle":q.angle,"radius":q.radius,"seed":q.seed,"alpha":_smooth(0.0,0.12,float(q.age))})
+	if tech=="breath":
+		var active := float(attack.get("active_time",1.0))
+		for q: Dictionary in attack.get("rocks",[]):
+			var age := float(q.age)
+			if age<0.0 or not q.alive: continue
+			var from: Vector2 = attack.mouth
+			var dir: Vector2 = (Vector2(q.destination)-from).normalized()
+			if age<0.92:
+				rows.append({"position":q.position,"angle":dir.angle(),"radius":q.radius,"seed":q.order,"alpha":_smooth(0.0,0.12,minf(age,0.42))*(1.0-_smooth(0.42,0.87,age))})
+			if age>=0.42 and age<1.82:
+				var seed := 71.0+float(q.order)
+				FX.impact(canvas,q.destination,age-0.42,float(q.radius)*1.25,seed,_cracks(seed,float(q.radius)*1.25*float(canvas.world_scale)))
+			var k := clampf(float(q.burn)/(active*0.28),0.0,1.0)
+			if k>0.0: FX.rock_heat(canvas,q.position,float(q.radius),k,float(q.burn),active*0.28,int(q.order),_cracks(61.0+float(q.order)*7.0,float(q.radius)*float(canvas.world_scale)))
+	_fire.apply_frame(rows,t)
 
 func _cracks(seed: float, radius: float) -> Array:
 	if not _crack_rows.has(seed):

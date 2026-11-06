@@ -1498,6 +1498,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
 		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
 		_boss_sword_visual.frame_event(event)
+		if event.type==&"draco_shake": ruler_shake = maxf(ruler_shake,float(event.amount))
 		if event.type==&"draco_roar":
 			ruler_shake = maxf(ruler_shake,12.0)
 			if pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.8)

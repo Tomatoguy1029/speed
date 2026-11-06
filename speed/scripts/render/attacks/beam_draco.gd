@@ -37,6 +37,7 @@ func _strip(c: CanvasItem, at: Vector2, angle: float, length: float, half: float
 var _frame_row := {}
 func frame_apply(row: Dictionary, pixel: float) -> void:
 	_frame_row=row
+	visible=false # 見た目は draco_fx の光の奔流が描く
 	if material==null:
 		var mat:=ShaderMaterial.new()
 		mat.shader=load("res://shaders/draco_beam.gdshader")

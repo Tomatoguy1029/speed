@@ -24,6 +24,7 @@ var frame_view: Node2D
 var cpp_background: Node2D
 var pipeline: RenderPipeline
 var _roar_post: CanvasLayer
+var _rift_post: CanvasLayer
 var _camera: Camera2D
 var cam_center := Vector2.ZERO
 var cam_zoom := 1.0
@@ -141,6 +142,8 @@ func _ready_cpp() -> void:
 	bonus_visual.setup(pipeline,cpp_background)
 	_roar_post = preload("res://scripts/render/bosses/roar_post.gd").new()
 	add_child(_roar_post)
+	_rift_post = preload("res://scripts/render/bosses/draco_rift_post.gd").new()
+	add_child(_rift_post)
 	sync_canvas_layers()
 
 ## 外観の追加後も画面効果とHUDを全ての敵より手前に保つ。
@@ -150,6 +153,7 @@ func sync_canvas_layers() -> void:
 		overlay_layer = maxi(overlay_layer,int(entry.id)-3)
 	if pipeline!=null: pipeline.set_overlay_layer(overlay_layer)
 	if _roar_post!=null: _roar_post.layer = overlay_layer+2
+	if _rift_post!=null: _rift_post.layer = overlay_layer+1
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud") as CanvasLayer
 	if hud!=null: hud.layer = maxi(hud.layer,overlay_layer+3)
 	preload("res://scripts/ui/canvas_order.gd").world_changed(self,hud.layer if hud!=null else overlay_layer+3)
@@ -199,6 +203,7 @@ func _present_cpp(delta: float) -> void:
 		_camera.offset = Vector2.ZERO if not view.is_empty() and not view.get("shake",false) else Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
 	else: _camera.offset = Vector2.ZERO
 	if _roar_post!=null: _roar_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center+_camera.offset,cam_zoom)
+	if _rift_post!=null: _rift_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center+_camera.offset,cam_zoom)
 	frame_view.perf.since(&"view_effects",effects_start)
 	var tail_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var hud := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")

@@ -217,6 +217,67 @@ static func impact(canvas, at: Vector2, age: float, radius: float, seed: float, 
 		var k := age/life
 		canvas.front.px(c.x+cos(a)*d,c.y+sin(a)*d,pal[3] if k<0.3 else STONE[4 if k<0.6 else 3])
 
+## 炎に耐える隕石：当たっている間にひびが広がって熱を持ち、欠片がこぼれる。
+static func rock_heat(canvas, at: Vector2, radius: float, k: float, burn: float, full: float, i: int, crack_rows: Array) -> void:
+	var pal := PRIM.ramp(BASE)
+	var c: Vector2 = canvas.to_logical(at)
+	var rr: float = radius*canvas.world_scale
+	for row: PackedVector2Array in crack_rows:
+		var show := ceili(row.size()*k)
+		for m in show:
+			var h := k*(1.0-0.5*m/row.size())
+			canvas.front.blend(c.x+row[m].x,c.y+row[m].y,pal[4 if h>0.6 else 3],minf(1.0,0.45+h*0.7))
+	canvas.front.glow(c.x,c.y,rr*0.8,pal[2],0.3*k)
+	for m in 16:
+		var th := m/16.0
+		if k<=th: continue
+		var ph := (burn-th*full)/0.5
+		if ph>=1.0: continue
+		var a := _hash(m*3.7+i)*TAU
+		var d := rr*(0.85+0.9*(1.0-exp(-ph*2.2)))
+		var x := c.x+cos(a)*d
+		var y := c.y+sin(a)*d
+		canvas.front.blend(x,y,STONE[3 if m%2 else 4],1.0-ph)
+		canvas.front.blend(x+1.0,y,STONE[3],(1.0-ph)*0.8)
+
+## 予兆の細いひびと、裂ける先端の光。
+static func rift_tells(canvas, tears: Array, tell: float, open_time: float, close_time: float, time: float) -> void:
+	var pal := PRIM.ramp(BASE)
+	var p = canvas.front
+	for tear: Dictionary in tears:
+		var age := float(tear.age)
+		var A: Vector2 = canvas.to_logical(tear.from)
+		var B: Vector2 = canvas.to_logical(tear.to)
+		var length := A.distance_to(B)
+		if length<1.0: continue
+		var u := (B-A)/length
+		var n := _orth(u)
+		var seed := float(tear.seed)
+		if age<0.0:
+			var k := clampf(1.0+age/tell,0.0,1.0)
+			if k<=0.0: continue
+			var d := 0.0
+			while d<length:
+				var f := d/length
+				if absf(f-0.5)*2.0<=0.25+0.75*k:
+					var j := (_hash(seed*3.0+floorf(d/4.0))-0.5)*3.0*k*sin(PI*f)
+					p.blend(A.x+u.x*d+n.x*j,A.y+u.y*d+n.y*j,pal[3 if k>0.7 else 2],(0.3+0.6*k)*(0.7+0.3*sin(time*40.0+d*0.3)))
+				d += 0.5
+			continue
+		var hold := float(tear.hold)
+		var close := smoothstep(0.0,1.0,(age-hold)/close_time)
+		if age>=hold+close_time: continue
+		var tip := _burst(age/open_time)*(1.0-close)
+		if age<open_time+0.05 or (close>0.0 and close<1.0):
+			var tx := A.x+u.x*length*tip
+			var ty := A.y+u.y*length*tip
+			p.glow(tx,ty,11.0,pal[3],0.9)
+			p.disc(tx,ty,2.2,Color.WHITE,1.0)
+			for m in 10:
+				var a := _hash(m*3.3+seed+floorf(time*30.0))*TAU
+				var d := 3.0+16.0*_hash(m*7.1+floorf(time*24.0))
+				p.blend(tx+cos(a)*d,ty+sin(a)*d,pal[4],0.9)
+
 static func dark_gather(canvas, mouth: Vector2, k: float, time: float) -> void:
 	var p = canvas.front
 	var c: Vector2 = canvas.to_logical(mouth)
