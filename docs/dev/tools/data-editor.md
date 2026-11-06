@@ -785,13 +785,8 @@
 | formation_margin (`formation_margin`) | 首の陣形が目標位置から離れても許す余白（距離） |
 | formation_timeout (`formation_timeout`) | 首の陣形配置を諦めるまでの時間（秒） |
 | formation_tolerance (`formation_tolerance`) | 首の陣形の到着許容距離 |
-| grid_clearance (`grid_clearance`) | 格子攻撃で確保する通行余白（距離） |
 | grid_cooldown (`grid_cooldown`) | 格子攻撃を再使用できるまでの時間（秒） |
-| grid_layouts (`grid_layouts`) | 格子攻撃の経路・配置。入れ子の辞書のためデータ編集では直接編集できない 保存はGodot Inspectorまたは専用画面で行う。 |
 | grid_minimum (`grid_minimum`) | 格子攻撃に必要な生存首の最小数 |
-| grid_regions (`grid_regions`) | 位置別の格子レイアウト名。入れ子の辞書のためデータ編集では直接編集できない 保存はGodot Inspectorまたは専用画面で行う。 |
-| grid_time (`grid_time`) | 格子攻撃の継続時間（秒） |
-| grid_tolerance (`grid_tolerance`) | 格子攻撃で配置のずれを許す距離 |
 | growth_thresholds (`growth_thresholds`) | 首の成長段階が切り替わるHP割合の配列。データ編集では直接編集できない 保存はGodot Inspectorまたは専用画面で行う。 |
 | growth_time (`growth_time`) | 首の成長演出にかける時間（秒） |
 | guard_radius (`guard_radius`) | 首が守る領域の半径（距離） |

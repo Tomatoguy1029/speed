@@ -163,9 +163,6 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     bundle->flow_weights=records.BossFlowWeight_rows;
     bundle->flow_forbidden=records.BossFlowForbidden_rows;
     bundle->hydra_grids=records.HydraGridDefinition_rows;
-    bundle->hydra_grid_layouts=records.HydraGridLayout_rows;
-    bundle->hydra_grid_slots=records.HydraGridSlot_rows;
-    bundle->hydra_grid_paths=records.HydraGridPath_rows;
     bundle->hydra_pincers=records.HydraPincerDefinition_rows;
     bundle->hydra_shatters=records.HydraShatterDefinition_rows;
     bundle->hydra_tornadoes=records.HydraTornadoDefinition_rows;
@@ -986,10 +983,7 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
     for (size_t i=0;i<bundle->hydra_wind_bands.size();++i) if (bundle->hydra_wind_bands[i].id!=i+1 || bundle->boss_techniques[bundle->hydra_wind_bands[i].technique-1].kind!=75) return {};
     for (size_t i=0;i<bundle->hydra_wind_blades.size();++i) {const auto &p=bundle->hydra_wind_blades[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=68) return {};}
     for (size_t i=0;i<bundle->hydra_majors.size();++i) {const auto &p=bundle->hydra_majors[i];if (p.id!=i+1 || bundle->bosses[bundle->boss_techniques[p.technique-1].boss-1].kind!=3) return {};}
-    for (size_t i=0;i<bundle->hydra_grids.size();++i) {const auto &p=bundle->hydra_grids[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=73 || p.width<=0 || p.planning_width<=0 || p.time<=0 || p.formation_timeout<=0 || p.tolerance<0 || p.clearance<0) return {};}
-    for (size_t i=0;i<bundle->hydra_grid_layouts.size();++i) {const auto &p=bundle->hydra_grid_layouts[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=73 || p.name.empty() || !p.region_mask || std::count_if(bundle->hydra_grid_paths.begin(),bundle->hydra_grid_paths.end(),[&](const auto &v){return v.layout==p.id;})<2) return {};uint32_t order=0;for (const auto &v:bundle->hydra_grid_slots) if (v.layout==p.id && v.order!=order++) return {};order=0;for (const auto &v:bundle->hydra_grid_paths) if (v.layout==p.id && v.order!=order++) return {};}
-    for (size_t i=0;i<bundle->hydra_grid_slots.size();++i) if (bundle->hydra_grid_slots[i].id!=i+1) return {};
-    for (size_t i=0;i<bundle->hydra_grid_paths.size();++i) if (bundle->hydra_grid_paths[i].id!=i+1) return {};
+    for (size_t i=0;i<bundle->hydra_grids.size();++i) {const auto &p=bundle->hydra_grids[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=73 || p.width<=0) return {};}
     for (size_t i=0;i<bundle->hydra_swarms.size();++i) {const auto &p=bundle->hydra_swarms[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=90 || p.radius<=0 || p.flight<=0 || p.formation_timeout<=0) return {};}
     for (size_t i=0;i<bundle->hydra_sequences.size();++i) {const auto &p=bundle->hydra_sequences[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=89 || p.radius<=0 || p.lunge<=0 || p.half_angle>3.141592653589793) return {};}
     for (size_t i=0;i<bundle->hydra_north.size();++i) {const auto &p=bundle->hydra_north[i];if (p.id!=i+1 || bundle->boss_techniques[p.technique-1].kind!=88 || p.radius<=0 || p.half_angle>3.141592653589793) return {};}

@@ -1140,24 +1140,7 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique, action
 		records.HydraPincerDefinition=[{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.pincer_delay),"time":float(values.pincer_time),"open_angle":float(values.pincer_open_angle),"close_angle":float(values.pincer_close_angle)}]
 	if move.technique==&"grid":
 		records.erase("HydraCurveDefinition")
-		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"delay":float(values.normal_charge),"time":float(values.grid_time),"planning_width":float(definition.params.beam_width),"clearance":float(definition.params.grid_clearance),"tolerance":float(definition.params.grid_tolerance),"formation_timeout":float(definition.params.formation_timeout),"minimum":int(definition.params.grid_minimum)}]
-		records.HydraGridLayout=[];records.HydraGridSlot=[];records.HydraGridPath=[]
-		var regions := [&"center",&"right",&"left",&"up",&"down"]
-		for name in definition.params.grid_layouts:
-			var layout: Dictionary=definition.params.grid_layouts[name]
-			var id: int=records.HydraGridLayout.size()+1
-			var mask := 0
-			for region in 5:
-				if definition.params.grid_regions.get(regions[region],&"provisional")==name:mask|=1<<region
-			if mask==0:continue
-			records.HydraGridLayout.append({"id":id,"technique":1,"name":String(name),"region_mask":mask})
-			var slots: Array=layout.slots.duplicate(true);slots.sort_custom(func(a,b):return int(a.priority)<int(b.priority))
-			for index in slots.size():
-				var slot: Dictionary=slots[index]
-				records.HydraGridSlot.append({"id":records.HydraGridSlot.size()+1,"layout":id,"order":index,"from_x":float(slot.from.x),"from_y":float(slot.from.y),"to_x":float(slot.to.x),"to_y":float(slot.to.y)})
-			for index in layout.path.size():
-				var point: Vector2=layout.path[index]
-				records.HydraGridPath.append({"id":records.HydraGridPath.size()+1,"layout":id,"order":index,"x":float(point.x),"y":float(point.y)})
+		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"minimum":int(definition.params.grid_minimum)}]
 	return records
 
 static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, action_rules: Resource = null) -> Dictionary:

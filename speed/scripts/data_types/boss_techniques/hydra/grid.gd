@@ -17,11 +17,6 @@ extends HydraTechnique
 	set(value):
 		cooldown = value
 		_values_dirty = true
-## 格子攻撃の時間
-@export_range(0,100000,0.01) var grid_time := 3.5:
-	set(value):
-		grid_time = value
-		_values_dirty = true
 ## 予備動作（秒）
 @export_range(0,100000,0.01) var normal_charge := 0.6:
 	set(value):

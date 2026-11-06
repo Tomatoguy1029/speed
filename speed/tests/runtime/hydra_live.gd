@@ -24,7 +24,6 @@ func _ready() -> void:
 		return
 	check_environment()
 	check_budget()
-	check_grid()
 	check_separated()
 	failed += helper.failed
 	helper.free()
@@ -147,18 +146,6 @@ func check_budget() -> void:
 	bridge._core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	bridge._core.step(4.0)
 	check(bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"通常敵の予算が0でも大技を開始する")
-	bridge.dispose()
-func check_grid() -> void:
-	var c: Dictionary = helper.hydra_major_case("grid",{},false,{}, {"planet_radius":1.0})
-	if c.is_empty(): check(false,"格子の試行を準備する");return
-	var bridge = c.bridge
-	helper.hydra_grid_separate(c)
-	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true}})
-	var plan: Dictionary = bridge.command("dev_hydra_grid_plan",{"entity_id":c.id,"definition":1}).value
-	check(not plan.is_empty(),"天体のない領域では格子の配置が成立する")
-	if not plan.is_empty():
-		check(bridge.command("dev_edit",{"kind":"planet","payload":{"position":plan.bearer,"radius":100.0}}).ok,"不死首の配置先に天体を置く")
-		check(bridge.command("dev_hydra_grid_plan",{"entity_id":c.id,"definition":1}).value.is_empty(),"不死首の配置先が天体の中なら格子を開始しない")
 	bridge.dispose()
 func check_separated() -> void:
 	var c: Dictionary = helper.hydra_normal_case(false,{}, {},"bite_thrust",{"planet_radius":1.0})

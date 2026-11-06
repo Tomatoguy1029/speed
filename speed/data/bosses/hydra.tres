@@ -52,56 +52,8 @@ params = {
 "formation_margin": 70.0,
 "formation_timeout": 12.0,
 "formation_tolerance": 45.0,
-"grid_clearance": 12.0,
 "grid_cooldown": 30.0,
-"grid_layouts": {
-&"provisional": {
-"path": PackedVector2Array(0, 0, 70, 100, 200, 100, 200, -100, 350, -100, 420, 0),
-"slots": [{
-"from": Vector2(135, -180),
-"priority": 0,
-"to": Vector2(135, 20)
-}, {
-"from": Vector2(265, 180),
-"priority": 1,
-"to": Vector2(265, -20)
-}, {
-"from": Vector2(40, -170),
-"priority": 2,
-"to": Vector2(220, -170)
-}, {
-"from": Vector2(400, 170),
-"priority": 3,
-"to": Vector2(200, 170)
-}, {
-"from": Vector2(-60, -200),
-"priority": 4,
-"to": Vector2(-60, -80)
-}, {
-"from": Vector2(450, 200),
-"priority": 5,
-"to": Vector2(450, 80)
-}, {
-"from": Vector2(20, 220),
-"priority": 6,
-"to": Vector2(150, 220)
-}, {
-"from": Vector2(400, -220),
-"priority": 7,
-"to": Vector2(270, -220)
-}]
-}
-},
 "grid_minimum": 3,
-"grid_regions": {
-&"center": &"provisional",
-&"down": &"provisional",
-&"left": &"provisional",
-&"right": &"provisional",
-&"up": &"provisional"
-},
-"grid_time": 3.5,
-"grid_tolerance": 6.0,
 "growth_thresholds": [0.75, 0.4],
 "growth_time": 1.0,
 "head_hp": 360.0,
