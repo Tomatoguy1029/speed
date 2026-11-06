@@ -28,7 +28,7 @@ bool HydraTechnique::ready(const RunRuntime &r,EnemyHandle actor,uint32_t defini
     if (r.content->boss_techniques[definition-1].kind==88 || r.content->boss_techniques[definition-1].kind==89) return !b->hydra->separated && front_heads(r,*b,definition).size()==3;
     if (r.content->boss_techniques[definition-1].kind==74) return participants(r,*b,{HydraHeadKind::Beam,HydraHeadKind::Beam}).size()==2;
     if (r.content->boss_techniques[definition-1].kind==73) return grid_ready(r,*b,definition);
-    if (r.content->boss_techniques[definition-1].kind==83) return participants(r,*b,{HydraHeadKind::Debris,HydraHeadKind::Beam}).size()==2;
+    if (r.content->boss_techniques[definition-1].kind==83) return r.state.enemies[b->actor.slot].pos.distance_to(r.state.ship_pos)>=700 && participants(r,*b,{HydraHeadKind::Debris,HydraHeadKind::Beam}).size()==2;
     if (r.content->boss_techniques[definition-1].kind==82) return participants(r,*b,{HydraHeadKind::Vortex,HydraHeadKind::Debris}).size()==2;
     return !b->hydra->separated && b->hydra->necks.size()>=5 && std::count_if(b->hydra->necks.begin(),b->hydra->necks.end(),[&](const auto &n){return HydraRegrow::alive(r,n);})>=3;
 }
@@ -65,6 +65,7 @@ void HydraTechnique::step(RunRuntime &r,TechniqueState &t,double dt) {
     if (((p.kind==74 || p.kind==89) && !all_participants_alive(r,v)) || (p.kind==89 && b->hydra->separated) || std::none_of(v.participants.begin(),v.participants.end(),[&](auto actor){return r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;})) {finish(r,t,true);return;}
     if ((r.content->boss_techniques[t.definition-1].kind==82 || r.content->boss_techniques[t.definition-1].kind==83) && !all_participants_alive(r,v)) {finish(r,t,true);return;}
     if (t.elapsed>=p.warn) {if (!v.playing) {v.playing=true;cue(r,*b,"attack_started",t.definition);}v.time+=dt;t.stage=TechniqueStage::Active;if (r.content->boss_techniques[t.definition-1].kind==83) debris_shatter(r,t,dt);else if (p.kind==74) pincer(r,t);else if (r.content->boss_techniques[t.definition-1].kind==82) tornado(r,t,dt);else if (p.kind==89) sequence(r,t,dt);else if (p.kind==90) swarm(r,t,dt);else curve(r,t,dt);}
+    else if (r.content->boss_techniques[t.definition-1].kind==83) debris_shatter_aim(r,t);else if (p.kind==72) curve_extend(r,t);
     t.previous_ship=r.state.ship_pos;
 }
 // Sourceのflow選択→timeline→首姿勢→attack_fieldの順で一度だけ進める。

@@ -23,6 +23,8 @@ namespace speed {class HydraTechnique {public:
     static godot::Array north_targets(const RunRuntime &,const BossBodyState &);
     static void pincer(RunRuntime &,TechniqueState &);
     static void debris_shatter(RunRuntime &,TechniqueState &,double);
+    static void debris_shatter_aim(RunRuntime &,TechniqueState &);
+    static void curve_extend(RunRuntime &,TechniqueState &);
     static void tornado(RunRuntime &,TechniqueState &,double);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static bool reserve(RunRuntime &,EnemyHandle,uint32_t);

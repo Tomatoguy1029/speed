@@ -9,7 +9,7 @@
 #include <godot_cpp/variant/vector2.hpp>
 namespace speed {
 struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattered=false;};
-struct HydraShatterState {bool initialized=false;double aim=0;std::vector<HydraShatterStone> rubble;};
+struct HydraShatterState {bool initialized=false,faced=false;double aim=0,face=0;std::vector<HydraShatterStone> rubble;};
 struct HydraTornadoState {bool initialized=false,launched=false;godot::Vector2 center,direction,from;AttackHandle vortex;std::vector<EnemyHandle> rubble;};
 struct HydraCurveState {};
 struct HydraSequenceState {};
