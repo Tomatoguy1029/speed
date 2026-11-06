@@ -35,6 +35,12 @@ if any(key in ARGUMENTS for key in ['custom_api_file', 'gdextension_dir']):
 if ARGUMENTS.get('api_version', api) != api:
     Exit('対象APIがdependencies.jsonと一致しません')
 ARGUMENTS['api_version'] = api
+# 開発用・配布用・直接のSCons実行を同じ最低OSへそろえ、SDKにも適用する。
+if ARGUMENTS.get('platform', 'macos' if sys.platform == 'darwin' else '') == 'macos':
+    minimum = locked['macos_deployment_target']
+    if ARGUMENTS.get('macos_deployment_target', minimum) != minimum:
+        Exit('macOSの最低OSがdependencies.jsonと一致しません')
+    ARGUMENTS['macos_deployment_target'] = minimum
 out = Path(ARGUMENTS.pop('output_dir', str(here / '../speed/extensions/run/bin'))).resolve()
 build = Path(ARGUMENTS.pop('build_dir', str(Path(tempfile.gettempdir()) / 'speed-run-build' / hashlib.sha256(str(here).encode()).hexdigest()[:12]))).resolve()
 SConsignFile(str(build / '.sconsign.dblite'))

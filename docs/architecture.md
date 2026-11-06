@@ -752,7 +752,7 @@ C++の録画出力の `xp` は、種類別の `supplied`・`collected`・`lost` 
 
 ### 15.3 生成と配布の入口
 
-Godot本体・API・SDK・export template・SCons・精度は `cpp/dependencies.json` で固定する。拡張は `cpp/SConstruct` が完全コミット・追跡ファイルの変更・APIハッシュを検査してビルドする。手順は[README](../README.md#godot-で開発する)に示す。
+Godot本体・API・SDK・export template・SCons・精度とMacの最低OSは `cpp/dependencies.json` で固定する。Macの最低OSは `cpp/SConstruct` がSDK・拡張のコンパイルとリンクへ適用し、export presetの両CPUの宣言と配布時に照合する。Metalの描画要件と、対象OS・GPUでの実動作確認を区別する。拡張は `cpp/SConstruct` が完全コミット・追跡ファイルの変更・APIハッシュを検査してビルドする。手順は[README](../README.md#godot-で開発する)に示す。
 
 `addons/content_build/builder.gd` は実行前・CLI・exportの共通生成入口で、編集元の署名と出力一覧をstampに持つ。ボスプログラム、外観、攻撃表示、星座、図鑑、音、制作中間データ、各ステージと導入の戦闘バイナリ・索引・RunResourcesを生成する。エディター内の不足・更新検出は開発用の生成経路として使う。配布版は生成済みの定義と資源を読み、必須データの不整合と欠落を拒否する。`.content/` と共有ライブラリは生成物としてGit管理から外す。
 

@@ -29,7 +29,7 @@ class PackageTest(unittest.TestCase):
                 original_main = 'extends Node\nfunc _ready() -> void:\n\tpass\n'
                 save.write_text(original_save)
                 main.write_text(original_main)
-                (project / 'export_presets.cfg').write_text('[preset.0.options]\n[preset.1.options]\n')
+                (project / 'export_presets.cfg').write_text('[preset.0.options]\napplication/min_macos_version_arm64="13.0"\napplication/min_macos_version_x86_64="13.0"\n[preset.1.options]\n')
                 (project / 'extensions/run').mkdir(parents=True)
                 (project / 'extensions/run/run_core.gdextension').write_text('')
                 checks = project / 'tests/content/check_rules.gd'
@@ -39,7 +39,7 @@ class PackageTest(unittest.TestCase):
                 sdk.mkdir()
                 (sdk / 'LICENSE.md').write_text('license')
                 (root / 'cpp').mkdir()
-                lock = {'engine': '4.7.2', 'export_templates': '4.7.2.stable'}
+                lock = {'engine': '4.7.2', 'export_templates': '4.7.2.stable', 'macos_deployment_target': '13.0'}
                 (root / 'cpp/dependencies.json').write_text(json.dumps(lock))
                 templates = base / lock['export_templates']
                 templates.mkdir()

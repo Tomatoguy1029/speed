@@ -316,6 +316,8 @@ func _package_final_runtime() -> void:
 	var on_save := func(): observed.saves += 1
 	SaveManager.save_changed.connect(on_save)
 	_package_measure("最終配布の既定起動",{"main_in_tree":root.get_node_or_null("Main")!=null,"headless":DisplayServer.get_name()=="headless"})
+	# 検証専用seedで通常の初期候補をW28に揃え、無入力の終了経路を再現する。
+	seed(5)
 	GameManager.start_run(1)
 	var session: RunSession = RunManager.current()
 	if session==null or not await _package_ready(session):
@@ -329,7 +331,13 @@ func _package_final_runtime() -> void:
 	session.cpp_finished.connect(func(result: Dictionary):
 		observed.results += 1
 		observed.result = result.duplicate(true))
-	var ok := await _package_initial_equipment(session,"最終通常出撃") and normal_mode
+	var run_seed: String = str(session.bridge.recording_origin.start.seed)
+	var initial_cards: Dictionary = session.bridge.read_frame().value.ui.cards
+	var fixture_start: bool = run_seed=="3066015881" and not initial_cards.candidates.is_empty() and str(initial_cards.candidates[0].id)=="W28"
+	_package_measure("終了確認の開始条件",{"fixture_seed":5,"run_seed":run_seed,"initial_weapon":initial_cards.candidates[0].id if not initial_cards.candidates.is_empty() else "","normal_mode":normal_mode,"idle_input":true,"reproducible":fixture_start})
+	var ok := normal_mode and fixture_start
+	if ok: ok = await _package_initial_equipment(session,"最終通常出撃")
+	var last_ui: Dictionary = session.bridge.read_frame().value.ui
 	var began := Time.get_ticks_usec()
 	var ticks := 0
 	while ticks<120*180 and Time.get_ticks_usec()-began<150000000 and observed.results==0 and ok:
@@ -340,7 +348,8 @@ func _package_final_runtime() -> void:
 		if not current.ok:
 			ok = false
 			break
-		var cards: Dictionary = current.value.ui.cards
+		last_ui = current.value.ui
+		var cards: Dictionary = last_ui.cards
 		if int(cards.get("offer_id",0))>0 and int(cards.get("selected_id",0))==0:
 			if cards.candidates.is_empty():
 				ok = false
@@ -360,7 +369,7 @@ func _package_final_runtime() -> void:
 		if ticks%16==0: await process_frame
 	# 自然な結果が出ない場合は、強制終了や時刻の上書きで成立させない。
 	var natural_death: bool = observed.results==1 and observed.result.get("kind","")=="Death"
-	_package_measure("撤去後の自然な終了",{"ticks":ticks,"step_budget_seconds":180,"elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"normal_mode":normal_mode,"result_count":observed.results,"kind":observed.result.get("kind","")})
+	_package_measure("撤去後の自然な終了",{"ticks":ticks,"step_budget_seconds":180,"elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"normal_mode":normal_mode,"result_count":observed.results,"kind":observed.result.get("kind",""),"run_seed":run_seed,"run_time":last_ui.get("run_time",-1.0),"hp":last_ui.get("hp",-1.0),"phase":last_ui.get("phase",-1)})
 	ok = natural_death and ok
 	if not ok:
 		push_error("最終配布確認は上限内の自然なDeathと結果通知が未成立です")

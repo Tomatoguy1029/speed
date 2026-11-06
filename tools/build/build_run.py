@@ -148,6 +148,12 @@ def package(root, lock, args):
     shutil.copy2(root / 'cpp/dependencies.json', licenses / 'dependencies.json')
     presets = project / 'export_presets.cfg'
     config = presets.read_text()
+    if args.platform == 'macos':
+        for arch in ['arm64', 'x86_64']:
+            setting = 'application/min_macos_version_' + arch
+            value = re.search(r'^' + re.escape(setting) + r'=("[^"\n]*")$', config, re.M)
+            if not value or json.loads(value[1]) != lock['macos_deployment_target']:
+                raise ValueError('Mac配布の最低OSがdependencies.jsonと一致しません: ' + arch)
     section = '[preset.0.options]' if args.platform == 'macos' else '[preset.1.options]'
     config = config.replace(section, section + '\n\ncustom_template/release=' + json.dumps(str(template)), 1)
     presets.write_text(config)
