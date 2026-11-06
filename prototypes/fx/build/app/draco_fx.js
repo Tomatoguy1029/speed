@@ -189,8 +189,11 @@ function dRiftPost(S, R) {
         let c0 = D_GAP.deep[0] + (D_GAP.mid[0] - D_GAP.deep[0]) * mixK, c1 = D_GAP.deep[1] + (D_GAP.mid[1] - D_GAP.deep[1]) * mixK, c2 = D_GAP.deep[2] + (D_GAP.mid[2] - D_GAP.deep[2]) * mixK; c0 += (col[0] - c0) * glowK; c1 += (col[1] - c1) * glowK; c2 += (col[2] - c2) * glowK;
         const star = hash(Math.floor(al * 0.9 - t * 26 * (1 + (Math.floor(lat) & 1))) * 7.1 + Math.floor(lat) * 13.3 + q.seed); if (star > 0.985) { c0 = 255; c1 = 255; c2 = 255; }
         out[k] = c0; out[k + 1] = c1; out[k + 2] = c2; out[k + 3] = 255; continue; }
-      const sign = lat >= 0 ? 1 : -1, gap = Math.abs(lat) - (lat >= 0 ? up : dn), fade = 1 - clamp(gap / band), end = clamp(Math.min(al, L - al) / 18), push = 9 * R.P.size * fade * fade * sp.tip * end * (1 - smooth(0, 1, (age - q.hold) / DS.close) * 0.5); if (push < 0.4 || out[k + 3]) continue;
-      const wob = Math.sin(al * 0.12 + t * 7) * 1.4 * fade, sx = Math.round(x - nx * sign * push + ux * wob), sy = Math.round(y - ny * sign * push + uy * wob); if (sx < 0 || sy < 0 || sx >= LW || sy >= LH) continue; const f = (sy * LW + sx) * 4; out[k] = src[f]; out[k + 1] = src[f + 1]; out[k + 2] = src[f + 2]; out[k + 3] = 255; } }
+      const sign = lat >= 0 ? 1 : -1, gap = Math.abs(lat) - (lat >= 0 ? up : dn), fade = 1 - clamp(gap / band), end = clamp(Math.min(al, L - al) / 18), open2 = sp.tip * end * (1 - smooth(0, 1, (age - q.hold) / DS.close) * 0.5), push = 17 * R.P.size * fade * fade * open2; if (push < 0.4 || out[k + 3]) continue;
+      // 裂け目の両側の空間を外へ押しのけ、岸ごとに裂け目に沿って逆向きへ引きずる。景色の点は引き伸ばされて筋になる
+      const drag = sign * 12 * R.P.size * fade * fade * open2 + Math.sin(al * 0.12 + t * 7) * 1.6 * fade; let r0 = 0, g0 = 0, b0 = 0, lum = -1;
+      for (const st of [-5, -2.5, 0, 2.5, 5]) { const sx = Math.round(x - nx * sign * push + ux * (drag + st * fade)), sy = Math.round(y - ny * sign * push + uy * (drag + st * fade)); if (sx < 0 || sy < 0 || sx >= LW || sy >= LH) continue; const f = (sy * LW + sx) * 4, v = src[f] + src[f + 1] + src[f + 2]; if (v > lum) { lum = v; r0 = src[f]; g0 = src[f + 1]; b0 = src[f + 2]; } }
+      if (lum < 0) continue; const tint = 0.32 * fade * fade * fade * open2; out[k] = r0 + (150 - r0) * tint; out[k + 1] = g0 + (100 - g0) * tint; out[k + 2] = b0 + (255 - b0) * tint; out[k + 3] = 255; } }
   to.x.putImageData(img, 0, 0); g.save(); g.setTransform(1, 0, 0, 1, 0, 0); g.imageSmoothingEnabled = false; g.drawImage(to.c, 0, 0, W, H); g.restore();
 }
 for (const d of DEMOS) if (d.id === 'D-rifts') d.post = dRiftPost;
