@@ -41,25 +41,45 @@
 - 実装：`cpp/behaviors/heroes/perseus.cpp`、`scripts/render/equipment/heroes.gd`、shader `hero_medusa` / `hero_medusa_screen` / `hero_shatter` / `hero_stone.gdshaderinc` / `hero_color.gdshaderinc`、敵の `pixel_sprite` / `pixel_armor` / `biter_part_armor`、`scripts/render/fx/stone_shards.gd`。設計は `docs/architecture.md` の該当段落。
 - 未確認：大物へのダメージの画面確認、多角形描画の敵（おおいぬ座の体など）は石の見た目対象外、`hero_aura_gpu.gd` は main 時点から別の型エラーで途中停止している（ペルセウス部分まで届かない）。
 
-### しし座 — 方向決定・絵待ち（ユーザーがシルエットの絵を用意する）
-- 力を変更する（仕様書はまだ未変更）：「線が太くなる」→ **獅子になる**
-  - 効いている間、機体は星でできた獅子の姿をまとう。機体は隠す（獅子そのものが機体）。
-  - 操作は通常の移動だけ（ゲージの描画なし）。速さは高速移動（なぞり終えたあとの勢い）と同じか少し速いくらい。
-  - 被弾しない（マリオのスター状態）。武器は止める。
-  - 触れた敵は装甲・特殊な倒し方に関係なく貫く。攻撃力は慎重に（大物・ボスのワンパン不可）。同じ敵には間隔を置いて当たる（張り付き不可、露骨に長くない自然な間隔）。
-  - 障害物は全部砕ける。惑星・月は跳ね返される（未確認、下書きではそうした）。
-  - 効いている時間はULTごとに強さを見て決める（一括にしない）。
-- 見た目：真上から見下ろす。唐獅子の形を参考（シーサー、古代メキシコのジャガー像、ライドンもモチーフ。ただし形をなぞらない）。体の中は半透明の宇宙（紫・マゼンタ・青の水彩の星雲に細かい星。参考画像はユーザーが会話で提示）、全身から金のオーラが立ちのぼり体のふちにもかかる、輪郭線は描かない。たてがみは体の6割ほどまでなびくのが一番かっこいい。シルエットは力強く。大きさは機体の2〜3倍。
-- 絵の依頼の目安：真上から・頭が右・機体の2〜3倍・シルエットのみ（色はshader）・たてがみは体の6割まで（別レイヤー可）・駆ける4〜6コマ。
-- 未コミットの試作（作業ツリーに残っている）：`speed/shaders/hero_leo.gdshader`、`speed/scripts/render/equipment/leo_lion.gd`。どちらも却下された図形ベースの試作。宇宙の質感（`cosmos()`）と星くずの粒は流用できるかもしれない。絵が来たら作り直す。
+### しし座 — 実装済み・未コミット（見た目はユーザー確認済み、力の中身は試遊待ち）
+- 力「獅子になる」は仕様書 8.1 が正本。数値は `speed/data/heroes/leo.tres`（10秒・クールダウン60秒・毎秒600・曲がり1.5倍・A×2.5・0.4秒間隔）。
+- C++：`cpp/behaviors/heroes/leo.{h,cpp}`（`active`・`contact`）、`ship.cpp`（移動・曲がり・当たりの切替）、`draw.cpp`（なぞり不可）、`run_runner.cpp`（武器・特性停止）、`combat_resolver.cpp`（被弾なし）、`heroes.cpp`（描画中は発動しない）。旧「線が太くなる」の `trace_width` は全削除。スキーマは LeoDefinition（speed・turn_mult・power・hit_interval・front・back・radius）。
+- 見た目：`speed/scripts/render/equipment/leo_lion.gd`、`speed/shaders/hero_leo.gdshader`（本体）、`hero_leo_blur.gdshader`（本体とオーラ別々のモーションブラー）、`hero_leo_screen.gdshader`（画面外側の星雲の光と十字のきらめき）、絵は `speed/assets/pixel/leo/`（`handoff/tools/export_lion.py` で aseprite から書き出し、はぐれドット除去）。`heroes.gd` が発動中だけ獅子を出し、`run_frame_view.gd` が機体を隠す。
+- 変身：星くずが輪郭へ移る（0.55秒）→閃光と波→本体4段階（〜0.95秒）→粒子4段階（〜1.75秒）。ユーザー確認はまだ。
+- テスト：`hero_behaviors.gd -- --cpp-leo`、`hero_aura_gpu.gd -- --cpp-leo` は新しい力に書き換え済みで通過。
+- 撮影・試遊：一時作業場所（`tools/dev/workspace.py`）の project.godot に `handoff/tools/lion_game_capture.gd`（本物のゲームで撮影）・`lion_play.gd`（しし座を救出した状態で起動）を autoload で足して使う。スクリプトを変えたら `build_all.gd -- --force` で内容データを作り直す（作り直さないとランの開始に失敗する）。
+- GIF はコマごとに色を選び直す `make_gif.py` を使う（共通パレットだと画面演出に色を取られて獅子の色が崩れる）。
 
-### ふたご座 — 方向のみ
-- 力は今のまま（線を2本、双子の機体が2本目を走る）。ミラージュ（分身）と近いが、ユーザーは「今のままでいい」。
-- コンセプト：カストルとポルックス、**光と影の兄弟**（片方が光、片方が影）が「かっこいい」と好評。具体案・試作はまだ。
+### ふたご座（光と影の兄弟）— 試作実装済み・未コミット（ユーザーと見た目を調整中）
+- 力は仕様書 8.1 が正本。`power`（影の体当たりの倍率、仮で2.0）は `speed/data/heroes/gemini.tres`。旧「線を2本」（`twin.first`・`capture_first`・`swap_paths`）は削除。`TwinFirst` の通知は `MeteorImpact` に置き換えた。
+- C++：`cpp/behaviors/heroes/gemini.{h,cpp}`。
+  - `launch`：反転した経路を作る。
+  - `follow`：並走中の影の位置。
+  - `duplicate`：弾の複製。
+  - `weapons`：ソニックブームの発射とエスコートウィングを毎フレーム進める。
+  - `finish`：突進の終わりの武器。
+  - `AsTwin`：機体の位置と経路を影のものに差し替える範囲。
+  - `equipment_appear`：ドローンが現れる進み。
+- 呼び出し元と、各武器の変更：
+  - `draw.cpp`：launch。`run_runner.cpp`：follow・duplicate・weapons。`render_builder.cpp`：ふたご座の間は通常のなぞり線を出さない。
+  - 影の武器は軽い方式で作った。弾は複製し、接触は `EquipmentSystem::contact` で反応させる。ミラージュは同じ残像の一覧へ影の残像を足し、ソニックブームは `SonicBehavior::emit` を影の値で呼ぶ（輪に `twin`）。エスコートは `LoadoutState::twin_escort` に影用の状態を持ち、質量牽引は `TowCargo::twin` で区別する。
+- 見た目：
+  - `gemini_twins.gd` が担当する。光の機体（金・形だけ）、影の機体、粘る分裂、並走、残光・残像、崩れて戻る断片、ドローンを影の粒が組み立てる演出。
+  - シェーダーは `hero_gemini.gdshaderinc`・`hero_gemini.gdshader`・`hero_gemini_split.gdshader`。
+  - 2本の線は `heroes.gd` の `draw_fire` が粉で描く。
+  - ふたご座の間は、`run_frame_view` が本物の機体を隠す。
+  - `afterimage.gd` は残像を番号で見分ける（同じ時刻に始まる影の残像と混ざって、2機の間が塗られる不具合への対応）。
+- 未確認：
+  - ドローンの組み立て演出と、ミラージュの塗りの修正は、実際の画面ではまだ見ていない。
+  - 装備のテスト（`equipment_effects`）で全武器が失敗していた。変更前からかどうかは、ユーザーの指示で調べていない。
 
-### ヘルクレス座（火の隕石）— 方向のみ
-- 土台は pixelFX の `fire/meteor` の作り（上から見た向き）。燃える岩が煙と火の尾を引いて落ち、着弾の閃光・火球・岩・燃えかす・冷えるクレーター。共通の爆発（BlastBursts）とかぶらない専用の着弾にする。試作はまだ（初期に作った円と点線の版は却下・削除済み）。
-- 今の表示は `heroes.gd` の `draw_fire`（円を描くだけの仮）。
+### ヘルクレス座（火の隕石）— 試作実装済み・未コミット（ユーザーと見た目を調整中）
+- 力の中身は今のまま（仕様書 8.1）。着弾の通知は共通の爆発ではなく `meteor_impact`（`cpp/behaviors/heroes/hercules.cpp`）。
+- 見た目：
+  - `hercules_meteors.gd` と `hero_hercules.gdshader` が担当する。
+  - 落下と着弾：炎に包まれた岩と涙の形の尾、岩の形の落下予告の影（0.6秒で岩の大きさまで育つ）、着弾の閃光・照り返し・破片・溶岩のしずく・煙、カメラの揺れ（`run_frame_view`）。
+  - 焼け跡：溶岩の殻のマグマ。
+- 落下時間を延ばす案（0.9秒）は、戦闘の時間のテストが6か所崩れるので保留。
 
 ### 獲得演出（カットイン）
 - 星座完成→絵を重ねる→獲得演出。今の仮は使わない。各ULTの演出が決まってから作る。
@@ -100,6 +120,8 @@
 - 本物の画面での撮影：`handoff/tools/live_capture.gd` と `capture_srgb.gdshader` をコピー先の `res://` に置き、`--script res://live_capture.gd -- <出力フォルダ> armored`（第2引数は敵の種類。テスト用ランの雑魚を差し替える）。今はペルセウス座を発動する流れなので、ほかのULTは発動する英雄と撮るコマを書き換えて使う。生のRGBを `handoff/tools/make_gif.py <フォルダ> <out.gif> 1024 768 30` でGIF化。
 
 ## 6. handoff/tools/ の中身
+- `hero_capture.gd`：本物のゲームで英雄を救出して発動し、決まった操作を流して撮る（`--hero-capture <出力> <gemini|hercules> [ステージ] [秒] [武器,…]`）。武器選択では1を押し、獲得演出などで操作できない間は3秒待ってから1秒おきにクリックする
+- `hero_lab.gd`：実験場のシーンを直接開いて英雄の力を選んだ試遊にする（`res://gyms/enemy_lab/enemy_lab.tscn -- --hero-lab <ID>`）
 - `make_gif.py`：生RGB連番→GIF（標準ライブラリのみ）
 - `gif_frames.py`：GIFから指定コマをPNGに
 - `crop_png.py`：PNGの一部を切り出して拡大（見比べ用）

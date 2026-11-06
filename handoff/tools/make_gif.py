@@ -1,26 +1,40 @@
-# Stdlib-only GIF89a encoder: raw RGB8 frames -> looping animated GIF with a shared 256-color palette.
+# Stdlib-only GIF89a encoder: raw RGB8 frames -> looping animated GIF.
+# Each frame gets its own 256-color palette (median cut over that frame's colors), so wide gradients in one part of
+# the screen do not steal colors from small subjects. Colors are mapped to the box median cut put them in.
 import sys, os, struct
 from collections import Counter
 
 src, out, w, h, fps = sys.argv[1], sys.argv[2], int(sys.argv[3]), int(sys.argv[4]), int(sys.argv[5])
 names = sorted(n for n in os.listdir(src) if n.endswith(".raw"))
-frames = [open(os.path.join(src, n), "rb").read() for n in names]
 
-counts = Counter()
-for f in frames[:: max(1, len(frames) // 12)]:
-    counts.update(f[i:i + 3] for i in range(0, len(f), 3 * 7))
-palette = [c for c, _ in counts.most_common(256)]
-while len(palette) < 256: palette.append(b"\0\0\0")
-pal_rgb = [tuple(c) for c in palette]
-cache = {c: i for i, c in enumerate(palette)}
-
-def index(c):
-    i = cache.get(c)
-    if i is None:
-        r, g, b = c
-        i = min(range(256), key=lambda k: (pal_rgb[k][0] - r) ** 2 * 3 + (pal_rgb[k][1] - g) ** 2 * 4 + (pal_rgb[k][2] - b) ** 2 * 2)
-        cache[c] = i
-    return i
+def median_cut(counts, size=256):
+    """counts: {rgb bytes: n}. Returns (palette list of 3-byte, mapping {rgb bytes: index})."""
+    boxes = [list(counts.items())]
+    while len(boxes) < size:
+        # split the box with the widest channel range (weighted by population)
+        best, best_score, best_ch = -1, -1, 0
+        for bi, box in enumerate(boxes):
+            if len(box) < 2: continue
+            lo = [min(c[0][k] for c in box) for k in range(3)]
+            hi = [max(c[0][k] for c in box) for k in range(3)]
+            ch = max(range(3), key=lambda k: hi[k] - lo[k])
+            pop = sum(n for _, n in box)
+            score = (hi[ch] - lo[ch]) * (pop ** 0.5)
+            if score > best_score: best, best_score, best_ch = bi, score, ch
+        if best < 0: break
+        box = sorted(boxes[best], key=lambda c: c[0][best_ch])
+        total = sum(n for _, n in box); acc = 0; cut = 1
+        for i, (_, n) in enumerate(box):
+            acc += n
+            if acc >= total / 2: cut = max(1, min(len(box) - 1, i + 1)); break
+        boxes[best:best + 1] = [box[:cut], box[cut:]]
+    palette, mapping = [], {}
+    for i, box in enumerate(boxes):
+        total = sum(n for _, n in box)
+        palette.append(bytes(round(sum(c[k] * n for c, n in box) / total) for k in range(3)))
+        for c, _ in box: mapping[c] = i
+    while len(palette) < size: palette.append(b"\0\0\0")
+    return palette, mapping
 
 def lzw(data):
     clear, end = 256, 257
@@ -50,18 +64,23 @@ def lzw(data):
     if nbits: out.append(bits & 255)
     return out
 
-g = bytearray(b"GIF89a" + struct.pack("<HHBBB", w, h, 0xF7, 0, 0))
-for c in palette: g += c
+g = bytearray(b"GIF89a" + struct.pack("<HHBBB", w, h, 0x70, 0, 0))
 g += b"\x21\xFF\x0BNETSCAPE2.0\x03\x01\x00\x00\x00"
 delay = round(100 / fps)
-for f in frames:
-    idx = bytes(index(f[i:i + 3]) for i in range(0, len(f), 3))
+for name in names:
+    f = open(os.path.join(src, name), "rb").read()
+    pixels = [f[i:i + 3] for i in range(0, len(f), 3)]
+    palette, mapping = median_cut(Counter(pixels))
+    idx = bytes(mapping[p] for p in pixels)
     g += b"\x21\xF9\x04\x04" + struct.pack("<H", delay) + b"\x00\x00"
-    g += b"\x2C" + struct.pack("<HHHHB", 0, 0, w, h, 0) + b"\x08"
+    # image descriptor with a local 256-color table
+    g += b"\x2C" + struct.pack("<HHHHB", 0, 0, w, h, 0x87)
+    for c in palette: g += c
+    g += b"\x08"
     data = lzw(idx)
     for i in range(0, len(data), 255):
         chunk = data[i:i + 255]; g += bytes([len(chunk)]) + chunk
     g += b"\x00"
 g += b"\x3B"
 open(out, "wb").write(g)
-print(out, len(frames), "frames", len(g) // 1024, "KB")
+print(out, len(names), "frames", len(g) // 1024, "KB")
