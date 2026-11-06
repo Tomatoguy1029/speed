@@ -88,6 +88,9 @@ func _build_art() -> void:
 	var cutout := ShaderMaterial.new()
 	cutout.shader = preload("res://assets/ui/upgrade/frame_cutout.gdshader")
 	background.material = cutout
+	var grid := _image(_texture("upgrade_ui_grid"))
+	grid.name = "UpgradeGrid"
+	grid.z_index = -1
 	_panel = MORPH_PANEL.new()
 	_panel.position = MORPH_PANEL.UPGRADE_RECT.position
 	_panel.size = MORPH_PANEL.UPGRADE_RECT.size
@@ -99,7 +102,7 @@ func _build_art() -> void:
 	var tooltips := _texture("upgrade_ui_tooltips")
 	for part: Array in PARTS:
 		_build_part(part, tooltips)
-	_image(_texture("upgrade_ui_letters"))
+	_image(_texture("upgrade_ui_letters")).z_index = 2
 	_back_fill = _image(_texture("upgrade_ui_back_button_infil"))
 	_back_fill.hide()
 	_image(_texture("upgrade_ui_back_button"))
@@ -214,6 +217,7 @@ func _build_part(part: Array, tooltips: Texture2D) -> void:
 	outline.region = part[2]
 	var box := _image(outline, part[2].position, part[2].size)
 	box.material = material
+	box.z_index = 1
 	var box_button := _button(part[3])
 	_connect_part(box_button, id)
 	var texture := _texture("upgrade_ui_parts_" + part[1])
