@@ -36,7 +36,7 @@ function dSettle(S, from, to, k) {
   S.B.pos = S.override[0];
 }
 // 隕石：頭を突き出して1個ずつ吐き、速いまま飛んで、着いた所で勢いが止まる（なめらかに滑らせない）
-const DB_WARN = 2.5, DB_ACTIVE = 3.9; // 試作の値：ブレスの予兆と吐く長さ
+const DB_WARN = 3.6, DB_ACTIVE = 3.9; // 試作の値：ブレスの予兆と吐く長さ
 // 試作の値：三本爪。自機の位置へ予兆を出し、竜の正面を横向き（少し斜め）に切り裂く
 const DS = { first: 0.6, gap: 0.62, count: 4, tell: 0.5, open: 0.16, hold: 1.5, close: 0.55, tilt: 0.3, length: 1250, width: 84, space: 170, active: 4.8 };
 // 試作の値：ピカロを作るときは上を向いて咆哮し、咆哮の間にピカロが現れる
