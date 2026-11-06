@@ -395,6 +395,8 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 
 func finale_camera_active() -> bool:
 	return _finale_view!=null and _finale_view.visible
+func finale_camera_shaken(offset: Vector2) -> void:
+	_finale_view.set_shake_offset(offset)
 func finale_camera_roll() -> float:
 	return _finale_view.camera_roll()
 func finale_camera_push() -> float:
@@ -1690,10 +1692,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_forward_world_time = ui.world_time if equipped_forward else -1.0
 	var draw_start := Time.get_ticks_usec() if perf.active else 0
 	_effects.begin()
-	preload("res://scripts/render/equipment/forward.gd").frame_draw(_flashes,_effects,world_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_forward)
+	preload("res://scripts/render/equipment/forward.gd").frame_draw(_flashes,_effects,world_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_forward and not finale_camera_active())
 	var scatter_dt: float = 0.0 if _scatter_world_time<0.0 else maxf(0.0,ui.world_time-_scatter_world_time)
 	_scatter_world_time = ui.world_time if equipped_scatter else -1.0
-	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter)
+	preload("res://scripts/render/equipment/scatter.gd").frame_draw(_scatter_flashes,_effects,scatter_dt,ui.ship.ship_pos,ui.ship.ship_heading,equipped_scatter and not finale_camera_active())
 	if _kill_sonic_visual!=null:
 		_kill_sonic_visual.sync_frame(ui.kill_sonic.waves,ui.world_time)
 		_kill_sonic_visual.frame_tick(0.0)
@@ -1786,7 +1788,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		sprite.position = ui.ship.ship_pos
 		sprite.rotation = ui.ship.ship_heading.angle()+PI/2.0
 		sprite.frame = int(_jet_time*12.0)%3
-		sprite.visible = (ui.phase==0 or ui.phase==4) and not (equipped_escort and ui.draw.tracing)
+		sprite.visible = _ship_visible and (ui.phase==0 or ui.phase==4) and not (equipped_escort and ui.draw.tracing)
 
 func _death_burst(at: Vector2) -> void:
 	_burst(at,Color("#9fe8ff"),60,500.0)

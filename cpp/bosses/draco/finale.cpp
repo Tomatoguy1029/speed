@@ -10,6 +10,7 @@
 #include "../flow/technique_runner.h"
 #include "../flow/flow_runner.h"
 #include "../../output/frame_builder.h"
+#include "../../systems/attack_system.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
 #include "state.h"
@@ -21,6 +22,8 @@ constexpr double PI=3.141592653589793,TAU=PI*2;
 using Stage=DracoFinaleStage;
 // 指定図が決まるまでの最終姿勢。胴の長さへ合わせて縮尺するので、節の長さは変わらない。
 constexpr double POSE_WAY[][2]={{-226,-205},{-140,-182},{40,-176},{170,-140},{214,-70},{150,-12},{-60,0},{-205,30},{-235,92},{-170,144},{10,158},{130,146},{190,108}};
+// 帯は見せず、戦闘HUDだけ隠したままにする値。
+constexpr double HUD_HIDDEN_BARS=0.001;
 constexpr double DOCK_FIRST=0.9,DOCK_STEP=0.42,UNLOCK_AT=2.6,ROAR_AT=2.72,BURST_AT=0.92;
 const char *const MODULES[]={"legendary_stern","legendary_keel","legendary_sail","legendary_compass"};
 double smooth(double a,double b,double x) {const double f=std::clamp((x-a)/(b-a),0.0,1.0);return f*f*(3-2*f);}
@@ -29,7 +32,6 @@ double out_cubic(double k) {const double m=1-std::clamp(k,0.0,1.0);return 1-m*m*
 double out_expo(double k) {return k>=1?1:1-std::pow(2.0,-10*std::clamp(k,0.0,1.0));}
 const DracoFinaleDefinition *rule(const RunRuntime &r,const BossBodyState &b) {const auto id=r.content->boss_bodies[b.definition-1].boss;const auto it=std::find_if(r.content->draco_finales.begin(),r.content->draco_finales.end(),[&](const auto &p){return p.boss==id;});return it==r.content->draco_finales.end()?nullptr:&*it;}
 void next(DracoFinaleState &v,Stage stage) {v.stage=stage;v.time=0;}
-void shake(RunRuntime &r,double amount) {godot::Dictionary e;e["amount"]=amount;FrameBuilder::append(r,"draco_shake",e);}
 void cue(RunRuntime &r,const char *name,godot::Vector2 at,double radius) {godot::Dictionary e;e["cue"]=name;e["pos"]=at;e["radius"]=radius;e["boss"]="draco";FrameBuilder::append(r,"draco_cue",e);}
 double flash_time(const DracoFinaleDefinition &p) {return p.flash_from+p.flash_ramp+p.flash_peak+p.flash_fade+p.flash_after;}
 std::vector<godot::Vector2> even(const std::vector<godot::Vector2> &points,uint32_t segments) {
@@ -61,7 +63,7 @@ void frame(RunRuntime &r,BossBodyState &b,const DracoFinaleDefinition &p) {
     case Stage::Charge:zoom=lerp(1.12,0.52,out_cubic(t/p.charge_time));break;
     default:break;
     }
-    DracoCinematic::frame(r,camera,zoom*size.y/720);
+    DracoCinematic::frame(r,camera,zoom*std::min(size.x/1280,size.y/720));
 }
 }
 bool DracoFinale::begin(RunRuntime &r,BossBodyState &b) {
@@ -70,7 +72,7 @@ bool DracoFinale::begin(RunRuntime &r,BossBodyState &b) {
     auto &v=b.draco->finale;v={};DracoCinematic::capture(r,v.saved);const auto &p=DracoBody::rule(r,b);auto &e=r.state.enemies[b.actor.slot];v.modules_before=r.state.control.final_modules;v.finish_before=r.state.control.draco_finish_done;r.state.control.final_modules.clear();r.state.control.draco_finish_done=false;v.original_ship=original_ship;v.original_velocity=original_velocity;v.original_pos=e.pos;v.original_angle=e.facing;v.original_guard=e.guard;v.camera_from=r.state.view_center;v.zoom=std::max(0.1,r.state.control.camera_zoom);v.center=e.pos-godot::Vector2::from_angle(e.facing)*p.body_length*0.32;v.ship_rest=original_ship;
     const auto from=even(DracoPose::points(r,b),p.body_segments),to=final_pose(p.body_length,p.body_segments);v.step=p.body_length/p.body_segments;v.head_from=from.front();v.head_to=v.center+to.front();v.heading_from=headings(from);v.heading_to=headings(to);double offset=0;for (size_t j=0;j<v.heading_to.size();++j) offset+=v.heading_from[j]-v.heading_to[j];offset=TAU*std::round(offset/v.heading_to.size()/TAU);for (auto &a:v.heading_to) a+=offset;
     v.core=v.core_from=from[size_t(from.size()*0.175)];v.core_to=v.core_from+godot::Vector2(-40,-300);
-    v.stage=Stage::Release;v.active=true;b.mode=BossMode::Final;e.hp=1;e.guard=1;e.vel={};auto &s=r.state;s.controls_locked=s.encounter_protected=true;s.control.cinematic_bars=1;s.control.cinematic_camera=s.control.cinematic_hide_enemies=true;s.draw.drawing=s.draw.tracing=false;s.ship.vel={};s.control.world_scale=0;TechniqueRunner::observe_scripted(r,b,"draco_finale","scripted_finale",ObservationEvent::Warning,true);return true;
+    AttackSystem::clear_hostile(r.state,AttackEndReason::BossClear);AttackSystem::clear_friendly(r.state,AttackEndReason::BossClear);v.stage=Stage::Release;v.active=true;b.mode=BossMode::Final;e.hp=1;e.guard=1;e.vel={};auto &s=r.state;s.controls_locked=s.encounter_protected=true;s.control.cinematic_bars=1;s.control.cinematic_camera=s.control.cinematic_hide_enemies=true;s.draw.drawing=s.draw.tracing=false;s.ship.vel={};s.control.world_scale=0;TechniqueRunner::observe_scripted(r,b,"draco_finale","scripted_finale",ObservationEvent::Warning,true);return true;
 }
 bool DracoFinale::tick(RunRuntime &r,double dt,const InputFrame &input,godot::Vector2 size) {
     auto found=std::find_if(r.state.bosses->bodies.begin(),r.state.bosses->bodies.end(),[](const auto &b){return b.draco->finale.active;});if (found==r.state.bosses->bodies.end()) return false;auto &b=*found;auto &v=b.draco->finale;const auto *p=rule(r,b);if (!p || !r.state.enemy_handles.contains(b.actor)) {dispose(r,b);return true;}auto &s=r.state;s.control.logical_size=size;v.time+=dt;b.clock+=dt;DracoRifts::tick_closing(r,b,dt);s.control.world_scale=0;
@@ -78,19 +80,19 @@ bool DracoFinale::tick(RunRuntime &r,double dt,const InputFrame &input,godot::Ve
     switch(v.stage) {
     case Stage::Release:
         writhe(r,b,v.time);
-        if (v.time>=BURST_AT) {v.core=v.core_from.lerp(v.core_to,out_expo((v.time-BURST_AT)/0.9));if (!v.burst) {v.burst=true;cue(r,"core_released",v.core_from,100);shake(r,14);}}
-        if (v.time>=ROAR_AT && !v.roared) {v.roared=true;b.draco->roar_mouth=v.core_to+godot::Vector2(135,-40);b.draco->roar_at=b.clock;cue(r,"bear_roar",v.core_to,180);shake(r,20);}
+        if (v.time>=BURST_AT) {v.core=v.core_from.lerp(v.core_to,out_expo((v.time-BURST_AT)/0.9));if (!v.burst) {v.burst=true;cue(r,"core_released",v.core_from,100);}}
+        if (v.time>=ROAR_AT && !v.roared) {v.roared=true;b.draco->roar_mouth=v.core_to+godot::Vector2(135,-40);b.draco->roar_at=b.clock;cue(r,"bear_roar",v.core_to,180);}
         if (v.time>=p->release_time) next(v,Stage::Combine);
         break;
     case Stage::Combine:
         writhe(r,b,p->release_time+v.time);s.ship_pos=s.ship.pos=v.ship_rest+dock_kick(v.time);
-        while (v.docked<4 && v.time>=DOCK_FIRST+v.docked*DOCK_STEP) {s.control.final_modules.push_back(MODULES[v.docked++]);shake(r,17);}
-        if (v.time>=UNLOCK_AT && !v.unlocked) {v.unlocked=true;shake(r,24);}
+        while (v.docked<4 && v.time>=DOCK_FIRST+v.docked*DOCK_STEP) {s.control.final_modules.push_back(MODULES[v.docked++]);}
+        if (v.time>=UNLOCK_AT) v.unlocked=true;
         if (v.time>=p->combine_time) next(v,Stage::Pose);
         break;
     case Stage::Pose:
         settle(r,b,std::clamp(v.time/p->pose_time,0.0,1.0));s.ship_pos=s.ship.pos=v.ship_rest.lerp(v.center+godot::Vector2(0,396),smooth(0.2,2.2,v.time));s.ship.heading={0,-1};
-        if (v.time>=p->pose_time) {next(v,Stage::Input);s.controls_locked=false;s.control.cinematic_bars=0;for (uint32_t j=0;j<=320;++j) {const double u=j/320.0,a=u*TAU+0.05*std::sin(u*TAU*5+0.6),radius=345*std::cos(4*a)*(1+0.14*std::sin(u*TAU*3+1));v.guide.push_back(v.center+godot::Vector2::from_angle(a)*radius);}}
+        if (v.time>=p->pose_time) {next(v,Stage::Input);s.controls_locked=false;s.control.cinematic_bars=HUD_HIDDEN_BARS;for (uint32_t j=0;j<=320;++j) {const double u=j/320.0,a=u*TAU+0.05*std::sin(u*TAU*5+0.6),radius=345*std::cos(4*a)*(1+0.14*std::sin(u*TAU*3+1));v.guide.push_back(v.center+godot::Vector2::from_angle(a)*radius);}}
         break;
     case Stage::Input:if ((input.press || input.alt_press || input.finale_pressed) && !v.began) {v.began=true;v.strokes.push_back(input.finale_pen);}if (v.began && input.has_cursor && (v.strokes.empty() || v.strokes.back().distance_to(input.finale_pen)>3)) v.strokes.push_back(input.finale_pen);if (v.began && (input.pen_release || input.finale_released)) {next(v,Stage::Strikes);s.controls_locked=true;s.draw.drawing=false;s.control.cinematic_bars=1;s.control.cinematic_hide_ship=true;}else s.draw.drawing=v.began;break;
     case Stage::Strikes:if (v.time>=p->rush_time) {next(v,Stage::Charge);s.ship_pos=s.ship.pos=v.center+godot::Vector2(0,385);s.ship.heading={0,-1};}break;

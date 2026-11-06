@@ -207,6 +207,7 @@ func _present_cpp(delta: float) -> void:
 		shake = maxf(0.0,shake-delta*40.0)
 		_camera.offset = Vector2.ZERO if not view.is_empty() and not view.get("shake",false) else Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)
 	else: _camera.offset = Vector2.ZERO
+	if frame_view.finale_camera_active(): frame_view.finale_camera_shaken(_camera.offset)
 	if _roar_post!=null: _roar_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center+_camera.offset,cam_zoom)
 	if _rift_post!=null: _rift_post.apply_frame(render.value.get("boss_bodies",[]),get_viewport().get_visible_rect().size,cam_center+_camera.offset,cam_zoom)
 	frame_view.perf.since(&"view_effects",effects_start)

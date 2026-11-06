@@ -27,6 +27,7 @@ public:
     static void end_encounter(godot::RunState &,EncounterHandle);
     static void clear_bonus(godot::RunState &);
     static void clear_hostile(godot::RunState &,AttackEndReason);
+    static void clear_friendly(godot::RunState &,AttackEndReason);
     static bool begin_hostile_update(godot::RunState &);
     static void finish_hostile_update(godot::RunState &);
     static bool hazard_act(const godot::RunState &,AttackHandle,double dt);

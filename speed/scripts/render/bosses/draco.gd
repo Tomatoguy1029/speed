@@ -390,7 +390,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 			for m in 6: FX.dust(canvas,effect.position,age-m*0.02,seed+m,m*TAU/6.0,2.4)
 		elif effect.technique=="picaro_wall": FX.dark_blast(canvas,effect.position,age,radius,seed)
 		else: FX.impact(canvas,effect.position,age,radius*1.1,seed,_cracks(seed,radius*1.1*float(canvas.world_scale)))
-	canvas.front.glow(canvas.to_logical(chest).x,canvas.to_logical(chest).y,10.0,Color("#8dbdff"),0.35)
+	if str(state.get("finale",{}).get("stage","")).is_empty(): canvas.front.glow(canvas.to_logical(chest).x,canvas.to_logical(chest).y,10.0,Color("#8dbdff"),0.35)
 	_draw_heavy(canvas,t,st,stage,tech,mouth,world_facing)
 	if tech=="rifts": FX.rift_tells(canvas,attack.get("rift_tears",[]),float(attack.get("rift_tell",0.5)),float(attack.get("rift_open",0.16)),float(attack.get("rift_close",0.55)),t)
 	_draw_rocks(canvas,t,tech,stage)

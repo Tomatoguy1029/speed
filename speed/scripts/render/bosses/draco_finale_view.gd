@@ -42,9 +42,10 @@ var _under_parent: Node
 var _fx_port: SubViewport
 var _wide_port: SubViewport
 var _far_port: SubViewport
-var _fx_out: Sprite2D
-var _wide_out: Sprite2D
-var _far_out: Sprite2D
+var _fine_port: SubViewport
+var _mix: Node2D
+var _mix_material: ShaderMaterial
+var _shake_offset := Vector2.ZERO
 var _grade_material: ShaderMaterial
 var _camera_at := Vector2.ZERO
 var _view_size := Vector2(1280,720)
@@ -71,10 +72,20 @@ func _ready() -> void:
 	_fx = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_fx,_fx_port)
 	_wide_port = _port(Vector2i(160,90),_fx_port)
 	_far_port = _port(Vector2i(48,27),_wide_port)
-	_far_out = _output(_far_port,0.9,CanvasItem.TEXTURE_FILTER_LINEAR)
-	_wide_out = _output(_wide_port,0.8,CanvasItem.TEXTURE_FILTER_LINEAR)
-	_fx_out = _output(_fx_port,1.0,CanvasItem.TEXTURE_FILTER_NEAREST)
-	_hi = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_hi)
+	_fine_port = _port(Vector2i(1280,720))
+	_hi = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_hi,_fine_port)
+	var copy := BackBufferCopy.new()
+	copy.copy_mode = BackBufferCopy.COPY_MODE_VIEWPORT
+	add_child(copy)
+	_mix = _canvas(-1,_draw_mix)
+	_mix_material = ShaderMaterial.new()
+	_mix_material.shader = preload("res://shaders/draco_finale_light.gdshader")
+	_mix_material.set_shader_parameter("fx_near",_fx_port.get_texture())
+	_mix_material.set_shader_parameter("fx_soft",_fx_port.get_texture())
+	_mix_material.set_shader_parameter("wide_glow",_wide_port.get_texture())
+	_mix_material.set_shader_parameter("far_glow",_far_port.get_texture())
+	_mix_material.set_shader_parameter("fine_light",_fine_port.get_texture())
+	_mix.material = _mix_material
 	_top = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_top)
 	_top.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_over = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_over)
@@ -111,17 +122,6 @@ func _port(size_: Vector2i, source: SubViewport = null) -> SubViewport:
 		copy.scale = Vector2(size_)/Vector2(source.size)
 		port.add_child(copy)
 	return port
-
-func _output(port: SubViewport, strength: float, filter: int) -> Sprite2D:
-	var sprite := Sprite2D.new()
-	sprite.texture = port.get_texture()
-	var shader := ShaderMaterial.new()
-	shader.shader = preload("res://shaders/draco_finale_add.gdshader")
-	shader.set_shader_parameter("strength",strength)
-	sprite.material = shader
-	sprite.texture_filter = filter
-	add_child(sprite)
-	return sprite
 
 func _canvas(mode: int, painter: Callable, parent: Node = null) -> Node2D:
 	var node := Node2D.new()
@@ -220,7 +220,7 @@ func set_shake_hook(hook: Callable) -> void:
 
 ## 霧は竜の後ろへ置く。
 func set_under_parent(parent: Node) -> void:
-	_under = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_under,parent)
+	_under = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_under,parent)
 	parent.move_child(_under,0)
 
 func hide_view() -> void:
@@ -230,6 +230,7 @@ func hide_view() -> void:
 		_fx_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		_wide_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		_far_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		_fine_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	f = {}
 	stage = ""
 
@@ -238,6 +239,7 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_fx_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		_wide_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		_far_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		_fine_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	f = finale
 	stage = str(finale.get("stage",""))
 	t = float(finale.get("time",0.0))
@@ -253,24 +255,31 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 	_view_size = view_half*2.0/push
 	view_rect = Rect2(view_center-view_half-position,view_half*2.0).grow(400.0)
 	_fx.position = position
-	var fx_scale := Vector2(FX_SIZE)/_view_size
-	_fx_port.canvas_transform = Transform2D(0.0,fx_scale,0.0,Vector2(FX_SIZE)*0.5)*Transform2D(-roll,Vector2.ZERO)*Transform2D(0.0,-view_center)
-	var smooth_fx := stage in ["combine","explode"]
-	_fx_out.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if smooth_fx else CanvasItem.TEXTURE_FILTER_NEAREST
-	var glow_strength := 0.45 if stage=="explode" else 1.0
-	_far_out.material.set_shader_parameter("strength",0.9*glow_strength)
-	_wide_out.material.set_shader_parameter("strength",0.8*glow_strength)
-	for sprite: Sprite2D in [_far_out,_wide_out,_fx_out]:
-		sprite.position = view_center-position
-		sprite.rotation = roll
-		sprite.scale = _view_size/sprite.texture.get_size()
+	_hi.position = position
+	var linear := get_viewport().use_hdr_2d
+	_grade_material.set_shader_parameter("linear_output",linear)
+	_mix_material.set_shader_parameter("linear_output",linear)
+	var screen := Vector2i(get_viewport().get_visible_rect().size)
+	if screen.x>0 and screen.y>0 and _fine_port.size!=screen: _fine_port.size = screen
+	_place_ports()
+	_mix_material.set_shader_parameter("smooth_fx",stage in ["combine","explode"])
+	_mix_material.set_shader_parameter("glow_strength",0.45 if stage=="explode" else 1.0)
 	if _under!=null:
 		_under.visible = true
 		_under.position = position
 		_under.queue_redraw()
-	if stage=="strikes": _rush_shake()
-	if stage=="explode" and _shake_hook.is_valid(): _shake_hook.call(62.0*exp(-t*1.25)+7.0*(1.0-_smooth(3.0,5.5,t)))
-	for node: Node2D in [_grade,_dim,_fx,_hi,_top,_over]: node.queue_redraw()
+	_stage_shake()
+	for node: Node2D in [_grade,_dim,_fx,_hi,_mix,_top,_over]: node.queue_redraw()
+
+func set_shake_offset(offset: Vector2) -> void:
+	_shake_offset = offset
+	if visible: _place_ports()
+
+func _place_ports() -> void:
+	var roll := camera_roll()
+	for port: SubViewport in [_fx_port,_fine_port]:
+		var factor := Vector2(port.size)/_view_size
+		port.canvas_transform = Transform2D(0.0,factor,0.0,Vector2(port.size)*0.5)*Transform2D(-roll,Vector2.ZERO)*Transform2D(0.0,-_camera_at-_shake_offset)
 
 func _rush_roll(time: float) -> float:
 	var k := clampf(time/float(times.rush),0.0,1.0)
@@ -293,8 +302,23 @@ func camera_push() -> float:
 		if tau>=0.0 and tau<=0.3: push += 0.012*exp(-tau*14.0)
 	return 1.0+push
 
-func _rush_shake() -> void:
+func _stage_shake() -> void:
 	if not _shake_hook.is_valid(): return
+	var amount := 0.0
+	match stage:
+		"release":
+			if t>0.95: amount += exp(-(t-0.95)*5.0)*14.0
+			if t>2.7: amount += exp(-(t-2.7)*1.5)*20.0
+		"combine":
+			if t>UNLOCK_AT: amount = exp(-(t-UNLOCK_AT)*3.2)*24.0
+			for i in 4:
+				var q := t-(DOCK_FIRST+i*DOCK_STEP)
+				if q>=0.0: amount = maxf(amount,17.0*exp(-q*9.0))
+		"strikes": _rush_shake()
+		"explode": amount = 62.0*exp(-t*1.25)+7.0*(1.0-_smooth(3.0,5.5,t))
+	if amount>0.0: _shake_hook.call(amount)
+
+func _rush_shake() -> void:
 	var hits := RUSH.hits
 	var strength := 0.0
 	for row in range(0,hits.size(),DracoFinaleRush.HIT_FIELDS):
@@ -347,7 +371,10 @@ func _darkness() -> float:
 
 func _draw_dim() -> void:
 	var d := _darkness()
-	if d>0.0: _dim.draw_rect(view_rect,Color(0,0,0.02,d))
+	if d>0.0: _dim.draw_rect(view_rect,Color(0,0,0.02,1.0-pow(1.0-d,2.2)))
+
+func _draw_mix() -> void:
+	_mix.draw_rect(view_rect,Color.WHITE)
 
 func _glow(at: Vector2, radius: float, color: Color, alpha := 1.0, canvas: Node2D = null) -> void:
 	(canvas if canvas!=null else _fx).draw_texture_rect(_soft,Rect2(at-Vector2.ONE*radius,Vector2.ONE*radius*2.0),false,Color(color,color.a*alpha))
@@ -680,7 +707,7 @@ func _hi_flash() -> void:
 	if b>0.0: _hi.draw_rect(view_rect,Color(Color("#3f86f0"),0.42*b))
 
 func _draw_under() -> void:
-	if stage=="flash" and t>=_flash_peak(): _under.draw_rect(view_rect,Color(Color("#2b67c4"),0.72*exp(-maxf(0.0,t-_impact())*0.55)))
+	if stage=="flash" and t>=_flash_peak(): _under.draw_rect(view_rect,Color(Color("#2b67c4"),pow(0.72*exp(-maxf(0.0,t-_impact())*0.55),2.2)))
 
 func _gold_amount() -> float:
 	var total := _flash_total()+float(times.sight)
@@ -771,7 +798,6 @@ func _fx_explode() -> void:
 		lines.append(at+Vector2(length,0))
 		var color := Color(piece.color,clampf((1.0-k/float(piece.life))*(0.6+0.4*sin(float(piece.tw)+clock*9.0)),0.0,1.0))
 		line_colors.append(color)
-		line_colors.append(color)
 	if lines.size()>1: _fx.draw_multiline_colors(lines,line_colors,1.6/zoom)
 	var band := 0.95*exp(-q*0.55)*(1.0-_smooth(4.2,6.2,q))
 	_streak(Vector2.ZERO,0.0,view_rect.size.x*0.6,50.0,Color("#ffb46a"),band*0.42)
@@ -861,7 +887,6 @@ func _hi_explode() -> void:
 		batch[0].append(base+dir*maxf(0.0,r-length))
 		var color := Color(piece.color,alpha*alpha)
 		batch[1].append(color)
-		batch[1].append(color)
 	for width: float in batches: _hi.draw_multiline_colors(batches[width][0],batches[width][1],maxf(0.5,width)/zoom)
 	for piece: Dictionary in _debris:
 		var k := t-float(piece.delay)
@@ -893,7 +918,7 @@ func _draw_over() -> void:
 	var white := 0.0
 	if stage=="flash": white = 0.14*_flash_state().b
 	if stage=="explode": white = 0.8*exp(-t*7.0)
-	if white>0.003: _over.draw_rect(view_rect,Color(1,1,1,white))
+	if white>0.003: _over.draw_rect(view_rect,Color(1,1,1,pow(white,2.2)))
 
 func _draw_debris() -> void:
 	for piece: Dictionary in _debris:
