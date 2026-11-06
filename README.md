@@ -25,6 +25,12 @@ Godotでプロジェクトを開くと、ツールバーの右側に状態を表
 
 `main` のC++は、統合後にGitHub Actionsがビルドし、Godotが自動で取得します。クローン直後の初回は拡張の読み込みエラーが出ますが、取得が終われば起動できます。初回のデータ生成はエディターを開いたあと裏で進み、ツールバーに進み具合が出ます。生成中にF5を押すと、終わり次第起動します。
 
+統合前のCI確認は、[Actions「開発用ライブラリ」](https://github.com/Tomatoguy1029/speed/actions/workflows/runtime-library.yml) の手動実行で、実行ブランチと `ref` に確認対象を指定します。Macの両CPUとWindowsをすべてビルドし、ActionsのArtifactsへ保存します。手動実行はReleaseの公開・上書き・削除を行いません。mainへの統合前は次のCLIで `fix/macos-distribution` の手動入口を実行できます。
+
+```bash
+gh workflow run runtime-library.yml --repo Tomatoguy1029/speed --ref fix/macos-distribution -f ref=<完全コミット>
+```
+
 手元でC++を編集したら、ツールバーの **ビルド** を押します。ビルドは押したときだけ別プロセスで動き、その間もエディターを使えます。ログは下部パネルの **C++ビルド** に表示します。ライブラリが古いまま起動しようとすると、**このまま起動** と **ビルド** を選ぶ確認を表示します。
 
 手元ビルドにはPython 3とC++コンパイラーを使います。macOSはXcode Command Line Tools、Windowsは「C++によるデスクトップ開発」を入れたVisual Studioです。固定版のSDKとSConsは初回のビルドで取得します。SDK・中間ファイル・共有キャッシュは、macOSは `~/.cache/speed-build`、Windowsは `%LOCALAPPDATA%\\speed-build` に置き、全worktreeで使います。

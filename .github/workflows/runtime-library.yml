@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
     paths: [.github/workflows/runtime-library.yml, cpp/**, tools/build/**]
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: '公開せずに全CPUを確認するブランチまたは完全コミット'
+        required: true
+        type: string
 
 concurrency:
   group: runtime-library-${{ github.ref }}
@@ -23,23 +29,33 @@ jobs:
     outputs:
       runtime_id: ${{ steps.identify.outputs.runtime_id }}
       targets: ${{ steps.identify.outputs.targets }}
+      source_commit: ${{ steps.identify.outputs.source_commit }}
     env:
       GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
-      - name: 公開先を用意し、未配布の対象を選ぶ
-        id: identify
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - name: mainの自動ビルドの公開先を用意
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           gh release view "$RELEASE_TAG" >/dev/null 2>&1 || gh release create "$RELEASE_TAG" \
             --prerelease --latest=false --target "$GITHUB_SHA" --title '開発用ライブラリ' \
             --notes 'Godotの開発用プラグインが取得するC++ライブラリの置き場所です。ゲームの配布物ではありません。'
+      - name: 固定するソースと確認対象を選ぶ
+        id: identify
+        env:
+          PUBLISH_LIBRARY: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+        run: |
           python3 - <<'PY' >> "$GITHUB_OUTPUT"
-          import json, subprocess, sys
+          import json, os, subprocess, sys
           sys.path.insert(0, 'tools/build')
           from runtime_id import runtime_id
           identifier = runtime_id('cpp')
-          data = json.loads(subprocess.check_output(['gh', 'release', 'view', 'runtime-library', '--json', 'assets']))
-          present = {asset['name'] for asset in data['assets']}
+          present = set()
+          if os.environ['PUBLISH_LIBRARY'] == 'true':
+              data = json.loads(subprocess.check_output(['gh', 'release', 'view', 'runtime-library', '--json', 'assets']))
+              present = {asset['name'] for asset in data['assets']}
           every = [
               {'os': 'macos-15', 'platform': 'macos', 'arch': 'arm64', 'file': 'libspeed_runtime.macos.template_release.arm64.dylib'},
               {'os': 'macos-15', 'platform': 'macos', 'arch': 'x86_64', 'file': 'libspeed_runtime.macos.template_release.x86_64.dylib'},
@@ -48,6 +64,7 @@ jobs:
           missing = [row for row in every if f'{identifier}-{row["file"]}.sha256' not in present]
           print('runtime_id=' + identifier)
           print('targets=' + json.dumps(missing))
+          print('source_commit=' + subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip())
           PY
 
   build:
@@ -68,6 +85,8 @@ jobs:
       LIBRARY: ${{ matrix.target.file }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.identify.outputs.source_commit }}
       - name: 固定SDKとSConsを準備
         run: |
           python - <<'PY'
@@ -84,7 +103,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/objects-shared
-          key: objects-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ github.sha }}
+          key: objects-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ needs.identify.outputs.source_commit }}
           restore-keys: objects-${{ matrix.target.platform }}-${{ matrix.target.arch }}-
       - name: ライブラリをビルド
         run: |
@@ -92,7 +111,15 @@ jobs:
             --platform '${{ matrix.target.platform }}' --arch '${{ matrix.target.arch }}' \
             --output "$RUNNER_TEMP/library" --build-dir "$RUNNER_TEMP/objects" \
             --cache-dir "$RUNNER_TEMP/objects-shared" --jobs 4
+      - name: 手動確認のライブラリを保存
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: 'runtime-library-${{ matrix.target.platform }}-${{ matrix.target.arch }}-${{ github.run_id }}'
+          path: ${{ runner.temp }}/library/
+          if-no-files-found: error
       - name: 公開
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
         run: |
           cd "$RUNNER_TEMP/library"
           cp "$LIBRARY" "$RUNTIME_ID-$LIBRARY"
@@ -104,7 +131,7 @@ jobs:
   prune:
     name: 古いライブラリを削除
     needs: [identify, build]
-    if: always() && needs.identify.result == 'success' && github.ref == 'refs/heads/main'
+    if: always() && needs.identify.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
