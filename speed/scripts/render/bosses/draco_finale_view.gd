@@ -13,14 +13,17 @@ const GOLD := Color("#ffc24d")
 const GOLD_LIGHT := Color("#ffd777")
 const GOLD_PALE := Color("#fff4cf")
 const SHIP_LOW := Vector2(0,385)
+const LIT := preload("res://assets/effects/build/draco_finale_lit.png")
+const LIT_PARTS := ["body_a","body_b","body_c","body_d","body_e","tail_joint","claw","arm","head","tail_tip"]
+const LIT_TURNS := 32
+const LIT_CELL := Vector2(100,110)
+const FX_SIZE := Vector2i(640,360)
+const ROLL := 0.045
 const RAIL_TRAIL := 0.55
 const DEPTH := 1100.0
 const DOCK_FIRST := 0.9
 const DOCK_STEP := 0.42
 const UNLOCK_AT := 2.6
-## 枠の色。黒い竜の影へ薄れていく色。
-const GRAY_TONE := Color(0.62,0.67,0.75)
-const SHADOW_TONE := Color(0.02,0.04,0.09)
 var f := {}
 var stage := ""
 var t := 0.0
@@ -31,9 +34,22 @@ var times := {}
 var _grade: Node2D
 var _dim: Node2D
 var _fx: Node2D
+var _hi: Node2D
 var _top: Node2D
+var _over: Node2D
+var _under: Node2D
+var _under_parent: Node
+var _fx_port: SubViewport
+var _wide_port: SubViewport
+var _far_port: SubViewport
+var _fx_out: Sprite2D
+var _wide_out: Sprite2D
+var _far_out: Sprite2D
+var _grade_material: ShaderMaterial
+var _camera_at := Vector2.ZERO
+var _view_size := Vector2(1280,720)
+var _ship_scale := 1.0
 var _soft: Texture2D
-var _textures := {}
 var _puffs: Array[Rect2] = []
 var _sparks: Array[Dictionary] = []
 var _streaks: Array[Dictionary] = []
@@ -46,11 +62,22 @@ var _charge: Array[Dictionary] = []
 var _shake_hook: Callable
 
 func _ready() -> void:
-	_grade = _canvas(CanvasItemMaterial.BLEND_MODE_MUL,_draw_grade)
+	_grade = _canvas(-1,_draw_grade)
+	_grade_material = ShaderMaterial.new()
+	_grade_material.shader = preload("res://shaders/draco_finale_grade.gdshader")
+	_grade.material = _grade_material
 	_dim = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_dim)
-	_fx = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_fx)
+	_fx_port = _port(FX_SIZE)
+	_fx = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_fx,_fx_port)
+	_wide_port = _port(Vector2i(160,90),_fx_port)
+	_far_port = _port(Vector2i(48,27),_wide_port)
+	_far_out = _output(_far_port,0.9,CanvasItem.TEXTURE_FILTER_LINEAR)
+	_wide_out = _output(_wide_port,0.8,CanvasItem.TEXTURE_FILTER_LINEAR)
+	_fx_out = _output(_fx_port,1.0,CanvasItem.TEXTURE_FILTER_NEAREST)
+	_hi = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_hi)
 	_top = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_top)
 	_top.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_over = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_over)
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0,0.18,0.5,1.0])
 	gradient.colors = PackedColorArray([Color.WHITE,Color(1,1,1,0.67),Color(1,1,1,0.15),Color(1,1,1,0)])
@@ -63,17 +90,47 @@ func _ready() -> void:
 	texture.fill_to = Vector2(1.0,0.5)
 	_soft = texture
 	for j in 4: _puffs.append(Rect2(j*96,0,96,96))
-	for part: String in DEBRIS_PARTS+["head","tail_tip"]: _textures[part] = load("res://assets/pixel/draco/%s.png" % part)
 	_build_particles()
 	visible = false
 
-func _canvas(mode: int, painter: Callable) -> Node2D:
+## 光を低解像度へ描き、さらに小さく写した絵を重ねて光のにじみを作る。
+func _port(size_: Vector2i, source: SubViewport = null) -> SubViewport:
+	var port := SubViewport.new()
+	port.size = size_
+	port.transparent_bg = true
+	port.disable_3d = true
+	port.world_2d = World2D.new()
+	port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	port.render_target_clear_mode = SubViewport.CLEAR_MODE_ALWAYS
+	port.canvas_item_default_texture_filter = Viewport.DEFAULT_CANVAS_ITEM_TEXTURE_FILTER_LINEAR
+	add_child(port)
+	if source!=null:
+		var copy := Sprite2D.new()
+		copy.texture = source.get_texture()
+		copy.centered = false
+		copy.scale = Vector2(size_)/Vector2(source.size)
+		port.add_child(copy)
+	return port
+
+func _output(port: SubViewport, strength: float, filter: int) -> Sprite2D:
+	var sprite := Sprite2D.new()
+	sprite.texture = port.get_texture()
+	var shader := ShaderMaterial.new()
+	shader.shader = preload("res://shaders/draco_finale_add.gdshader")
+	shader.set_shader_parameter("strength",strength)
+	sprite.material = shader
+	sprite.texture_filter = filter
+	add_child(sprite)
+	return sprite
+
+func _canvas(mode: int, painter: Callable, parent: Node = null) -> Node2D:
 	var node := Node2D.new()
-	var material_ := CanvasItemMaterial.new()
-	material_.blend_mode = mode
-	node.material = material_
+	if mode>=0:
+		var material_ := CanvasItemMaterial.new()
+		material_.blend_mode = mode
+		node.material = material_
 	node.draw.connect(painter)
-	add_child(node)
+	(parent if parent!=null else self).add_child(node)
 	return node
 
 func _random(seed_value: int) -> RandomNumberGenerator:
@@ -85,14 +142,14 @@ func _build_particles() -> void:
 	var r := _random(99)
 	for j in 300:
 		_charge.append({"a":r.randf()*TAU,"r":110.0+r.randf()*430.0,"ts":0.55*pow(r.randf(),1.5),"life":0.3+r.randf()*0.15,"turn":(-1.0 if r.randf()<0.5 else 1.0)*(1.8+r.randf()*1.8),"color":[GOLD_PALE,GOLD_LIGHT,GOLD,Color("#ffe9a8")][r.randi()%4],"w":0.9+r.randf()*1.3})
-	for j in 1500:
+	for j in 2600:
 		var a := r.randf()*TAU
 		var speed := 120.0+r.randf()*r.randf()*2300.0
-		_sparks.append({"at":Vector2((r.randf()-0.5)*90.0,(r.randf()-0.5)*560.0),"v":Vector2.from_angle(a)*speed,"drag":0.7+r.randf()*1.2,"life":2.0+r.randf()*4.6,"color":WARM[r.randi()%8],"tw":r.randf()*TAU,"delay":r.randf()*0.4})
-	for j in 900:
+		_sparks.append({"at":Vector2((r.randf()-0.5)*90.0,(r.randf()-0.5)*560.0),"v":Vector2.from_angle(a)*speed,"drag":0.7+r.randf()*1.2,"life":2.0+r.randf()*4.6,"color":WARM[r.randi()%8],"size":2.0 if r.randf()<0.16 else 1.0,"tw":r.randf()*TAU,"delay":r.randf()*0.4})
+	for j in 1300:
 		var flat := r.randf()<0.3
 		var a := (0.0 if r.randf()<0.5 else PI)+(r.randf()-0.5)*0.28 if flat else r.randf()*TAU
-		_streaks.append({"dir":Vector2.from_angle(a),"speed":700.0+r.randf()*r.randf()*4800.0,"y":(r.randf()-0.5)*168.0,"drag":0.55+r.randf()*0.8,"life":0.7+r.randf()*2.2,"delay":r.randf()*r.randf()*1.5,"color":WARM[r.randi()%8],"shutter":0.05+r.randf()*0.09})
+		_streaks.append({"dir":Vector2.from_angle(a),"speed":700.0+r.randf()*r.randf()*4800.0,"y":(r.randf()-0.5)*168.0,"drag":0.55+r.randf()*0.8,"life":0.7+r.randf()*2.2,"delay":r.randf()*r.randf()*1.5,"color":WARM[r.randi()%8],"w":0.8+r.randf()*r.randf()*2.6,"shutter":0.05+r.randf()*0.09})
 	for j in 150:
 		var a := r.randf()*TAU
 		_clouds.append({"puff":r.randi()%4,"color":[Color("#ff8c3c"),Color("#ff8c3c"),Color("#ffcd78"),Color("#ffcd78"),Color("#46beff"),Color("#d2dcff"),Color("#7846ff"),Color("#ff5abe")][r.randi()%8],"at":Vector2((r.randf()-0.5)*260.0,(r.randf()-0.5)*620.0),"v":Vector2(cos(a)*(120.0+r.randf()*760.0),sin(a)*(90.0+r.randf()*620.0)),"size":460.0+r.randf()*1300.0,"rot":r.randf()*TAU,"spin":(r.randf()-0.5)*0.5,"life":3.0+r.randf()*4.4,"delay":r.randf()*0.7})
@@ -115,7 +172,7 @@ func _build_particles() -> void:
 		var y := RUSH.cuts[row]+(r.randf()-0.5)*RUSH.cuts[row+1]*1.6
 		_rubble.append({"part":DEBRIS_PARTS[r.randi()%8],"at":Vector2(_jag(y)+side*(6.0+r.randf()*40.0),y),"v":Vector2(side*(50.0+r.randf()*r.randf()*560.0),(r.randf()-0.5)*300.0+70.0),"rot":r.randf()*TAU,"spin":(r.randf()-0.5)*3.0,"tum":r.randf()*TAU,"size":0.14+r.randf()*0.42})
 	for j in 190: _debris.append(_chunk(r,DEBRIS_PARTS[r.randi()%8],0.9+r.randf()*2.1))
-	for j in 300: _debris.append(_chunk(r,DEBRIS_PARTS[r.randi()%8],0.14+r.randf()*0.42))
+	for j in 520: _debris.append(_chunk(r,DEBRIS_PARTS[r.randi()%8],0.14+r.randf()*0.42))
 	_debris.append(_chunk(r,"head",2.7,1100.0))
 	_debris.append(_chunk(r,"tail_tip",1.8,1400.0))
 	for d in 5:
@@ -161,26 +218,80 @@ static func kink(points: PackedVector2Array, finale: Dictionary) -> PackedVector
 func set_shake_hook(hook: Callable) -> void:
 	_shake_hook = hook
 
+## 霧は竜の後ろへ置く。
+func set_under_parent(parent: Node) -> void:
+	_under = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_under,parent)
+	parent.move_child(_under,0)
+
 func hide_view() -> void:
-	if visible: visible = false
+	if visible:
+		visible = false
+		if _under!=null: _under.visible = false
+		_fx_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		_wide_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		_far_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	f = {}
 	stage = ""
 
-func apply_frame(finale: Dictionary, world_clock: float, view: Rect2, view_zoom: float) -> void:
-	var previous := stage
+func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, view_half: Vector2, view_zoom: float, character_scale: float) -> void:
+	if not visible:
+		_fx_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		_wide_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+		_far_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	f = finale
 	stage = str(finale.get("stage",""))
 	t = float(finale.get("time",0.0))
 	clock = world_clock
 	zoom = maxf(view_zoom,0.01)
 	times = finale.get("times",{})
+	_ship_scale = character_scale
 	visible = true
 	position = finale.center
-	view_rect = Rect2(view.position-position,view.size).grow(200.0)
+	_camera_at = view_center
+	var push := camera_push()
+	var roll := camera_roll()
+	_view_size = view_half*2.0/push
+	view_rect = Rect2(view_center-view_half-position,view_half*2.0).grow(400.0)
+	_fx.position = position
+	var fx_scale := Vector2(FX_SIZE)/_view_size
+	_fx_port.canvas_transform = Transform2D(0.0,fx_scale,0.0,Vector2(FX_SIZE)*0.5)*Transform2D(-roll,Vector2.ZERO)*Transform2D(0.0,-view_center)
+	var smooth_fx := stage in ["combine","explode"]
+	_fx_out.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR if smooth_fx else CanvasItem.TEXTURE_FILTER_NEAREST
+	var glow_strength := 0.45 if stage=="explode" else 1.0
+	_far_out.material.set_shader_parameter("strength",0.9*glow_strength)
+	_wide_out.material.set_shader_parameter("strength",0.8*glow_strength)
+	for sprite: Sprite2D in [_far_out,_wide_out,_fx_out]:
+		sprite.position = view_center-position
+		sprite.rotation = roll
+		sprite.scale = _view_size/sprite.texture.get_size()
+	if _under!=null:
+		_under.visible = true
+		_under.position = position
+		_under.queue_redraw()
 	if stage=="strikes": _rush_shake()
 	if stage=="explode" and _shake_hook.is_valid(): _shake_hook.call(62.0*exp(-t*1.25)+7.0*(1.0-_smooth(3.0,5.5,t)))
-	for node: Node2D in [_grade,_dim,_fx,_top]: node.queue_redraw()
-	if previous!=stage: pass
+	for node: Node2D in [_grade,_dim,_fx,_hi,_top,_over]: node.queue_redraw()
+
+func _rush_roll(time: float) -> float:
+	var k := clampf(time/float(times.rush),0.0,1.0)
+	return ROLL*sin(time*2.7)*k
+
+func camera_roll() -> float:
+	if times.is_empty(): return 0.0
+	match stage:
+		"strikes": return _rush_roll(t)
+		"charge": return lerpf(_rush_roll(float(times.rush)),0.0,_out_cubic(t/float(times.charge)))
+		"explode": return (0.02*sin(t*23.0)+0.012*sin(t*37.0))*exp(-t*1.1)
+	return 0.0
+
+func camera_push() -> float:
+	if stage!="strikes": return 1.0
+	var hits := RUSH.hits
+	var push := 0.0
+	for row in range(0,hits.size(),DracoFinaleRush.HIT_FIELDS):
+		var tau := t-hits[row]
+		if tau>=0.0 and tau<=0.3: push += 0.012*exp(-tau*14.0)
+	return 1.0+push
 
 func _rush_shake() -> void:
 	if not _shake_hook.is_valid(): return
@@ -199,27 +310,31 @@ func _impact() -> float:
 func _flash_total() -> float:
 	return _impact()+float(times.fade)+float(times.after)
 
-## 世界の色：止まった世界の青。
+func _flash_peak() -> float:
+	return float(times.from)+float(times.ramp)
+
+## 竜の色と切り口。閃光で灰色になり、光の筋が見えてくるにつれて黒くなる。
 func tone() -> Dictionary:
+	var center: Vector2 = f.get("center",Vector2.ZERO)
 	if stage=="flash":
-		if t<float(times.from)+float(times.ramp): return {"on":false}
+		if t<_flash_peak(): return {}
 		var impact := _impact()
-		var gray := 1.0-_smooth(impact,maxf(impact+0.01,_flash_total()-0.7),t)
-		return {"on":true,"color":SHADOW_TONE.lerp(GRAY_TONE,gray)}
-	if stage=="sight":
-		return {"on":true,"color":SHADOW_TONE.lerp(GRAY_TONE,_smooth(0.2,float(times.sight),t)*0.7)}
-	return {"on":false}
+		if t<impact: return {"on":true,"gray":1.0,"lit":0.0}
+		return {"on":true,"gray":1.0-_smooth(impact,maxf(impact+0.01,_flash_total()-0.7),t),"lit":0.0,"gap":7.0,"center":center}
+	if stage=="sight": return {"on":true,"gray":0.0,"lit":_smooth(0.2,float(times.sight),t)*0.7,"gap":7.0,"center":center}
+	return {}
 
 func _mono() -> float:
 	match stage:
 		"input": return _smooth(0.0,0.35,t)*0.85
 		"strikes","charge": return 0.85
-		"flash": return 0.85 if t<float(times.from)+float(times.ramp) else 0.0
+		"flash": return 0.85 if t<_flash_peak() else 0.0
 	return 0.0
 
 func _draw_grade() -> void:
 	var m := _mono()
-	if m>0.0: _grade.draw_rect(view_rect,Color.WHITE.lerp(Color(0.2,0.3,0.72),m))
+	_grade_material.set_shader_parameter("amount",m)
+	if m>0.0: _grade.draw_rect(view_rect,Color.WHITE)
 
 func _darkness() -> float:
 	if stage=="flash":
@@ -234,8 +349,8 @@ func _draw_dim() -> void:
 	var d := _darkness()
 	if d>0.0: _dim.draw_rect(view_rect,Color(0,0,0.02,d))
 
-func _glow(at: Vector2, radius: float, color: Color, alpha := 1.0) -> void:
-	_fx.draw_texture_rect(_soft,Rect2(at-Vector2.ONE*radius,Vector2.ONE*radius*2.0),false,Color(color,color.a*alpha))
+func _glow(at: Vector2, radius: float, color: Color, alpha := 1.0, canvas: Node2D = null) -> void:
+	(canvas if canvas!=null else _fx).draw_texture_rect(_soft,Rect2(at-Vector2.ONE*radius,Vector2.ONE*radius*2.0),false,Color(color,color.a*alpha))
 
 func _streak(at: Vector2, angle: float, length: float, width: float, color: Color, alpha: float, canvas: Node2D = null) -> void:
 	var target := canvas if canvas!=null else _fx
@@ -247,10 +362,10 @@ func _burst(at: Vector2, count: int, length: float, width: float, rot: float, al
 	var half := ceili(count*0.5)
 	for k in half:
 		var big := k%2==0
-		_streak(at,rot+k*PI/half,length*(1.0 if big else 0.6),width*(5.0 if big else 3.6),GOLD,alpha*0.8)
-	_streak(at,0.0,length*2.0,width*3.6,GOLD_LIGHT,alpha*0.8)
-	_streak(at,0.0,length*0.9,width*1.8,GOLD_PALE,alpha*0.7)
-	_streak(at,PI*0.5,length*0.9,width*1.8,GOLD_PALE,alpha*0.7)
+		_streak(at,rot+k*PI/half,length*(1.0 if big else 0.6),width*(5.0 if big else 3.6),GOLD,alpha*0.8,_hi)
+	_streak(at,0.0,length*2.0,width*3.6,GOLD_LIGHT,alpha*0.8,_hi)
+	_streak(at,0.0,length*0.9,width*1.8,GOLD_PALE,alpha*0.7,_hi)
+	_streak(at,PI*0.5,length*0.9,width*1.8,GOLD_PALE,alpha*0.7,_hi)
 
 func _ship_at() -> Vector2:
 	return Vector2(f.get("ship_pos",Vector2.ZERO))-position
@@ -332,35 +447,63 @@ func _fx_combine() -> void:
 				points.append(_module_at(i,maxf(0.0,k-0.28+0.28*n/8.0),ship))
 				colors.append(Color(GOLD,n/8.0*0.75))
 			_fx.draw_polyline_colors(points,colors,3.0)
-			var at := _module_at(i,k,ship)
-			_glow(at,30.0,GOLD_LIGHT,0.6)
-			_burst(at,4,44.0,1.3,clock*3.0,0.8)
+			_glow(_module_at(i,k,ship),30.0,GOLD_LIGHT,0.6)
+		var dq := t-dock
+		if dq>=0.0 and dq<0.7:
+			var b := exp(-dq*6.0)
+			_glow(ship,70.0+dq*160.0,GOLD_LIGHT,b)
+			_glow(ship,170.0+dq*240.0,Color("#ff9a30"),0.55*b)
+	var q2 := t-UNLOCK_AT
+	if q2>0.0:
+		_glow(ship,lerpf(190.0,90.0,clampf(q2*1.5,0.0,1.0)),GOLD_LIGHT,0.6*exp(-q2*3.0))
+		_glow(ship,lerpf(150.0,70.0,clampf(q2*1.5,0.0,1.0)),GOLD,0.5*exp(-q2*2.2)+0.16)
+		var sparks := _random(77)
+		for i in 26:
+			var a := sparks.randf()*TAU
+			var speed := 120.0+sparks.randf()*420.0
+			_glow(ship+Vector2.from_angle(a)*speed*_out_expo(clampf(q2*1.4,0.0,1.0)),7.0,Color("#ffe3a0"),clampf(1.0-q2*0.9,0.0,1.0))
+
+func _hi_combine() -> void:
+	var ship := _ship_at()
+	var aura := 0.0
+	for i in 4: aura += _smooth(0.0,0.2,t-(DOCK_FIRST+i*DOCK_STEP))
+	aura *= 0.25
+	for i in 4:
+		var start := 0.25+i*0.16
+		var dock := DOCK_FIRST+i*DOCK_STEP
+		var k := clampf((t-start)/(dock-start),0.0,1.0)
+		if t>start and t<dock:
 			var q := _random(i*7+5)
 			for n in 46:
 				var back := q.randf()*0.34
 				var spot := _module_at(i,maxf(0.0,k-back),ship)+Vector2.from_angle(q.randf()*TAU)*(8.0+q.randf()*20.0)+Vector2(0,back*40.0)
 				var twinkle := sin(clock*18.0+n)*0.5+0.5
-				_fx.draw_rect(Rect2(spot,Vector2.ONE*(2.2 if n%6==0 else 1.2)),Color(GOLD_LIGHT if n%3!=0 else GOLD_PALE,(1.0-back/0.34)*(0.3+0.7*twinkle)))
+				_hi.draw_rect(Rect2(spot,Vector2.ONE*(2.2 if n%6==0 else 1.2)),Color(GOLD_LIGHT if n%3!=0 else GOLD_PALE,(1.0-back/0.34)*(0.3+0.7*twinkle)))
+			_burst(_module_at(i,k,ship),4,44.0,1.3,clock*3.0,0.8)
 		var dq := t-dock
 		if dq>=0.0:
-			if dq<0.7:
-				var b := exp(-dq*6.0)
-				_glow(ship,70.0+dq*160.0,GOLD_LIGHT,b)
-				_glow(ship,170.0+dq*240.0,Color("#ff9a30"),0.55*b)
 			if dq<0.55: _burst(ship,14,120.0+_out_expo(dq*3.0)*240.0,3.2,i*0.4+dq*0.6,exp(-dq*5.5))
 			_fx_glitter(i,ship,dq)
 	var q2 := t-UNLOCK_AT
-	if q2>0.0:
-		_glow(ship,lerpf(190.0,90.0,clampf(q2*1.5,0.0,1.0)),GOLD_LIGHT,0.6*exp(-q2*3.0))
-		_glow(ship,lerpf(150.0,70.0,clampf(q2*1.5,0.0,1.0)),GOLD,0.5*exp(-q2*2.2)+0.16)
+	if q2>=0.0:
 		if q2<0.9: _burst(ship,20,280.0+_out_expo(q2*2.0)*420.0,5.5,q2*0.5,exp(-q2*3.4))
 		_fx_glitter(4,ship,q2)
+	if aura>0.0:
+		var q := _random(77)
+		for n in 16:
+			var r := 26.0+q.randf()*92.0
+			var an := q.randf()*TAU
+			var phase := q.randf()*TAU
+			var twinkle := pow(maxf(0.0,sin(clock*3.4+phase)),8.0)*aura
+			if twinkle>0.03: _burst(ship+Vector2.from_angle(an)*r,4,15.0*twinkle+5.0,0.7,0.0,twinkle)
+		var pulse := Vector2(1.0+0.13*aura+0.05*sin(clock*6.0),1.0+0.08*aura)
+		_ship_shape(_hi,ship,-PI*0.5,Color(GOLD,0.7*aura),_ship_scale*pulse.x)
 	var fl := 0.0
 	for i in 4:
 		var q3 := t-(DOCK_FIRST+i*DOCK_STEP)
 		if q3>=0.0: fl = maxf(fl,0.34*exp(-q3*10.0))
 	if q2>=0.0: fl = maxf(fl,0.58*exp(-q2*5.0))
-	if fl>0.004: _fx.draw_rect(view_rect,Color(Color("#ffb445"),fl))
+	if fl>0.004: _hi.draw_rect(view_rect,Color(Color("#ffb445"),fl))
 
 func _fx_glitter(index: int, at: Vector2, age: float) -> void:
 	for piece: Dictionary in _glitter[index]:
@@ -368,7 +511,7 @@ func _fx_glitter(index: int, at: Vector2, age: float) -> void:
 		var f2 := (1.0-exp(-age*float(piece.drag)))/float(piece.drag)
 		var twinkle := 0.45+0.55*sin(float(piece.tw)+clock*22.0)
 		var spot: Vector2 = at+Vector2.from_angle(float(piece.a))*float(piece.speed)*f2+Vector2(0,float(piece.fall)*age*age)
-		_fx.draw_rect(Rect2(spot,Vector2.ONE*float(piece.size)),Color(piece.color,clampf((1.0-age/float(piece.life))*twinkle,0.0,1.0)))
+		_hi.draw_rect(Rect2(spot,Vector2.ONE*float(piece.size)),Color(piece.color,clampf((1.0-age/float(piece.life))*twinkle,0.0,1.0)))
 
 func _fx_input() -> void:
 	var guide: PackedVector2Array = f.guide
@@ -399,7 +542,7 @@ func _path_at(time: float) -> Vector2:
 	var span := path[next_row*3]-path[low*3]
 	return a.lerp(b,clampf((time-path[low*3])/span,0.0,1.0) if span>0.0 else 0.0)
 
-func _trail(time: float, window: float, offset: float, width: float, color: Color, alpha: float) -> void:
+func _trail(canvas: Node2D, time: float, window: float, offset: float, width: float, color: Color, alpha: float) -> void:
 	var path := RUSH.path
 	var points := PackedVector2Array()
 	var colors := PackedColorArray()
@@ -415,7 +558,7 @@ func _trail(time: float, window: float, offset: float, width: float, color: Colo
 		points.append(at+side)
 		colors.append(Color(color,alpha*strength*strength))
 		row -= 2
-	if points.size()>1: _fx.draw_polyline_colors(points,colors,width)
+	if points.size()>1: canvas.draw_polyline_colors(points,colors,width)
 
 func _sharp_hit(time: float) -> int:
 	var hits := RUSH.hits
@@ -434,12 +577,8 @@ func _ship_shape(canvas: Node2D, at: Vector2, angle: float, color: Color, scale_
 	canvas.draw_set_transform(Vector2.ZERO)
 
 func _fx_rush(time: float) -> void:
-	var window := RAIL_TRAIL
-	_trail(time,window,0.0,9.0,Color("#3f78ff"),0.5)
-	_trail(time,window*0.5,0.0,5.0,Color("#9fd2ff"),0.8)
-	var offsets := [-13.0,-7.0,-3.0,3.0,8.0,14.0]
-	var tints := [Color("#7fb6ff"),Color("#cfe8ff"),Color.WHITE,Color.WHITE,Color("#ffe9a8"),Color("#8fc4ff")]
-	for j in 6: _trail(time,window*(0.5+0.09*j),offsets[j],1.6,tints[j],0.95)
+	_trail(_fx,time,RAIL_TRAIL,0.0,9.0,Color("#3f78ff"),0.5)
+	_trail(_fx,time,RAIL_TRAIL*0.5,0.0,5.0,Color("#9fd2ff"),0.8)
 	var hits := RUSH.hits
 	for row in range(0,hits.size(),DracoFinaleRush.HIT_FIELDS):
 		var tau := time-hits[row]
@@ -450,34 +589,46 @@ func _fx_rush(time: float) -> void:
 		var at := Vector2(hits[row+3],hits[row+4])
 		var dir := Vector2(hits[row+5],hits[row+6])
 		_glow(at,130.0*size_*(1.0+tau*2.0),Color("#e2f0ff"),b)
-		_streak(at,dir.angle(),240.0*size_*(1.0+tau*4.0),6.0*b*size_,Color.WHITE,b)
+		var reach := 240.0*size_*(1.0+tau*4.0)
+		_fx.draw_line(at-dir*reach,at+dir*reach,Color(1,1,1,b),maxf(1.0,6.0*b*size_))
 		var q := _random(row+1)
 		for j in (12 if big else 6):
 			var angle := dir.angle()+(q.randf()-0.5)*1.6
-			var reach := (240.0+q.randf()*560.0)*(1.0-exp(-tau*5.0))/5.0
-			_fx.draw_rect(Rect2(at+Vector2.from_angle(angle)*reach,Vector2.ONE*4.0),Color(Color("#e8f3ff"),b))
+			var spread := (240.0+q.randf()*560.0)*(1.0-exp(-tau*5.0))/5.0
+			_fx.draw_rect(Rect2(at+Vector2.from_angle(angle)*spread,Vector2.ONE*4.0),Color(Color("#e8f3ff"),b))
+
+func _hi_rush(time: float) -> void:
+	var offsets := [-13.0,-7.0,-3.0,3.0,8.0,14.0]
+	var tints := [Color("#7fb6ff"),Color("#cfe8ff"),Color.WHITE,Color.WHITE,Color("#ffe9a8"),Color("#8fc4ff")]
+	for j in 6: _trail(_hi,time,RAIL_TRAIL*(0.5+0.09*j),offsets[j],1.6,tints[j],0.95)
 	var ghosts := RUSH.ghosts
 	for row in range(0,ghosts.size(),DracoFinaleRush.GHOST_FIELDS):
 		var age := time-ghosts[row]
 		if age<0.0 or age>0.24: continue
-		_ship_shape(_fx,Vector2(ghosts[row+1],ghosts[row+2]),ghosts[row+3],Color(Color("#bfe0ff"),0.8*(1.0-age/0.24)))
+		_ship_shape(_hi,Vector2(ghosts[row+1],ghosts[row+2]),ghosts[row+3],Color(Color("#bfe0ff"),0.8*(1.0-age/0.24)),_ship_scale)
 	if time>=float(times.rush) or _sharp_hit(time)>=0: return
 	for k in 12:
 		var a := _path_at(time-k*0.0035)
 		var b := _path_at(time-k*0.0035-0.003)
-		_ship_shape(_fx,a,(a-b).angle(),Color(Color("#bfe0ff"),0.3*(1.0-k/12.0)))
-	_glow(_path_at(time),46.0,Color("#a8d4ff"),0.5)
+		_ship_shape(_hi,a,(a-b).angle(),Color(Color("#bfe0ff"),0.3*(1.0-k/12.0)),_ship_scale)
+	_glow(_path_at(time),46.0,Color("#a8d4ff"),0.5,_hi)
 
 func _charge_time() -> float:
 	return float(times.charge)
 
+func _charge_ship() -> Vector2:
+	return SHIP_LOW+Vector2(0,_smooth(0.0,_charge_time(),t)*16.0)
+
 func _fx_charge() -> void:
 	var charge := _charge_time()
 	var k := _smooth(-0.3,charge*0.8,t)
-	var ship := SHIP_LOW+Vector2(0,_smooth(0.0,charge,t)*16.0)
 	var radius := 20.0+k*k*62.0
-	_glow(ship,radius,GOLD,0.28+0.32*k)
-	_glow(ship,radius*2.2,Color("#ff9a30"),0.22*k)
+	_glow(_charge_ship(),radius,GOLD,0.28+0.32*k)
+	_glow(_charge_ship(),radius*2.2,Color("#ff9a30"),0.22*k)
+
+func _hi_charge() -> void:
+	var charge := _charge_time()
+	var ship := _charge_ship()
 	var progress := t/charge
 	for piece: Dictionary in _charge:
 		var u := (progress-float(piece.ts))/float(piece.life)
@@ -490,34 +641,46 @@ func _fx_charge() -> void:
 			var q := clampf(u-along*0.36,0.0,1.0)
 			points.append(ship+Vector2.from_angle(float(piece.a)+float(piece.turn)*q*q)*float(piece.r)*(1.0-pow(q,2.4)))
 			colors.append(Color(piece.color,base*(1.0-along)*(1.0-along*0.3)))
-		_fx.draw_polyline_colors(points,colors,float(piece.w)/zoom)
-	var aura := _smooth(0.0,charge,t)
-	_ship_shape(_fx,ship,-PI*0.5,Color(GOLD,0.75*aura),1.5*(1.0+0.14*aura))
+		_hi.draw_polyline_colors(points,colors,float(piece.w)/zoom)
+	var aura := _smooth(-0.3,charge*0.8,t)
+	_ship_shape(_hi,ship,-PI*0.5,Color(GOLD,0.75*aura),1.5*_ship_scale*(1.0+0.14*aura))
 
 func _soft_line(width: float, alpha: float, top: float, bottom: float) -> void:
 	var half := width*3.2
-	_fx.draw_texture_rect(_soft,Rect2(-half*1.4,top,half*2.8,bottom-top),false,Color(Color("#4d7dff"),alpha*0.5))
-	_fx.draw_rect(Rect2(-width*0.5,top,width,bottom-top),Color(1,1,1,alpha))
+	var band := PackedVector2Array([Vector2(-half,top),Vector2(-half*0.24,top),Vector2(-half*0.24,bottom),Vector2(-half,bottom)])
+	for side in [-1.0,1.0]:
+		_fx.draw_polygon(PackedVector2Array([Vector2(side*half,top),Vector2(side*half*0.24,top),Vector2(side*half*0.24,bottom),Vector2(side*half,bottom)]),PackedColorArray([Color(0.2,0.35,1,0),Color(0.47,0.69,1,0.5*alpha),Color(0.47,0.69,1,0.5*alpha),Color(0.2,0.35,1,0)]))
+		_fx.draw_polygon(PackedVector2Array([Vector2(side*half*0.24,top),Vector2(side*half*0.03,top),Vector2(side*half*0.03,bottom),Vector2(side*half*0.24,bottom)]),PackedColorArray([Color(0.47,0.69,1,0.5*alpha),Color(1,1,1,alpha),Color(1,1,1,alpha),Color(0.47,0.69,1,0.5*alpha)]))
+	_fx.draw_rect(Rect2(-half*0.03,top,half*0.06,bottom-top),Color(1,1,1,alpha))
 
-func _fx_flash() -> void:
+func _flash_state() -> Dictionary:
 	var impact := _impact()
 	var fade_end := impact+float(times.fade)
-	var line := float(times.line)
-	if t<fade_end:
-		var rise := _flash_rise()
-		var fade := 1.0-_smooth(impact,fade_end,t)
-		var b := rise*fade
-		var head := lerpf(SHIP_LOW.y,-900.0,clampf(t/line,0.0,1.0))
-		if b>0.0:
-			_glow(Vector2.ZERO,360.0*(0.3+0.7*b),Color.WHITE,b)
-			_glow(Vector2.ZERO,760.0*(0.3+0.7*b),Color("#7fb6ff"),b*0.45)
-			_streak(Vector2.ZERO,0.0,view_rect.size.x*0.5,12.0,Color.WHITE,0.9*b)
-			_streak(Vector2.ZERO,0.0,view_rect.size.x*0.5,36.0,Color("#8fc0ff"),0.36*b)
-			_fx.draw_rect(view_rect,Color(Color("#3f86f0"),0.42*b))
-		_soft_line(lerpf(8.0,30.0,b),fade,head,lerpf(SHIP_LOW.y+16.0,1700.0,rise))
-		if t<line: _glow(Vector2(0,head),85.0,Color.WHITE,1.0)
-	var hold := 0.72*exp(-maxf(0.0,t-impact)*0.55)
-	if t>=float(times.from)+float(times.ramp): _fx.draw_rect(view_rect,Color(Color("#2b67c4"),hold))
+	var rise := _flash_rise()
+	var fade := 1.0-_smooth(impact,fade_end,t)
+	return {"rise":rise,"fade":fade,"b":rise*fade,"head":lerpf(SHIP_LOW.y,-900.0,clampf(t/float(times.line),0.0,1.0)),"live":t<fade_end}
+
+func _fx_flash() -> void:
+	var s := _flash_state()
+	if not s.live: return
+	var b: float = s.b
+	if b>0.0:
+		_glow(Vector2.ZERO,360.0*(0.3+0.7*b),Color.WHITE,b)
+		_glow(Vector2.ZERO,760.0*(0.3+0.7*b),Color("#7fb6ff"),b*0.45)
+		_streak(Vector2.ZERO,0.0,view_rect.size.x*0.5,5.0,Color.WHITE,0.9*b)
+		_streak(Vector2.ZERO,0.0,view_rect.size.x*0.5,20.0,Color("#8fc0ff"),0.36*b)
+	_soft_line(lerpf(8.0,30.0,b),s.fade,s.head,lerpf(SHIP_LOW.y+16.0,1700.0,float(s.rise)))
+	if t<float(times.line): _glow(Vector2(0,s.head),85.0,Color.WHITE,1.0)
+
+func _hi_flash() -> void:
+	var s := _flash_state()
+	if not s.live: return
+	var b: float = s.b
+	if t<float(times.line): _hi.draw_line(Vector2(0,SHIP_LOW.y+16.0),Vector2(0,s.head),Color.WHITE,4.2/zoom)
+	if b>0.0: _hi.draw_rect(view_rect,Color(Color("#3f86f0"),0.42*b))
+
+func _draw_under() -> void:
+	if stage=="flash" and t>=_flash_peak(): _under.draw_rect(view_rect,Color(Color("#2b67c4"),0.72*exp(-maxf(0.0,t-_impact())*0.55)))
 
 func _gold_amount() -> float:
 	var total := _flash_total()+float(times.sight)
@@ -598,6 +761,89 @@ func _fx_explode() -> void:
 		_fx.draw_polyline(points,Color(Color("#cfe2ff"),0.42*alpha),2.2)
 	var lines := PackedVector2Array()
 	var line_colors := PackedColorArray()
+	for piece: Dictionary in _sparks:
+		var k := q-float(piece.delay)
+		if k<0.0 or k>float(piece.life): continue
+		var f2 := (1.0-exp(-k*float(piece.drag)))/float(piece.drag)+k*0.05
+		var at: Vector2 = piece.at+piece.v*f2
+		var length := (float(piece.size)+1.0)/zoom*0.75
+		lines.append(at)
+		lines.append(at+Vector2(length,0))
+		var color := Color(piece.color,clampf((1.0-k/float(piece.life))*(0.6+0.4*sin(float(piece.tw)+clock*9.0)),0.0,1.0))
+		line_colors.append(color)
+		line_colors.append(color)
+	if lines.size()>1: _fx.draw_multiline_colors(lines,line_colors,1.6/zoom)
+	var band := 0.95*exp(-q*0.55)*(1.0-_smooth(4.2,6.2,q))
+	_streak(Vector2.ZERO,0.0,view_rect.size.x*0.6,50.0,Color("#ffb46a"),band*0.42)
+	_streak(Vector2.ZERO,0.0,view_rect.size.x*0.6,12.0,Color("#fff0d6"),band*0.8)
+	var north := _smooth(5.0,6.6,t)
+	if north>0.0: _star(Vector2.ZERO,(70.0+9.0*sin(clock*2.2))*north,Color("#cfe8ff"),north)
+
+func _draw_piece(part: String, at: Vector2, angle: float, size_: float, squash: float, alpha: float) -> void:
+	var row := LIT_PARTS.find(part)
+	var turn := posmod(roundi(angle/(TAU/LIT_TURNS)),LIT_TURNS)
+	_top.draw_set_transform(at,angle,Vector2(size_,size_*(0.25+0.75*absf(squash))))
+	_top.draw_texture_rect_region(LIT,Rect2(-LIT_CELL*0.5,LIT_CELL),Rect2(Vector2(turn,row)*LIT_CELL,LIT_CELL),Color(1,1,1,alpha))
+
+func _draw_rubble(age: float, alpha: float) -> void:
+	var f2 := (1.0-exp(-age*0.75))/0.75
+	for piece: Dictionary in _rubble:
+		var rot := float(piece.rot)+float(piece.spin)*f2
+		_draw_piece(piece.part,piece.at+piece.v*f2,rot,float(piece.size),cos(float(piece.tum)+float(piece.spin)*f2*2.0),alpha)
+	_top.draw_set_transform(Vector2.ZERO)
+
+func _ship_modules(at: Vector2, scale_: float, count: int) -> void:
+	var offsets := [Vector2(0,42),Vector2(-26,8),Vector2(26,8),Vector2(0,-16)]
+	for i in count:
+		_top.draw_set_transform(at+offsets[i]*scale_,0.0,Vector2.ONE*0.2*scale_)
+		MODULE.draw(_top,MODULES[i],GOLD_LIGHT)
+	_top.draw_set_transform(Vector2.ZERO)
+
+func _ship_full(at: Vector2, scale_: float, count: int) -> void:
+	var frame := int(clock*14.0)%3
+	_top.draw_set_transform(at,0.0,Vector2.ONE*scale_)
+	_top.draw_texture_rect_region(FLAME,Rect2(-15.5,-35,31,70),Rect2(frame*31,0,31,70))
+	_top.draw_texture(SHIP,-SHIP.get_size()*0.5)
+	_top.draw_set_transform(Vector2.ZERO)
+	_ship_modules(at,scale_,count)
+
+func _docked_count() -> int:
+	return int(f.get("docked",0))
+
+func _draw_top() -> void:
+	match stage:
+		"combine":
+			for i in 4:
+				var start := 0.25+i*0.16
+				var dock := DOCK_FIRST+i*DOCK_STEP
+				if t>start and t<dock:
+					_top.draw_set_transform(_module_at(i,clampf((t-start)/(dock-start),0.0,1.0),_ship_at()),0.0,Vector2.ONE*0.3)
+					MODULE.draw(_top,MODULES[i],GOLD_LIGHT)
+			_top.draw_set_transform(Vector2.ZERO)
+			_ship_full(_ship_at(),_ship_scale,_docked_count())
+		"pose","input":
+			_ship_modules(_ship_at(),_ship_scale,4)
+		"strikes":
+			var row := _sharp_hit(t)
+			if row>=0:
+				var hits := RUSH.hits
+				var dir := Vector2(hits[row+5],hits[row+6])
+				_ship_shape(_top,Vector2(hits[row+3],hits[row+4])-dir*64.0,dir.angle(),Color.WHITE,1.45*_ship_scale)
+		"charge":
+			var charge := _charge_time()
+			var shaking := _smooth(0.0,charge,t)*(1.0-_smooth(charge,charge+0.04,t))
+			var at := _charge_ship()+Vector2(sin(clock*61.0)*1.8*shaking,cos(clock*53.0)*1.6*shaking)
+			_ship_full(at,1.5*_ship_scale,4)
+		"flash":
+			if t>=_impact(): _draw_rubble(t-_impact(),1.0)
+		"sight":
+			_draw_rubble(_flash_total()+t-_impact(),1.0)
+		"explode":
+			if t<0.6: _draw_rubble(_flash_total()+float(times.sight)+t-_impact(),1.0-t/0.6)
+			_draw_debris()
+
+func _hi_explode() -> void:
+	var batches := {}
 	for piece: Dictionary in _streaks:
 		var k := t-float(piece.delay)
 		if k<0.0 or k>float(piece.life): continue
@@ -608,72 +854,54 @@ func _fx_explode() -> void:
 		var dir: Vector2 = piece.dir
 		var base := Vector2(0,float(piece.y))
 		var alpha := 1.0-k/float(piece.life)
-		lines.append(base+dir*r)
-		lines.append(base+dir*maxf(0.0,r-length))
+		var width := snappedf(float(piece.w),0.5)
+		if not batches.has(width): batches[width] = [PackedVector2Array(),PackedColorArray()]
+		var batch: Array = batches[width]
+		batch[0].append(base+dir*r)
+		batch[0].append(base+dir*maxf(0.0,r-length))
 		var color := Color(piece.color,alpha*alpha)
-		line_colors.append(color)
-		line_colors.append(color)
-	for piece: Dictionary in _sparks:
-		var k := q-float(piece.delay)
+		batch[1].append(color)
+		batch[1].append(color)
+	for width: float in batches: _hi.draw_multiline_colors(batches[width][0],batches[width][1],maxf(0.5,width)/zoom)
+	for piece: Dictionary in _debris:
+		var k := t-float(piece.delay)
 		if k<0.0 or k>float(piece.life): continue
-		var f2 := (1.0-exp(-k*float(piece.drag)))/float(piece.drag)+k*0.05
-		var at: Vector2 = piece.at+piece.v*f2
-		lines.append(at)
-		lines.append(at+Vector2(2.0/zoom,0))
-		var color := Color(piece.color,clampf((1.0-k/float(piece.life))*(0.6+0.4*sin(float(piece.tw)+clock*9.0)),0.0,1.0))
-		line_colors.append(color)
-		line_colors.append(color)
-	if lines.size()>1: _fx.draw_multiline_colors(lines,line_colors,1.6/zoom)
-	var band := 0.95*exp(-q*0.55)*(1.0-_smooth(4.2,6.2,q))
-	_streak(Vector2.ZERO,0.0,view_rect.size.x*0.6,50.0,Color("#ffb46a"),band*0.42)
-	_streak(Vector2.ZERO,0.0,view_rect.size.x*0.6,12.0,Color("#fff0d6"),band*0.8)
-	var north := _smooth(5.0,6.6,t)
-	if north>0.0: _star(Vector2.ZERO,(70.0+9.0*sin(clock*2.2))*north,Color("#cfe8ff"),north)
-	var white := 0.8*exp(-t*7.0)
-	if white>0.003: _fx.draw_rect(view_rect,Color(1,1,1,white))
+		var state := _debris_at(piece,k)
+		if state.past: continue
+		var size_ := float(piece.size)*float(state.scale)
+		if size_<=0.5: continue
+		var before := _debris_at(piece,maxf(0.0,k-0.07))
+		var heat := exp(-k*0.7)
+		_hi.draw_line(state.at,before.at,Color(Color("#ffd6a0") if heat>0.5 else Color("#8fb4ff"),0.62*heat*(1.0-k/float(piece.life))),minf(10.0,size_*2.4)/zoom*0.6)
+		_glow(state.at,size_*18.0,Color("#ffb26a"),0.3*heat,_hi)
 
-func _draw_piece(part: String, at: Vector2, angle: float, size_: float, squash: float, alpha: float) -> void:
-	var texture: Texture2D = _textures[part]
-	_top.draw_set_transform(at,angle,Vector2(size_,size_*(0.25+0.75*absf(squash))))
-	_top.draw_texture(texture,-texture.get_size()*0.5,Color(1,1,1,alpha))
+func _debris_at(piece: Dictionary, k: float) -> Dictionary:
+	var f2 := (1.0-exp(-k*0.62))/0.62+k*0.035
+	var z := float(piece.vz)*f2
+	var scale_ := DEPTH/maxf(40.0,DEPTH-z)
+	return {"at":(piece.at+piece.v*f2)*scale_,"scale":scale_,"past":z>DEPTH*0.9}
 
-func _draw_rubble(age: float, alpha: float) -> void:
-	var f2 := (1.0-exp(-age*0.75))/0.75
-	for piece: Dictionary in _rubble:
-		var rot := float(piece.rot)+float(piece.spin)*f2
-		_draw_piece(piece.part,piece.at+piece.v*f2,rot,float(piece.size),cos(float(piece.tum)+float(piece.spin)*f2*2.0),alpha)
-	_top.draw_set_transform(Vector2.ZERO)
-
-func _draw_top() -> void:
+func _draw_hi() -> void:
 	match stage:
-		"strikes":
-			var row := _sharp_hit(t)
-			if row>=0:
-				var hits := RUSH.hits
-				var dir := Vector2(hits[row+5],hits[row+6])
-				_ship_shape(_top,Vector2(hits[row+3],hits[row+4])-dir*64.0,dir.angle(),Color.WHITE,1.45)
-		"charge":
-			var shaking := _smooth(0.0,_charge_time(),t)*(1.0-_smooth(_charge_time(),_charge_time()+0.04,t))
-			var at := SHIP_LOW+Vector2(sin(clock*61.0)*1.8*shaking,_smooth(0.0,_charge_time(),t)*16.0+cos(clock*53.0)*1.6*shaking)
-			_ship_shape(_top,at,-PI*0.5,Color.WHITE,1.5)
-		"flash":
-			if t>=_impact(): _draw_rubble(t-_impact(),1.0)
-		"sight":
-			_draw_rubble(_flash_total()+t-_impact(),1.0)
-		"explode":
-			if t<0.6: _draw_rubble(_flash_total()+float(times.sight)+t-_impact(),1.0-t/0.6)
-			_draw_debris()
+		"combine": _hi_combine()
+		"strikes": _hi_rush(t)
+		"charge": _hi_rush(float(times.rush)+t); _hi_charge()
+		"flash": _hi_flash()
+		"explode": _hi_explode()
+
+func _draw_over() -> void:
+	var white := 0.0
+	if stage=="flash": white = 0.14*_flash_state().b
+	if stage=="explode": white = 0.8*exp(-t*7.0)
+	if white>0.003: _over.draw_rect(view_rect,Color(1,1,1,white))
 
 func _draw_debris() -> void:
 	for piece: Dictionary in _debris:
 		var k := t-float(piece.delay)
 		if k<0.0 or k>float(piece.life): continue
-		var f2 := (1.0-exp(-k*0.62))/0.62+k*0.035
-		var z := float(piece.vz)*f2
-		if z>DEPTH*0.9: continue
-		var scale_ := DEPTH/maxf(40.0,DEPTH-z)
-		var at: Vector2 = (piece.at+piece.v*f2)*scale_
+		var state := _debris_at(piece,k)
+		if state.past: continue
 		var rot := float(piece.rot)+float(piece.spin)*(1.0-exp(-k*0.5))/0.5
 		var alpha := 1.0-_smooth(0.72,1.0,k/float(piece.life))
-		_draw_piece(piece.part,at,rot,float(piece.size)*scale_,cos(float(piece.tum)+float(piece.ts)*k*0.5),alpha)
+		_draw_piece(piece.part,state.at,rot,float(piece.size)*float(state.scale),cos(float(piece.tum)+float(piece.ts)*k*0.5),alpha)
 	_top.draw_set_transform(Vector2.ZERO)

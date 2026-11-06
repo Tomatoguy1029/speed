@@ -65,7 +65,7 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	_pose = _present(points,body,current)
 	points = _pose.points
 	points = FINALE_VIEW.kink(points,finale)
-	_parts.set_finale_tone(finale_view.tone() if finale_view!=null else {})
+	_parts.set_finale_tone(finale_view.tone() if finale_view!=null and finale_view.visible else {})
 	_parts.arm_turns = _pose.arms
 	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
 	_parts.position = Vector2(feedback.offset).rotated(-float(body.facing))

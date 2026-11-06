@@ -12,6 +12,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[3]
 RUSH_PATH = ROOT / 'speed/data/bosses/draco_finale_rush.tres'
 PUFF_PATH = ROOT / 'speed/assets/effects/build/draco_finale_puff.png'
+LIT_PATH = ROOT / 'speed/assets/effects/build/draco_finale_lit.png'
+PARTS_DIR = ROOT / 'speed/assets/pixel/draco'
+LIT_PARTS = ['body_a', 'body_b', 'body_c', 'body_d', 'body_e', 'tail_joint', 'claw', 'arm', 'head', 'tail_tip']
+LIT_TURNS = 32
+LIT_CELL = (100, 110)
 TAU = math.pi * 2
 BODY_LENGTH = 1500.0
 BODY_WIDTH = 154.0
@@ -200,7 +205,89 @@ def bake_puffs():
     PUFF_PATH.write_bytes(png)
 
 
+def read_png(path):
+    data = path.read_bytes()
+    at, idat = 8, b''
+    while at < len(data):
+        size = struct.unpack('>I', data[at:at + 4])[0]
+        kind = data[at + 4:at + 8]
+        body = data[at + 8:at + 8 + size]
+        if kind == b'IHDR':
+            width, height, depth, color = struct.unpack('>IIBB', body[:10])
+            if depth != 8 or color != 6:
+                raise ValueError(f'{path}: RGBA 8bitのみ対応')
+        elif kind == b'IDAT':
+            idat += body
+        at += size + 12
+    raw = zlib.decompress(idat)
+    stride = width * 4
+    rows, previous, cursor = [], bytearray(stride), 0
+    for _ in range(height):
+        mode = raw[cursor]
+        line = bytearray(raw[cursor + 1:cursor + 1 + stride])
+        cursor += 1 + stride
+        for i in range(stride):
+            a = line[i - 4] if i >= 4 else 0
+            b = previous[i]
+            c = previous[i - 4] if i >= 4 else 0
+            if mode == 1:
+                line[i] = (line[i] + a) & 255
+            elif mode == 2:
+                line[i] = (line[i] + b) & 255
+            elif mode == 3:
+                line[i] = (line[i] + (a + b) // 2) & 255
+            elif mode == 4:
+                p = a + b - c
+                pa, pb, pc = abs(p - a), abs(p - b), abs(p - c)
+                line[i] = (line[i] + (a if pa <= pb and pa <= pc else b if pb <= pc else c)) & 255
+        rows.append(line)
+        previous = line
+    return width, height, rows
+
+
+def write_png(path, width, height, rows):
+    def chunk(kind, data):
+        body = kind + data
+        return struct.pack('>I', len(data)) + body + struct.pack('>I', zlib.crc32(body) & 0xffffffff)
+    raw = b''.join(b'\0' + bytes(row) for row in rows)
+    path.write_bytes(b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', struct.pack('>IIBBBBB', width, height, 8, 6, 0, 0, 0)) + chunk(b'IDAT', zlib.compress(raw, 9)) + chunk(b'IEND', b''))
+
+
+def bake_lit():
+    """瓦礫の絵へ、ゲームの竜と同じ法線の光を回転ごとに焼く。行が部位、列が回転。"""
+    cell_w, cell_h = LIT_CELL
+    width, height = cell_w * LIT_TURNS, cell_h * len(LIT_PARTS)
+    atlas = [bytearray(width * 4) for _ in range(height)]
+    key, fill = (0.686, -0.686, 0.243), (-0.686, 0.686, 0.243)
+    for row, part in enumerate(LIT_PARTS):
+        w, h, color = read_png(PARTS_DIR / f'{part}.png')
+        _, _, normal = read_png(PARTS_DIR / f'{part}_normal.png')
+        ox, oy = (cell_w - w) // 2, (cell_h - h) // 2
+        for turn in range(LIT_TURNS):
+            r = turn * TAU / LIT_TURNS
+            ax, ay = (math.cos(r), math.sin(r)), (-math.sin(r), math.cos(r))
+            for y in range(h):
+                for x in range(w):
+                    i = x * 4
+                    alpha = color[y][i + 3]
+                    if not alpha:
+                        continue
+                    nx, ny, nz = normal[y][i] / 127.5 - 1, normal[y][i + 1] / 127.5 - 1, max(normal[y][i + 2] / 127.5 - 1, 0.001)
+                    size = math.sqrt(nx * nx + ny * ny + nz * nz)
+                    nx, ny, nz = nx / size, ny / size, nz / size
+                    wx, wy = ax[0] * nx - ay[0] * ny, ax[1] * nx - ay[1] * ny
+                    length = math.sqrt(wx * wx + wy * wy + nz * nz)
+                    energy = 0.08 + 1.1 * max((wx * key[0] + wy * key[1] + nz * key[2]) / length, 0) + 0.6 * max((wx * fill[0] + wy * fill[1] + nz * fill[2]) / length, 0)
+                    target = atlas[row * cell_h + oy + y]
+                    at = (turn * cell_w + ox + x) * 4
+                    for c in range(3):
+                        target[at + c] = int(clamp(color[y][i + c] * energy, 0, 255))
+                    target[at + 3] = alpha
+    write_png(LIT_PATH, width, height, atlas)
+
+
 if __name__ == '__main__':
     count, samples = write_rush()
     bake_puffs()
+    bake_lit()
     print(f'hits={count} path={samples}')

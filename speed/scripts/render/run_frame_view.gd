@@ -393,6 +393,13 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_spark = _exhaust("res://assets/pixel/airship_spark.png",character_scale)
 	_spark.modulate.a = 0.65
 
+func finale_camera_active() -> bool:
+	return _finale_view!=null and _finale_view.visible
+func finale_camera_roll() -> float:
+	return _finale_view.camera_roll()
+func finale_camera_push() -> float:
+	return _finale_view.camera_push()
+
 func _layer(layer: int) -> Node2D:
 	if not _layers.has(layer):
 		var node := Node2D.new()
@@ -1259,9 +1266,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			if _finale_view==null:
 				_finale_view=preload("res://scripts/render/bosses/draco_finale_view.gd").new()
 				_layer(14).add_child(_finale_view)
+				_finale_view.set_under_parent(_pulser_parent)
 				_finale_view.set_shake_hook(func(amount: float):ruler_shake=maxf(ruler_shake,amount))
 			finale_shown=true
-			_finale_view.apply_frame(body.finale,float(frame.ui.world_time),Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0),_zoom)
+			_finale_view.apply_frame(body.finale,float(frame.ui.world_time),frame.ui.view_center,frame.ui.view_half,_zoom,float(frame.ui.character_scale))
 			var display=_boss_body_displays.get(body.id)
 			if display!=null:display.finale_view=_finale_view
 	if not finale_shown and _finale_view!=null:_finale_view.hide_view()

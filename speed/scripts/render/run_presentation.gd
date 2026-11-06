@@ -170,6 +170,11 @@ func _present_cpp(delta: float) -> void:
 	cam_zoom = float(view.get("zoom",frame.camera.zoom))
 	_camera.position = cam_center
 	_camera.zoom = Vector2.ONE*cam_zoom
+	_camera.ignore_rotation = false
+	_camera.rotation = 0.0
+	if frame_view.finale_camera_active():
+		_camera.rotation = frame_view.finale_camera_roll()
+		_camera.zoom *= frame_view.finale_camera_push()
 	var half := get_viewport().get_visible_rect().size/(2.0*cam_zoom)
 	var began := Time.get_ticks_usec()
 	var render: Dictionary = bridge.read_render(Rect2(cam_center-half,half*2.0),1.0)
