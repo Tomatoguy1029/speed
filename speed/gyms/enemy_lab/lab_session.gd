@@ -68,6 +68,7 @@ const SUPPORT_MEMO := "res://.content/dev/lab_support.json"
 var _support_memo := {}
 var _support_signature := ""
 var _support_dirty := false
+var _program_memo := {}
 var _last_input := {}
 ## 描いたルートを本番の描画で描いている途中（点の列・描き終えるまでの回数・進んだ回数）。空なら描いていない
 var _route_play := {}
@@ -166,7 +167,8 @@ func _rebuild() -> void:
 	_source.resources = _source.resources.duplicate(true)
 	_source.resources.enemy_ids = PackedStringArray()
 	_load_support_memo()
-	BUILDER.begin_package_memo()
+	_program_memo = {}
+	BUILDER.begin_package_memo(_program_memo)
 	_definitions = {}
 	for id in _baseline_definitions:
 		var definition: EnemyDef = _baseline_definitions[id].duplicate(true)
@@ -539,6 +541,10 @@ func _apply_meta(levels: Dictionary) -> Dictionary:
 	return bridge.command("dev_edit",{"kind":"meta","payload":{"levels":packed,"profile":ProfileManager.for_cpp(true,levels)}})
 
 ## 次の技再生にだけ使う値を、本番と同じ変換・版検査で取り替える。
+## 動いている行動データの中身を表す値。まだ編集していないボスは loaded を返す。
+func boss_program_key(id: String, loaded: String) -> String:
+	return preload("res://tools/content/build_boss_program.gd").fingerprint(_boss_programs[id]) if _boss_programs.has(id) else loaded
+
 func set_boss_program(id: String, program: Dictionary) -> Dictionary:
 	var previous: Dictionary = _boss_programs
 	_boss_programs = _boss_programs.duplicate()
@@ -550,7 +556,7 @@ func set_boss_program(id: String, program: Dictionary) -> Dictionary:
 func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	var next := _definitions.duplicate(true)
 	var bosses := _boss_definitions.duplicate(true)
-	var config := _config.duplicate(true) as GameConfig
+	var config: GameConfig = _config.duplicate(true) if kind=="config" else _config
 	var type := StringName(args.get("type",""))
 	var key := String(args.get("key",""))
 	if kind=="config":
@@ -560,7 +566,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 	elif kind in ["boss_parameter","boss_appearance","boss_program"]:
 		if kind=="boss_parameter" and (not args.has("value") or typeof(args.value) not in [TYPE_INT,TYPE_FLOAT,TYPE_BOOL]): return {"ok":false}
 		if not bosses.has(type): return {"ok":false,"message":"このボスの編集はまだ移行していません"}
-		bosses[type] = bosses[type].duplicate(true)
+		if kind!="boss_program": bosses[type] = bosses[type].duplicate(true)
 		var definition: BossDef = bosses[type]
 		if kind=="boss_program": pass
 		elif kind=="boss_appearance":
@@ -605,7 +611,11 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		_replace_visuals(resources, type)
 		return {"ok":true}
 	var bundle := {}
+	# 行動データの編集では敵と他のボスが変わらないので、前回の結果を使い回す。
+	if kind!="boss_program": _program_memo = {}
+	BUILDER.begin_package_memo(_program_memo)
 	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses,scene.cpp_resources,_boss_programs,PackedStringArray(),false,bundle)
+	BUILDER.end_package_memo()
 	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
 	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "boss_parameter" if kind in ["boss_parameter","boss_appearance","boss_program"] else "parameter")
 	if result.ok:

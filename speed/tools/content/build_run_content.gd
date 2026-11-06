@@ -1218,15 +1218,15 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 
 ## 同じ入力の生成を一度で済ませる。実験場の作り直しの間だけ使う。
 static var _package_memo = null
-static func begin_package_memo() -> void:
-	_package_memo = {}
+static func begin_package_memo(memo := {}) -> void:
+	_package_memo = memo
 static func end_package_memo() -> void:
 	_package_memo = null
 static func _memoized(kind: String, inputs: Array, make: Callable) -> Dictionary:
 	if _package_memo == null: return make.call()
-	# 編集中の行動データは Resource を含むので、文字列にせず実体のハッシュで見分ける。覚えるのは1回の作り直しの間だけ。
+	# 定義と行動データは複製されるので中身で見分ける。
 	var key := kind
-	for value in inputs: key += "/"+(str(value.get_instance_id()) if value is Object else str(value.hash()) if value is Dictionary else "-")
+	for value in inputs: key += "/"+("-" if value==null else value if value is String else str(value.get_instance_id()) if value is GameConfig or value is RuntimeStage else BossProgram.fingerprint(value))
 	if not _package_memo.has(key): _package_memo[key] = make.call()
 	return _package_memo[key].duplicate(true)
 
@@ -2839,7 +2839,8 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	paths.sort()
 	var profiles_error: Error = preload("res://tools/content/build_visuals.gd").validate()
 	if profiles_error!=OK: return profiles_error
-	var manifest := preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_resources.keys if previous_resources!=null else {})
+	var previous_keys: Dictionary = previous_resources.keys if previous_resources!=null else {}
+	var manifest := _memoized("manifest",[var_to_bytes([paths,visuals,previous_keys]).hex_encode().sha256_text()],func(): return preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_keys))
 	if manifest.is_empty(): return ERR_INVALID_DATA
 	paths = manifest.paths
 	var resolved_input := source_sha256.to_utf8_buffer()
