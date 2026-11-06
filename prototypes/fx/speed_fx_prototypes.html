@@ -7454,7 +7454,7 @@ function hFire(S, n) {
   if (S.tech === 'beam_bolt') S.shots.push({ kind: 'bolt', from: at, angle: n.angle, t: S.t });
 }
 function hSetup(S, id) {
-  const d = H_TECH[id]; S.tech = id; S.r = hRule(id); S.B = bossActor('hydra', V(-300, 0)); S.age = -0.6; S.necks = []; S.shots = [];
+  const d = H_TECH[id]; S.tech = id; S.r = hRule(id); if (id === 'bite_sweep') S.r.normal_charge = P().sweepCharge ?? 1; S.B = bossActor('hydra', V(-300, 0)); S.age = -0.6; S.necks = []; S.shots = [];
   S.ship = shipState({ ...d.ship }, Math.PI, 0); S.ship.vel = d.shipVel ? { ...d.shipVel } : V(0, 0); if (d.shipVel) { S.ship.heading = angOf(d.shipVel); S.ship.speed = len(d.shipVel); }
   for (let i = 0; i < 5; i++) { const baseAngle = TAU * i / 5, n = { kind: H_KINDS[i], baseAngle, angle: baseAngle, length: HP.neck_rest, aimV: 0, glow: 0, hist: [] }; S.necks.push(n); }
   S.actor = S.necks.find(n => n.kind === d.kind); S.B.facing = -S.actor.baseAngle; // 本体を回して、技を使う首を機体側へ向ける（body.cpp front_body の考え）
@@ -7966,7 +7966,8 @@ const H_PARAMS = [
   { k: 'windR1', label: '風の帯（竜巻）の先の太さ（半径）', type: 'range', min: 60, max: 200, step: 1, def: 115 },
   { k: 'bladeW', label: '三日月の風刃の太さ（見た目）', type: 'range', min: 8, max: 90, step: 1, def: 46 },
   { k: 'bladeFur', label: '三日月の風刃の毛羽立ちの長さ', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
-  { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
+  { k: 'sweepCharge', label: '横薙ぎのため（秒）', type: 'range', min: 0.6, max: 1.8, step: 0.05, def: 1 },
+  { k: 'alive', label: '横薙ぎの緩急と踏み込み', type: 'range', min: 0, max: 2, step: 0.05, def: 0.7 },
   { k: 'coil', label: 'ための首の曲がり', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'snap', label: '発動の勢い（反動・衝撃）', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
   { k: 'dust', label: '小石・土ぼこりの量', type: 'range', min: 0, max: 2, step: 0.05, def: 1 },
