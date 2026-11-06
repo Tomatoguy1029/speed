@@ -338,12 +338,23 @@ func _package_final_runtime() -> void:
 	var ok := normal_mode and fixture_start
 	if ok: ok = await _package_initial_equipment(session,"最終通常出撃")
 	var last_ui: Dictionary = session.bridge.read_frame().value.ui
+	var rewards: Node = session.view.get_node("Hud/HudRoot").get("_rewards")
+	var reward_confirmations := 0
 	var began := Time.get_ticks_usec()
 	var ticks := 0
 	while ticks<120*180 and Time.get_ticks_usec()-began<150000000 and observed.results==0 and ok:
 		if not is_instance_valid(session) or session.bridge==null:
 			ok = false
 			break
+		# 継続報酬は押下待ちで戦闘時計を止める。通常のHUD入力で次へ進める。
+		if ticks%16==0 and rewards.is_bonus_active():
+			for pressed in [true,false]:
+				var event := InputEventAction.new()
+				event.action = &"ui_accept"
+				event.pressed = pressed
+				session.view.get_viewport().push_input(event)
+			reward_confirmations += 1
+			await process_frame
 		var current: Dictionary = session.bridge.read_frame()
 		if not current.ok:
 			ok = false
@@ -369,7 +380,7 @@ func _package_final_runtime() -> void:
 		if ticks%16==0: await process_frame
 	# 自然な結果が出ない場合は、強制終了や時刻の上書きで成立させない。
 	var natural_death: bool = observed.results==1 and observed.result.get("kind","")=="Death"
-	_package_measure("撤去後の自然な終了",{"ticks":ticks,"step_budget_seconds":180,"elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"normal_mode":normal_mode,"result_count":observed.results,"kind":observed.result.get("kind",""),"run_seed":run_seed,"run_time":last_ui.get("run_time",-1.0),"hp":last_ui.get("hp",-1.0),"phase":last_ui.get("phase",-1)})
+	_package_measure("撤去後の自然な終了",{"ticks":ticks,"step_budget_seconds":180,"elapsed_ms":(Time.get_ticks_usec()-began)/1000.0,"normal_mode":normal_mode,"result_count":observed.results,"kind":observed.result.get("kind",""),"run_seed":run_seed,"run_time":last_ui.get("run_time",-1.0),"hp":last_ui.get("hp",-1.0),"phase":last_ui.get("phase",-1),"reward_confirmations":reward_confirmations})
 	ok = natural_death and ok
 	if not ok:
 		push_error("最終配布確認は上限内の自然なDeathと結果通知が未成立です")
