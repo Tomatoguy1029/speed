@@ -218,10 +218,11 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_layer(9).add_child(_hero_power_visual)
 	var hero_sky := Node2D.new()
 	mark_layer.add_child(hero_sky)
-	_hero_power_visual.setup(_pixel,hero_sky,_layer(2))
+	# ふたご座の光と影の線は、敵より上・光と影の機体より下に描く
 	_hero_fire_canvas = DrawLayer.new()
 	_hero_fire_canvas.draw_fn = _hero_power_visual.draw_fire
-	_layer(2).add_child(_hero_fire_canvas)
+	hero_sky.add_child(_hero_fire_canvas)
+	_hero_power_visual.setup(_pixel,hero_sky,_layer(2))
 	_hero_canvas = DrawLayer.new()
 	_hero_canvas.draw_fn = _draw_hero_values
 	_layer(2).add_child(_hero_canvas)
@@ -1285,9 +1286,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var twin_on := StringName(twin_hero.get("power",&""))==&"gemini" and float(twin_hero.get("active",0.0))>0.0
 	var twin_run: Dictionary = twin_hero.get("twin",{})
 	if twin_on and bool(twin_draw.get("drawing",false)):
-		_hero_power_visual.twin_preview = {"drawing":true,"light":twin_draw.get("draw_points",PackedVector2Array()),"ship":frame.ui.ship.ship_pos,"heading":frame.ui.ship.ship_heading,"width":_pixel*9.0}
+		_hero_power_visual.twin_preview = {"drawing":true,"light":twin_draw.get("draw_points",PackedVector2Array()),"ship":frame.ui.ship.ship_pos,"heading":frame.ui.ship.ship_heading,"width":_pixel*22.0}
 	elif bool(twin_draw.get("tracing",false)) and bool(twin_run.get("tracing",false)):
-		_hero_power_visual.twin_preview = {"light":twin_draw.get("trace_path",PackedVector2Array()),"shadow":twin_run.get("path",PackedVector2Array()),"ship":frame.ui.ship.ship_pos,"twin":twin_run.get("position",Vector2.INF),"width":_pixel*9.0}
+		_hero_power_visual.twin_preview = {"light":twin_draw.get("trace_path",PackedVector2Array()),"shadow":twin_run.get("path",PackedVector2Array()),"ship":frame.ui.ship.ship_pos,"twin":twin_run.get("position",Vector2.INF),"width":_pixel*22.0}
 	else:
 		_hero_power_visual.twin_preview = {}
 	_hero_power_visual.world_time = float(frame.ui.world_time)

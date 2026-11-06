@@ -19,6 +19,11 @@ const METEORS := preload("res://scripts/render/equipment/hercules_meteors.gd")
 const TWIN_SHADOW_POWDER := [Color(0.07, 0.02, 0.13), Color(0.2, 0.07, 0.34), Color(0.36, 0.15, 0.6), Color(0.55, 0.3, 0.88), Color(0.13, 0.04, 0.22)]
 const TWIN_LIGHT_POWDER := [Color(0.98, 0.6, 0.16), Color(1.0, 0.8, 0.32), Color(1.0, 0.9, 0.55), Color(1.0, 0.72, 0.25)]
 const TWIN_LIGHT_SPARK := Color(1.0, 1.0, 0.95)
+## 粉の下にぼんやり光るかすみ：線の中心が TWIN_HAZE_ALPHA の濃さで、幅の TWIN_HAZE_WIDTH 倍の端まで透明へなめらかに薄れる
+const TWIN_HAZE_WIDTH := 1.5
+const TWIN_HAZE_ALPHA := 0.22
+const TWIN_LIGHT_HAZE := Color(1.0, 0.72, 0.28)
+const TWIN_SHADOW_HAZE := Color(0.5, 0.24, 0.85)
 ## 線が消えたあとの跡が薄れる秒
 const TWIN_LIGHT_FADE := 0.6
 const TWIN_SHADOW_FADE := 1.6
@@ -228,6 +233,33 @@ func _tick_twin_trails(dt: float) -> void:
 		_twin_trails.append({"points": _twin_last.shadow, "light": false, "age": 0.0, "life": TWIN_SHADOW_FADE, "seed": 0.0})
 	_twin_last = lines
 
+## 線にそって、中心が color の濃さで左右の端（中心から half）と両端の先で透明になる、境目のないかすみの帯を描く
+static func _draw_haze(canvas: CanvasItem, points: PackedVector2Array, half: float, color: Color) -> void:
+	var count := points.size()
+	if count < 2: return
+	var lengths := PackedFloat32Array([0.0])
+	for i in range(1, count): lengths.append(lengths[i - 1] + points[i].distance_to(points[i - 1]))
+	var total: float = lengths[count - 1]
+	var normals := PackedVector2Array()
+	for i in count:
+		var before := (points[i] - points[maxi(i - 1, 0)]).normalized()
+		var after := (points[mini(i + 1, count - 1)] - points[i]).normalized()
+		var n := (before + after).normalized() if (before + after).length_squared() > 0.0001 else after
+		normals.append(n.orthogonal() if n.length_squared() > 0.0 else Vector2.UP)
+	var clear := Color(color, 0.0)
+	for i in range(1, count):
+		# 両端は半幅ぶんの長さで薄れる
+		var a0 := color.a * clampf(minf(lengths[i - 1], total - lengths[i - 1]) / maxf(half, 0.001), 0.0, 1.0)
+		var a1 := color.a * clampf(minf(lengths[i], total - lengths[i]) / maxf(half, 0.001), 0.0, 1.0)
+		var c0 := Color(color, a0)
+		var c1 := Color(color, a1)
+		var p0 := points[i - 1]
+		var p1 := points[i]
+		for side in [1.0, -1.0]:
+			var e0: Vector2 = p0 + normals[i - 1] * half * side
+			var e1: Vector2 = p1 + normals[i] * half * side
+			canvas.draw_polygon(PackedVector2Array([p0, p1, e1, e0]), PackedColorArray([c0, c1, clear, clear]))
+
 static func _hash(x: float) -> float:
 	var v := sin(x * 12.9898) * 43758.5453
 	return v - floorf(v)
@@ -236,8 +268,10 @@ static func _hash(x: float) -> float:
 ## 粒の位置と色は線上の位置ごとに決まった乱数で選ぶので、コマごとにちらつかない
 func _draw_powder(canvas: CanvasItem, points: PackedVector2Array, width: float, k: float, age: float, light: bool, seed: float) -> void:
 	if k <= 0.0 or points.size() < 2: return
+	# 粉の後ろの背景を、線の色のかすみでぼんやり光らせる（粉が消えるのに合わせて薄れる）
+	_draw_haze(canvas, points, width * TWIN_HAZE_WIDTH, Color(TWIN_LIGHT_HAZE if light else TWIN_SHADOW_HAZE, TWIN_HAZE_ALPHA * k))
 	var colors: Array = TWIN_LIGHT_POWDER if light else TWIN_SHADOW_POWDER
-	var step := px * (1.4 if light else 1.1)
+	var step := px * (1.0 if light else 0.8)
 	var along := 0.0
 	var i := 0
 	for s in range(1, points.size()):
@@ -249,23 +283,23 @@ func _draw_powder(canvas: CanvasItem, points: PackedVector2Array, width: float, 
 		var normal := u.orthogonal()
 		while along <= length:
 			var base := a + u * along
-			for j in 3:
-				var h := float(i * 3 + j) + seed * 101.0
+			for j in 6:
+				var h := float(i * 6 + j) + seed * 101.0
 				var h1 := _hash(h)
 				var h2 := _hash(h + 0.37)
 				var h3 := _hash(h + 0.71)
 				if h3 > k: continue
 				# 中心ほど密に、外ほどまばらに
 				var side := (h1 * 2.0 - 1.0)
-				side = side * absf(side) * width * (0.7 if light else 0.85)
+				side = signf(side) * pow(absf(side), 1.3) * width * 0.6
 				# 消える前の粉は外へ漂い、少し後ろへ流れる
 				var drift := normal * signf(side) * age * px * (4.0 + 10.0 * h2) - u * age * px * 3.0 * h1
 				var c: Color = colors[int(h2 * colors.size()) % colors.size()]
-				var size := px * (2.0 if h1 * h3 > 0.62 else 1.0)
+				var size := px * (2.0 if h1 * h3 > 0.55 else 1.0)
 				if light and sin(world_time * 11.0 + h * 1.7) > 0.86:
 					c = TWIN_LIGHT_SPARK
 					size = px * 2.0
-				canvas.draw_rect(Rect2(((base + normal * side + drift) / px).floor() * px, Vector2.ONE * size), Color(c, c.a * (0.55 + 0.45 * k)))
+				canvas.draw_rect(Rect2(((base + normal * side + drift) / px).floor() * px, Vector2.ONE * size), Color(c, c.a * (0.6 + 0.4 * k)))
 			i += 1
 			along += step
 		along -= length
