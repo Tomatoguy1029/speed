@@ -25,10 +25,10 @@ Godotでプロジェクトを開くと、ツールバーの右側に状態を表
 
 `main` のC++は、統合後にGitHub Actionsがビルドし、Godotが自動で取得します。クローン直後の初回は拡張の読み込みエラーが出ますが、取得が終われば起動できます。初回のデータ生成はエディターを開いたあと裏で進み、ツールバーに進み具合が出ます。生成中にF5を押すと、終わり次第起動します。
 
-統合前のCI確認は、[Actions「開発用ライブラリ」](https://github.com/Tomatoguy1029/speed/actions/workflows/runtime-library.yml) の手動実行で、実行ブランチと `ref` に確認対象を指定します。Macの両CPUとWindowsをすべてビルドし、ActionsのArtifactsへ保存します。手動実行はReleaseの公開・上書き・削除を行いません。mainへの統合前は次のCLIで `fix/macos-distribution` の手動入口を実行できます。
+公開前のCI確認は、[Actions「開発用ライブラリ」](https://github.com/Tomatoguy1029/speed/actions/workflows/runtime-library.yml) の手動実行で、**Use workflow from** に `main`、`ref` に確認対象のブランチまたは完全コミットSHAを指定します。Macの両CPUとWindowsをすべてビルドし、ActionsのArtifactsへ保存します。手動実行はReleaseの公開・上書き・削除を行いません。
 
 ```bash
-gh workflow run runtime-library.yml --repo Tomatoguy1029/speed --ref fix/macos-distribution -f ref=<完全コミット>
+gh workflow run runtime-library.yml --repo Tomatoguy1029/speed --ref main -f ref=<完全コミット>
 ```
 
 手元でC++を編集したら、ツールバーの **ビルド** を押します。ビルドは押したときだけ別プロセスで動き、その間もエディターを使えます。ログは下部パネルの **C++ビルド** に表示します。ライブラリが古いまま起動しようとすると、**このまま起動** と **ビルド** を選ぶ確認を表示します。
@@ -82,16 +82,16 @@ godot-bg --editor --path speed
 
 ### 配布用ビルド
 
-GitHubで手動実行する入口は [Actions「C++配布確認」](https://github.com/Tomatoguy1029/speed/actions/workflows/cpp-runtime.yml) です。配布フローの修正は `fix/macos-distribution` ブランチにあり、mainへの統合前です。
+GitHubで手動実行する入口は [Actions「C++配布確認」](https://github.com/Tomatoguy1029/speed/actions/workflows/cpp-runtime.yml) です。
 
-1. **Run workflow** を開き、**Use workflow from** で `fix/macos-distribution` を選びます。
-2. `ref` に `fix/macos-distribution`（版を固定するときは完全コミットSHA）、`platform` に **all** を指定します。片方だけ作る場合は `windows` または `macos` を選びます。mainの入力フォームが表示される場合も、`ref` と `platform=all` を明示します。
+1. **Run workflow** を開き、**Use workflow from** で `main` を選びます。
+2. `ref` に `main`（版を固定するときは完全コミットSHA）、`platform` に **all** を指定します。片方だけ作る場合は `windows` または `macos` を選びます。
 3. **Run workflow** を押します。成功後は実行結果の **Summary → Artifacts** から `speed-windows-<run_id>` と `speed-macos-<run_id>` を取得します。`-logs-` を含む成果物は確認ログです。WindowsはダウンロードしたZIPを一式展開し、Macは中の `Speed.zip` を使います。
 
 CLIでも同じブランチ・対象を指定できます。
 
 ```bash
-gh workflow run cpp-runtime.yml --repo Tomatoguy1029/speed --ref fix/macos-distribution -f ref=fix/macos-distribution -f platform=all
+gh workflow run cpp-runtime.yml --repo Tomatoguy1029/speed --ref main -f ref=main -f platform=all
 ```
 
 配布用のビルドはソースの外に新しい作業先を指定します。以下はMacの例です。MacのexportはGodot本体を直接使えます。手元の `godot-bg` がPATHにあれば、フォーカスを保つ補助として使います。importと共通生成はheadlessで行い、シェーダー事前変換を使うexportは描画付きで行います。`--templates` は `version.txt` を持つGodot 4.7.2のexport templateフォルダへ置き換えてください。

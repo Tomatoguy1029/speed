@@ -131,7 +131,7 @@ jobs:
   prune:
     name: 古いライブラリを削除
     needs: [identify, build]
-    if: always() && needs.identify.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: always() && needs.identify.result == 'success' && needs.build.result == 'success' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
