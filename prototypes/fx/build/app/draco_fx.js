@@ -133,7 +133,23 @@ function dSafeFx(S, R) {
 }
 // 炎に耐える隕石：当たっている間にひびが広がって熱を持ち、欠片がこぼれて震える。ブレスが終わると耐えきれず砕ける（破片は演出で、当たりはない）
 function dRockHeat(S, q) { return clamp((q.burn || 0) / (S.r.active * 0.28)); }
+function dMeteorDraw(S, R, q, i) {
+  if (q.born == null) return; const age = S.t - q.born, on = smooth(0, 0.12, age); drawImg('meteor_0', q.pos, q.seed * 1.7 + age * 1.9, q.radius * (0.6 + 0.4 * on)); if (!R.proto) return;
+  const H = D_FLAME, c = toL(q.pos), rr = q.radius * WL * R.P.size, u = q.dir, flick = 0.8 + 0.2 * Math.sin(S.t * 17 + i);
+  for (const k of aqCracks(61 + i * 7, rr * 0.92)) for (const [x, y] of k.pts) R.front.blend(c.x + x, c.y + y, H[3], 0.55 * flick * on);
+  for (let n = 0; n <= 40; n++) { const a = -1.25 + 2.5 * n / 40, e = 1 - Math.abs(a) / 1.25, x = c.x + Math.cos(Math.atan2(u.y, u.x) + a) * rr * 1.04, y = c.y + Math.sin(Math.atan2(u.y, u.x) + a) * rr * 1.04; R.front.blend(x, y, H[1], e * 0.95 * on); R.front.blend(x + u.x, y + u.y, H[3], e * 0.6 * on); }
+  R.front.glow(c.x + u.x * rr * 0.7, c.y + u.y * rr * 0.7, rr * 1.2, H[4], 0.45 * on * R.P.intensity);
+}
+// 飛ぶ隕石：通った道に尾が伸び、前で焼けた炎が後ろへ流れて冷え、煙と火の粉になる。遅くても勢いが見えるよう、尾の中を炎が走る
+function dMeteorTrail(S, R, q, age, i) {
+  const fire = PIXELFX.fx['src/fx/fire/_lib.js'], p = R.back, H = D_FLAME, s = R.P.size, u = q.dir, nx = -u.y, ny = u.x, c = toL(q.pos), rad = q.radius * WL * s, L = Math.min(age * DM.speed, 760) * WL * s, seed = i * 13.7 + 3; if (L < 2) return;
+  for (let d = 0; d < L; d += 0.75) { const f = d / L, w = rad * 1.05 * Math.pow(1 - f, 0.75) * (1 + 0.12 * Math.sin(d * 0.14 - age * 9 + seed)); for (let o = -w; o <= w; o += 0.75) { const e = Math.abs(o) / Math.max(1, w), heat = clamp((1 - f) * (1.15 - e) * (0.75 + 0.5 * (0.5 + 0.5 * PX.tileNoise(d * 0.05 - age * 5, o * 0.12 + seed, 0, 0, 5)))); if (heat > 0.05) p.blend(c.x - u.x * d + nx * o, c.y - u.y * d + ny * o, H[Math.min(7, Math.round(lerp(7, 3, heat)))], Math.min(0.85, heat * 1.15)); } }
+  for (let n = 0; n < 12; n++) { const h = k => hash(n * 7.31 + k * 3.17 + seed), ph = (age * lerp(0.35, 0.6, h(1)) + h(2)) % 1, d = L * (0.55 + 0.6 * ph), lat = (h(3) - 0.5) * rad * (1.4 + ph * 1.6); fire.smokePuff(p, c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, 1 - ph, rad * 0.4, H[7], true, 0.5); }
+  for (let n = 0; n < 34; n++) { const h = k => hash(n * 4.19 + k * 2.71 + seed), ph = (age * lerp(0.9, 1.6, h(1)) + h(2)) % 1, d = ph * L * 0.8 + rad * 0.2, lat = (h(3) - 0.5) * rad * 1.7 * (1 - ph * 0.5) + Math.sin(ph * 7 + n) * rad * 0.12; fire.firePuff(p, c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, 1 - ph, rad * lerp(0.14, 0.32, h(4)) * (1 - 0.35 * ph), h(5), H, 0.03, -u.x * 0.8, -u.y * 0.8); }
+  for (let n = 0; n < 18; n++) { const h = k => hash(n * 9.13 + k * 1.9 + seed), ph = (age * lerp(0.7, 1.3, h(1)) + h(2)) % 1, d = ph * L * 1.1, lat = (h(3) - 0.5) * rad * (2 + 3 * ph); R.front.blend(c.x - u.x * d + nx * lat, c.y - u.y * d + ny * lat, H[n % 2 ? 1 : 3], 1 - ph); }
+}
 function dRockDraw(S, R, rock, i) {
+  if (S.tech === 'meteor') return dMeteorDraw(S, R, rock, i);
   const age = dRockAge(S, i); if (age < 0 || (rock.breakAt && S.t >= rock.breakAt)) return; const land = age - DR_FLIGHT, thud = land > 0 ? Math.exp(-land / 0.09) * Math.sin(Math.min(land, 0.3) * 30) : 0, k = dRockHeat(S, rock), shake = 5 * k * k, pos = add(rock.pos, V(Math.sin(S.t * 71 + i) * shake, Math.cos(S.t * 83 + i) * shake)), size = rock.radius * (1 + 0.08 * thud) * (1 - 0.1 * k);
   drawImg('meteor_0', pos, rock.seed * 1.7 + Math.min(age, DR_FLIGHT) * 11 + Math.max(0, thud) * 0.12, size);
   if (!R.proto || k <= 0) return; const pal = dRamp(R), c = toL(pos), rr = size * WL * R.P.size, cracks = aqCracks(61 + i * 7, rr);
@@ -297,7 +313,8 @@ function dDraw(S, R) {
     dSafeFx(S, R);
   }
   if (R.proto) for (const q of S.projectiles) if (q.vel && q.t != null) { const sp = len(q.vel), dir = norm(q.vel), age = t - q.t; dRockTrail(S, R, { from: sub(q.pos, mul(q.vel, age)), speed: sp, radius: q.radius, seed: q.seed || 1 }, age, dir, Infinity); }
-  if (R.proto) S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / DR_FLIGHT; if (age < DR_FLIGHT + 0.5) dRockTrail(S, R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, DR_FLIGHT); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
+  if (R.proto && id === 'meteor') S.rocks.forEach((q, i) => { if (q.born != null) dMeteorTrail(S, R, q, t - q.born, i); });
+  if (R.proto && id === 'breath') S.rocks.forEach((q, i) => { const age = dRockAge(S, i); if (age < 0) return; const d = norm(sub(q.to, q.from)), sp = dist(q.from, q.to) / DR_FLIGHT; if (age < DR_FLIGHT + 0.5) dRockTrail(S, R, { from: q.from, speed: sp, radius: q.radius, seed: i + 1 }, age, d, DR_FLIGHT); if (age >= DR_FLIGHT) dImpactFx(S, R, q.to, age - DR_FLIGHT, q.radius * 1.25, 71 + i); });
   R.blitBack();
   for (const q of S.projectiles) { if (R.proto) { if (q.vel) hRockGhosts(q.pos, norm(q.vel), len(q.vel), q.seed + t, q.radius); drawImg('meteor_0', q.pos, q.seed + t, q.radius); } else D2.circle(q.pos, q.radius, '#8c704c'); }
   S.rocks.forEach((rock, i) => { dRockDraw(S, R, rock, i); dRockBreak(S, R, rock, i); });

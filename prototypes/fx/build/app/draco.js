@@ -43,6 +43,7 @@ const DS = { first: 0.6, gap: 0.62, count: 4, tell: 0.5, open: 0.16, hold: 1.5, 
 const DP_WARN = 2.6, DP_CUE = 0.5;
 const DW = { warn: 1.2, active: 1.25, recover: 2.8 }; // 試作の値：尻尾の薙ぎ払いの長さ。戻りは特にゆっくり
 const DA_SPEED = 1500; // 試作の値：闇の矢の速さ
+const DM = { speed: 430, spread: 0.5, scale: 1.3, active: 3.6 }; // 試作の値：隕石投射。遅くて大きい弾が間隔をあけて飛び続ける
 const DR_SPACING = 150; // 試作の値：隕石を隙間なく並べて壁にする（半径78）
 const DR_FLIGHT = 0.42, DR_ORDER = [1, 0, 2];
 function dRockAge(S, i) { if (S.B.mode !== 'windup') return S.r.warn + S.elapsed; return S.elapsed - S.r.warn * (0.18 + 0.22 * DR_ORDER[i % 3]); }
@@ -139,12 +140,13 @@ function dSetup(S, id) {
   if (['charge', 'leap', 'rifts', 'inhale'].includes(id)) S.staging = { phase: 'exit', side: id === 'inhale' ? -1 : S.rng() < 0.5 ? -1 : 1, enter: id !== 'charge', height: id === 'leap' ? -0.3 : 0, age: 0, exitAngle: angOf(sub(S.points[0], S.points[1])), awayAngle: angOf(sub(S.B.pos, S.ship.pos)) };
   else { if (id === 'tail_slam') S.ship.pos = V(700, 300); S.axis = ['tail_sweep', 'tail_slam'].includes(id) ? 0 : angOf(sub(S.ship.pos, S.B.pos)); S.B.facing = S.axis; S.direction = fromA(S.axis); S.base = dNeutral(S.B.pos, S.axis, S.t); S.trail = S.base; S.points = S.base; }
   if (id === 'bite') { S.target = dPredict(S, S.r.warn + S.r.active * 0.55, S.r.lead_cap); S.direction = norm(sub(S.target, S.origin)); S.axis = angOf(S.direction); S.B.facing = S.axis; S.base = dNeutral(S.origin, S.axis, S.t); S.retracted = sub(S.origin, mul(S.direction, S.r.retract)); S.destination = add(S.origin, mul(S.direction, S.r.reach)); }
-  if (['breath', 'meteor'].includes(id)) { S.mouth = dMouth(S); const r = S.r; r.rock_spacing = DR_SPACING; for (let i = 0; i < r.rocks; i++) { const to = add(add(S.mouth, mul(S.direction, r.rock_distance)), mul(orth(S.direction), (i - (r.rocks - 1) * 0.5) * r.rock_spacing)); S.rocks.push({ from: S.mouth, to, pos: S.mouth, radius: r.rock_radius, seed: i }); } }
+  if (['breath', 'meteor'].includes(id)) { S.mouth = dMouth(S); const r = S.r; if (id === 'breath') r.rock_spacing = DR_SPACING; for (let i = 0; i < r.rocks; i++) { const to = add(add(S.mouth, mul(S.direction, r.rock_distance)), mul(orth(S.direction), (i - (r.rocks - 1) * 0.5) * r.rock_spacing)); S.rocks.push({ from: S.mouth, to, pos: S.mouth, radius: r.rock_radius, seed: i }); } }
   if (id === 'picaro_wall') { const r = S.r, center = lerpV(S.B.pos, S.ship.pos, 0.5); S.shotTimes = []; S.picaro = Array.from({ length: r.count }, (_, i) => mkE(r.wall_candidates[i % r.wall_candidates.length], add(center, mul(orth(S.direction), (i - (r.count - 1) * 0.5) * 300)), S.axis)); }
   if (id === 'clones') { const choices = ['bite_thrust', 'wind_band', 'rubble_fan', 'beam_fixed', 'thunder_drop']; for (let i = choices.length - 1; i > 0; i--) { const j = Math.floor(S.rng() * (i + 1)); [choices[i], choices[j]] = [choices[j], choices[i]]; }
     S.center = { ...S.ship.pos }; for (let i = 0; i < 3; i++) { const pos = i === 0 ? { ...S.B.pos } : add(S.center, mul(fromA(i * TAU / 3), 650)), angle = angOf(sub(S.center, pos)); S.units.push({ pos, origin: { ...pos }, angle, face: angle, mode: choices[i], t: 0, index: i, target: { ...S.center }, glow: 0, locked: false, length: 100, step: 0, points: dNeutral(pos, angle, 0), turn: i % 2 ? 1 : -1 }); }
   }
   if (id === 'breath') { S.r.warn = DB_WARN; S.r.active = DB_ACTIVE; }
+  if (id === 'meteor') { S.r.active = DM.active; S.rocks.forEach((q, i) => { q.dir = fromA(S.axis + (i - (S.rocks.length - 1) / 2) * DM.spread); q.to = add(q.from, mul(q.dir, 500)); q.radius *= DM.scale; }); }
   if (id === 'rifts') S.r.active = DS.active;
   if (id === 'star_fan') S.r.warn = 1.5;
   if (id === 'tail_slam') { S.r.warn = DSL.warn; S.r.active = DSL.active; S.r.recover = DSL.recover; }
@@ -180,7 +182,7 @@ function dWindup(S, dt) {
   else if (id === 'leap') { const setup = Math.min(0.2, r.warn * 0.3), head = S.elapsed < setup ? S.origin : lerpV(S.origin, S.takeoff, smooth(setup, r.warn, S.elapsed)); dNeckPose(S, S.base, head); S.tell = [[add(S.takeoff, mul(S.direction, 105 * DP.head_scale)), S.target]]; }
   else if (id === 'tail_sweep') { S.override = dSweepBody(S, S.elapsed); S.B.pos = S.override[0]; S.tell = [Array.from({ length: 33 }, (_, i) => add(S.origin, mul(fromA(S.axis + Math.PI - r.half_angle + r.half_angle * 2 * i / 32), r.reach)))]; }
   else if (id === 'tail_slam') { if (!S.locked) { S.target = dSlamBody(S, r.warn + r.active * 0.65).pop(); S.locked = true; } S.override = dSlamBody(S, S.elapsed); S.B.pos = S.override[0]; }
-  else if (['breath', 'meteor'].includes(id)) { dRockAim(S, dt); S.rocks.forEach((q, i) => { q.pos = lerpV(q.from, q.to, clamp(dRockAge(S, i) / DR_FLIGHT)); }); }
+  else if (['breath', 'meteor'].includes(id)) { dRockAim(S, dt); if (id === 'breath') S.rocks.forEach((q, i) => { q.pos = lerpV(q.from, q.to, clamp(dRockAge(S, i) / DR_FLIGHT)); }); }
   else if (id === 'star_fan') { if (!S.locked) { let predicted = S.ship.pos; for (let i = 0; i < 8; i++) predicted = dPredict(S, Math.max(0, r.warn - S.elapsed) + Math.max(0, dist(B.pos, predicted) - r.radius) / r.speed, r.lead_cap); S.direction = norm(sub(predicted, B.pos)); B.facing = angOf(S.direction); S.starPositions = []; for (let i = 0; i < r.count; i++) { const a = B.facing + lerp(-r.arc, r.arc, i / Math.max(1, r.count - 1)); S.starPositions.push({ pos: add(B.pos, mul(fromA(a), r.radius)), a }); } S.locked = S.elapsed >= Math.min(0.25, r.warn * 0.35); } }
   else if (['picaro_wall', 'clones'].includes(id)) { const home = id === 'clones' ? S.units[0].angle : -Math.PI / 2; B.facing = S.axis + angDiff(-Math.PI / 2, S.axis) * smooth(0.02, DP_CUE, S.elapsed); if (id === 'clones') B.facing += angDiff(home, B.facing) * smooth(r.warn - 0.35, r.warn, S.elapsed); B.visualMouth = dMouth(S); if (S.elapsed >= DP_CUE && !S.shouts.length) S.shouts.push({ small: false, at: dMouth(S), a: B.facing, t: S.t, seed: 1 }); }
   else if (id === 'spiral') dSpiralWindup(S, dt);
@@ -314,8 +316,9 @@ function dSwipes(S, dt) { // 予兆を出す瞬間の自機の位置へ、竜か
 }
 // 咆哮：おおいぬ座と同じ段階3（ブラー大）の値をそのまま使う
 function dPicaroRoar(S, R) { postCanisRoar({ ...S, tech: 'nova' }, { ...R, P: { ...R.P, ...ROAR_LEVEL_DEFAULTS[3], roarLevel: 3 } }); }
+function dMeteorFly(S, dt) { S.rocks.forEach((q, i) => { if (q.born == null && dRockAge(S, i) >= 0) { q.born = S.t; q.pos = { ...S.mouth }; } if (q.born != null) q.pos = add(q.pos, mul(q.dir, DM.speed * dt)); }); }
 function dStep(S, dt) {
-  S.age += dt; if (S.age < 0) return; if (['inhale', 'picaro_wall', 'rifts', 'tail_slam', 'star_fan', 'tail_sweep'].includes(S.tech)) dExhaleShake(S);
+  S.age += dt; if (S.age < 0) return; if (S.tech === 'meteor') dMeteorFly(S, dt); if (['inhale', 'picaro_wall', 'rifts', 'tail_slam', 'star_fan', 'tail_sweep'].includes(S.tech)) dExhaleShake(S);
   if (S.tech !== 'inhale' && !(S.tech === 'spiral' && S.B.mode === 'active' && S.elapsed < S.spiral.coil)) { S.ship.pos.y = (S.tech === 'tail_slam' ? 300 : 90) + Math.sin(S.t * 0.5) * 50; S.shipVel = V(0, Math.cos(S.t * 0.5) * 25); }
   if (S.tech === 'rifts') { S.ship.pos = V(520 + Math.cos(S.t * 0.75) * 300, 40 + Math.sin(S.t * 1.15) * 210); S.shipVel = V(0, 0); }
   S.elapsed += dt; const B = S.B, r = S.r, before = { ...B.pos }; S.override = null;
@@ -378,7 +381,7 @@ function dDraw(S, R) {
 }
 for (const id of Object.keys(DRACO.moves)) {
   const r = bossRule('draco', id);
-  DEMOS.push({ id: 'D-' + id, ids: id === 'inhale' ? ['D03', 'D04'] : ['D04'], cat: 'りゅう座（D）', group: 'りゅう座', title: r.display_name, duration: id === 'tail_sweep' ? DW.warn + DW.active + DW.recover + 1.2 : id === 'tail_slam' ? DSL.warn + DSL.active + DSL.recover + 1.2 : id === 'breath' ? DB_WARN + DB_ACTIVE + r.recover + 1.2 : id === 'spiral' ? 17 : id === 'rifts' ? r.warn + DS.active + r.recover + 6 : ['charge', 'leap', 'rifts', 'inhale'].includes(id) ? r.warn + r.active + r.recover + 6 : r.warn + r.active + r.recover + 1.2, color: '#ab9cff',
+  DEMOS.push({ id: 'D-' + id, ids: id === 'inhale' ? ['D03', 'D04'] : ['D04'], cat: 'りゅう座（D）', group: 'りゅう座', title: r.display_name, duration: id === 'meteor' ? r.warn + DM.active + r.recover + 0.5 : id === 'tail_sweep' ? DW.warn + DW.active + DW.recover + 1.2 : id === 'tail_slam' ? DSL.warn + DSL.active + DSL.recover + 1.2 : id === 'breath' ? DB_WARN + DB_ACTIVE + r.recover + 1.2 : id === 'spiral' ? 17 : id === 'rifts' ? r.warn + DS.active + r.recover + 6 : ['charge', 'leap', 'rifts', 'inhale'].includes(id) ? r.warn + r.active + r.recover + 6 : r.warn + r.active + r.recover + 1.2, color: '#ab9cff',
     params: id === 'inhale' ? [{ k: 'stars', label: '実験場：吸い込んだ星の数', type: 'range', min: 0, max: 12, step: 1, def: 12 }] : [],
     status: { '状態': '独立HTMLの試作（未承認）。本番への組み込みはC++移行後', '全身': '現行画像と節長を保ち、胸と首を縮めて溜め、発動で解放する。腕と爪は一緒に振り、頭と首の向きをつなぐ', '動作': '技の時刻・射数・範囲・速度は現行値。退場と再登場を含めて再生。単独の比較場面で共通AIの自然選択は省略', '未決・保留': id === 'spiral' ? 'D01の新しい挙動案は入れず、現行の2周・収縮・退出を再現。カメラも現行の0.82倍まで引く' : id === 'inhale' ? '本番のactiveは6秒。吸引3秒→予告1秒のあと、残りの攻撃時間内だけ照射する現行の時間関係を維持。D02の移動仕様変更は保留' : id === 'clones' ? '現行の3体と各技を独立再生。D05のGodot実験場エラーは、このHTMLの再生成功で解決扱いにしない' : 'D01・D02の本番の移動仕様、D05の実験場不具合は未変更。ピカロの通常AIと地形への干渉は比較対象外' },
     refs: ['scripts/bosses/draco_parts.gd・draco_form.gd（全身のパーツと経路追従）', 'scripts/bosses/draco_attack_motion.gd・draco_screen_staging.gd（首・尾・退場）', 'data/bosses/draco_moves/' + id + '.tres・scripts/bosses/draco/techniques/' + id + '.gd', 'scripts/bosses/draco/technique_visual.gd（現行の予告・着弾）', 'pixelFX原本 fire/fire-breath の青いスプライト、冷える斬撃・光粒の手法、SPEEDの現行画像'],
