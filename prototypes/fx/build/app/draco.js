@@ -89,11 +89,10 @@ function dPresentation(S) {
     points = dFit(desired, points);
   }
   const total = pathLength(points), arms = Array.from({ length: 4 }, (_, i) => (i % 2 ? 1 : -1) * charge * (i < 2 ? 0.42 : 0.16));
-  if (S.tech === 'rifts' && ready && (windup || active)) for (let i = 0; i < 2; i++) {
-    const arm = dArmFrame(points, DP.body_width, total, i), side = arm.side, baseAngle = angOf(sub(arm.claw, arm.pos)), folded = facing + Math.PI - side * 0.3, strike = facing - side * 1.25, swipe = (S.swipes || []).filter((q, n) => n % 2 === i).filter(q => q.fire <= S.t).pop(), local = active && swipe ? S.t - swipe.fire : -1;
-    const reach = active && local >= 0 ? smooth(0, DS.open, local) : 0, settle = active && local >= 0 ? smooth(DS.open + 0.06, DS.open + 0.44, local) : 0;
-    const desired = folded + angDiff(strike, folded) * reach;
-    arms[i] = angDiff(desired, baseAngle) * (windup ? k : 1 - settle);
+  if (S.tech === 'rifts' && ready && (windup || active)) for (let i = 0; i < 2; i++) { // 爪：腕を前へ振り上げ、体の前を内側へ引っ掻いて、前側を通って元へ戻す（肘が逆へ曲がる後ろ回りをしない）
+    const arm = dArmFrame(points, DP.body_width, total, i), base = angOf(sub(arm.claw, arm.pos)), fw = fromA(facing), sign = fw.x * Math.sin(base) - fw.y * Math.cos(base) >= 0 ? 1 : -1, out = mul(orth(fw), sign), rise = angOf(add(fw, mul(out, 0.7))), strike = angOf(add(fw, mul(out, -0.45))), mine = (S.swipes || []).filter((q, n) => n % 2 === i), done = mine.filter(q => q.fire <= S.t).pop(), next = mine.find(q => q.fire > S.t), local = active && done ? S.t - done.fire : -1, reach = local >= 0 ? smooth(0, DS.open, local) : 0, settle = local >= 0 ? smooth(DS.open + 0.06, DS.open + 0.44, local) : 0, ready2 = next ? smooth(0.42, 0.12, next.fire - S.t) : 0;
+    let want = rise + angDiff(strike, rise) * reach; want += angDiff(rise, want) * ready2;
+    arms[i] = angDiff(want, base) * (windup ? k : Math.max(local >= 0 ? 1 - settle : 1, ready2));
   }
   const claws = arms.map((turn, i) => dArmFrame(points, DP.body_width, total, i, turn).claw);
   return { points, facing, charge, arms, claws, mouth: add(points[0], mul(fromA(facing), 120 * DP.head_scale)), chest: pathAt(points, Math.min(total, DP.body_width * 0.9)).pos };
