@@ -33,6 +33,8 @@ var _fire: Node2D
 const FX := preload("res://scripts/render/bosses/draco_fx.gd")
 const HYDRA_FX := preload("res://scripts/render/bosses/hydra_fx.gd")
 const FORM := preload("res://scripts/bosses/draco_form.gd")
+const FINALE_VIEW := preload("res://scripts/render/bosses/draco_finale_view.gd")
+var finale_view: Node2D
 const PRIM := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
@@ -62,8 +64,10 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	var finale: Dictionary=body.get("finale",{})
 	_pose = _present(points,body,current)
 	points = _pose.points
+	points = FINALE_VIEW.kink(points,finale)
+	_parts.set_finale_tone(finale_view.tone() if finale_view!=null else {})
 	_parts.arm_turns = _pose.arms
-	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" else float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
+	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
 	_parts.position = Vector2(feedback.offset).rotated(-float(body.facing))
 	_parts.rotation = float(feedback.angle)
 	var live := {}
@@ -92,7 +96,6 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 func _draw() -> void:
 	if state.is_empty() or not visible: return
 	_draw_rift()
-	_draw_finale()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
 		for j in 16:
@@ -102,7 +105,7 @@ func _draw() -> void:
 	var intro: Dictionary = state.get("intro",{})
 	var glow: float = float(intro.chest_glow) if intro.get("active",false) else 1.0
 	var finale: Dictionary=state.get("finale",{})
-	if not finale.get("stage","").is_empty():glow=0.12 if float(finale.get("split",0.0))<=0.0 else 0.0
+	if not finale.get("stage","").is_empty():glow=0.0
 	var depth := float(state.perspective_scale)
 	var core := Vector2(-110.0*float(state.head_scale)*depth,0)
 	var pulse := 0.85+sin(float(state.clock)*3.0)*0.15
@@ -529,36 +532,3 @@ func _draw_rift() -> void:
 			var offset := axis.rotated(-rotation)*12.0
 			draw_line(at-offset,at+offset,Color(1.0,0.1,0.3,float(intro.eyes)),8.0,false)
 
-func _draw_finale() -> void:
-	var f: Dictionary=state.get("finale",{})
-	var stage: String=f.get("stage","")
-	if stage.is_empty():return
-	var form=preload("res://scripts/bosses/draco_form.gd")
-	if stage=="strikes":
-		for trail: Dictionary in f.strike_trails:
-			var age: float=float(state.clock)-float(trail.time)
-			var points:=PackedVector2Array()
-			for at: Vector2 in trail.points:points.append(to_local(at))
-			if points.size()>1:
-				draw_polyline(points,Color(0.5,0.56,1.0,maxf(0.0,0.35-age*0.7)),14.0,false)
-				draw_polyline(points,Color(0.83,0.93,1.0,maxf(0.0,0.7-age*1.4)),3.0,false)
-	if stage in ["release","combine","pose","input"]:
-		var bear:=PackedVector2Array()
-		for at: Vector2 in [Vector2(0,-130),Vector2(-35,-65),Vector2(-80,-15),Vector2(-145,10),Vector2(-130,70),Vector2(-55,80),Vector2(-80,-15)]:bear.append(to_local(f.core+at))
-		draw_polyline(bear,Color("#e6eeff"),3.0,false)
-		for at in bear:form.star(self,at,9.0,Color("#eefaff"))
-		draw_circle(bear[0],12.0,Color.WHITE)
-		if stage=="combine":
-			var modules=["legendary_stern","legendary_keel","legendary_sail","legendary_compass"]
-			for j in 4:
-				var start:=to_local(f.core+Vector2.from_angle(j*TAU/4.0)*250.0)
-				var at:=start.lerp(to_local(f.ship_pos),clampf(float(f.time)/2.0,0.0,1.0))
-				draw_set_transform(at,-rotation,Vector2.ONE*0.4)
-				preload("res://scripts/ui/legendary_module_geometry.gd").draw(self,modules[j],Color("#d3c2ff"))
-				draw_set_transform(Vector2.ZERO)
-				form.star(self,at,7.0,Color("#f3eaff"))
-	if stage=="input":
-		for key in ["guide","strokes"]:
-			var points:=PackedVector2Array()
-			for at: Vector2 in f[key]:points.append(to_local(at))
-			if points.size()>1:draw_polyline(points,Color(0.65,0.75,1.0,0.18) if key=="guide" else Color("#effaff"),3.0 if key=="guide" else 4.0,false)

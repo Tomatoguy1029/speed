@@ -1014,7 +1014,12 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		draco.threshold_1 = float(definition.params.thresholds[0])
 		draco.threshold_2 = float(definition.params.thresholds[1])
 		data.DracoBodyDefinition = [draco]
-		data.DracoFinaleDefinition = [{"id":1,"boss":1,"finish_passes":maxi(1,int(definition.params.get("finish_passes",8))),"finish_pass_time":maxf(0.15,float(definition.params.get("finish_pass_time",0.32)))}]
+		var finale := {"id":1,"boss":1}
+		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="DracoFinaleDefinition")[0].fields:
+			if field.name in ["id","boss"]: continue
+			if not definition.params.has(field.name): return {}
+			finale[field.name] = float(definition.params[field.name])
+		data.DracoFinaleDefinition = [finale]
 	if definition.id==&"centaurus":
 		var centaurus := {"id":1,"body":1,"guard":1}
 		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="CentaurusBodyDefinition")[0].fields:

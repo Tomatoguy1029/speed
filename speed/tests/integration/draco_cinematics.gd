@@ -241,7 +241,7 @@ func native_finale_motion() -> void:
 		body=finale_body(f)
 		if not body.finale.completed:
 			check(f.bridge.read_lab().value.clock.time==before.clock.time and f.bridge.read_lab().value.clock.world_time==before.clock.world_time,"決着だけを実時間で進めランと戦闘の時計を止める")
-	check(observed==["release","combine","pose","input","strikes","last","sight","split","explode"],"核解放から決着まで全9段階を通る")
+	check(observed==["release","combine","pose","input","strikes","charge","flash","sight","explode"],"核解放から決着まで全9段階を通る")
 	check((finale_body(f).finale.completed and f.bridge.read_frame().value.ui.draco_finish_done),"完走後に通常クリアへ渡す完了値を立てる")
 	var count: int=f.events.filter(func(e):return e.type=="boss_defeated").size()
 	finale_tick(f);finale_tick(f)
@@ -249,7 +249,7 @@ func native_finale_motion() -> void:
 	f.bridge.dispose()
 
 func native_finale_interrupt() -> void:
-	for target in ["release","combine","pose","input","strikes","last","sight","split"]:
+	for target in ["release","combine","pose","input","strikes","charge","flash","sight"]:
 		var f:=finale_fixture()
 		if f.is_empty():return
 		f.bridge._core.step_ship(0.05,0.05,{"has_cursor":true,"cursor":Vector2(1000,200)})
@@ -258,7 +258,7 @@ func native_finale_interrupt() -> void:
 		check(ship.ship_vel.length()>0.0,"中断確認を動いている機体から始める")
 		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
 		check(finale_to(f,target),"中断する段階まで到達する: "+target)
-		if target in ["strikes","last"]:
+		if target in ["strikes","charge"]:
 			for tick in 14:finale_tick(f)
 			check(f.bridge._core.ship_snapshot().ship_pos!=ship.ship_pos,"連撃の実移動を経て中断する: "+target)
 		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"cancel"})

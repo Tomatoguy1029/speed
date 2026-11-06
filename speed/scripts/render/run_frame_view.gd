@@ -172,8 +172,7 @@ var _ship_white_material: ShaderMaterial
 var _ship_visible := true
 var _ship_visual_position := Vector2.INF
 var _zoom := 1.0
-var _finale_overlay: Dictionary={}
-var _finale_rect:=Rect2()
+var _finale_view: Node2D
 var _particle_canvas: Node2D
 var _dim: Node2D
 var _dim_strength := 0.0
@@ -384,7 +383,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 			_particle_canvas.draw_set_transform(shard.pos,shard.angle)
 			_particle_canvas.draw_texture(shard.texture,-shard.texture.get_size()*0.5,Color(1,1,1,shard.life/0.65))
 		_particle_canvas.draw_set_transform(Vector2.ZERO)
-		_draw_finale_overlay())
+		pass)
 	_dim = Node2D.new()
 	_layer(16).add_child(_dim)
 	_dim.draw.connect(func():
@@ -1254,10 +1253,18 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if authoring_paused:
 			dt = 0.0
 			frame.ui.input_enabled = false
-	_finale_overlay={}
-	_finale_rect=Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0).grow(400.0)
+	var finale_shown:=false
 	for body: Dictionary in frame.ui.get("boss_bodies",[]):
-		if body.get("kind",-1)==4:_finale_overlay=body.get("finale",{})
+		if body.get("kind",-1)==4 and body.get("finale",{}).get("active",false):
+			if _finale_view==null:
+				_finale_view=preload("res://scripts/render/bosses/draco_finale_view.gd").new()
+				_layer(14).add_child(_finale_view)
+				_finale_view.set_shake_hook(func(amount: float):ruler_shake=maxf(ruler_shake,amount))
+			finale_shown=true
+			_finale_view.apply_frame(body.finale,float(frame.ui.world_time),Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0),_zoom)
+			var display=_boss_body_displays.get(body.id)
+			if display!=null:display.finale_view=_finale_view
+	if not finale_shown and _finale_view!=null:_finale_view.hide_view()
 	var equipped_forward: bool = frame.ui.get("weapon_levels",[]).any(func(item): return item.id=="W01")
 	if not equipped_forward:
 		_flashes = ShotFlashes.new()
@@ -1988,13 +1995,3 @@ func _sync_cpp_boss_final_beams(bodies: Array) -> void:
 			_boss_final_beams[id].queue_free()
 			_boss_final_beams.erase(id)
 
-func _draw_finale_overlay() -> void:
-	var f: Dictionary=_finale_overlay
-	if f.is_empty() or not f.get("active",false):return
-	if float(f.dim)>0.0:_particle_canvas.draw_rect(_finale_rect,Color(0,0,0.02,float(f.dim)))
-	var line: PackedVector2Array=f.line
-	if line.size()==2:
-		var width:=18.0 if f.stage=="strikes" else 48.0
-		var alpha:=1.0 if f.stage in ["strikes","last"] else maxf(0.0,float(f.dim))
-		_particle_canvas.draw_line(line[0],line[1],Color(0.65,0.65,1.0,alpha*0.45),width*3.0,false)
-		_particle_canvas.draw_line(line[0],line[1],Color(1,1,1,alpha),width,false)

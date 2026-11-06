@@ -2886,8 +2886,20 @@ struct DracoInhaleArc {
 struct DracoFinaleDefinition {
     uint32_t id{};
     uint32_t boss{};
-    uint32_t finish_passes{};
-    double finish_pass_time{};
+    double release_time{};
+    double combine_time{};
+    double pose_time{};
+    double rush_time{};
+    double charge_time{};
+    double hold_time{};
+    double line_time{};
+    double flash_from{};
+    double flash_ramp{};
+    double flash_peak{};
+    double flash_fade{};
+    double flash_after{};
+    double sight_time{};
+    double explode_time{};
 };
 struct DracoClonesDefinition {
     uint32_t id{};

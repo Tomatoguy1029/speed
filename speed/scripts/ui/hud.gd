@@ -777,6 +777,7 @@ func _draw_cpp() -> void:
 		_draw_edge_arrow_values(hero.center,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	if _hero_notice_t>0.0 and hero.get("guidance",false):
 		draw_string(_font,Vector2(12,110),tr("hud.hero_discovered"),HORIZONTAL_ALIGNMENT_CENTER,size.x-24,18,Color(1.0,0.91,0.63,minf(1.0,_hero_notice_t/0.4)))
+	_draw_finale_text()
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		if body.mode>=4 or not body.has("hp"): continue
 		var width := minf(520.0,size.x*0.6)
@@ -1011,6 +1012,19 @@ func _owned_loadout(field: String) -> Dictionary:
 	var owned := {}
 	for item: Dictionary in _cpp_ui.get(field,[]): owned[StringName(item.id)] = int(item.level)
 	return owned
+
+## 決着の場面に重ねる短い案内。時間は戦闘の状態から読む。
+func _draw_finale_text() -> void:
+	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
+		var finale: Dictionary=body.get("finale",{})
+		if not finale.get("active",false): continue
+		var time: float=finale.time
+		if finale.stage=="input" and not finale.began and time>=5.0:
+			var alpha:=smoothstep(5.0,5.7,time)
+			if time>5.7: alpha*=1.0-0.11*(1.0-cos((time-5.7)*PI))
+			draw_string(_font,Vector2(0,size.y*0.1),tr("hud.finale_hint"),HORIZONTAL_ALIGNMENT_CENTER,size.x,22,Color(0.9,0.94,1.0,alpha))
+		if finale.stage=="combine" and time>=2.75:
+			draw_string(_font,Vector2(0,size.y*0.76),tr("hud.finale_unlock"),HORIZONTAL_ALIGNMENT_CENTER,size.x,26,Color(1.0,0.9,0.66,smoothstep(2.75,3.0,time)))
 
 func _update_cpp_cinematic() -> void:
 	if _cpp_ui.is_empty() or _loadout_icons==null:return

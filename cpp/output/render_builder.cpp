@@ -449,7 +449,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     if (state.ship.invuln>0 && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
     for (const auto visual:{config.cannon_visual,config.ship_visual}) {
         Dictionary pose;pose["participant_id"]=0;pose["part_key"]=visual;pose["transform"]=transform;
-        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
+        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !state.control.cinematic_hide_ship && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}

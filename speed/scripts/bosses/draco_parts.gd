@@ -57,6 +57,13 @@ func use_picaro(seed: float) -> void:
 	for child in get_children():
 		if child is Sprite2D: child.material = _lighting
 
+## 決着の閃光のあいだだけ、竜全体を一色の陰影で塗る。
+func set_finale_tone(tone: Dictionary) -> void:
+	var on: bool = tone.get("on",false)
+	_lighting.set_shader_parameter("painted",on)
+	_lighting.set_shader_parameter("use_normal",not on)
+	if on: _lighting.set_shader_parameter("paint",tone.color)
+
 func _sprite(part: StringName) -> Sprite2D:
 	var sprite := Sprite2D.new()
 	var texture := CanvasTexture.new()

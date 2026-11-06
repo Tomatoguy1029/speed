@@ -187,7 +187,7 @@ func check_restore_draco_final() -> void:
 	var start:=0
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--restore-draco-from="):start=int(arg.get_slice("=",1))
-	var stages: Array[String]=["release","combine","pose","input","strikes","last","sight","split","explode"]
+	var stages: Array[String]=["release","combine","pose","input","strikes","charge","flash","sight","explode"]
 	for index in stages.size():
 		var stage: String=stages[index]
 		if not helper.finale_to(f,stage):check(false,"保持する決着の段階へ進む: "+stage);break
