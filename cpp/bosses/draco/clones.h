@@ -5,6 +5,7 @@
 #include "state.h"
 namespace speed {class DracoClones {public:
     static void begin(RunRuntime &,TechniqueState &);
+    static void windup(RunRuntime &,TechniqueState &);
     static void active(RunRuntime &,TechniqueState &,double);
     static void clear(RunRuntime &,BossBodyState &);
     static void end(RunRuntime &,TechniqueState &,bool);

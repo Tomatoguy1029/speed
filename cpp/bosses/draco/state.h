@@ -18,21 +18,24 @@ struct DracoLeapState {DracoStagingState staging;godot::Vector2 origin,destinati
 struct DracoTailSlamState {godot::Vector2 origin,target;double axis=0,mirror=1;std::vector<godot::Vector2> base;bool fired=false;};
 struct DracoTailSweepState {godot::Vector2 origin;double facing=0;std::vector<godot::Vector2> base,prior,area;};
 struct DracoStarFanState {std::vector<godot::Vector2> positions;std::vector<double> angles;bool fired=false;};
-struct DracoRiftsState {DracoStagingState staging;std::vector<std::vector<godot::Vector2>> paths;std::vector<AttackHandle> walls,slashes;godot::Vector2 center;uint32_t claws=3,sides=0;bool ended=false;};
+struct DracoRiftTear {godot::Vector2 from,to;double fire=0,width=0,hold=0;uint32_t seed=0;AttackHandle slash,wall;};
+struct DracoRiftSwipe {double fire=0,aim=0,side=1;};
+struct DracoRiftsState {DracoStagingState staging;std::vector<DracoRiftTear> tears;std::vector<DracoRiftSwipe> swipes;godot::Vector2 center;bool ended=false;};
 struct DracoArrowImpact {godot::Vector2 position;double wait=0,warn=0,age=0;bool locked=false;};
-struct DracoPicaroWallState {uint32_t shots=0;std::vector<DracoArrowImpact> impacts;};
+struct DracoPicaroWallState {uint32_t shots=0;double axis=0;bool roared=false;std::vector<DracoArrowImpact> impacts;};
 struct DracoSpiralState {
     DracoStagingState return_staging;
-    godot::Vector2 center,correction,held_ship,outside,control,inside,recovery;
+    godot::Vector2 center,held_ship,outside,control,inside,recovery;
     double extent=1000,horizontal=1000,length=9000,inner=0.2,coil=1.2,pause=1.6,first=0.42,second=0.54,bend=0.24,shrink=2,offset=320,bend_radius=220,zoom=1,departure_time=0,departure_angle=0,hp_before=0;
     bool camera_before=false,controls_before=false,protection_before=false,departing=true,holding=false,charging=false,trapped=false,trapped_hit=false,hp_sampled=false;
-    std::vector<godot::Vector2> points,trail,entry;
+    std::vector<godot::Vector2> points,trail,entry,coiled;
+    godot::Vector2 pull_from;
     std::vector<AttackHandle> walls;
 };
 struct DracoSideEntryState {godot::Vector2 origin,outside,inside;double angle=0,facing=0,side=1;};
-struct DracoInhaleState {DracoSideEntryState staging;uint32_t stars=0;bool spent=false,caught=false;double release_at=0;AttackHandle beam;godot::Vector2 direction;};
+struct DracoInhaleState {DracoSideEntryState staging;uint32_t stars=0;bool spent=false,caught=false,spat=false;double release_at=0;AttackHandle beam;godot::Vector2 direction;};
 struct DracoCloneUnit;
-struct DracoClonesState {std::vector<DracoCloneUnit> units;godot::Vector2 center;bool ended=false;};
+struct DracoClonesState {std::vector<DracoCloneUnit> units;godot::Vector2 center;double axis=0;bool roared=false,ended=false;};
 struct DracoTechniqueState {double stage_time=0;std::vector<godot::Vector2> warning,attack;double warning_width=0,attack_width=0;std::vector<std::vector<godot::Vector2>> warning_paths;std::variant<DracoBiteState,DracoBreathState,DracoChargeState,DracoLeapState,DracoTailSlamState,DracoTailSweepState,DracoStarFanState,DracoRiftsState,DracoPicaroWallState,DracoInhaleState,DracoSpiralState,DracoClonesState> move;};
 struct DracoPicaroMember {
     EnemyHandle actor;
@@ -94,5 +97,5 @@ struct DracoBodyState {
     std::vector<godot::Vector2> trail,pose,override_points;
     double width=154,head_scale=1.35,depth=1,alpha=1;
 };
-struct DracoCloneUnit {TechniqueState inner;HydraNeckState neck;std::vector<EnemyHandle> parts;std::vector<godot::Vector2> points;godot::Vector2 origin;uint32_t index=0;bool entry_hit=false;};
+struct DracoCloneUnit {TechniqueState inner;HydraNeckState neck;std::vector<EnemyHandle> parts;std::vector<godot::Vector2> points,trail;double face=0;godot::Vector2 origin;uint32_t index=0;bool entry_hit=false;};
 }
