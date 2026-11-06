@@ -17,6 +17,7 @@ function dTellDraw(S, R, pose) {
   else if (id === 'picaro_wall') { const e = smooth(0.62, 1, k); if (e > 0) dDarkGather(S, R, pose.mouth, e); }
   else if (!['charge', 'leap', 'bite', 'spiral', 'clones'].includes(id)) { bossGather(R, pose.mouth, 85, k, S.t, 191); dSupply(R, pose.chest, pose.mouth, k, S.t, 215, 30); }
   if (id === 'tail_slam' && S.target) dGroundTremble(S, R, S.target, S.r.radius, k, 121);
+  if (id === 'leap' && S.target) dGroundTremble(S, R, S.target, 170, smooth(0.15, 0.9, k), 141);
   if (id === 'star_fan') (S.starPositions || []).forEach((q, i) => { dSupply(R, pose.mouth, q.pos, smooth(0.1, 0.75, k), S.t, 230 + i, (i - S.starPositions.length * 0.5) * 7); dStarCharge(S, R, q, i, smooth(0.08 + i * 0.03, 0.85, k)); });
 }
 const D_EYE = { fw: 77, side: 25 }; // 頭の絵の赤い目の位置（頭の絵の画素 × head_scale × 2）

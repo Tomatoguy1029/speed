@@ -148,7 +148,7 @@ function dSetup(S, id) {
   if (id === 'breath') { S.r.warn = DB_WARN; S.r.active = DB_ACTIVE; }
   if (id === 'meteor') { S.r.active = DM.active; S.rocks.forEach((q, i) => { q.dir = fromA(S.axis + (i - (S.rocks.length - 1) / 2) * DM.spread); q.to = add(q.from, mul(q.dir, 500)); q.radius *= DM.scale; }); }
   if (id === 'rifts') S.r.active = DS.active;
-  if (id === 'leap') { S.r.warn = 1.4; S.r.active = 0.7; }
+  if (id === 'leap') { S.r.warn = 2.3; S.r.active = 0.7; }
   if (id === 'star_fan') S.r.warn = 1.5;
   if (id === 'tail_slam') { S.r.warn = DSL.warn; S.r.active = DSL.active; S.r.recover = DSL.recover; }
   if (id === 'tail_sweep') { S.r.warn = DW.warn; S.r.active = DW.active; S.r.recover = DW.recover; }
