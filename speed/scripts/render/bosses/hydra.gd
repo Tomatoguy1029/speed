@@ -63,7 +63,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var effects_now: Array = state.get("effects",[])
 	var heavy := false
 	for effect: Dictionary in effects_now:
-		if String(effect.kind) in ["wind","wind_blade","bolt","rubble"]: heavy = true
+		if String(effect.kind) in ["wind","wind_blade","bolt","rubble","tornado","tornado_charge"]: heavy = true
 	if heavy:
 		_raster.begin(canvas.front.colors,canvas.front.lights,canvas.front.width,canvas.front.height,float(canvas.world_scale),canvas._camera_position)
 		_raster_back.begin(canvas.back.colors,canvas.back.lights,canvas.back.width,canvas.back.height,float(canvas.world_scale),canvas._camera_position)
@@ -74,6 +74,11 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		var e := float(effect.age)-float(effect.delay)
 		var life := float(effect.life)
 		match String(effect.kind):
+			"tornado":
+				_raster_back.tornado(points[0].lerp(points[1],0.5),float(effect.width)*0.5*lerpf(0.8,1.0,smoothstep(0.0,0.15,float(effect.age))),clampf((life-float(effect.age))/0.4,0.0,1.0),1.0,t)
+			"tornado_charge":
+				var grow := pow(clampf(float(effect.age)/maxf(0.01,life),0.0,1.0),1.4)
+				_raster_back.tornado(points[0],float(effect.width)*0.5*lerpf(0.1,1.0,grow),1.0,grow,t)
 			"wind":
 				if e>=0.0: _raster.wind_band(points[0],(points[1]-points[0]).angle(),points[0].distance_to(points[1]),e,life)
 			"wind_blade":

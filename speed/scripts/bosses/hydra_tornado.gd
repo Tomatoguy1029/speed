@@ -25,6 +25,7 @@ func _ready() -> void:
 	wind.material.set_shader_parameter("tint",effect_tint * _visual_values().get("vortex_tint", Color.WHITE))
 	wind.material.set_shader_parameter("pixel_size",3.0 * float(EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("pixel_scale", 1.0)))
 	wind.z_index=1
+	wind.visible=false # 渦の本体は論理画素の層へ描く
 	add_child(wind)
 	for i in 14:
 		var rock:=Sprite2D.new()

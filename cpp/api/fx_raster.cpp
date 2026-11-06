@@ -37,6 +37,7 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("exhale","at","angle","reach","width","beam_age","extend","life","time"),&SpeedFxRaster::exhale);
     ClassDB::bind_method(D_METHOD("comet","pos","angle","age","speed","radius","tail","shine","seed","with_star"),&SpeedFxRaster::comet);
     ClassDB::bind_method(D_METHOD("dark_shot","pos","angle","age","seed"),&SpeedFxRaster::dark_shot);
+    ClassDB::bind_method(D_METHOD("tornado","center","radius","fade","grow","time"),&SpeedFxRaster::tornado);
     ClassDB::bind_method(D_METHOD("wind_band","mouth","angle","length","elapsed","active"),&SpeedFxRaster::wind_band);
     ClassDB::bind_method(D_METHOD("wind_blade","center","angle","age","life","size","side","seed"),&SpeedFxRaster::wind_blade);
     ClassDB::bind_method(D_METHOD("rock_comet","head","angle","speed","age","radius","seed","pace"),&SpeedFxRaster::rock_comet);
@@ -118,6 +119,14 @@ void SpeedFxRaster::dark_shot(Vector2 pos,double angle,double age,double seed) {
     for (int i=0;i<14;++i) {const double d=L*0.6+(i*13+std::fmod(age*900*((i%3)*0.1+0.2),13.0)),off=(hash1(i*3.3+seed)-0.5)*(6+i*1.1),f=i/14.0;soft(float(tip.x-ux*d+nx*off),float(tip.y-uy*d+ny*off),float(7-f*3),H[i%3?5:4],0.5*(1-f));}
     for (double d=0;d<L;d+=0.5) {const double f=d/L,w=(f<0.3?f/0.3:std::pow(1-(f-0.3)/0.7,0.7))*W*(1+0.16*std::sin(d*0.9+age*40+seed)*f);for (double o=-w;o<=w;o+=0.5) {const double e=std::abs(o)/std::max(0.5,w);blend(float(tip.x-ux*d+nx*o),float(tip.y-uy*d+ny*o),e>0.8?H[2]:e>0.55?H[4]:H[7],e>0.8?1:0.97);}blend(float(tip.x-ux*d+nx*w),float(tip.y-uy*d+ny*w),H[1],1-f*0.5);blend(float(tip.x-ux*d-nx*w),float(tip.y-uy*d-ny*w),H[1],1-f*0.5);}
     glow(float(tip.x-ux*L*0.4),float(tip.y-uy*L*0.4),20,H[2],0.55);
+}
+// 瓦礫竜巻：見下ろしの渦。らせんの腕が中心へ巻き込み、緑の風の腕に瓦礫の砂ぼこりの腕が混ざる。
+void SpeedFxRaster::tornado(Vector2 center,double radius,double fade,double grow,double t) {
+    const Color *C=WIND;const Color DUST[2]={hexc(0x9a8f86),hexc(0x7a7068)};const Color STONE3=hexc(0x6f7f8d),STONE2=hexc(0x4b5a68);const Vector2 L=logical(center);const double Rr=radius*wl_,turn=t*10;if (Rr<1) return;
+    const auto ramp=[&](double v) {const double q=clamp1(v)*5;const int i=std::min(4,int(std::floor(q)));return cmix(C[1+i],C[2+i],q-i);};
+    for (int sy=std::max(0,int(L.y-Rr*1.2));sy<=std::min(h_-1,int(L.y+Rr*1.2));++sy) for (int sx=std::max(0,int(L.x-Rr*1.2));sx<=std::min(w_-1,int(L.x+Rr*1.2));++sx) {const double dx=sx+0.5-L.x,dy=sy+0.5-L.y,r=std::hypot(dx,dy)/Rr;if (r>1.15) continue;const double ph=std::atan2(dy,dx),tw=5.2*std::log(r+0.1),n=fbm((ph/TAU+0.5)*8,r*3-t*1.4,37,2),n2=fbm((ph/TAU+0.5)*16,r*6-t*3,11,2),big=std::pow(0.5+0.5*std::cos(3*ph+tw+turn),1.2),thin=std::pow(0.5+0.5*std::cos(7*ph+tw*1.25+turn*1.5+1.3),1.6),arm=clamp1((0.72*big+0.42*thin)*(0.72+0.8*n)),grit=clamp1(std::pow(0.5+0.5*std::cos(2*ph+tw+turn+2.1),3.0)*smooth(0.3,0.75,r)*(0.5+1.1*n2)),env=smooth(0.03,0.16,r)*(1-smooth(0.82,1.12,r)),core=1-smooth(0.04,0.12,r),a=(0.62+0.36*arm)*env*fade;if (core>0) blend(sx,sy,C[0],core*0.85*fade);if (a>0.015) blend(sx,sy,ramp(arm*(1.12-0.4*r)),a);if (grit*env>0.03) blend(sx,sy,DUST[n2>0.5?0:1],grit*env*0.8*fade);}
+    for (int k=0;k<16;++k) {const double a0=k*TAU/16+hash1(k*3.1)*1.2-t*12*(0.85+0.3*hash1(k*5.3)),r0=mix1(0.14,0.5,hash1(k*2.7)),r1=r0+mix1(0.3,0.55,hash1(k*7.9));const int n=int(std::ceil(Rr*3));for (int m=0;m<=n;++m) {const double u=double(m)/n,rr=mix1(r0,r1,u),ang=a0-5.2/3*std::log(rr+0.1),f=std::sin(PI*u);blend(float(L.x+std::cos(ang)*rr*Rr),float(L.y+std::sin(ang)*rr*Rr),C[k%3==0 && f>0.7?7:6],f*f*(k%3==0?0.8:0.5)*fade);}}
+    for (int i=0;i<44;++i) {const double seed=53,life=mix1(0.7,1.1,hash1(i*3.7+seed)),off=hash1(i*9.1+seed)*life,c=std::floor((t+off)/life),age=t+off-c*life;const auto rnd=[&](double k) {return hash1(i*13.1+c*7.3+k*1.91+seed);};const double k=age/life,rr=mix1(1.3,0.14,std::pow(k,1.3))*Rr,th=rnd(1)*TAU-mix1(2,3,rnd(2))*TAU*std::pow(k,1.6),a=std::min(1.0,k*6)*(1-smooth(0.8,1,k))*fade*grow,spin=age*mix1(-14,14,rnd(4));const bool leaf=rnd(3)<0.45;const float x=float(L.x+std::cos(th)*rr),y=float(L.y+std::sin(th)*rr);blend(x,y,leaf?C[5]:STONE3,a);blend(float(x+std::round(std::cos(spin))),float(y+std::round(std::sin(spin))),leaf?C[4]:STONE2,a);}
 }
 // 風の帯（竜巻）：横倒しの竜巻を上から見た形。口から先へ広がる円錐の中を、ねじれた風の筋がらせんに回る。pixelFX ice/frost-breath の作り（Hugo Duprez、MIT）。
 void SpeedFxRaster::wind_band(Vector2 mouth,double angle,double L,double e,double active) {
