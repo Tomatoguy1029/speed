@@ -10,7 +10,7 @@ extends Node2D
 @export var tail_tip: Texture2D
 @export var immortal: Texture2D
 ## 合体中の首は当たらないので、本体より少し暗くする。
-@export var merged_neck_tint := Color.WHITE
+@export var merged_neck_tint := Color(0.55,0.55,0.55)
 ## 分離後は蛇ごとに色相をずらし、1匹ずつ見分けられるようにする（度／蛇1匹）。
 @export var snake_hue_step := 10.8
 @export var snake_saturation := 1.21
