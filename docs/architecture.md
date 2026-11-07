@@ -760,7 +760,7 @@ Godot本体・API・SDK・export template・SCons・精度とMacの最低OSは `
 
 差分生成はボスごとの技とフロー・外観・攻撃表示・星座・図鑑・索引・音・診断入力・各ステージ・導入を単位にし、入力の内容と参照先・import設定、必須出力の存在を照合する。全編集元の内容と必須出力が前回と一致するときは、Resourceの読み込みと単位ごとの照合を省く。更新時は変更がない単位の出力を再利用し、出力が欠けた単位を作り直す。単位ごとの入力は、出力内容を決める生成処理とデータを追跡する。ステージと導入の生成内容は `tools/content/build_stage_bundle.gd` に置き、入口・実行順・進捗集計を担う `addons/content_build/` とCLI入口 `tools/content/build_all.gd` の変更は全体の編集元署名だけへ反映する。この境界は戦闘の準備キャッシュと実行資源の依存一覧でも共有する。エディターの実行前生成とexport前生成は、同じGodot実行ファイルの新しいheadlessプロセスで共通の生成入口を呼ぶ。エディターが保持する古いC++拡張やResourceを生成に使わず、終了コードと単位別の結果を親へ返す。実行前生成は、処理時間と作り直した単位数を出力する。ステージの配置・記録名・診断入力・戦闘データは同じ生成単位で更新する。戦闘と固定外観の解決結果を開発用キャッシュへ保存し、UIなどの変更ではその結果を再利用して資源の参照・署名だけを更新する。同じ生成内の依存探索と署名計算は共有し、生成の終了時に破棄する。全体の編集元署名は各ステージの索引へ反映し、開始後に編集元が変わったランの判定を維持する。`--force` は全単位と戦闘の解決結果を作り直す。キャッシュは `.content/dev/` に置き、配布には生成済みの戦闘データと実行資源だけを含める。
 
-`tools/build/build_run.py` は固定SDKでの拡張ビルドを担当する。`--package-dir` を指定するとソース外の新しい独立コピーで、import・共通生成・export・配布構成の検査を順に行う。Macはarm64・x86_64を作ってuniversalへまとめ、Windowsはx86_64を作る。公式godot-cppのLICENSEと依存固定情報を `licenses/run/` へ含める。
+`tools/build/build_run.py` は固定SDKでの拡張ビルドを担当する。`--package-dir` を指定するとソース外の新しい独立コピーで、import・共通生成・export・配布構成の検査を順に行う。Macはarm64・x86_64を作ってuniversalへまとめ、Windowsはx86_64を作る。公式godot-cppのLICENSEと依存固定情報を `licenses/run/` へ含める。Mac配布では共通生成の後、配布用コピーの `shader_bake_targets.tres` に配布対象のCanvas shaderと標準素材相当のShaderMaterialをまとめ、次のeditor走査とShader Bakerへ渡す。生成対象はexport presetの除外指定に従い、通常ランの資源参照・warmup対象は維持する。
 
 Macのexportは `shader_baker/enabled` を有効にし、描画デバイスを使って変換したshaderキャッシュをPCKへ含める。中間形式からMetal用ライブラリまで変換する場合はAppleのMetal Toolchainを使う。利用できる変換の範囲と警告を配布の確認ログへ残し、端末依存の描画パイプラインは[起動ロード](#81-定義データresource)で準備する。Macの配布対象は翻訳Resourceを含み、編集元の翻訳CSVと参照のない星環の実験シーンを除外する。
 
