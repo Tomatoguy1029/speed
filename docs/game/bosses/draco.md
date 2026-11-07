@@ -283,7 +283,7 @@ HP段階移行時の配置済み隕石は[段階移行時の扱い](#22-段階�
 
 ### 9.2 実装状況と接続先
 
-技の動きと公開値は `scripts/bosses/draco/techniques/`、技の見た目は `scenes/bosses/draco/`、保存値は `data/bosses/draco_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+技の実行は `cpp/bosses/draco/`、編集する性能値の型は `scripts/data_types/boss_techniques/draco/`、技の見た目は `scenes/bosses/draco/`、保存値は `data/bosses/draco_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
 
 実装状況は[敵一覧](../catalog/enemies.md)で管理する。役者・技・演出の共通基盤は[設計書6.1](../../architecture.md#61-敵とボスの-ai)を参照する。区間ごとの候補リストと本書の行動条件を実装要件とする。
 
@@ -293,9 +293,9 @@ HP0を[最終決着](#23-hp0から最終決着)への接続点とする。決着
 
 ボスの登録・編集・単独試遊への接続は[AI向けの追加手順](../../dev/stage-production-ai.md#新しい技調整項目ボスを追加する手順)、実行用データの生成と資源の寿命は[設計書15.1](../../architecture.md#151-ビルドと実行時の境界)に従う。自動テストは依頼時に実行し、生成・読み込み・短い画面確認と区別する。
 
-ブレスの遮蔽は、ぼうえんきょう座の`speed/scripts/enemies/sniper.gd`にある、障害物で方向ごとの光線の長さを切り、表示と視線判定で共有する処理を応用する。共通の `scripts/common/beam_occlusion.gd` へ方向ごとの遮蔽距離を渡し、炎の表示とダメージ判定で同じ光線を共有する。
+ブレスの遮蔽は `cpp/bosses/draco/breath.cpp` が `cpp/systems/field.cpp` の `sight_blockers()`・`sight_reach()` で方向ごとの距離を求める。遮蔽した攻撃形状を表示とダメージ判定で共有する。
 
-螺旋収縮の被弾は`speed/scripts/runtime/systems/ship_system.gd`の共通ダメージ処理と無敵状態へ接続し、点滅は`speed/scripts/render/ship_visual.gd`の透明度による表示を利用する。1回の収縮によるダメージを一度にまとめ、点滅・無敵と竜の離脱の時間を合わせる。
+螺旋収縮の被弾は `cpp/bosses/draco/spiral.cpp` から `cpp/systems/combat_resolver.cpp` の `ship_damage()` と共通の無敵状態へ接続する。点滅は `scripts/render/run_frame_view.gd` が表示する。1回の収縮によるダメージを一度にまとめ、点滅・無敵と竜の離脱の時間を合わせる。
 
 ## 10. 調整・素材の未完項目
 

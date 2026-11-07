@@ -87,7 +87,7 @@
 
 突進時は、取り込んだとも座の船尾ブースターから噴射を出し、その勢いで加速して突っ込む様子を見せる。通常突進・連続突進・踏み込み薙ぎの踏み込み・光の槍・光角の乱舞に共通する演出として、発進・移動に合わせて再生する。速く動くときは、噴射の炎が途切れて点線に見えないよう、1回の更新で進んだ間を炎で埋める。連続突進の止まりと踏み込み薙ぎの止まりでは、ジェットを前へ逆に吹く。攻撃判定は突進と角の判定を使う。
 
-外観は、尻尾位置の船尾部品をブースター状にし、そこから出る青白い炎が尻尾の形を作る。普段は短く揺らめき、突進時に後方へ大きく噴き出す。ブースターは接続部を支点に胴体より遅れて旋回する。炎の根元は噴出口へ接続し、先端ほど向きの追従を遅らせ、ピクセル単位の矩形で曲がった尾を描く。追従時間と角度の上限は `monoceros_presentation.gd` の `Turning` エクスポート項目で調整する。絵素材の依頼・分割・納品条件は[共有アート素材リスト](../catalog/art-assets.md#いっかくじゅう座)で管理し、噴射の動きと発進への同期は演出側で扱う。炎の形状の細部・噴射の強さや時間は調整する。
+外観は、尻尾位置の船尾部品をブースター状にし、そこから出る青白い炎が尻尾の形を作る。普段は短く揺らめき、突進時に後方へ大きく噴き出す。ブースターは接続部を支点に胴体より遅れて旋回する。炎の根元は噴出口へ接続し、先端ほど向きの追従を遅らせ、ピクセル単位の矩形で曲がった尾を描く。追従時間と角度の上限は `scripts/render/bosses/monoceros.gd` の `Turning` エクスポート項目で調整する。絵素材の依頼・分割・納品条件は[共有アート素材リスト](../catalog/art-assets.md#いっかくじゅう座)で管理し、噴射の動きと発進への同期は演出側で扱う。炎の形状の細部・噴射の強さや時間は調整する。
 
 第2形態への移行では、足を止めて踏ん張り、角と目へ光を集めて強く輝かせる。`unicorn_horn_with_normals_planar.aseprite` の1フレーム目を通常の角とし、移行時は2〜15フレーム目を `phase_time` に合わせて一度再生する。移行後は最終フレームの剣を保つ。角と法線のアトラスは `tools/art/export_monoceros_horn.lua` が制作時に生成し、演出は世界時間でフレームを選ぶ。角・剣の根元は頭へ追従し、先端の長さを既存の判定に合わせる。
 
@@ -101,13 +101,9 @@
 
 針状の光・衝撃波・ソニックブームなどのエフェクトは shader で作る。作れないものはテクスチャを描いてもらう。
 
-`scenes/bosses/monoceros_presentation.tscn` を差し替えて、役者の `presentation_scene` に指定する。シーンは `bind_monoceros(actor)` で以下を接続する。
+`scenes/bosses/monoceros_presentation.tscn` を表示シーンとして使う。`scripts/render/run_frame_view.gd` がC++の描画出力と出来事を `scripts/render/bosses/monoceros.gd` の `apply_frame()`・`frame_event()` へ渡す。位置・姿勢・技の段・予告と攻撃形状・世界時間を同じ戦闘状態から表示し、世界時間の停止中はアニメーションも止める。表示資源はランの表示の寿命で保持・解放する。
 
-- `presentation_event`：予告、方向固定、発進、隙、角刺さり、角抜き、形態変化、被弾、撃破、制限時間演出と、技の段ごとの合図（止まる、振り抜く、衝撃波を放つ、斬撃を放つ、槍が砕ける、旋回を始める）。`cue`・`technique`・`phase`・`mode`・`position`・`angle`・`world_time` を渡す。
-- `presentation_advanced`：世界時間の進行。停止中はアニメーションも止まる。
-- `horn_points()`：ワールド座標の判定線。首の捻り・振りを含めた今の角の向きと長さを返す。
-
-パーツの構成は `monoceros_parts.tscn`、戦闘との同期と攻撃の光は `monoceros_presentation.gd` で扱う。 実際にHPが減った被弾では本体を薄く白く光らせ、短い減衰する揺れを描画へ加える。連続命中では演出時間と揺れ幅を上限内へ戻し、本体座標・照準・予告線・攻撃判定は戦闘状態を使う。
+パーツの構成は `monoceros_parts.tscn`、戦闘との同期と攻撃の光は `scripts/render/bosses/monoceros.gd` で扱う。 実際にHPが減った被弾では本体を薄く白く光らせ、短い減衰する揺れを描画へ加える。連続命中では演出時間と揺れ幅を上限内へ戻し、本体座標・照準・予告線・攻撃判定は戦闘状態を使う。
 
 ## 9. 実装・調整・接続
 
@@ -125,17 +121,17 @@
 
 ### 9.2 調整と実装の接続
 
-技の動きと公開値は `scripts/bosses/monoceros/techniques/`、技の見た目は `scenes/bosses/monoceros/`、保存値は `data/bosses/monoceros_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+技の実行は `cpp/bosses/monoceros/`、編集する性能値の型は `scripts/data_types/boss_techniques/monoceros/`、技の見た目は `scenes/bosses/monoceros/`、保存値は `data/bosses/monoceros_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
 
-連続突進は `techniques/return_charge.gd`・`monoceros_moves/return_charge.tres`・`monoceros/return_charge_visual.tscn`、踏み込み薙ぎは `techniques/sweep.gd`・`monoceros_moves/sweep.tres`・`monoceros/sweep_visual.tscn`、角の衝撃波は `techniques/horn_wave.gd`・`monoceros_moves/horn_wave.tres`・`monoceros/horn_wave_visual.tscn` を使う。衝撃波の仮表示は `scripts/bosses/monoceros/horn_wave_visual.gd` が持つ。
+連続突進は `scripts/data_types/boss_techniques/monoceros/return_charge.gd`・`monoceros_moves/return_charge.tres`・`monoceros/return_charge_visual.tscn`、踏み込み薙ぎは `scripts/data_types/boss_techniques/monoceros/sweep.gd`・`monoceros_moves/sweep.tres`・`monoceros/sweep_visual.tscn`、角の衝撃波は `scripts/data_types/boss_techniques/monoceros/horn_wave.gd`・`monoceros_moves/horn_wave.tres`・`monoceros/horn_wave_visual.tscn` を使う。衝撃波の仮表示は `scripts/bosses/monoceros/horn_wave_visual.gd` が持つ。
 
-光の剣の連撃は `techniques/sword_flash.gd`・`monoceros_moves/sword_flash.tres`・`monoceros/sword_flash_visual.tscn`、光の槍は `techniques/lance.gd`・`monoceros_moves/lance.tres`・`monoceros/lance_visual.tscn`、光角の乱舞は `techniques/horn_dance.gd`・`monoceros_moves/horn_dance.tres`・`monoceros/horn_dance_visual.tscn` を使う。連撃と槍の仮表示は `scripts/bosses/monoceros/sword_flash_visual.gd`・`scripts/bosses/monoceros/lance_visual.gd` が持つ。
+光の剣の連撃は `scripts/data_types/boss_techniques/monoceros/sword_flash.gd`・`monoceros_moves/sword_flash.tres`・`monoceros/sword_flash_visual.tscn`、光の槍は `scripts/data_types/boss_techniques/monoceros/lance.gd`・`monoceros_moves/lance.tres`・`monoceros/lance_visual.tscn`、光角の乱舞は `scripts/data_types/boss_techniques/monoceros/horn_dance.gd`・`monoceros_moves/horn_dance.tres`・`monoceros/horn_dance_visual.tscn` を使う。連撃と槍の仮表示は `scripts/bosses/monoceros/sword_flash_visual.gd`・`scripts/bosses/monoceros/lance_visual.gd` が持つ。
 
 「ボス行動」画面で、使う技・区間の順序と選択条件・既存技の組み合わせ・技の数値を調整できるようにする。技固有の動作と演出はスクリプトと表示シーンで作り、戦闘の組み立ては[共通のノード編集](../../dev/stage-production.md#56-ボス行動を調整する)を使う。組み合わせは本体を共有する技の実行制約に従う。
 
 本体の数値の正は [`speed/data/bosses/monoceros.tres`](../../../speed/data/bosses/monoceros.tres)、技別の性能は [`monoceros_moves/`](../../../speed/data/bosses/monoceros_moves/) のリソースとする。HP・装甲・移動速度・旋回速度、距離・角度、技別の予告・実行・硬直・ダメージ・再使用待ち時間、突進回数、角刺さり・角抜き時間、形態移行のHP閾値は試遊調整用の仮値とする。`use_def_stats` を有効にしてHP・装甲を専用データから読み、共通の敵HP・装甲倍率を掛ける。
 
-連続突進・踏み込み薙ぎ・角の衝撃波・光の剣の連撃・光の槍・光角の乱舞は、段（止まる・向き直る・振る・旋回するなど）を持つ。これらは技の Runner が世界時間で段を進め、段の時間・速さ・角度はすべて技の値として公開してボス行動画面で調整できるようにする。第2形態で変える値は、同じ名前に `_p2` を付けた値で持つ。通常突進と後ろ蹴りは、`monoceros_boss_timeline.tres` の `attack` で進める。`attack` は方向固定・発進・終了のメソッドトラックを持つ。役者ごとに複製し、技の開始時に専用データの時間へ合わせて手動更新する。表示は戦闘イベントへ接続する。技の性能・時間・再使用待ちは`monoceros_moves/*.tres`を使う。制限時間の一撃は`boss_final_strike.gd`の共通演出を使う。
+連続突進・踏み込み薙ぎ・角の衝撃波・光の剣の連撃・光の槍・光角の乱舞は、段（止まる・向き直る・振る・旋回するなど）を持つ。これらは技の Runner が世界時間で段を進め、段の時間・速さ・角度はすべて技の値として公開してボス行動画面で調整できるようにする。第2形態で変える値は、同じ名前に `_p2` を付けた値で持つ。通常突進と後ろ蹴りは `cpp/bosses/monoceros/charge.cpp`・`kick.cpp` で進める。技の性能・時間・再使用待ちは `data/bosses/monoceros_moves/` を生成時に読み、C++の世界時間で更新する。制限時間の一撃は `cpp/bosses/flow/phase_controller.cpp` が判定し、表示へ出来事を渡す。
 
 短い受け入れ確認は `tests/runtime/monoceros.tscn`、描画付きの技の見本は同じシーンへ `-- --capture` を付けて実行する。実験場では `monoceros` を配置して試遊できる。ボス行動画面で作るコンボも共通の順次・待機・条件分岐を使い、各技の開始時に距離・形態・再使用待ちを確認する。
 
@@ -143,6 +139,6 @@
 
 ## 10. 調整・素材の未完項目
 
-船尾ブースターから青白い炎の尻尾を描き、突進時と登場飛行で噴射を強める。登場飛行の尺は本体の `params.entrance_time` で調整する。第2形態の角は光る剣状になる。光の槍の穂先の形・砕けるまでの時間、衝撃波・斬撃・ソニックブームの見た目は、技の値と表示シーンで調整する。
+戦闘と登場・形態変化の接続は実装済みで、試遊と仕上げを行う。エフェクト制作は完了扱いとし、追加が必要なものを個別に確認する。船尾ブースターから青白い炎の尻尾を描き、突進時と登場飛行で噴射を強める。登場飛行の尺は本体の `params.entrance_time` で調整する。第2形態の角は光る剣状になる。光の槍の穂先の形・砕けるまでの時間、衝撃波・斬撃・ソニックブームの見た目は、技の値と表示シーンで調整する。
 
-戦闘バランスの確定値、仮絵の仕上げ、剣状の角と光の槍の輪郭の細部、首を捻る・振るポーズの正式な絵、エフェクトの shader、個別の音、カメラ演出の細部は未決。演出の細部は具体案を相談して定め、数値は試遊用の仮値として調整する。
+戦闘バランスの確定値、仮絵の仕上げ、剣状の角と光の槍の輪郭の細部、首を捻る・振るポーズの正式な絵、個別の音、カメラ演出の細部は未決。演出の細部は具体案を相談して定め、数値は試遊用の仮値として調整する。
