@@ -293,15 +293,17 @@ func native_inhale() -> void:
 	var remaining_pose:= "--cpp-draco-inhale-pose" in OS.get_cmdline_user_args()
 	var saved: Array=[]
 	var shown: Array=[]
+	var away: Vector2=bridge._core.ship_snapshot().ship_pos
 	for frame in 1500:
+		bridge.command("dev_ship_motion",{"position":away,"velocity":Vector2.ZERO})
 		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 		var body: Dictionary=bridge.command("dev_boss_body_state").value[-1]
-		var key: int=0 if attack.stage==0 else 4 if attack.stage==2 else 3 if attack.spent else 2 if attack.caught else 1
+		var key: int=0 if attack.stage==0 else 4 if attack.stage==2 else 3 if attack.spent else 1
 		if not remaining_pose and key not in saved and attack.stage<3:
 			saved.append(key)
 			var held: Dictionary=bridge.checkpoint()
-			check(held.ok,"横入り・吸引・噛みつき・吐き出し・回復を保持する")
+			check(held.ok,"横入り・吸引・吐き出し・回復を保持する")
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 			var future: Array=bridge.command("dev_boss_state").value
 			var future_body: Array=bridge.command("dev_boss_body_state").value
@@ -332,14 +334,27 @@ func native_inhale() -> void:
 		check(native_frame_checked,"専用光線の読取値を通常描画へ渡す")
 		bridge.dispose()
 		print("[cpp_draco_inhale_pose] failures=",failed);get_tree().quit(1 if failed else 0);return
-	check(saved.size()==5 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"全段階の復帰・表示を通り、終了時にビームを解放する")
+	check(saved.size()==4 and shown.size()==5 and bridge._core.hazards_snapshot().is_empty(),"全段階の復帰・表示を通り、終了時にビームを解放する")
 	check(bridge._core.hostiles_snapshot().size()==24,"実験場の12星から弧ごとの割当と上限24発を生成し、終了後も彗星を残す")
+	bridge.dispose()
+	fixture=breath_fixture(move);bridge=fixture.bridge
+	check(bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1}).ok,"口へ届く吸引を開始する")
+	var bitten: bool=false
+	for frame in 1500:
+		bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
+		var attack: Dictionary=bridge.command("dev_boss_state").value[0]
+		bitten = bitten or attack.caught
+		check(not attack.spent and bridge._core.hazards_snapshot().is_empty(),"口に届いた機体へビームを撃たない")
+		if attack.stage==5:break
+	check(bitten and bridge._core.hostiles_snapshot().is_empty(),"口に届いたら噛みつきだけで技を終える")
 	check(fixture.captured.any(func(e):return e.type==&"combat_player_damage" and e.payload.accepted and e.payload.cause==&"inhale_bite" and e.payload.source==&"draco" and e.payload.technique==&"inhale" and is_equal_approx(e.payload.hp_before-e.payload.hp_after,30.0)),"吸引の噛みつきの実HPと専用原因・出所・技名を記録する")
 	bridge.dispose()
 	for operation in ["windup","pull","caught","spent","recovery","dev_cancel_boss"]:
 		fixture=breath_fixture(move);bridge=fixture.bridge
 		var started: Dictionary=bridge.command("dev_boss_technique",{"entity_id":fixture.boss,"definition":1})
+		var hold_at: Vector2=bridge._core.ship_snapshot().ship_pos
 		for frame in 1400:
+			if operation in ["spent","recovery","dev_cancel_boss"]:bridge.command("dev_ship_motion",{"position":hold_at,"velocity":Vector2.ZERO})
 			bridge._core.step(1.0/120.0);bridge._core.step_hazards(1.0/120.0)
 			var attack: Dictionary=bridge.command("dev_boss_state").value[0]
 			if operation=="windup" or operation=="pull" and attack.stage==1 or operation=="caught" and attack.caught or operation in ["spent","dev_cancel_boss"] and attack.spent or operation=="recovery" and attack.stage==2:break

@@ -6,6 +6,9 @@ const EFFECT_SETTINGS := preload("res://data/visuals/effect_settings.tres")
 @export var core_glow_color := Color(0.38,0.59,1.0)
 @export var rift_color := Color("#5a4d91")
 var state := {}
+## 吸引で口に届いたときは、通常の噛みつきと同じ大きさの牙を見せる。
+const INHALE_BITE_WIDTH := 96.0
+const INHALE_BITE_RECOVER := 0.8
 var attack := {}
 var _move_style := {}
 var _styles := {}
@@ -321,12 +324,13 @@ func draw_reference(canvas, _real_dt: float) -> void:
 				FX.supply(canvas,mouth,stars[i],FX._smooth(0.1,0.75,k),t,230.0+i,(i-stars.size()*0.5)*7.0)
 				FX.star_charge(canvas,stars[i],i,FX._smooth(0.08+i*0.03,0.85,k),t)
 	if tech in ["charge","leap"] and stage==1: FX.rush(canvas,world_points,float(state.body_width),attack.get("takeoff",attack.get("origin",head)),float(body_angle),st,float(attack.active_time),FORM)
-	if tech in ["bite","leap"] and stage in [1,2]:
+	var inhale_bite: bool = tech=="inhale" and stage==2 and attack.get("caught",false)
+	if inhale_bite or (tech in ["bite","leap"] and stage in [1,2]):
 		var active := float(attack.get("active_time",0.5))
-		var bite_time := (st if stage==1 else active+st)-active*0.7
+		var bite_time := st if inhale_bite else (st if stage==1 else active+st)-active*0.7
 		if bite_time>=0.0:
 			if _bite.is_empty(): _bite = {"at":mouth,"angle":world_facing}
-			FX.bite_tear(canvas,_bite.at,_bite.angle,bite_time,float(attack.get("attack_width",96.0)),float(attack.get("recover_time",1.0)),t)
+			FX.bite_tear(canvas,_bite.at,_bite.angle,bite_time,INHALE_BITE_WIDTH if inhale_bite else float(attack.get("attack_width",96.0)),INHALE_BITE_RECOVER if inhale_bite else float(attack.get("recover_time",1.0)),t)
 	else: _bite = {}
 	if tech=="tail_sweep" and stage==1:
 		var last := world_points.size()-1
