@@ -35,6 +35,7 @@ var _raster_back := SpeedFxRaster.new()
 var _rock_last := {}
 var _rock_sprites: Array[Sprite2D] = []
 var _rocks_now: Array = []
+var _sweeps_now: Array = []
 const ROCK_TEXTURE := preload("res://assets/pixel/meteor_0.png")
 var _reference_canvas
 func set_reference_canvas(canvas) -> void:
@@ -64,10 +65,12 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var heavy := false
 	for effect: Dictionary in effects_now:
 		if String(effect.kind) in ["wind","wind_blade","bolt","rubble","tornado","tornado_charge"]: heavy = true
-	if state.has("shatter_stones"): heavy = true
+	if state.has("shatter_stones") or not _sweeps_now.is_empty(): heavy = true
 	if heavy:
 		_raster.begin(canvas.front.colors,canvas.front.lights,canvas.front.width,canvas.front.height,float(canvas.world_scale),canvas._camera_position)
 		_raster_back.begin(canvas.back.colors,canvas.back.lights,canvas.back.width,canvas.back.height,float(canvas.world_scale),canvas._camera_position)
+	for sweep: Array in _sweeps_now: _raster.sweep_band(sweep[0],sweep[1],sweep[2],sweep[3],sweep[4],sweep[5])
+	_sweeps_now.clear()
 	var rocks := {}
 	for effect: Dictionary in effects_now:
 		var points: PackedVector2Array = effect.points
@@ -246,7 +249,10 @@ func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[C
 		var m: Vector2 = canvas.to_logical(mouth)
 		canvas.front.glow(m.x,m.y,6.0,PRIM.ramp(color)[2],0.4*(1.0-(rel-active)/0.25))
 	if mode=="bite_sweep":
-		FX.sweep_trail(canvas,neck,rel,float(mem.get("fire_angle",facing)),PRESENT,float(neck.get("bite_radius",70.0)),color)
+		var start := maxf(0.0,rel-0.35)
+		var path := PackedVector2Array()
+		for step in range(0,roundi((rel-start)*300.0)+2): path.append(PRESENT.sweep_visual(neck,start+step/300.0,float(mem.get("fire_angle",facing))).pos)
+		_sweeps_now.append([path,start,rel,float(neck.active_time),float(neck.get("bite_radius",70.0)),color])
 		if rel>=active: DRACO_FX.dust(canvas,head,rel-active,77.0,facing+PI*0.5,0.8)
 	if mode=="bite_thrust":
 		if rel<=active+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,active,color)

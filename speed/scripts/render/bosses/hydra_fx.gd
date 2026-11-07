@@ -241,58 +241,6 @@ static func air(canvas, from: Vector2, to: Vector2, rel: float, active: float, c
 					canvas.front.dot(q.x,q.y,pal[3 if k<0.3 else 2],(1.0-k)*0.75)
 				s += step
 
-## 薙ぎ払い：頭の通った弧に、先が白く後ろへ冷えて細る三日月の帯。後ろから虫食いで消える。
-static func sweep_trail(canvas, neck: Dictionary, rel: float, fire_angle: float, present, radius: float, color: Color) -> void:
-	var pal := PRIM.ramp(color)
-	var active := float(neck.active_time)
-	var max_age := 0.34
-	var half := radius*0.55*float(canvas.world_scale)
-	var dt := 1.0/150.0
-	var o := -half
-	while o<=half:
-		var e := absf(o)/half
-		var lane := roundf(o/1.5)
-		var life := max_age*(1.0-pow(e,1.6))*(0.5+0.5*DRACO_FX._hash(lane*3.7+1.0))
-		if life>0.01:
-			var age := maxf(0.0,rel-active)
-			while age<=life:
-				var q := rel-age
-				if q<0.0: break
-				var A: Vector2 = canvas.to_logical(present.sweep_visual(neck,q,fire_angle).pos)
-				var B: Vector2 = canvas.to_logical(present.sweep_visual(neck,maxf(0.0,q-dt),fire_angle).pos)
-				var tangent := (A-B).normalized()
-				var n := Vector2(-tangent.y,tangent.x)
-				var k := age/life
-				var x := A.x+n.x*o
-				var y := A.y+n.y*o
-				age += dt
-				if k>0.55 and DRACO_FX._hash(lane*11.0+floorf(q*300.0)*5.0)>(1.0-k)*2.2: continue
-				var speed := A.distance_to(B)/dt/float(canvas.world_scale)
-				var al := (1.0-k)*(1.0-e*0.7)*smoothstep(200.0,900.0,speed)
-				if al<0.03: continue
-				var level := 4 if k<0.12 and e<0.35 else 3 if k<0.4 else 2
-				if al>0.6 and e<0.25: canvas.front.px(x,y,pal[level])
-				elif al*(1.0-e)>0.18: canvas.front.dot(x,y,pal[maxi(1,level-1)],al*(1.0-e)*0.9)
-				canvas.front.light(x,y,pal[2],al*(1.0-e)*0.1)
-		o += 1.5
-	var base: Vector2 = neck.base
-	var sweep := float(neck.sweep)
-	var arc := float(neck.sweep_arc)
-	var reach := float(neck.sweep_reach)
-	for i in 30:
-		var born := active*DRACO_FX._hash(i*2.3+5.0)
-		var a := rel-born
-		var life := 0.35+0.3*DRACO_FX._hash(i*4.1)
-		if a<0.0 or a>life: continue
-		var an := sweep+arc*(born/active-0.5)
-		var u := Vector2.from_angle(an)
-		var at := base+u*(reach+(DRACO_FX._hash(i*6.7)-0.3)*radius)
-		var v := (Vector2(-u.y,u.x)+u*(0.4+0.5*DRACO_FX._hash(i))).normalized()
-		var k := a/life
-		if DRACO_FX._hash(i*19.0+floorf(a*25.0))>(1.0-k)*1.8: continue
-		var q: Vector2 = canvas.to_logical(at+v*(160.0+260.0*DRACO_FX._hash(i*8.1))*0.12*(1.0-exp(-a/0.12)))
-		canvas.front.px(q.x,q.y,STONE[4 if k<0.4 else 3])
-
 ## 伸びる間：頭の形の光が通り道に残る。
 static func silhouette(canvas, mask: Dictionary, center: Vector2, angle: float, color: Color, a: float, factor: float, seed: float) -> void:
 	var wl: float = canvas.world_scale

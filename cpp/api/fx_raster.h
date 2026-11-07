@@ -47,6 +47,7 @@ public:
     void wind_band(Vector2 mouth,double angle,double length,double elapsed,double active);
     void wind_blade(Vector2 center,double angle,double age,double life,double size,double side,double seed);
     void rock_comet(Vector2 head,double angle,double speed,double age,double radius,double seed,double pace);
+    void sweep_band(PackedVector2Array path,double start,double rel,double active,double radius,Color color);
     void bolt_bar(Vector2 tail,double angle,double age,double life,double speed,double length,double width,Color color,double time);
 };
 }

@@ -41,6 +41,7 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("wind_band","mouth","angle","length","elapsed","active"),&SpeedFxRaster::wind_band);
     ClassDB::bind_method(D_METHOD("wind_blade","center","angle","age","life","size","side","seed"),&SpeedFxRaster::wind_blade);
     ClassDB::bind_method(D_METHOD("rock_comet","head","angle","speed","age","radius","seed","pace"),&SpeedFxRaster::rock_comet);
+    ClassDB::bind_method(D_METHOD("sweep_band","path","start","rel","active","radius","color"),&SpeedFxRaster::sweep_band);
     ClassDB::bind_method(D_METHOD("bolt_bar","tail","angle","age","life","speed","length","width","color","time"),&SpeedFxRaster::bolt_bar);
 }
 void SpeedFxRaster::begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera) {colors_=colors;lights_=lights;w_=width;h_=height;wl_=world_scale;camera_=camera;c_=colors_.ptrw();l_=lights_.ptrw();}
@@ -152,6 +153,17 @@ void SpeedFxRaster::rock_comet(Vector2 world,double angle,double speed,double ag
     struct T {double off,len,ph,wid;} tongues[6];for (int i=0;i<6;++i) tongues[i]={(i/5.0-0.5)*1.5,mix1(0.55,1,hash1(i*3.1+2)),hash1(i*5.7)*TAU,mix1(0.32,0.55,hash1(i*2.3+7))};
     if (L>2) {const double x0=std::min(double(head.x),head.x-ux*L)-rad*1.6,x1=std::max(double(head.x),head.x-ux*L)+rad*1.6,y0=std::min(double(head.y),head.y-uy*L)-rad*1.6,y1=std::max(double(head.y),head.y-uy*L)+rad*1.6;for (int sy=std::max(0,int(y0));sy<=std::min(h_-1,int(y1));++sy) for (int sx=std::max(0,int(x0));sx<=std::min(w_-1,int(x1));++sx) {const double dx=sx+0.5-head.x,dy=sy+0.5-head.y,along=-(dx*ux+dy*uy),lat=-dx*uy+dy*ux,k0=along/L;if (k0<-0.04 || k0>1) continue;double a=0,k1=0;for (const auto &t:tongues) {const double k=k0/t.len;if (k>1) continue;const double c=rad*(t.off*(1-k*0.75)+std::sin(k*7-age*34*pace+t.ph)*0.26*clamp1(k*2.2)),w=rad*t.wid*std::pow(1-std::max(k,0.0),0.75)*(0.6+0.4*clamp1(k*4)),e=1-std::abs(lat-c)/std::max(0.4,w);if (e<=0) continue;const double v=smooth(0,0.5,e)*std::pow(1-std::max(k,0.0),1.3)*0.85;if (v>a) {a=v;k1=k;}}if (a>0.02) blend(sx,sy,cmix(DUST[2],DUST[1],clamp1(k1*1.5)),a*on);}}
     const Vector2 start=world-Vector2::from_angle(angle)*speed*age;for (int i=std::max(0,int(std::floor((age-0.45)*26)));i/26.0<=age;++i) {const double born=i/26.0;const auto rnd=[&](double k) {return hash1(i*7.31+k*3.17+seed);};const double life=mix1(0.2,0.45,rnd(1)),k=1-(age-born)/life;if (k<=0) continue;const Vector2 dv=Vector2::from_angle(angle);const Vector2 q=logical(start+dv*(speed*born-radius)+Vector2(-dv.y,dv.x)*(rnd(3)-0.5)*radius*1.5);const double len=mix1(5,14,rnd(2))*mix1(0.4,1,pace);for (double t=0;t<len;t+=0.5) blend(float(q.x-ux*t),float(q.y-uy*t),DUST[rnd(6)<0.5?0:1],k*k*(1-t/len)*0.6);}
+}
+// 薙ぎ払いの帯：頭の通った道に沿う筋の束。真ん中の筋ほど長く残り、先が太く後ろが細る三日月になる。path は start 秒から1/300秒ごとの頭の位置。
+void SpeedFxRaster::sweep_band(PackedVector2Array path,double start,double rel,double active,double radius,Color color) {
+    if (path.size()<2) return;const Ramp r(color);const Color *pal=r.v;const double half=radius*0.55*wl_,dt=1.0/300,max_age=0.34;
+    const auto at=[&](double q) {const double u=std::clamp((q-start)*300,0.0,double(path.size()-1));const int i=std::min(int(u),int(path.size())-2);return logical(path[i].lerp(path[i+1],float(u-i)));};
+    for (double o=-half;o<=half;o+=0.75) {const double e=std::abs(o)/half,lane=std::round(o/0.75),life=max_age*(1-std::pow(e,1.6))*(0.5+0.5*hash1(lane*3.7+1));if (life<=0.01) continue;
+        for (double age=std::max(0.0,rel-active);age<=life;age+=dt) {const double q=rel-age;if (q<0) break;const Vector2 A=at(q),B=at(std::max(0.0,q-dt)),tangent=(A-B).normalized(),n(-tangent.y,tangent.x);const double k=age/life;const float x=A.x+n.x*o,y=A.y+n.y*o;
+            if (k>0.55 && hash1(lane*11+std::floor(q*300)*5)>(1-k)*2.2) continue;
+            const double speed=A.distance_to(B)/dt/wl_,al=(1-k)*(1-e*0.7)*smooth(200,900,speed);const int level=k<0.12 && e<0.35?4:k<0.4?3:2;if (al<0.03) continue;
+            if (al>0.6 && e<0.25) px(x,y,pal[level]);else if (al*(1-e)>0.18) blend(x,y,pal[std::max(1,level-1)],al*(1-e)*0.9);
+            add(int(std::floor(x)),int(std::floor(y)),pal[2],al*(1-e)*0.1);}}
 }
 // 光の棒：両端がとがり、前寄りが一番太い。芯が白く、縁へ冷える。後ろにちらつく光の粒を引く。
 void SpeedFxRaster::bolt_bar(Vector2 tail,double angle,double age,double life,double speed,double length,double width,Color color,double t) {
