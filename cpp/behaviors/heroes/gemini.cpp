@@ -75,14 +75,14 @@ bool GeminiBehavior::motion(const RunRuntime &r,godot::Vector2 &pos,godot::Vecto
 namespace {
 // 機体の武器を影として呼ぶ間だけ、機体の位置・向き・速さと、なぞりの経路・進み・状態を影のものへ差し替え、終わったら戻す
 struct AsTwin {
-    RunRuntime &r;godot::Vector2 pos,heading,velocity;godot::PackedVector2Array path;int64_t segment;double seg_pos;bool tracing;
+    RunRuntime &r;godot::Vector2 pos,heading,velocity,ship_pos;godot::PackedVector2Array path;int64_t segment;double seg_pos;bool tracing;
     explicit AsTwin(RunRuntime &run):r(run) {
-        auto &s=r.state;const auto &t=s.heroes.twin;pos=s.ship.pos;heading=s.ship.heading;velocity=s.ship.vel;path=s.draw.path;segment=s.draw.segment;seg_pos=s.draw.seg_pos;tracing=s.draw.tracing;
+        auto &s=r.state;const auto &t=s.heroes.twin;pos=s.ship.pos;ship_pos=s.ship_pos;heading=s.ship.heading;velocity=s.ship.vel;path=s.draw.path;segment=s.draw.segment;seg_pos=s.draw.seg_pos;tracing=s.draw.tracing;
         GeminiBehavior::motion(r,s.ship.pos,s.ship.heading,s.ship.vel);
         if (t.path.size()>=2) {godot::PackedVector2Array twin_path;for (auto p:t.path) twin_path.push_back(p);s.draw.path=twin_path;s.draw.segment=int64_t(std::min(t.segment,t.path.size()-2));s.draw.seg_pos=t.segment_position;}
-        s.draw.tracing=t.tracing;
+        s.draw.tracing=t.tracing;s.heroes.twin.acting=true;
     }
-    ~AsTwin() {auto &s=r.state;s.ship.pos=pos;s.ship.heading=heading;s.ship.vel=velocity;s.draw.path=path;s.draw.segment=segment;s.draw.seg_pos=seg_pos;s.draw.tracing=tracing;}
+    ~AsTwin() {auto &s=r.state;s.ship.pos=pos;s.ship_pos=ship_pos;s.ship.heading=heading;s.ship.vel=velocity;s.draw.path=path;s.draw.segment=segment;s.draw.seg_pos=seg_pos;s.draw.tracing=tracing;s.heroes.twin.acting=false;}
 };
 // 影のエスコートウィング：設定は機体のものを写し、編隊・展開・命中の状態だけ影のものを使って f を呼ぶ
 template<class F> void with_twin_escort(RunRuntime &r,F f) {
@@ -145,6 +145,17 @@ bool sweep(RunRuntime &r,godot::Vector2 from,const GeminiBehavior::Collide &coll
     }
     return blocked;
 }
+}
+// 突進していない間の影の体当たり：機体が自由に飛んで体当たりした（ship_from から今の位置まで）のと同じ動きを、機体の右横の影の位置で、機体と同じ処理（collide）で行う。
+// 分裂を見せ終わるまでは当たらない。弾かれても影は機体の右横へ戻る（follow）
+void GeminiBehavior::ram(RunRuntime &r,godot::Vector2 ship_from,const Collide &collide) {
+    auto &s=r.state;auto &t=s.heroes.twin;if (!definition(r) || t.tracing || elapsed(r)<SPLIT_TIME || s.phase!=godot::RunState::Phase::Play) return;
+    const auto h=s.ship.heading.is_zero_approx()?godot::Vector2(1,0):s.ship.heading.normalized();
+    const auto side=godot::Vector2(-h.y,h.x)*SIDE*r.content->config.character_scale;
+    t.position=s.ship.pos+side;
+    AsTwin scope(r);auto &run_up=s.loadout->run_up;const bool first=run_up.first;run_up.first=t.run_up_first;
+    collide(ship_from+side);
+    t.run_up_first=run_up.first;run_up.first=first;
 }
 namespace {
 // 影が走り終えたところで、機体の突進の終わりと同じ武器（終点の爆発・機雷・閃光斬・双極ビーム）を影の位置から使う。

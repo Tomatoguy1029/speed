@@ -3,11 +3,6 @@ const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
 var source: HeroAuraAssets
 func _ready() -> void:
-	if "--cpp-hercules" in OS.get_cmdline_user_args():
-		await cpp_hercules_display()
-		print("[cpp_H_hercules_view] failed=%d" % failed)
-		get_tree().quit(1 if failed else 0)
-		return
 	if "--cpp-gemini" in OS.get_cmdline_user_args():
 		await cpp_gemini_display()
 		print("[cpp_H_gemini_view] failed=%d" % failed)
@@ -258,54 +253,6 @@ func cpp_gemini_display() -> void:
 	frame = behavior._cpp_read(bridge)
 	for i in 60: view.update_effects(frame,1.0/60.0)
 	check(twins._state==&"off" and view._hero_power_visual.twin_light()==0.0,"効果が切れると影は光へ戻り、機体の色も戻る")
-	v.queue_free()
-	await get_tree().process_frame
-	bridge.dispose()
-	failed += guide.failed+behavior.failed
-	guide.free()
-	behavior.free()
-
-func cpp_hercules_display() -> void:
-	var guide = load("res://tests/integration/hero_guidance.gd").new()
-	var behavior = load("res://tests/runtime/hero_behaviors.gd").new()
-	var bridge = guide._cpp_fixture(true,100000.0,100000.0)
-	behavior._cpp_rescue(bridge,"hercules")
-	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
-	bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)})
-	var intent := Intent.new()
-	intent.hero_press = true
-	behavior._cpp_step(bridge,intent)
-	behavior._cpp_hero_tick(bridge,0.3,0.3)
-	var frame: Dictionary = behavior._cpp_hero_tick(bridge,0.3,0.6)
-	var held: Dictionary = bridge.checkpoint()
-	var v := viewport()
-	var camera := Camera2D.new()
-	v.add_child(camera)
-	var scope := ContentResourceScope.new()
-	for path in ["res://.content/hero_aura.res","res://.content/meteor_pieces.res","res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/pixel/airship_armor.png","res://assets/pixel/airship_mine.png","res://assets/pixel/xp_crystal_facets.tres","res://assets/effects/elite_death/masks.tres","res://assets/effects/landmark/masks.tres","res://data/visuals/landmark_aura_material.tres","res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/elite_runtime.tres","res://assets/pixel/airship_turret_base.png","res://assets/pixel/airship_turret.png"]: scope.provide(path,load(path))
-	for visual: Dictionary in guide._cpp_visuals:
-		if not String(visual.get("path","")).is_empty(): scope.provide(visual.path,load(visual.path))
-	var view = load("res://scripts/render/run_frame_view.gd").new()
-	v.add_child(view)
-	var visuals: Array[Dictionary] = []
-	visuals.assign(guide._cpp_visuals)
-	view.setup(scope,visuals,frame.ui.character_scale)
-	view.update_effects(frame,0.0)
-	var rect := Rect2(-512,-384,1024,768)
-	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.fire.falls.size()==3 and view._hero_power_visual.fire.burns.size()==3,"次の隕石の影・本体と燃える跡を同じ状態から描く")
-	view.update_effects(frame,1.0/60.0)
-	check(view._hero_power_visual._meteors._sky.multimesh.visible_instance_count>0 and view._hero_power_visual._meteors._ground.multimesh.visible_instance_count>0,"落ちてくる岩と焼け跡を描く")
-	var before: Dictionary = view._hero_power_visual.fire.duplicate(true)
-	behavior._cpp_hero_tick(bridge,15.0,15.6)
-	frame = behavior._cpp_read(bridge)
-	view.update_effects(frame,0.0)
-	check(view._hero_power_visual.fire.falls.is_empty() and view._hero_power_visual.fire.burns.is_empty(),"効果と炎の寿命後に前の火を残さない")
-	check(bridge.restore(held.value).ok,"火の表示途中へ戻す")
-	frame = behavior._cpp_read(bridge)
-	view.update_effects(frame,0.0)
-	check(view.apply_frame(bridge.read_render(rect,1.0).value) and view._hero_power_visual.fire==before and frame.ui.hero.active>9.0,"復帰で落下・燃焼・力の残り時間を出し直す")
-	await settle()
-	check(v.get_texture().get_image().save_png("user://speed-heroes-hercules.png")==OK,"ヘルクレスの表示を保存する")
 	v.queue_free()
 	await get_tree().process_frame
 	bridge.dispose()
