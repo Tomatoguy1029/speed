@@ -203,6 +203,7 @@ func default_settings() -> Dictionary:
 		"window_mode": "windowed",
 		"screen_shake": 1.0,
 		"hitstop": true,
+		"intro_auto_advance": false,
 		"bindings": {},
 	}
 

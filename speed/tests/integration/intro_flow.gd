@@ -51,6 +51,7 @@ func _ready() -> void:
 	check(intro.scene_index == 0 and intro._picture.get_child_count() == 1, "Scene1から開始")
 	check(Rect2(Vector2.ZERO, intro.ART_SIZE).encloses(intro.find_child("SkipIntro", true, false).get_rect()), "スキップを画面内に収める")
 	check(intro._text.text == tr("intro.scene1.1"), "シナリオの最初の段落を表示")
+	await _test_playback(intro)
 	await shot("scene1")
 	GameManager.back()
 	await frames()
@@ -60,6 +61,8 @@ func _ready() -> void:
 	replay.pressed.emit()
 	await frames()
 	intro = app._current
+	check(intro._auto_play.button_pressed, "選んだ自動再生を再視聴へ引き継ぐ")
+	intro._auto_play.button_pressed = false
 	intro.scene_fade_seconds = 0.01
 	intro.star_fade_seconds = 0.15
 	intro.star_gap_seconds = 0.03
@@ -109,6 +112,8 @@ func _ready() -> void:
 	intro.paragraph_index = intro.STORY.SCENES[7].text.size() - 1
 	intro._begin_paragraph()
 	intro._text.visible_characters = intro._text.get_total_character_count()
+	intro._process(100.0)
+	check(GameManager.screen == GameManager.Screen.INTRO and not SaveManager.has_seen_intro(), "手動送りの最終段落も操作するまで終了しない")
 	intro.advance()
 	await frames()
 	check(GameManager.screen == GameManager.Screen.TITLE and SaveManager.has_seen_intro(), "完了で視聴済みを保存してタイトルへ")
@@ -132,3 +137,78 @@ func _ready() -> void:
 	await frames()
 	print("[intro_story] failures=", failed)
 	get_tree().quit(1 if failed else 0)
+
+## 実入力と長い経過時間で、全文表示・待機・次送り・途中切替を区別する。
+func _test_playback(intro: Control) -> void:
+	intro.set_process(false)
+	check(not SaveManager.default_settings().intro_auto_advance, "初期設定は手動送り")
+	intro._auto_play.button_pressed = false
+	intro._begin_paragraph()
+	var auto_button: Button = intro._auto_play
+	check(Rect2(Vector2.ZERO, intro.ART_SIZE).encloses(auto_button.get_rect()), "自動再生の切替を画面内に収める")
+	check(not auto_button.get_rect().intersects(intro._next.get_rect()), "自動再生と次へを重ねない")
+	await frames()
+	var picture_point: Vector2 = intro._canvas.get_global_transform_with_canvas() * Vector2(320, 180)
+	_click_at(picture_point)
+	check(intro.paragraph_index == 0 and intro._text.visible_characters == intro._text.get_total_character_count(), "画面の1クリックで全文だけを表示")
+	intro._process(100.0)
+	check(intro.paragraph_index == 0, "全文表示後は長く待っても手動では進まない")
+	_click_at(picture_point)
+	check(intro.paragraph_index == 1 and intro._text.visible_characters == 0, "次のクリックで次段落を先頭から表示")
+	intro._process(100.0)
+	intro._process(100.0)
+	check(intro.paragraph_index == 1, "自然に全文を表示した場合も手動では進まない")
+	var before: String = intro._text.text
+	_click_at(auto_button.get_global_rect().get_center())
+	check(auto_button.button_pressed and SaveManager.settings.intro_auto_advance, "切替ボタンの実クリックで自動再生を保存")
+	check(intro._text.text == before and intro.paragraph_index == 1, "切替クリックが次送りへ漏れない")
+	intro._process(intro.text_hold_seconds - 0.01)
+	check(intro.paragraph_index == 1, "自動再生を入れても待ち時間前には進まない")
+	intro._process(0.02)
+	check(intro.paragraph_index == 2, "自動再生は待ち時間の後に進む")
+	intro._process(0.05)
+	var shown: int = intro._text.visible_characters
+	_click_at(auto_button.get_global_rect().get_center())
+	check(not auto_button.button_pressed and intro._text.visible_characters == shown, "文字表示途中で手動へ切り替えても文章を飛ばさない")
+	_click_at(intro._next.get_global_rect().get_center())
+	check(intro.paragraph_index == 2 and intro._text.visible_characters == intro._text.get_total_character_count(), "全文表示ボタンも1クリックで全文だけを表示")
+	intro._process(100.0)
+	check(intro.scene_index == 0 and intro.paragraph_index == 2, "場面末尾の全文表示後も停止")
+	intro._auto_play.button_pressed = true
+	intro._process(intro.text_hold_seconds * 0.75)
+	intro._auto_play.button_pressed = false
+	intro._process(100.0)
+	check(intro.scene_index == 0, "自動再生の待ち時間中に手動へ切り替えると止まる")
+	intro.paragraph_index = 0
+	intro._begin_paragraph()
+	intro._next.release_focus()
+	var touch := InputEventScreenTouch.new()
+	touch.position = picture_point
+	touch.pressed = true
+	get_viewport().push_input(touch, true)
+	touch.pressed = false
+	get_viewport().push_input(touch, true)
+	check(intro.paragraph_index == 0 and intro._text.visible_characters == intro._text.get_total_character_count(), "タップでも全文表示と次送りを分ける")
+	for down in [true, false]:
+		var accept := InputEventAction.new()
+		accept.action = &"ui_accept"
+		accept.pressed = down
+		get_viewport().push_input(accept, true)
+	check(intro.paragraph_index == 1, "決定キーで次の段落へ進む")
+	intro.paragraph_index = 0
+	intro._begin_paragraph()
+	intro._auto_play.button_pressed = true
+	intro.set_process(true)
+
+func _click_at(point: Vector2) -> void:
+	var motion := InputEventMouseMotion.new()
+	motion.position = point
+	get_viewport().push_input(motion, true)
+	for down in [true, false]:
+		var event := InputEventMouseButton.new()
+		event.position = point
+		event.global_position = point
+		event.button_index = MOUSE_BUTTON_LEFT
+		event.button_mask = MOUSE_BUTTON_MASK_LEFT if down else 0
+		event.pressed = down
+		get_viewport().push_input(event, true)

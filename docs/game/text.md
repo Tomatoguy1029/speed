@@ -53,7 +53,10 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | intro.skip | スキップ | Skip |
 | intro.next | 次へ | Next |
 | intro.reveal | 全文を表示 | Show text |
-| intro.continue | クリック／決定で次へ | Click / confirm to continue |
+| intro.continue | クリック／決定で全文表示・次へ | Click / confirm to reveal or continue |
+| intro.auto&#95;on | 自動再生：ON | Auto-play: ON |
+| intro.auto&#95;off | 自動再生：OFF | Auto-play: OFF |
+| intro.auto&#95;hint | 自動再生中・クリック／決定で早送り | Auto-playing; click / confirm to advance |
 | intro.scene1.1 | 21XX年。 |  |
 | intro.scene1.2 | 人々は星々の光を道しるべに、広大な銀河を航海していた。 |  |
 | intro.scene1.3 | その日も、一隻の宇宙船が静かな星空を進んでいた。 |  |
@@ -94,6 +97,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | settings.effects | 演出 | Effects |
 | settings.screen&#95;shake | 画面の揺れ | Screen Shake |
 | settings.hitstop | ヒットストップ（敵を倒したときなどに一瞬止まる） | Hit Stop (brief freeze on kills and critical hits) |
+| settings.intro&#95;auto&#95;advance | イントロの自動再生 | Auto-play opening |
 | settings.window&#95;mode | 画面モード | Display Mode |
 | settings.windowed | ウィンドウ | Windowed |
 | settings.fullscreen | フルスクリーン | Fullscreen |

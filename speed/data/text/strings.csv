@@ -13,7 +13,10 @@ intro.replay,もう一度イントロを見る,Replay opening
 intro.skip,スキップ,Skip
 intro.next,次へ,Next
 intro.reveal,全文を表示,Show text
-intro.continue,クリック／決定で次へ,Click / confirm to continue
+intro.continue,クリック／決定で全文表示・次へ,Click / confirm to reveal or continue
+intro.auto_on,自動再生：ON,Auto-play: ON
+intro.auto_off,自動再生：OFF,Auto-play: OFF
+intro.auto_hint,自動再生中・クリック／決定で早送り,Auto-playing; click / confirm to advance
 intro.scene1.1,21XX年。,
 intro.scene1.2,人々は星々の光を道しるべに、広大な銀河を航海していた。,
 intro.scene1.3,その日も、一隻の宇宙船が静かな星空を進んでいた。,
@@ -54,6 +57,7 @@ settings.mute,消音（M キーでも切り替え）,Mute (also toggled with M)
 settings.effects,演出,Effects
 settings.screen_shake,画面の揺れ,Screen Shake
 settings.hitstop,ヒットストップ（敵を倒したときなどに一瞬止まる）,Hit Stop (brief freeze on kills and critical hits)
+settings.intro_auto_advance,イントロの自動再生,Auto-play opening
 settings.window_mode,画面モード,Display Mode
 settings.windowed,ウィンドウ,Windowed
 settings.fullscreen,フルスクリーン,Fullscreen
