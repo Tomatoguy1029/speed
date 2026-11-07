@@ -130,6 +130,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hud.kills | 撃破 {n} | Kills {n} |
 | hud.bonus | ボーナスステージ　残り {n} 秒 | Bonus Stage  {n}s Left |
 | hud.warning | WARNING!! | WARNING!! |
+| hud.finale&#95;hint | 軌跡を描いてブースト発動 | Draw a path to boost |
+| hud.finale&#95;unlock | 制限解除 | Limiter Released |
 | hud.hero&#95;discovered | 英雄の星座を発見 | Hero constellation discovered |
 | hud.clear | CLEAR! | CLEAR! |
 | hud.game&#95;over | GAME OVER | GAME OVER |

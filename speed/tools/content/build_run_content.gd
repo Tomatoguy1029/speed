@@ -370,8 +370,8 @@ static func canis_technique_records(definition: BossDef, move: BossTechnique) ->
 			records.CanisPounceDefinition.append(row)
 	return records
 
-static func canis_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig) -> Dictionary:
-	var package := boss_body_package(definition,config)
+static func canis_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, body: Dictionary = {}) -> Dictionary:
+	var package := body.duplicate(true) if not body.is_empty() else boss_body_package(definition,config)
 	var records := canis_technique_records(definition,move)
 	if package.is_empty() or records.is_empty(): return {}
 	for key in records: package.records[key] = records[key]
@@ -418,13 +418,14 @@ static func canis_technique_package(definition: BossDef, move: BossTechnique, co
 static func canis_set_package(definition: BossDef, moves: Array, config: GameConfig) -> Dictionary:
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
+	var body := package.duplicate(true)
 	var sources := []
 	var identities := {}
 	var seen := {}
 	for move: BossTechnique in moves:
 		if move==null or seen.has(move.technique): return {}
 		seen[move.technique] = move
-		var part := canis_technique_package(definition,move,config)
+		var part := canis_technique_package(definition,move,config,body)
 		if part.is_empty(): return {}
 		sources.append({"move":String(move.technique),"package":part})
 		for original: Dictionary in part.records.BossTechniqueDefinition:
@@ -1013,7 +1014,12 @@ static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictio
 		draco.threshold_1 = float(definition.params.thresholds[0])
 		draco.threshold_2 = float(definition.params.thresholds[1])
 		data.DracoBodyDefinition = [draco]
-		data.DracoFinaleDefinition = [{"id":1,"boss":1,"finish_passes":maxi(1,int(definition.params.get("finish_passes",8))),"finish_pass_time":maxf(0.15,float(definition.params.get("finish_pass_time",0.32)))}]
+		var finale := {"id":1,"boss":1}
+		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="DracoFinaleDefinition")[0].fields:
+			if field.name in ["id","boss"]: continue
+			if not definition.params.has(field.name): return {}
+			finale[field.name] = float(definition.params[field.name])
+		data.DracoFinaleDefinition = [finale]
 	if definition.id==&"centaurus":
 		var centaurus := {"id":1,"body":1,"guard":1}
 		for field in Schema.SCHEMA.records.filter(func(value): return value.name=="CentaurusBodyDefinition")[0].fields:
@@ -1140,30 +1146,14 @@ static func hydra_major_records(definition: BossDef, move: BossTechnique, action
 		records.HydraPincerDefinition=[{"id":1,"technique":1,"length":float(values.beam_len),"width":float(values.beam_width),"delay":float(values.pincer_delay),"time":float(values.pincer_time),"open_angle":float(values.pincer_open_angle),"close_angle":float(values.pincer_close_angle)}]
 	if move.technique==&"grid":
 		records.erase("HydraCurveDefinition")
-		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"delay":float(values.normal_charge),"time":float(values.grid_time),"planning_width":float(definition.params.beam_width),"clearance":float(definition.params.grid_clearance),"tolerance":float(definition.params.grid_tolerance),"formation_timeout":float(definition.params.formation_timeout),"minimum":int(definition.params.grid_minimum)}]
-		records.HydraGridLayout=[];records.HydraGridSlot=[];records.HydraGridPath=[]
-		var regions := [&"center",&"right",&"left",&"up",&"down"]
-		for name in definition.params.grid_layouts:
-			var layout: Dictionary=definition.params.grid_layouts[name]
-			var id: int=records.HydraGridLayout.size()+1
-			var mask := 0
-			for region in 5:
-				if definition.params.grid_regions.get(regions[region],&"provisional")==name:mask|=1<<region
-			if mask==0:continue
-			records.HydraGridLayout.append({"id":id,"technique":1,"name":String(name),"region_mask":mask})
-			var slots: Array=layout.slots.duplicate(true);slots.sort_custom(func(a,b):return int(a.priority)<int(b.priority))
-			for index in slots.size():
-				var slot: Dictionary=slots[index]
-				records.HydraGridSlot.append({"id":records.HydraGridSlot.size()+1,"layout":id,"order":index,"from_x":float(slot.from.x),"from_y":float(slot.from.y),"to_x":float(slot.to.x),"to_y":float(slot.to.y)})
-			for index in layout.path.size():
-				var point: Vector2=layout.path[index]
-				records.HydraGridPath.append({"id":records.HydraGridPath.size()+1,"layout":id,"order":index,"x":float(point.x),"y":float(point.y)})
+		records.HydraGridDefinition=[{"id":1,"technique":1,"width":float(values.beam_width),"minimum":int(definition.params.grid_minimum)}]
 	return records
 
-static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, action_rules: Resource = null) -> Dictionary:
+static func hydra_technique_package(definition: BossDef, move: BossTechnique, config: GameConfig, action_rules: Resource = null, body: Dictionary = {}) -> Dictionary:
 	var records := hydra_major_records(definition,move,action_rules) if move.technique in [&"curve",&"grid",&"beam_pincer",&"tornado",&"debris_shatter",&"north",&"sequence",&"swarm"] else hydra_normal_records(definition,move,action_rules)
 	if records.is_empty(): return {}
-	var package := boss_body_package(definition,config)
+	# 全技をまとめる生成では、作り済みの本体の写しを使う。
+	var package := body.duplicate(true) if not body.is_empty() else boss_body_package(definition,config)
 	if package.is_empty(): return {}
 	# 単独の確認用パッケージでは、本体の仮通常技を大技へ置き換える。
 	for record in Schema.SCHEMA.records:
@@ -1202,9 +1192,10 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 			if not String(record.name).begins_with("Hydra") or tables.has(record.name): continue
 			for field: Dictionary in record.fields:
 				if tables.has(field.get("ref","")): tables[record.name]=true;changed=true;break
+	var body := package.duplicate(true)
 	for name in tables: package.records[name]=[]
 	for move: BossTechnique in rules.techniques:
-		var part := hydra_technique_package(definition,move,config,rules)
+		var part := hydra_technique_package(definition,move,config,rules,body)
 		if part.is_empty(): return {}
 		var maps := {}
 		for record: Dictionary in Schema.SCHEMA.records:
@@ -1225,7 +1216,30 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
+## 同じ入力の生成を一度で済ませる。実験場ごとにリセットまで保持する。
+static var _package_memo = null
+static func begin_package_memo(memo := {}) -> void:
+	_package_memo = memo
+static func end_package_memo() -> void:
+	_package_memo = null
+static func _memoized(kind: String, inputs: Array, make: Callable) -> Dictionary:
+	if _package_memo == null: return make.call()
+	# 定義と行動データは複製されるので中身で見分ける。
+	var key := kind
+	for value in inputs: key += "/"+("-" if value==null else value if value is String else str(value.get_instance_id()) if value is GameConfig or value is RuntimeStage else BossProgram.fingerprint(value))
+	# 調整するたびに旧版を溜めず、種類ごとに最後の入力と結果だけを持つ。
+	var slot := kind+"/"+String(inputs[0].id) if inputs[0] is EnemyDef or inputs[0] is BossDef else kind
+	var cached: Dictionary = _package_memo.get(slot,{})
+	if cached.get("key","")!=key:
+		cached = {"key":key,"value":make.call()}
+		_package_memo[slot] = cached
+	return cached.value.duplicate(true)
+
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
+	var stage_values: Variant = [stage.time_limit,stage.legendary_module_id] if stage!=null else null
+	return _memoized("boss",[definition,config,stage_values,program],func(): return _boss_package(definition,config,stage,program))
+
+static func _boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"hydra",&"draco"]: return {}
 	var package := boss_body_package(definition,config)
 	if package.is_empty(): return {}
@@ -1384,6 +1398,9 @@ static func boss_flow_records(rules: Resource, flow: Resource, techniques: Array
 	return records
 
 static func chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
+	return _memoized("chase",[definition,config,stage],func(): return _chase_package(definition,config,stage))
+
+static func _chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
 	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
@@ -2831,18 +2848,27 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	paths.sort()
 	var profiles_error: Error = preload("res://tools/content/build_visuals.gd").validate()
 	if profiles_error!=OK: return profiles_error
-	var manifest := preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_resources.keys if previous_resources!=null else {})
+	var previous_keys: Dictionary = previous_resources.keys if previous_resources!=null else {}
+	# 資源探索が使う番号とパスだけを鍵にする。色・照明は参照先を変えない。
+	var visual_paths: Array = visuals.map(func(entry: Dictionary): return [entry.id,entry.path])
+	var manifest := _memoized("manifest",[var_to_bytes([paths,visual_paths,previous_keys]).hex_encode().sha256_text()],func(): return preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_keys))
 	if manifest.is_empty(): return ERR_INVALID_DATA
+	# 初回に割り当てた資源番号を次のライブ編集の入力にも対応させる。
+	if _package_memo!=null:
+		_package_memo.manifest.key = "manifest/"+var_to_bytes([paths,visual_paths,manifest.keys]).hex_encode().sha256_text()
 	paths = manifest.paths
 	var resolved_input := source_sha256.to_utf8_buffer()
-	resolved_input.append_array(_write_reference_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
+	var resolved_content := _write_reference_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
+	if resolved_content.is_empty(): return ERR_INVALID_DATA
+	resolved_input.append_array(resolved_content)
 	resolved_input.append_array("\n".join(paths).to_utf8_buffer())
 	resolved_input.append_array(var_to_bytes(appearance_metadata))
 	resolved_input.append_array(var_to_bytes([stage.background_color,stage.backgrounds.map(func(item): return [item.texture_path,item.offset,item.scale,item.rotation_degrees,item.display_tint(),item.bounds(),item.parallax,item.fire_preset_path,item.fire_offset,item.fire_scale]),stage.fire_uses]))
 	resolved_input.append_array(var_to_bytes(manifest.hashes))
 	resolved_input.append_array(var_to_bytes([manifest.keys,manifest.equipment,manifest.order,manifest.signatures,visuals]))
 	input_sha256 = Schema.sha256(resolved_input).hex_encode()
-	var bytes := _write_reference_content(data,input_sha256.hex_decode())
+	# 署名計算の時点で固定FXは解決済み。画像由来の表を二度生成しない。
+	var bytes := Schema.write_content(data,input_sha256.hex_decode())
 	if bytes.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
 	var validator = ClassDB.instantiate(&"SpeedRunCore")
 	if not validator.configure_content(bytes): return ERR_INVALID_DATA

@@ -23,6 +23,8 @@ namespace speed {class HydraTechnique {public:
     static godot::Array north_targets(const RunRuntime &,const BossBodyState &);
     static void pincer(RunRuntime &,TechniqueState &);
     static void debris_shatter(RunRuntime &,TechniqueState &,double);
+    static void debris_shatter_aim(RunRuntime &,TechniqueState &);
+    static void curve_extend(RunRuntime &,TechniqueState &);
     static void tornado(RunRuntime &,TechniqueState &,double);
     static bool ready(const RunRuntime &,EnemyHandle,uint32_t);
     static bool reserve(RunRuntime &,EnemyHandle,uint32_t);
@@ -32,10 +34,11 @@ namespace speed {class HydraTechnique {public:
     static void cancel(RunRuntime &,TechniqueState &);
     static void finish(RunRuntime &,TechniqueState &,bool);
     static bool validate(const TechniqueState &,const ContentBundle &);
-    static std::optional<HydraGridPlan> grid_plan(const RunRuntime &,const BossBodyState &,uint32_t);
+    static bool grid_ready(const RunRuntime &,const BossBodyState &,uint32_t);
     static void grid_prepare(RunRuntime &,TechniqueState &);
-    static bool grid_position(RunRuntime &,TechniqueState &,double);
-    static void grid(RunRuntime &,TechniqueState &);
+    static void grid(RunRuntime &,TechniqueState &,double);
+    static bool grid_valid(const HydraGridState &,size_t);
+    static void grid_snapshot(const HydraGridState &,godot::Dictionary &);
     static std::optional<godot::Vector2> bearer_target(const RunRuntime &,const BossBodyState &);
     static godot::Dictionary snapshot(const TechniqueState &,const ContentBundle &);
     static void curve(RunRuntime &,TechniqueState &,double);

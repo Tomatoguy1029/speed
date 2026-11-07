@@ -4463,43 +4463,8 @@ inline bool read(BinaryReader &input, HydraGridDefinition &out) {
     if (out.id < 1) return false;
     if (!input.read_u32(out.technique)) return false;
     if (!input.read_f64(out.width)) return false;
-    if (!input.read_f64(out.delay)) return false;
-    if (!input.read_f64(out.time)) return false;
-    if (!input.read_f64(out.planning_width)) return false;
-    if (!input.read_f64(out.clearance)) return false;
-    if (!input.read_f64(out.tolerance)) return false;
-    if (!input.read_f64(out.formation_timeout)) return false;
     if (!input.read_u32(out.minimum)) return false;
     if (out.minimum < 1) return false;
-    return true;
-}
-inline bool read(BinaryReader &input, HydraGridLayout &out) {
-    if (!input.read_u32(out.id)) return false;
-    if (out.id < 1) return false;
-    if (!input.read_u32(out.technique)) return false;
-    if (!input.read_string(out.name)) return false;
-    if (!input.read_u32(out.region_mask)) return false;
-    if (out.region_mask > 31) return false;
-    return true;
-}
-inline bool read(BinaryReader &input, HydraGridSlot &out) {
-    if (!input.read_u32(out.id)) return false;
-    if (out.id < 1) return false;
-    if (!input.read_u32(out.layout)) return false;
-    if (!input.read_u32(out.order)) return false;
-    if (!input.read_f64(out.from_x)) return false;
-    if (!input.read_f64(out.from_y)) return false;
-    if (!input.read_f64(out.to_x)) return false;
-    if (!input.read_f64(out.to_y)) return false;
-    return true;
-}
-inline bool read(BinaryReader &input, HydraGridPath &out) {
-    if (!input.read_u32(out.id)) return false;
-    if (out.id < 1) return false;
-    if (!input.read_u32(out.layout)) return false;
-    if (!input.read_u32(out.order)) return false;
-    if (!input.read_f64(out.x)) return false;
-    if (!input.read_f64(out.y)) return false;
     return true;
 }
 inline bool read(BinaryReader &input, HydraRubbleDefinition &out) {
@@ -4926,11 +4891,34 @@ inline bool read(BinaryReader &input, DracoFinaleDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
     if (!input.read_u32(out.boss)) return false;
-    if (!input.read_u32(out.finish_passes)) return false;
-    if (out.finish_passes < 1) return false;
-    if (out.finish_passes > 1000000) return false;
-    if (!input.read_f64(out.finish_pass_time)) return false;
-    if (out.finish_pass_time < 0.15) return false;
+    if (!input.read_f64(out.release_time)) return false;
+    if (out.release_time < 0) return false;
+    if (!input.read_f64(out.combine_time)) return false;
+    if (out.combine_time < 0) return false;
+    if (!input.read_f64(out.pose_time)) return false;
+    if (out.pose_time < 0) return false;
+    if (!input.read_f64(out.rush_time)) return false;
+    if (out.rush_time < 0) return false;
+    if (!input.read_f64(out.charge_time)) return false;
+    if (out.charge_time < 0) return false;
+    if (!input.read_f64(out.hold_time)) return false;
+    if (out.hold_time < 0) return false;
+    if (!input.read_f64(out.line_time)) return false;
+    if (out.line_time < 0) return false;
+    if (!input.read_f64(out.flash_from)) return false;
+    if (out.flash_from < 0) return false;
+    if (!input.read_f64(out.flash_ramp)) return false;
+    if (out.flash_ramp < 0) return false;
+    if (!input.read_f64(out.flash_peak)) return false;
+    if (out.flash_peak < 0) return false;
+    if (!input.read_f64(out.flash_fade)) return false;
+    if (out.flash_fade < 0) return false;
+    if (!input.read_f64(out.flash_after)) return false;
+    if (out.flash_after < 0) return false;
+    if (!input.read_f64(out.sight_time)) return false;
+    if (out.sight_time < 0) return false;
+    if (!input.read_f64(out.explode_time)) return false;
+    if (out.explode_time < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, DracoClonesDefinition &out) {
@@ -6246,26 +6234,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 381: {
         if (version != 1) return false;
-        if (count > input.remaining()/68) return false;
+        if (count > input.remaining()/20) return false;
         for (uint32_t i=0; i<count; ++i) { HydraGridDefinition row; if (!read(input,row)) return false; out.HydraGridDefinition_rows.push_back(std::move(row)); }
-        return input.remaining()==0;
-    }
-    case 384: {
-        if (version != 1) return false;
-        if (count > input.remaining()/16) return false;
-        for (uint32_t i=0; i<count; ++i) { HydraGridLayout row; if (!read(input,row)) return false; out.HydraGridLayout_rows.push_back(std::move(row)); }
-        return input.remaining()==0;
-    }
-    case 385: {
-        if (version != 1) return false;
-        if (count > input.remaining()/44) return false;
-        for (uint32_t i=0; i<count; ++i) { HydraGridSlot row; if (!read(input,row)) return false; out.HydraGridSlot_rows.push_back(std::move(row)); }
-        return input.remaining()==0;
-    }
-    case 386: {
-        if (version != 1) return false;
-        if (count > input.remaining()/28) return false;
-        for (uint32_t i=0; i<count; ++i) { HydraGridPath row; if (!read(input,row)) return false; out.HydraGridPath_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 390: {
@@ -6426,7 +6396,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 448: {
         if (version != 1) return false;
-        if (count > input.remaining()/20) return false;
+        if (count > input.remaining()/120) return false;
         for (uint32_t i=0; i<count; ++i) { DracoFinaleDefinition row; if (!read(input,row)) return false; out.DracoFinaleDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -6874,12 +6844,6 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HydraMajorDefinition_rows) if (!HydraMajorDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraGridDefinition_ids;
     for (const auto &row:data.HydraGridDefinition_rows) if (!HydraGridDefinition_ids.insert(row.id).second) return false;
-    std::unordered_set<uint32_t> HydraGridLayout_ids;
-    for (const auto &row:data.HydraGridLayout_rows) if (!HydraGridLayout_ids.insert(row.id).second) return false;
-    std::unordered_set<uint32_t> HydraGridSlot_ids;
-    for (const auto &row:data.HydraGridSlot_rows) if (!HydraGridSlot_ids.insert(row.id).second) return false;
-    std::unordered_set<uint32_t> HydraGridPath_ids;
-    for (const auto &row:data.HydraGridPath_rows) if (!HydraGridPath_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraRubbleDefinition_ids;
     for (const auto &row:data.HydraRubbleDefinition_rows) if (!HydraRubbleDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> HydraPincerDefinition_ids;
@@ -7160,9 +7124,6 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HydraCurveDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.HydraMajorDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.HydraGridDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
-    for (const auto &row:data.HydraGridLayout_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
-    for (const auto &row:data.HydraGridSlot_rows) if (!HydraGridLayout_ids.count(row.layout)) return false;
-    for (const auto &row:data.HydraGridPath_rows) if (!HydraGridLayout_ids.count(row.layout)) return false;
     for (const auto &row:data.HydraRubbleDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;
     for (const auto &row:data.HydraRubbleDefinition_rows) if (!EnemyRecord_ids.count(row.enemy)) return false;
     for (const auto &row:data.HydraPincerDefinition_rows) if (!BossTechniqueDefinition_ids.count(row.technique)) return false;

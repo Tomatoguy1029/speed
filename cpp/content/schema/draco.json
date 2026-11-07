@@ -715,15 +715,74 @@
           "ref": "BossDefinition"
         },
         {
-          "name": "finish_passes",
-          "type": "u32",
-          "min": 1,
-          "max": 1000000
+          "name": "release_time",
+          "type": "f64",
+          "min": 0
         },
         {
-          "name": "finish_pass_time",
+          "name": "combine_time",
           "type": "f64",
-          "min": 0.15
+          "min": 0
+        },
+        {
+          "name": "pose_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "rush_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "charge_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "line_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash_from",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash_ramp",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash_peak",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash_fade",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "flash_after",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "sight_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "explode_time",
+          "type": "f64",
+          "min": 0
         }
       ]
     },

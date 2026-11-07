@@ -5,7 +5,8 @@
 namespace speed {class DracoRifts {public:
     static void begin(RunRuntime &,TechniqueState &);
     static void windup(RunRuntime &,TechniqueState &,double);
-    static void active(RunRuntime &,TechniqueState &);
+    static constexpr double TELL=0.5,OPEN=0.16;
+    static void active(RunRuntime &,TechniqueState &,double);
     static void end(RunRuntime &,TechniqueState &,bool);
     static void tick_closing(RunRuntime &,BossBodyState &,double);
     static void clear(RunRuntime &,BossBodyState &);

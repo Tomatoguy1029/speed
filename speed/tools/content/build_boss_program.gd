@@ -143,6 +143,10 @@ static func build_boss(id: String, output: String) -> Dictionary:
 	if rules == null or flow == null: return {"error": ERR_FILE_NOT_FOUND, "generated": false}
 	return compile({"rules": rules, "flow": flow}, output)
 
+## 行動データの中身を表す値。複製しても内容が同じなら同じ値になる。
+static func fingerprint(value: Variant) -> String:
+	return var_to_bytes(canonical(value)).hex_encode().sha256_text()
+
 static func canonical(value: Variant) -> Variant:
 	if value is Script: return {"script": value.resource_path}
 	if value is PackedScene: return {"scene": value.resource_path, "hash": FileAccess.get_sha256(value.resource_path) if FileAccess.file_exists(value.resource_path) else ""}

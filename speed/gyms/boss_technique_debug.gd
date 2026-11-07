@@ -15,6 +15,7 @@ var requested := ""
 var _saved := {}
 var _origin := Vector2.ZERO
 var _pending_start := false
+var _loaded_program := ""
 
 func bind(value, id: String, source: Resource = null) -> bool:
 	if not OS.is_debug_build() or StringName(id) not in BOSSES: return false
@@ -29,6 +30,7 @@ func bind(value, id: String, source: Resource = null) -> bool:
 	boss = id
 	entity_id = session._selected_id
 	program = source
+	_loaded_program = PROGRAM.fingerprint(source.data)
 	action_rules = source.data.rules
 	for move in action_rules.techniques: _moves[StringName(move.technique)] = move
 	var body := state()
@@ -105,6 +107,9 @@ func prepare(phase: int, point: Vector2, selection: bool, guard: float, steering
 	session._refresh_projection()
 	return result.ok
 
+func _running(value: Dictionary) -> bool:
+	return PROGRAM.fingerprint(value)==session.boss_program_key(boss,_loaded_program)
+
 func execute(id: String, phase: int, animate_split := false) -> bool:
 	message = unavailable(id,phase)
 	if not message.is_empty(): return false
@@ -134,10 +139,12 @@ func execute(id: String, phase: int, animate_split := false) -> bool:
 		var flow: Resource = source.flow
 		flow.maximum_stamina = maxf(20.0,float(rules.costs.get(id,1.0)))
 		flow.sections = [{"request":"any","cap":flow.maximum_stamina,"next":1,"weights":{"single":100.0,"combo":100.0,"major":100.0}}, {"request":"any","cap":flow.maximum_stamina,"next":1,"weights":{}}]
-	var replaced: Dictionary = session.set_boss_program(boss,source)
-	if not replaced.get("ok",false):
-		message = replaced.get("message","試行の定義を生成できません。")
-		return false
+	# 中身が同じ行動データは作り直さず、通常の技と繰り返しをすぐ始める。
+	if not _running(source):
+		var replaced: Dictionary = session.set_boss_program(boss,source)
+		if not replaced.get("ok",false):
+			message = replaced.get("message","試行の定義を生成できません。")
+			return false
 	if not prepare(prepared_phase,point,combo,0.0,_saved.steering_locked): return false
 	if animate_split and boss=="hydra" and phase==4 and not action("separate"): return false
 	requested = id
@@ -153,10 +160,16 @@ func execute(id: String, phase: int, animate_split := false) -> bool:
 
 func finish() -> void:
 	if not active: return
+	if session.bridge==null:
+		active = false
+		_pending_start = false
+		_saved.clear()
+		requested = ""
+		return
 	if has_body():
 		var point: Vector2 = session.run.state.ship_pos
 		if prepare(_saved.phase,point,false,_saved.guard,_saved.steering_locked):
-			var restored: Dictionary = session.set_boss_program(boss,program.data)
+			var restored: Dictionary = {"ok":true} if _running(program.data) else session.set_boss_program(boss,program.data)
 			if restored.ok: prepare(_saved.phase,point,_saved.selection,_saved.guard,_saved.steering_locked)
 	session._apply("pin",{"value":_saved.get("pinned",false),"pos":_saved.get("pin",Vector2.ZERO)})
 	active = false

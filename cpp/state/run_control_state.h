@@ -35,7 +35,7 @@ struct RunControlState {
     godot::Vector2 camera_center, logical_size;
     double cinematic_bars=0;
     double camera_zoom=1, base_view=1, zoom_ref_speed=1, zoom_exp=0, zoom_min=1, look_ahead=0;
-    bool camera_ready=false,cinematic_camera=false,cinematic_hide_enemies=false;
+    bool camera_ready=false,cinematic_camera=false,cinematic_hide_enemies=false,cinematic_hide_ship=false;
     bool lab_pinned=false;
     godot::Vector2 lab_pin;
     struct LabSchedule {uint32_t definition=0;int64_t start=0,end=0,interval=1,count=1;double probability=1,radius=0,spacing=60,facing=0;godot::Vector2 position;bool enabled=true,elite=false,boss=false;};

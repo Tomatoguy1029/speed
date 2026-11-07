@@ -111,7 +111,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         const auto &enemy=state.enemies[i];if (enemy.alive && !enemy.dead) ++live_rows;
         if (!enemy.alive || enemy.dead || enemy.clone_visual || enemy.picaro_owner.generation || (state.control.cinematic_hide_enemies && !enemy.is_boss)) continue;
         const auto &definition=run.content->definitions[enemy.definition];
-        const bool hydra_part=HydraBody::owns_part(run,state.enemy_handles.at(i));
+        const bool hydra_part=HydraBody::owns_part(run,state.enemy_handles.at(i)) || (enemy.origin==SpawnOrigin::BossPart && definition.kind==EnemyDefinition::Kind::Drift);
         if (hydra_part && definition.kind!=EnemyDefinition::Kind::Meteor && view.grow(enemy.radius).has_point(enemy.pos)) {
             if ((enemy.is_boss || enemy.radius>=25.0) && enemy.max_hp>0 && enemy.hp<enemy.max_hp) for (float value:{enemy.pos.x,enemy.pos.y,float(enemy.radius),float(std::max(0.0,enemy.hp/enemy.max_hp))}) enemy_health.push_back(value);
             if (enemy.stone>0) for (float value:{enemy.pos.x,enemy.pos.y,float(enemy.radius)}) petrified_enemies.push_back(value);
@@ -263,7 +263,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             const auto &d=run.content->star_bolts[shot.star_bolt.definition-1];StarBoltSystem::render(run,row,batch(d.visual,10,0),batch(d.stone_visual,10,1));continue;
         }
         if (!shot.alive || !shot.definition || !view.grow(40.0).has_point(shot.pos)) continue;
-        const auto &definition=run.content->hostile_definitions[shot.definition-1];const auto *record=AttackSystem::get(state,shot.attack);if (!record) continue;
+        const auto &definition=run.content->hostile_definitions[shot.definition-1];const auto *record=AttackSystem::get(state,shot.attack);if (!record) continue;if (record->spec.source_technique && run.content->boss_techniques[record->spec.source_technique-1].kind==83) continue;
         batch(definition.visual,10,0).add(record->id,shot.pos,shot.kind==int64_t(HostileKind::Reflected)?shot.vel.angle():0.0,shot.radius,Color(1,1,1,1));
         if (shot.stone>0) batch(definition.stone_visual,10,1).add(record->id,shot.pos,0,shot.radius*1.3,Color(0.62,0.6,0.58,0.9));
     }
@@ -446,7 +446,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     if (state.ship.invuln>0 && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
     for (const auto visual:{config.cannon_visual,config.ship_visual}) {
         Dictionary pose;pose["participant_id"]=0;pose["part_key"]=visual;pose["transform"]=transform;
-        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
+        pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !state.control.cinematic_hide_ship && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);
     }
     Dictionary boss_ram;const auto &ram=state.control.boss_ram;
     if (ram.serial>0) {boss_ram["pending"]=ram.pending;boss_ram["serial"]=ram.serial;boss_ram["id"]=ram.target_id;boss_ram["entry"]=ram.entry;boss_ram["exit"]=ram.exit;boss_ram["direction"]=ram.direction;boss_ram["remaining"]=ram.remaining;boss_ram["started_at"]=ram.started_at;boss_ram["released_at"]=ram.released_at;boss_ram["clock"]=state.sim_time;}

@@ -3,6 +3,8 @@ extends CanvasLayer
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const SHADER := preload("res://shaders/roar_post.gdshader")
 const LEVELS := {1:{"life":0.24,"blur":0.028,"mix":0.55},2:{"life":0.36,"blur":0.075,"mix":0.8},3:{"life":0.52,"blur":0.17,"mix":1.0}}
+## りゅうの咆哮はおおいぬ座の段階3と同じ値。
+const DRACO := {"roarPost":1.41,"intensity":1.0,"size":1.0,"roarLevel":3,"roarTime":3.5,"roarSize":1.2,"roarColor":"#b6e5ff","roarClear":0.7,"roarRange":2.35,"roarBlur":1.6,"roarLines":1.0,"roarShake":1.1}
 var _copy: BackBufferCopy
 var _image: ColorRect
 var _material: ShaderMaterial
@@ -32,7 +34,7 @@ func apply_frame(bodies: Array, size: Vector2, camera: Vector2, zoom: float) -> 
 	for body: Dictionary in bodies:
 		var roar: Dictionary = body.get("roar",{})
 		if roar.is_empty(): continue
-		var params: Dictionary = SETTINGS.for_id(str(roar.id))
+		var params: Dictionary = DRACO if str(roar.id)=="draco" else SETTINGS.for_id(str(roar.id))
 		if params.is_empty() or float(params.roarPost)<=0.0 or float(params.intensity)<=0.0: continue
 		var level := clampi(int(params.roarLevel),1,3)
 		var age := float(roar.age)

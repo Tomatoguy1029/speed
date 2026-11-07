@@ -12,7 +12,6 @@ display_name = "格子ビーム"
 beam_dmg = 18.0
 beam_width = 40.0
 cooldown = 30.0
-grid_time = 3.5
 normal_charge = 0.6
 performance_time = 5.2
 tech_recovery = 1.5

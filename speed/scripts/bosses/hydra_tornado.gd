@@ -25,6 +25,7 @@ func _ready() -> void:
 	wind.material.set_shader_parameter("tint",effect_tint * _visual_values().get("vortex_tint", Color.WHITE))
 	wind.material.set_shader_parameter("pixel_size",3.0 * float(EFFECT_SETTINGS.values_for("boss/shared/tornado_shader").get("pixel_scale", 1.0)))
 	wind.z_index=1
+	wind.visible=false # 渦の本体は論理画素の層へ描く
 	add_child(wind)
 	for i in 14:
 		var rock:=Sprite2D.new()
@@ -57,6 +58,7 @@ func update_effect(effect: Dictionary, clock: float) -> void:
 	wind.material.set_shader_parameter("power",charge)
 	for i in stones.size():
 		var rock:=stones[i]
+		rock.visible=false # 渦の中の岩は実際の瓦礫を回す
 		var phase:=clock*(3.0+float(i%3)*0.3)+float(i)*TAU/7.0
 		var orbit:=0.65+float(i%4)*0.09
 		rock.position=Vector2(sin(phase)*(span*0.27+width*0.31),cos(phase)*width*0.32)*orbit

@@ -2650,35 +2650,7 @@ struct HydraGridDefinition {
     uint32_t id{};
     uint32_t technique{};
     double width{};
-    double delay{};
-    double time{};
-    double planning_width{};
-    double clearance{};
-    double tolerance{};
-    double formation_timeout{};
     uint32_t minimum{};
-};
-struct HydraGridLayout {
-    uint32_t id{};
-    uint32_t technique{};
-    std::string name{};
-    uint32_t region_mask{};
-};
-struct HydraGridSlot {
-    uint32_t id{};
-    uint32_t layout{};
-    uint32_t order{};
-    double from_x{};
-    double from_y{};
-    double to_x{};
-    double to_y{};
-};
-struct HydraGridPath {
-    uint32_t id{};
-    uint32_t layout{};
-    uint32_t order{};
-    double x{};
-    double y{};
 };
 struct HydraRubbleDefinition {
     uint32_t id{};
@@ -2925,8 +2897,20 @@ struct DracoInhaleArc {
 struct DracoFinaleDefinition {
     uint32_t id{};
     uint32_t boss{};
-    uint32_t finish_passes{};
-    double finish_pass_time{};
+    double release_time{};
+    double combine_time{};
+    double pose_time{};
+    double rush_time{};
+    double charge_time{};
+    double hold_time{};
+    double line_time{};
+    double flash_from{};
+    double flash_ramp{};
+    double flash_peak{};
+    double flash_fade{};
+    double flash_after{};
+    double sight_time{};
+    double explode_time{};
 };
 struct DracoClonesDefinition {
     uint32_t id{};
@@ -3163,9 +3147,6 @@ struct ContentRecords {
     std::vector<HydraCurveDefinition> HydraCurveDefinition_rows;
     std::vector<HydraMajorDefinition> HydraMajorDefinition_rows;
     std::vector<HydraGridDefinition> HydraGridDefinition_rows;
-    std::vector<HydraGridLayout> HydraGridLayout_rows;
-    std::vector<HydraGridSlot> HydraGridSlot_rows;
-    std::vector<HydraGridPath> HydraGridPath_rows;
     std::vector<HydraRubbleDefinition> HydraRubbleDefinition_rows;
     std::vector<HydraPincerDefinition> HydraPincerDefinition_rows;
     std::vector<HydraTornadoDefinition> HydraTornadoDefinition_rows;
@@ -3196,5 +3177,5 @@ struct ContentRecords {
     std::vector<DracoClonesDefinition> DracoClonesDefinition_rows;
     std::vector<DracoFlowGateDefinition> DracoFlowGateDefinition_rows;
 };
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=246;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=243;
 }

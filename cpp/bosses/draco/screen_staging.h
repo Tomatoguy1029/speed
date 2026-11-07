@@ -3,7 +3,7 @@
 #include "../../state/boss_states.h"
 #include "state.h"
 namespace speed {class DracoScreenStaging {public:
-    static void side_entry(RunRuntime &,TechniqueState &,DracoSideEntryState &);
+    static void side_entry(RunRuntime &,TechniqueState &,DracoSideEntryState &,double);
     static void advance_side(RunRuntime &,TechniqueState &,const DracoSideEntryState &,double);
     static bool validate_side(const DracoSideEntryState &);
     static void begin(RunRuntime &,TechniqueState &,DracoStagingState &,bool enter=false,double height=0);

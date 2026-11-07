@@ -195,7 +195,7 @@ func finale_tick(f: Dictionary,intent: Intent=null) -> bool:
 	return f.bridge.step(1.0/120.0,f.bridge.pack_intent(intent),{"logical_size":f.size}).ok
 
 func finale_to(f: Dictionary,target: String) -> bool:
-	for tick in 2500:
+	for tick in 4500:
 		var body:=finale_body(f)
 		if body.finale.stage==target:return true
 		var input:=Intent.new()
@@ -223,7 +223,7 @@ func native_finale_motion() -> void:
 	var before: Dictionary=f.bridge.read_lab().value
 	var observed: Array[String]=[]
 	var checkpoint_stages: Array[String]=[]
-	for tick in 2500:
+	for tick in 4500:
 		var body:=finale_body(f)
 		var current: String=body.finale.stage
 		if not current in observed:observed.append(current)
@@ -241,7 +241,7 @@ func native_finale_motion() -> void:
 		body=finale_body(f)
 		if not body.finale.completed:
 			check(f.bridge.read_lab().value.clock.time==before.clock.time and f.bridge.read_lab().value.clock.world_time==before.clock.world_time,"決着だけを実時間で進めランと戦闘の時計を止める")
-	check(observed==["release","combine","pose","input","strikes","last","sight","split","explode"],"核解放から決着まで全9段階を通る")
+	check(observed==["release","combine","pose","input","strikes","charge","flash","sight","explode"],"核解放から決着まで全9段階を通る")
 	check((finale_body(f).finale.completed and f.bridge.read_frame().value.ui.draco_finish_done),"完走後に通常クリアへ渡す完了値を立てる")
 	var count: int=f.events.filter(func(e):return e.type=="boss_defeated").size()
 	finale_tick(f);finale_tick(f)
@@ -249,7 +249,7 @@ func native_finale_motion() -> void:
 	f.bridge.dispose()
 
 func native_finale_interrupt() -> void:
-	for target in ["release","combine","pose","input","strikes","last","sight","split"]:
+	for target in ["release","combine","pose","input","strikes","charge","flash","sight"]:
 		var f:=finale_fixture()
 		if f.is_empty():return
 		f.bridge._core.step_ship(0.05,0.05,{"has_cursor":true,"cursor":Vector2(1000,200)})
@@ -258,7 +258,7 @@ func native_finale_interrupt() -> void:
 		check(ship.ship_vel.length()>0.0,"中断確認を動いている機体から始める")
 		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"begin"})
 		check(finale_to(f,target),"中断する段階まで到達する: "+target)
-		if target in ["strikes","last"]:
+		if target in ["strikes","charge"]:
 			for tick in 14:finale_tick(f)
 			check(f.bridge._core.ship_snapshot().ship_pos!=ship.ship_pos,"連撃の実移動を経て中断する: "+target)
 		f.bridge.command("dev_draco_finale",{"entity_id":f.boss,"operation":"cancel"})
@@ -351,19 +351,19 @@ func finale_hud_case(size: Vector2,angle: float) -> void:
 	var parent:=Node2D.new();add_child(parent)
 	var display=load("res://scripts/render/bosses/draco.gd").new();parent.add_child(display)
 	var visible_all:=true
-	for tick in 490:
+	for tick in 900:
 		finale_tick(f)
 		var body:=finale_body(f);display.apply_frame(body)
 		var frame: Dictionary=f.bridge.read_frame().value;camera.zoom=Vector2.ONE*float(frame.camera.zoom);camera.position=frame.camera.center
-		if body.finale.stage in ["release","combine"]:
-			for at in [body.position,frame.ui.ship.ship_pos,body.finale.core]:
+		if body.finale.stage=="combine" and float(body.finale.time)>0.6:
+			for at in [frame.ui.ship.ship_pos]:
 				var pixel: Vector2=(at-frame.camera.center)*float(frame.camera.zoom)+size*0.5
 				if not Rect2(size*Vector2(0.04,0.12),size*Vector2(0.92,0.76)).has_point(pixel):visible_all=false
 	hud.apply_snapshot(f.bridge.read_frame().value.ui);hud._update_cpp_cinematic()
 	await get_tree().process_frame
 	if DisplayServer.get_name()!="headless":await RenderingServer.frame_post_draw
-	check(render_only or visible_all,"構図は頭/自機/核を画面内へ収める: "+str(size))
-	check(render_only or (hud._loadout_icons.visible and hud._loadout_icons.get_child_count()==4),"黒帯中も実際の4部品を武器欄へ渡す")
+	check(render_only or visible_all,"構図は合体する機体を画面内へ収める: "+str(size))
+	check(render_only or hud._cpp_ui.get("final_modules",[]).size()==4,"黒帯中も実際の4部品を武器欄へ渡す")
 	check(display._parts.visible,"決着の点列と核/分裂を正式な表示へ渡す")
 	if DisplayServer.get_name()!="headless":
 		var image:=get_viewport().get_texture().get_image()

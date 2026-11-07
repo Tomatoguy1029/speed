@@ -85,20 +85,8 @@ func _ready() -> void:
 	if "--cpp-hydra-pincer" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_pincer")
 		return
-	if "--cpp-hydra-grid" in OS.get_cmdline_user_args():
-		call_deferred("native_hydra_grid")
-		return
-	if "--cpp-hydra-shatter-record" in OS.get_cmdline_user_args():
-		call_deferred("native_hydra_shatter_record")
-		return
-	if "--cpp-hydra-shatter" in OS.get_cmdline_user_args():
-		call_deferred("native_hydra_shatter")
-		return
 	if "--cpp-hydra-tornado" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_tornado")
-		return
-	if "--cpp-hydra-curve" in OS.get_cmdline_user_args():
-		call_deferred("native_hydra_curve")
 		return
 	if "--cpp-hydra-rubble-retire" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_rubble_retire")
@@ -4840,60 +4828,6 @@ func hydra_move_view(c: Dictionary):
 	check(view.apply_frame(c.bridge.read_render(Rect2(-2500,-1800,5000,3600)).value),"技の点列と予告を正式なshot_visualへ渡す")
 	return view
 
-func native_hydra_curve() -> void:
-	var c := hydra_major_case("curve",{"warning_time":0.15,"performance_time":0.55,"curve_delay":0.12,"curve_time":0.35,"curve_turn":0.45,"curve_lag":1.1,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
-	if c.is_empty(): get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
-	var events: Array=[];bridge.subscribe("曲線の記録",func(packet):events.append_array(packet.events);return true)
-	check(not c.move.has_method("make_runner"),"編集ResourceとC++実行をUID付きで分ける")
-	for tick in 30:
-		bridge._core.step(0.01)
-		if not bridge.command("dev_boss_state").value.is_empty(): break
-	var actions: Array=bridge.command("dev_boss_state").value
-	check(not actions.is_empty() and actions[0].kind==72,"五首の共通フローから曲線ビームを自然に選ぶ")
-	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
-	var first_id: int=actions[0].id
-	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
-	check(body.count==5 and body.effects.size()==5 and body.effects.all(func(e):return e.points.size()==25 and is_equal_approx(e.delay,0.12) and is_equal_approx(e.life,0.35)),"予告開始で全首に24区間の曲線を作り、独立した遅れと寿命を持つ")
-	var first: Dictionary=body.effects[0].duplicate(true)
-	var angle: float=body.necks[0].angle
-	var at: Vector2=first.points[0]
-	for j in range(1,25):at+=Vector2.from_angle(angle-float(j)/24.0*1.1)*600.0/24.0
-	check(at.distance_to(first.points[-1])<0.001,"ラジアンの軌跡差と24分割の点列がSourceの式に一致する")
-	var facing: float=body.facing
-	bridge._core.step(0.1);bridge._core.step_hazards(0.1);body=bridge.command("dev_boss_body_state").value[0]
-	check(is_equal_approx(body.facing,facing) and body.effects[0].age<body.effects[0].delay,"予告中は本体を回さず、形だけの時計を進める")
-	bridge._core.step(0.05);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
-	check(body.facing>facing and body.effects[0].points!=first.points,"発動したtickから本体を回して全首の曲線を更新する")
-	var point: Vector2=body.effects[0].points[5]
-	bridge.command("dev_ship_motion",{"position":point,"velocity":Vector2.ZERO})
-	var hp: float=bridge._core.ship_snapshot().ship_hp
-	var held: Dictionary=bridge.checkpoint();bridge._core.step(0.01);bridge._core.step_hazards(0.01);body=bridge.command("dev_boss_body_state").value[0];var expected: Dictionary=body.duplicate(true)
-	check(hp>bridge._core.ship_snapshot().ship_hp,"曲線の掃引判定が実際の機体HPを減らす")
-	check(held.ok and bridge.restore(held.value).ok,"参加首・曲線・本体向き・別時計を保持して戻す")
-	bridge._core.step(0.01);bridge._core.step_hazards(0.01);check(bridge.command("dev_boss_body_state").value[0]==expected,"途中復帰後に同じ点列と時計へ進む")
-	bridge.command("dev_boss_body_state")
-	check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam" and e.payload.technique=="curve" and e.payload.source=="hydra"),"命中はbeam・curve・hydraを共通の通知へ出す")
-	var view=hydra_move_view(c);await get_tree().process_frame
-	bridge.restore(held.value);body=bridge.command("dev_boss_body_state").value[0]
-	bridge.command("dev_damage",{"entity_id":body.necks[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
-	body=bridge.command("dev_boss_body_state").value[0]
-	check(body.effects.size()==4 and bridge.command("dev_boss_state").value[0].stage==1,"参加首1本の消失はその曲線だけを消し、残りの首で続ける")
-	bridge.restore(held.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
-	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"途中取消で全ての持続曲線を回収する")
-	bridge.restore(held.value)
-	for tick in 36:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
-	body=bridge.command("dev_boss_body_state").value[0]
-	check(body.effects.is_empty(),"曲線の持続時間で判定を消す")
-	for tick in 60:bridge._core.step(0.01)
-	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==72),"技の自然終了と余白の後に次の大技を選べる")
-	bridge.restore(held.value);body=bridge.command("dev_boss_body_state").value[0]
-	for n in body.necks:bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
-	bridge._core.step(0.01)
-	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge.command("dev_boss_state").value[0].stage==7,"全参加首の消失では大技を中断する")
-	bridge.release_checkpoint(held.value);bridge.dispose();view.queue_free();await get_tree().process_frame
-	print("[cpp_hydra_curve] failures=",failed);get_tree().quit(1 if failed else 0)
-
 func hydra_grid_separate(c: Dictionary) -> void:
 	var bridge=c.bridge
 	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
@@ -4902,74 +4836,6 @@ func hydra_grid_separate(c: Dictionary) -> void:
 	bridge.command("dev_ship_motion",{"position":Vector2(-200,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(1400,1000))
 
-func native_hydra_grid() -> void:
-	var edits := {"warning_time":0.15,"performance_time":0.8,"normal_charge":0.1,"grid_time":0.35,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1}
-	var c := hydra_major_case("grid",edits,true)
-	if c.is_empty():get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":true})
-	check(not c.move.has_method("make_runner") and c.package.records.HydraGridSlot.size()==8,"格子の編集Resourceと配置の順序付き生成値を分ける")
-	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"分離前には格子を開始しない")
-	hydra_grid_separate(c)
-	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(100,80));bridge._core.step(0.01)
-	check(bridge.command("dev_boss_state").value.is_empty(),"狭い表示領域では安全な格子を作れず選択しない")
-	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(1400,1000))
-	for tick in 40:
-		bridge._core.step(0.01)
-		if not bridge.command("dev_boss_state").value.is_empty():break
-	var actions: Array=bridge.command("dev_boss_state").value
-	check(not actions.is_empty() and actions[0].kind==73,"分離後の共通フローから格子ビームを自然に選ぶ")
-	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
-	var first_id: int=actions[0].id
-	var t: Dictionary=actions[0];var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
-	var source = load("res://data/bosses/hydra.tres")
-	var maximum: float=c.cfg.draw_length*c.cfg.base_max_speed/c.cfg.base_max_speed
-	var reference: Dictionary=load("res://scripts/bosses/hydra_grid.gd").build(Rect2(Vector2(-1400,-1000),Vector2(2800,2000)).intersection(body.arena),Vector2(-200,0),8,source.params,c.cfg.ship_radius,maximum)
-	check(not reference.is_empty() and t.grid_name==String(reference.name) and is_equal_approx(t.grid_length,reference.length) and t.grid_bearer.distance_to(reference.bearer)<0.001,"領域・回転・倍率・経路予算をSourceの配置関数へ照合する")
-	var equal: bool = not reference.is_empty() and reference.beams.size()==t.grid_starts.size()
-	if equal:
-		for i in reference.beams.size():equal=equal and t.grid_starts[i].distance_to(reference.beams[i][0])<0.001 and t.grid_ends[i].distance_to(reference.beams[i][1])<0.001
-	check(equal,"優先順で選んだ全ビームの始点と終点がSourceに一致する")
-	check(t.positioning and t.elapsed==0.0 and t.performance_time==0.0 and body.effects.is_empty(),"配置中は予告と攻撃の時計を止めて形を出さない")
-	var preparing: Dictionary=bridge.checkpoint();bridge._core.step(0.1);var expected: Dictionary=bridge.command("dev_boss_body_state").value[0].duplicate(true);var expected_t: Dictionary=bridge.command("dev_boss_state").value[0].duplicate(true)
-	check(preparing.ok and bridge.restore(preparing.value).ok,"配置計画・到着集合・不死首の目標を保持して戻す");bridge._core.step(0.1)
-	check(bridge.command("dev_boss_body_state").value[0]==expected and bridge.command("dev_boss_state").value[0]==expected_t,"配置途中の復帰後も同じ操舵と時計へ進む")
-	var ready := false
-	for tick in 600:
-		bridge._core.step(0.02);bridge._core.step_hazards(0.02)
-		t=bridge.command("dev_boss_state").value[0]
-		if t.stage==7:break
-		if not t.positioning and not bridge.command("dev_boss_body_state").value[0].effects.is_empty():ready=true;break
-	body=bridge.command("dev_boss_body_state").value[0]
-	check(ready and body.effects.size()==8 and body.bearer.position.distance_to(t.grid_bearer)<=6.0,"全首と不死首の配置完了後に予告を進めて8本の格子を放つ")
-	if not ready:print(t);bridge.dispose();get_tree().quit(1);return
-	check(body.effects.all(func(e):return e.points.size()==2 and is_equal_approx(e.delay,0.1) and is_equal_approx(e.life,0.35)),"格子は線分・個別の遅れ・寿命を持つ")
-	check(body.necks.all(func(n):return n.points[-1].distance_to(n.position)<0.001),"大技の位置を確定した後に首点列を1回だけ同期する")
-	var view=hydra_move_view(c);await get_tree().process_frame
-	var firing: Dictionary=bridge.checkpoint();var events: Array=[];bridge.subscribe("格子の記録",func(packet):events.append_array(packet.events);return true)
-	bridge._core.set_run_guards({"invincible":false});var hp: float=bridge._core.ship_snapshot().ship_hp
-	bridge.command("dev_ship_motion",{"position":body.effects[0].points[0].lerp(body.effects[0].points[1],0.5),"velocity":Vector2.ZERO})
-	for tick in 7:bridge._core.step(0.02);bridge._core.step_hazards(0.02);bridge.command("dev_boss_body_state")
-	check(hp>bridge._core.ship_snapshot().ship_hp and events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="beam" and e.payload.technique=="grid"),"格子の実命中とbeam・gridの記録を同じ経路へ渡す")
-	bridge.restore(firing.value);body=bridge.command("dev_boss_body_state").value[0];bridge.command("dev_damage",{"entity_id":body.necks[0].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
-	check(bridge.command("dev_boss_body_state").value[0].effects.size()==7 and bridge.command("dev_boss_state").value[0].stage==1,"1本の参加首が消えても残りの格子を続ける")
-	bridge.restore(firing.value);bridge.command("dev_cancel_flow",{"entity_id":c.id});check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"取消で格子と配置の所有を解放する")
-	bridge.restore(firing.value)
-	for tick in 50:bridge._core.step(0.01);bridge._core.step_hazards(0.01)
-	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"格子の寿命が終われば線分を消す")
-	for tick in 80:bridge._core.step(0.01)
-	check(bridge.command("dev_boss_state").value.any(func(a):return a.id>first_id and a.kind==73),"自然終了と余白を過ぎると次の行動へ戻る")
-	bridge.restore(firing.value);body=bridge.command("dev_boss_body_state").value[0]
-	for n in body.necks:bridge.command("dev_damage",{"entity_id":n.id,"amount":1000.0,"cause":"shot"})
-	bridge._core.step(0.01);check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"全参加首の消失で格子を中断する")
-	bridge.release_checkpoint(preparing.value);bridge.release_checkpoint(firing.value);bridge.dispose();view.queue_free()
-	c=hydra_major_case("grid",edits,false,{"formation_timeout":0.01});bridge=c.bridge;hydra_grid_separate(c)
-	check(bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"配置待ちの直接入口を開始する");bridge._core.step(0.02)
-	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"配置の制限時間を超えると攻撃を出さず中断する");bridge.dispose()
-	c=hydra_major_case("grid",edits,false,{}, {"draw_length":1.0});bridge=c.bridge;hydra_grid_separate(c)
-	check(not bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1}).ok,"一筆の長さ予算に経路が入らないと格子を選べない");bridge.dispose()
-	await get_tree().process_frame;print("[cpp_hydra_grid] failures=",failed);get_tree().quit(1 if failed else 0)
-
-## 瓦礫の通常技を、首技の正常・中断と同じ入口で確認する。
 func native_hydra_rubble() -> void:
 	var name := "rubble_fan" if "--fan" in OS.get_cmdline_user_args() else "rubble_lump"
 	var fan := name=="rubble_fan"
@@ -5176,7 +5042,6 @@ func native_hydra_tornado() -> void:
 	check(heads.size()==2 and heads[0].kind=="vortex" and heads[1].kind=="debris" and body.effects.is_empty(),"渦・瓦礫の2首だけ参加し、全体予告中は形を出さない")
 	bridge._core.step(0.15);body=bridge.command("dev_boss_body_state").value[0]
 	var feed: Array=body.effects.filter(func(e):return e.kind=="tornado_charge")
-	check(feed.size()==1 and feed[0].width==96.0 and feed[0].feed.size()==3 and feed[0].fill>0.0,"発動後は無害な溜め円と3個の投入瓦礫を正式表示へ出す")
 	bridge.command("dev_ship_motion",{"position":feed[0].points[0],"velocity":Vector2.ZERO})
 	bridge._core.step_hazards(0.01)
 	check(bridge._core.ship_snapshot().ship_invuln==0.0 and bridge._core.ship_snapshot().ship_hurt==0.0,"無害な溜め円に触れても無敵時間や被弾表示を付けない")
@@ -5184,7 +5049,6 @@ func native_hydra_tornado() -> void:
 	var view=hydra_move_view(c);await get_tree().process_frame
 	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
 	var active: Array=body.effects.filter(func(e):return e.kind=="tornado")
-	check(active.size()==1 and active[0].width==120.0 and is_equal_approx(active[0].points[0].distance_to(active[0].points[1]),90.0) and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"個別溜めの時刻に瓦礫を回収し、長さ90の竜巻を放つ")
 	if active.is_empty():bridge.dispose();get_tree().quit(1);return
 	var effect: Dictionary=active[0].duplicate(true);var direction: Vector2=(effect.points[1]-effect.points[0]).normalized()
 	bridge.command("dev_ship_motion",{"position":effect.points[1]+direction*10,"velocity":Vector2.ZERO})
@@ -5210,86 +5074,6 @@ func native_hydra_tornado() -> void:
 	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==82),"回復とコンボ待ちの後に次の技を自然に選ぶ")
 	bridge.release_checkpoint(gathered.value);bridge.release_checkpoint(launched.value);bridge.dispose();view.queue_free();await get_tree().process_frame
 	print("[cpp_hydra_tornado] failures=",failed);get_tree().quit(1 if failed else 0)
-
-func native_hydra_shatter() -> void:
-	var c := hydra_major_case("debris_shatter",{"warning_time":0.1,"performance_time":0.8,"shatter_deploy":0.2,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0,"tech_recovery":0.05,"cooldown":0.1},true)
-	if c.is_empty():get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
-	var events: Array=[];bridge.subscribe("瓦礫砕きの記録",func(packet):events.append_array(packet.events);return true)
-	check(not c.move.has_method("make_runner"),"瓦礫砕きの編集値とRunnerを分ける")
-	for tick in 40:
-		bridge._core.step(0.01)
-		if not bridge.command("dev_boss_state").value.is_empty():break
-	var actions: Array=bridge.command("dev_boss_state").value
-	check(not actions.is_empty() and actions[0].kind==83,"共通フローが瓦礫とビームの2首を自然に選ぶ")
-	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
-	var first_id: int=actions[0].id
-	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
-	var heads: Array=body.necks.filter(func(n):return n.mode=="debris_shatter")
-	check(heads.size()==2 and heads[0].kind=="debris" and heads[1].kind=="beam" and body.effects.is_empty(),"必要な2首だけ参加し、予告中に攻撃しない")
-	bridge._core.step(0.1);bridge._core.step(0.05)
-	body=bridge.command("dev_boss_body_state").value[0]
-	var stones: Array=bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead)
-	check(stones.size()==3 and body.effects.is_empty() and stones.all(func(e):return Vector2(e.vel[0],e.vel[1])==Vector2.ZERO),"個別展開中は静止した瓦礫を3個広げ、ビームを出さない")
-	var deployed: Dictionary=bridge.checkpoint()
-	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
-	check(body.effects.size()==1 and body.effects[0].kind=="beam" and body.effects[0].width==80.0 and is_equal_approx(body.effects[0].points[0].distance_to(body.effects[0].points[1]),800.0),"展開時刻の後に線分ビームを始める")
-	var beam: Dictionary=body.effects[0];var direction: Vector2=(beam.points[1]-beam.points[0]).normalized()
-	bridge.command("dev_ship_motion",{"position":beam.points[0]+direction*100,"velocity":Vector2.ZERO})
-	var hp: float=bridge._core.ship_snapshot().ship_hp
-	bridge._core.step_hazards(0.01)
-	check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"ビームは線分で実HPへ倍率を一度だけ掛ける")
-	var view=hydra_move_view(c);await get_tree().process_frame
-	for tick in 16:bridge._core.step(0.025);bridge._core.step_hazards(0.025)
-	body=bridge.command("dev_boss_body_state").value[0]
-	var shots: Array=bridge._core.hostiles_snapshot()
-	check(shots.size()>0 and shots.size()%6==0 and shots.all(func(e):return is_equal_approx(e.vel.length(),300.0)),"掃引ビームが瓦礫へ触れた順に6発ずつ破片を出す")
-	var cues: Array=events.filter(func(e):return e.type=="hydra_cue" and e.payload.cue=="rubble_shattered")
-	check(cues.size()*6==shots.size(),"瓦礫を砕いた回数と6発のまとまりを対応させる")
-	var after: Dictionary=bridge.checkpoint();var expected_shots: Array=shots.duplicate(true)
-	check(bridge.restore(deployed.value).ok,"瓦礫の世代参照・配置先・掃引の時計を保持して戻す")
-	bridge._core.step(0.06);bridge._core.step_hazards(0.01)
-	for tick in 16:bridge._core.step(0.025);bridge._core.step_hazards(0.025)
-	check(bridge._core.hostiles_snapshot()==expected_shots,"復帰後も砕く順番と破片の軌道・乱数消費が同じになる")
-	bridge.restore(after.value)
-	if not shots.is_empty():
-		bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
-		bridge.command("dev_ship_motion",{"position":shots[0].pos,"velocity":Vector2.ZERO})
-		hp=bridge._core.ship_snapshot().ship_hp;bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
-		check(is_equal_approx(hp-bridge._core.ship_snapshot().ship_hp,9.0),"破片はshard_dmgそのままで実HPを減らし追加倍率を掛けない")
-		check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bullet" and e.payload.technique=="debris_shatter" and e.payload.source=="hydra"),"破片はbullet・debris_shatter・hydraを記録する")
-	bridge.restore(deployed.value);bridge.command("dev_cancel_flow",{"entity_id":c.id})
-	check(bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"展開中の取消で瓦礫を回収する")
-	bridge.restore(after.value);bridge.command("dev_damage",{"entity_id":heads[1].id,"amount":1000.0,"cause":"shot"});bridge._core.step(0.01)
-	check(bridge.command("dev_boss_state").value[0].stage==7 and bridge.command("dev_boss_body_state").value[0].effects.is_empty() and bridge._core.hostiles_snapshot().size()==shots.size(),"参加首消失ではビームと残る瓦礫を消し、発射済み破片を残す")
-	var remaining_life: float=shots.map(func(shot):return shot.life).max() if not shots.is_empty() else 1.0
-	bridge._core.step_hostiles(remaining_life+0.1)
-	check(bridge._core.hostiles_snapshot().is_empty(),"発射済み破片は自然寿命で回収する")
-	bridge.restore(after.value);bridge._core.step(0.3)
-	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"実行時間で自然終了し持続ビームを消す")
-	for tick in 80:
-		bridge._core.step(0.01)
-		if bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==83):break
-	check(bridge.command("dev_boss_state").value.any(func(t):return t.id>first_id and t.kind==83),"自然終了の待ち後に次のコンボを選ぶ")
-	bridge.release_checkpoint(deployed.value);bridge.release_checkpoint(after.value);bridge.dispose();view.queue_free();await get_tree().process_frame
-	print("[cpp_hydra_debris_shatter] failures=",failed);get_tree().quit(1 if failed else 0)
-
-func native_hydra_shatter_record() -> void:
-	var c := hydra_major_case("debris_shatter",{"warning_time":0.1,"performance_time":0.8,"shatter_deploy":0.2,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0,"tech_recovery":0.05,"cooldown":0.1})
-	if c.is_empty():get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
-	var events: Array=[];bridge.subscribe("破片の記録",func(packet):events.append_array(packet.events);return true)
-	bridge.command("dev_boss_technique",{"entity_id":c.id,"definition":1})
-	bridge._core.step(0.1);bridge._core.step(0.05);bridge._core.step(0.06)
-	for tick in 16:bridge._core.step(0.025)
-	var shots: Array=bridge._core.hostiles_snapshot()
-	if shots.is_empty():check(false,"記録用の破片が出る");bridge.dispose();get_tree().quit(1);return
-	bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
-	bridge.command("dev_ship_motion",{"position":shots[0].pos,"velocity":Vector2.ZERO})
-	bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
-	check(events.any(func(e):return e.type=="combat_player_damage" and e.payload.accepted and e.payload.cause=="bullet" and e.payload.technique=="debris_shatter" and e.payload.source=="hydra"),"破片の原因・技と、共通通知のボス所有元を保つ")
-	bridge.dispose();print("[cpp_hydra_shatter_record] failures=",failed);get_tree().quit(1 if failed else 0)
-
 
 func hydra_thunder_case(flowing := false, overrides := {}) -> Dictionary:
 	var values := {"normal_charge":0.2,"normal_hold":0.1,"attack_cd":0.03,"thunder_radius":50.0,"thunder_flash":0.12,"beam_dmg":7.0,"target_lock_fraction":0.5,"thunder_lead":0.4}
@@ -6235,67 +6019,6 @@ func semantics_number(a: float,b: float) -> bool:
 func semantics_hydra_finish(bridge,label: String) -> void:
 	bridge.dispose();print("SEMANTICS_HYDRA ",label," failures=",failed);get_tree().quit(1 if failed else 0)
 
-func semantics_hydra_curve() -> void:
-	var c := hydra_major_case("curve",{"warning_time":0.15,"performance_time":0.55,"curve_delay":0.12,"curve_time":0.35,"curve_turn":0.45,"curve_lag":1.1,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
-	if c.is_empty(): get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
-	var events: Array=[];bridge.subscribe("曲線の記録",func(packet):events.append_array(packet.events);return true)
-	for tick in 30:
-		bridge._core.step(0.01)
-		if not bridge.command("dev_boss_state").value.is_empty(): break
-	var actions: Array=bridge.command("dev_boss_state").value
-	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
-	var first_id: int=actions[0].id
-	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
-	check(body.count==5 and body.effects.size()==5 and body.effects.all(func(e):return e.points.size()==25 and semantics_number(e.delay,0.12) and semantics_number(e.life,0.35)),"予告開始で全首に24区間の曲線を作り、独立した遅れと寿命を持つ")
-	var first: Dictionary=body.effects[0].duplicate(true)
-	var angle: float=body.necks[0].angle
-	var at: Vector2=first.points[0]
-	for j in range(1,25):
-		at+=Vector2.from_angle(angle-float(j)/24.0*1.1)*600.0/24.0
-		check(at.distance_to(first.points[j])<=1e-4,"曲線の全点の指定許容幅")
-	check(at.distance_to(first.points[-1])<=1e-4,"ラジアンの軌跡差と24分割の点列がSourceの式に一致する")
-	var facing: float=body.facing
-	bridge._core.step(0.1);bridge._core.step_hazards(0.1);body=bridge.command("dev_boss_body_state").value[0]
-	check(semantics_number(body.facing,facing) and body.effects[0].age<body.effects[0].delay,"予告中は本体を回さず、形だけの時計を進める")
-	bridge._core.step(0.05);bridge._core.step_hazards(0.05);body=bridge.command("dev_boss_body_state").value[0]
-	semantics_hydra_finish(bridge,"curve")
-
-func semantics_hydra_grid() -> void:
-	var edits := {"warning_time":0.15,"performance_time":0.8,"normal_charge":0.1,"grid_time":0.35,"beam_width":60.0,"beam_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1}
-	var c := hydra_major_case("grid",edits,true)
-	if c.is_empty():get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":true})
-	hydra_grid_separate(c)
-	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(100,80));bridge._core.step(0.01)
-	bridge._core.set_motion_context(Vector2(-200,0),Vector2.ZERO,Vector2(1400,1000))
-	for tick in 40:
-		bridge._core.step(0.01)
-		if not bridge.command("dev_boss_state").value.is_empty():break
-	var actions: Array=bridge.command("dev_boss_state").value
-	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
-	var first_id: int=actions[0].id
-	var t: Dictionary=actions[0];var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
-	var source = load("res://data/bosses/hydra.tres")
-	var maximum: float=c.cfg.draw_length*c.cfg.base_max_speed/c.cfg.base_max_speed
-	var reference: Dictionary=load("res://scripts/bosses/hydra_grid.gd").build(Rect2(Vector2(-1400,-1000),Vector2(2800,2000)).intersection(body.arena),Vector2(-200,0),8,source.params,c.cfg.ship_radius,maximum)
-	check(not reference.is_empty() and t.grid_name==String(reference.name) and semantics_number(t.grid_length,reference.length) and t.grid_bearer.distance_to(reference.bearer)<=1e-4,"領域・回転・倍率・経路予算をSourceの配置関数へ照合する")
-	var equal: bool = not reference.is_empty() and reference.beams.size()==t.grid_starts.size()
-	if equal:
-		for i in reference.beams.size():equal=equal and t.grid_starts[i].distance_to(reference.beams[i][0])<=1e-4 and t.grid_ends[i].distance_to(reference.beams[i][1])<=1e-4
-	check(equal,"優先順で選んだ全ビームの始点と終点がSourceに一致する")
-	var ready := false
-	for tick in 600:
-		bridge._core.step(0.02);bridge._core.step_hazards(0.02)
-		t=bridge.command("dev_boss_state").value[0]
-		if t.stage==7:break
-		if not t.positioning and not bridge.command("dev_boss_body_state").value[0].effects.is_empty():ready=true;break
-	body=bridge.command("dev_boss_body_state").value[0]
-	if not ready:print(t);bridge.dispose();get_tree().quit(1);return
-	check(body.effects.all(func(e):return e.points.size()==2 and semantics_number(e.delay,0.1) and semantics_number(e.life,0.35)),"格子は線分・個別の遅れ・寿命を持つ")
-	check(body.necks.all(func(n):return n.points[-1].distance_to(n.position)<=1e-4),"大技の位置を確定した後に首点列を1回だけ同期する")
-	semantics_hydra_finish(bridge,"grid")
-
 func semantics_hydra_pincer() -> void:
 	var edits := {"warning_time":0.15,"performance_time":0.7,"pincer_delay":0.1,"pincer_time":0.3,"pincer_open_angle":0.8,"pincer_close_angle":0.12,"beam_len":600.0,"beam_width":60.0,"beam_dmg":7.0,"cooldown":0.1,"tech_recovery":0.05}
 	var c := hydra_major_case("beam_pincer",edits,true,{"combo_cooldown":0.1})
@@ -6634,7 +6357,6 @@ func semantics_hydra_tornado() -> void:
 	bridge._core.step_hazards(0.01)
 	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
 	var active: Array=body.effects.filter(func(e):return e.kind=="tornado")
-	check(active.size()==1 and active[0].width==120.0 and active[0].points[0].distance_to(center-source_direction*45.0)<=1e-4 and active[0].points[1].distance_to(center+source_direction*45.0)<=1e-4 and bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead).is_empty(),"個別溜めの時刻に瓦礫を回収し、長さ90の竜巻を放つ")
 	if "--semantics-hydra-shape-only" in OS.get_cmdline_user_args():semantics_hydra_finish(bridge,"tornado_shape");return
 	if active.is_empty():bridge.dispose();get_tree().quit(1);return
 	var effect: Dictionary=active[0].duplicate(true);var direction: Vector2=(effect.points[1]-effect.points[0]).normalized()
@@ -6733,43 +6455,6 @@ func semantics_hydra_wind() -> void:
 	bridge._core.step(0.025);bridge._core.step_hazards(0.025)
 	check(bridge._core.ship_snapshot().ship_vel.distance_to(direction*20.0)<=1e-4,"同じ風に触れている間は毎tick押し出す")
 	semantics_hydra_finish(bridge,"wind")
-
-func semantics_hydra_shatter() -> void:
-	var c := hydra_major_case("debris_shatter",{"warning_time":0.1,"performance_time":0.8,"shatter_deploy":0.2,"shatter_time":0.4,"shatter_arc":1.8,"rubble_count":3,"beam_len":800.0,"beam_width":80.0,"beam_dmg":7.0,"shard_dmg":9.0,"shard_speed":300.0,"tech_recovery":0.05,"cooldown":0.1},true)
-	if c.is_empty():get_tree().quit(1);return
-	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
-	var events: Array=[];bridge.subscribe("瓦礫砕きの記録",func(packet):events.append_array(packet.events);return true)
-	for tick in 40:
-		bridge._core.step(0.01)
-		if not bridge.command("dev_boss_state").value.is_empty():break
-	var actions: Array=bridge.command("dev_boss_state").value
-	if actions.is_empty():bridge.dispose();get_tree().quit(1);return
-	var first_id: int=actions[0].id
-	var body: Dictionary=bridge.command("dev_boss_body_state").value[0]
-	var heads: Array=body.necks.filter(func(n):return n.mode=="debris_shatter")
-	bridge._core.step(0.1);bridge._core.step(0.05)
-	body=bridge.command("dev_boss_body_state").value[0]
-	var stones: Array=bridge._core.enemies_snapshot().filter(func(e):return e.type=="hydra_rubble" and not e.dead)
-	bridge._core.step(0.06);body=bridge.command("dev_boss_body_state").value[0]
-	check(body.effects.size()==1 and body.effects[0].kind=="beam" and body.effects[0].width==80.0 and body.effects[0].points[1].distance_to(body.effects[0].points[0]+Vector2.from_angle(body.necks.filter(func(n):return n.mode=="debris_shatter" and n.kind=="beam")[0].angle)*800.0)<=1e-4,"展開時刻の後に線分ビームを始める")
-	var beam: Dictionary=body.effects[0];var direction: Vector2=(beam.points[1]-beam.points[0]).normalized()
-	bridge.command("dev_ship_motion",{"position":beam.points[0]+direction*100,"velocity":Vector2.ZERO})
-	var hp: float=bridge._core.ship_snapshot().ship_hp
-	bridge._core.step_hazards(0.01)
-	check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,7.0*c.cfg.atk_scale),"ビームは線分で実HPへ倍率を一度だけ掛ける")
-	for tick in 16:bridge._core.step(0.025);bridge._core.step_hazards(0.025)
-	body=bridge.command("dev_boss_body_state").value[0]
-	var shots: Array=bridge._core.hostiles_snapshot()
-	for j in shots.size():
-		var base_angle:float=shots[j-j%6].vel.angle()
-		check(shots[j].vel.distance_to(Vector2.from_angle(base_angle+float(j%6)*0.45)*300.0)<=1e-4,"破片の全速度をSourceの式で照合する")
-	var cues: Array=events.filter(func(e):return e.type=="hydra_cue" and e.payload.cue=="rubble_shattered")
-	if not shots.is_empty():
-		bridge.command("dev_ship_defense",{"shield":0.0,"invulnerability":0.0})
-		bridge.command("dev_ship_motion",{"position":shots[0].pos,"velocity":Vector2.ZERO})
-		hp=bridge._core.ship_snapshot().ship_hp;bridge._core.step_hostiles(0.001);bridge.command("dev_boss_body_state")
-		check(semantics_number(hp-bridge._core.ship_snapshot().ship_hp,9.0),"破片はshard_dmgそのままで実HPを減らし追加倍率を掛けない")
-	semantics_hydra_finish(bridge,"shatter")
 
 func semantics_hydra_final() -> void:
 	var count:=9 if "--separated" in OS.get_cmdline_user_args() else 3

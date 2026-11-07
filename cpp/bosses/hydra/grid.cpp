@@ -3,6 +3,7 @@
 #include "body.h"
 #include "regrow.h"
 #include "swim.h"
+#include "../../systems/motion_math.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/field.h"
@@ -15,36 +16,42 @@
 namespace speed {
 namespace {
 using V=godot::Vector2;
-constexpr double pi=3.141592653589793;
+// 蛇は泳ぎ続け、1匹ずつ止まって機体を狙う。ビームは撃った場所に残り、プレイヤーがよけた跡が格子になる。
+constexpr double START=1.4,GAP=0.7,STOP=0.75,LOCK=0.4,HOLD=1.9,REACH=380;
 const HydraGridDefinition &grid_rule(const RunRuntime &r,uint32_t definition) {return *std::find_if(r.content->hydra_grids.begin(),r.content->hydra_grids.end(),[&](const auto &v){return v.technique==definition;});}
-double distance(V point,V a,V b) {const auto d=b-a;return point.distance_to(a+d*(d.length_squared()>0?std::clamp(double((point-a).dot(d)/d.length_squared()),0.,1.):0));}
-bool crosses(V a,V b,V c,V d) {const auto u=b-a,v=d-c;const float denominator=u.cross(v);if (denominator==0) return false;const float s=(c-a).cross(v)/denominator,t=(c-a).cross(u)/denominator;return s>=0 && s<=1 && t>=0 && t<=1;}
-bool clear(const HydraGridPlan &plan,double radius) {for (size_t i=1;i<plan.path.size();++i) for (size_t j=0;j<plan.starts.size();++j) {const auto a=plan.path[i-1],b=plan.path[i],c=plan.starts[j],d=plan.ends[j];if (crosses(a,b,c,d) || distance(a,c,d)<radius || distance(b,c,d)<radius || distance(c,a,b)<radius || distance(d,a,b)<radius) return false;}return true;}
+double wave(double n) {const double v=std::sin(n*127.1+311.7)*43758.5453;return v-std::floor(v);}
+HydraNeckState *pick(RunRuntime &r,BossBodyState &b,const HydraTechniqueState &v,const HydraGridState &g) {
+    // 機体から見て、これまでに撃った蛇と離れた方向にいる蛇を次に選ぶ。
+    const auto ship=r.state.ship_pos;HydraNeckState *best=nullptr;double top=-1e18;
+    for (size_t i=0;i<v.participants.size();++i) {auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n) || std::any_of(g.shots.begin(),g.shots.end(),[&](const auto &q){return same_handle(q.actor,n->actor);})) continue;const double bearing=(n->free_pos-ship).angle();double score=-double(n->free_pos.distance_to(ship));if (!g.shots.empty()) {score=1e9;for (const auto &q:g.shots) if (const auto *m=HydraNormalAttack::neck(b,q.actor)) score=std::min(score,std::abs(angle_difference(bearing-(m->free_pos-ship).angle())));}if (score>top) {top=score;best=n;}}
+    return best;
 }
-std::optional<HydraGridPlan> HydraTechnique::grid_plan(const RunRuntime &r,const BossBodyState &b,uint32_t definition) {
-    if (!b.hydra->separated || !HydraRegrow::alive(r,b.hydra->bearer)) return {};const auto &p=grid_rule(r,definition);const size_t count=std::count_if(b.hydra->necks.begin(),b.hydra->necks.end(),[&](const auto &n){return HydraRegrow::alive(r,n);});if (count<p.minimum) return {};
-    godot::Rect2 rect(r.state.view_center-r.state.view_half,r.state.view_half*2);for (const auto &a:r.state.field.arenas) if (same_handle(a.owner,b.actor)) rect=rect.intersection(a.bounds);if (!rect.has_area()) return {};
-    const auto player=r.state.ship_pos,rel=(player-rect.get_center())/(rect.size*0.5);const uint32_t region=std::abs(rel.x)<=0.25 && std::abs(rel.y)<=0.25?0:std::abs(rel.x)>std::abs(rel.y)?rel.x>0?1:2:rel.y>0?4:3;
-    const auto layout=std::find_if(r.content->hydra_grid_layouts.begin(),r.content->hydra_grid_layouts.end(),[&](const auto &v){return v.technique==definition && (v.region_mask&(1u<<region));});if (layout==r.content->hydra_grid_layouts.end()) return {};
-    std::vector<V> path,starts,ends;for (const auto &v:r.content->hydra_grid_paths) if (v.layout==layout->id) path.emplace_back(v.x,v.y);for (const auto &v:r.content->hydra_grid_slots) if (v.layout==layout->id && starts.size()<count) {starts.emplace_back(v.from_x,v.from_y);ends.emplace_back(v.to_x,v.to_y);}if (starts.size()!=count || path.empty()) return {};
-    const double radius=r.state.ship_config.ship_radius,budget=r.state.draw_config.length*r.state.draw_config.capacity*r.state.draw_config.length_mult*r.state.ship_config.max_speed/r.state.ship_config.base_max_speed;const double preferred=region==1?pi:region==3?pi*0.5:region==4?-pi*0.5:0;const auto safe=rect.grow(-radius-p.planning_width*0.5-8);
-    for (double rotation:{preferred,preferred+pi*0.5,preferred-pi*0.5,preferred+pi}) for (double scale:{1.,0.9,0.8}) {
-        std::vector<V> offsets;for (auto v:path) offsets.push_back((v*scale).rotated(rotation));for (size_t i=0;i<starts.size();++i) {offsets.push_back((starts[i]*scale).rotated(rotation));offsets.push_back((ends[i]*scale).rotated(rotation));}godot::Rect2 extent(offsets.front(),{});for (auto v:offsets) extent=extent.expand(v);if (extent.size.x>safe.size.x || extent.size.y>safe.size.y) continue;
-        const auto origin=player.clamp(safe.position-extent.position,safe.get_end()-extent.get_end());HydraGridPlan plan;plan.layout=layout->id;plan.region=region;plan.path={player};for (auto v:path) {const auto at=origin+(v*scale).rotated(rotation);if (plan.path.back().distance_to(at)>0.01) plan.path.push_back(at);}for (size_t i=0;i<starts.size();++i) {plan.starts.push_back(origin+(starts[i]*scale).rotated(rotation));plan.ends.push_back(origin+(ends[i]*scale).rotated(rotation));}
-        bool inside=true;for (const auto *points:{&plan.path,&plan.starts,&plan.ends}) for (auto v:*points) if (!safe.has_point(v)) inside=false;for (size_t i=1;i<plan.path.size();++i) plan.length+=plan.path[i-1].distance_to(plan.path[i]);if (!inside || plan.length>budget || !clear(plan,radius+p.planning_width*0.5+p.clearance)) continue;plan.bearer=plan.path.back();
-        double head_radius=0;for (const auto &n:b.hydra->necks) if (HydraRegrow::alive(r,n)) head_radius=std::max(head_radius,r.state.enemies[n.actor.slot].radius);for (const auto &obstacle:r.state.field.bodies) {if (plan.bearer.distance_to(obstacle.position)<obstacle.radius+r.state.enemies[b.hydra->bearer.actor.slot].radius) return {};for (auto at:plan.starts) if (at.distance_to(obstacle.position)<obstacle.radius+head_radius) return {};for (size_t i=1;i<plan.path.size();++i) if (CollisionQuery::segment_circle_t(plan.path[i-1],plan.path[i],obstacle.position,obstacle.radius+radius)>=0) return {};}
-        return plan;
-    }return {};
 }
-void HydraTechnique::grid_prepare(RunRuntime &r,TechniqueState &t) {auto &b=*PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();HydraGridState g;const auto plan=grid_plan(r,b,t.definition);if (!plan) {finish(r,t,true);return;}g.plan=*plan;g.arrived.resize(v.participants.size(),false);v.move=g;}
-std::optional<V> HydraTechnique::bearer_target(const RunRuntime &r,const BossBodyState &b) {for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && supports(r.content->boss_techniques[t.definition-1].kind)) if (const auto *v=t.detail.get_if<HydraTechniqueState>()) if (const auto *g=std::get_if<HydraGridState>(&v->move)) return g->plan.bearer;return {};}
-bool HydraTechnique::grid_position(RunRuntime &r,TechniqueState &t,double dt) {
-    auto &b=*PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();auto &g=std::get<HydraGridState>(v.move);const auto &p=grid_rule(r,t.definition);g.position_elapsed+=dt;if (g.position_elapsed>p.formation_timeout) {finish(r,t,true);return false;}bool ready=true;
-    for (size_t i=0;i<v.participants.size();++i) {auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n)) continue;const auto slot=g.plan.starts[i];if (!g.arrived[i]) {if (n->free_pos.distance_to(slot)<45) {n->velocity=(slot-n->free_pos).limit_length(100);n->free_pos+=n->velocity*dt*4;}else HydraSwim::steer(r,b,*n,slot,dt,1.8,true);}n->strike_pos=n->free_pos;r.state.enemies[n->actor.slot].pos=n->free_pos;if (n->free_pos.distance_to(slot)<=p.tolerance) g.arrived[i]=true;if (!g.arrived[i]) ready=false;}
-    if (b.hydra->bearer.free_pos.distance_to(g.plan.bearer)>p.tolerance) ready=false;if (!ready) return false;for (auto actor:v.participants) {auto *n=HydraNormalAttack::neck(b,actor);if (n && HydraRegrow::alive(r,*n) && !godot::Rect2(r.state.view_center-r.state.view_half,r.state.view_half*2).grow(-r.state.enemies[actor.slot].radius).has_point(n->strike_pos)) {finish(r,t,true);return false;}}
-    g.positioning=false;for (auto actor:v.participants) if (auto *n=HydraNormalAttack::neck(b,actor)) n->strike_from=n->strike_pos;return true;
+bool HydraTechnique::grid_ready(const RunRuntime &r,const BossBodyState &b,uint32_t definition) {return b.hydra->separated && HydraRegrow::alive(r,b.hydra->bearer) && size_t(std::count_if(b.hydra->necks.begin(),b.hydra->necks.end(),[&](const auto &n){return HydraRegrow::alive(r,n);}))>=grid_rule(r,definition).minimum;}
+void HydraTechnique::grid_prepare(RunRuntime &r,TechniqueState &t) {
+    auto &b=*PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();HydraGridState g;godot::Rect2 rect(r.state.view_center-r.state.view_half,r.state.view_half*2);for (const auto &a:r.state.field.arenas) if (same_handle(a.owner,b.actor)) rect=rect.intersection(a.bounds);if (!rect.has_area()) {finish(r,t,true);return;}
+    const auto center=rect.get_center();const auto off=r.state.ship_pos-center;g.bearer=center+V(off.x>0?-1:1,off.y>0?-1:1)*rect.size*0.5*V(0.78,0.69);g.center=center;g.finish_at=START+(v.participants.size()-1)*GAP+HOLD;
+    for (size_t i=0;i<v.participants.size();++i) {const auto *n=HydraNormalAttack::neck(b,v.participants[i]);const auto at=n?n->free_pos-center:V(1,0);g.orbit.push_back({at.angle(),double(at.length()),(i%2?1:-1)*(0.16+wave(i*6.7)*0.1)});}
+    v.move=g;
 }
-void HydraTechnique::grid(RunRuntime &r,TechniqueState &t) {
-    auto &b=*PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();auto &g=std::get<HydraGridState>(v.move);const auto &p=grid_rule(r,t.definition);for (size_t i=0;i<v.participants.size();++i) {auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n) || n->emission.generation) continue;const std::vector<V> points{n->strike_pos,g.plan.ends[i]};n->angle=(points[1]-points[0]).angle();n->emission=emit(r,t,n->actor,points,p.width,p.delay,p.time);HydraNormalAttack::cue(r,b,*n,"attack_started",t.definition);}
+std::optional<V> HydraTechnique::bearer_target(const RunRuntime &r,const BossBodyState &b) {for (const auto &t:r.state.bosses->techniques) if (same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished && supports(r.content->boss_techniques[t.definition-1].kind)) if (const auto *v=t.detail.get_if<HydraTechniqueState>()) if (const auto *g=std::get_if<HydraGridState>(&v->move)) return g->bearer;return {};}
+void HydraTechnique::grid(RunRuntime &r,TechniqueState &t,double dt) {
+    auto &b=*PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();auto &g=std::get<HydraGridState>(v.move);const auto &p=grid_rule(r,t.definition);g.elapsed+=dt;v.time=t.elapsed=g.elapsed;if (g.elapsed>=g.finish_at) {finish(r,t,false);return;}
+    if (std::none_of(v.participants.begin(),v.participants.end(),[&](auto actor){return r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;})) {finish(r,t,true);return;}
+    while (g.fired<v.participants.size() && g.elapsed>=START+g.fired*GAP-STOP) {const double fire=START+g.fired*GAP;++g.fired;if (auto *n=pick(r,b,v,g)) {HydraGridShot shot;shot.actor=n->actor;shot.fire_at=fire;g.shots.push_back(shot);n->velocity={};}}
+    const auto ship=r.state.ship_pos;
+    for (size_t i=0;i<v.participants.size();++i) {
+        auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n)) continue;auto shot=std::find_if(g.shots.begin(),g.shots.end(),[&](const auto &q){return same_handle(q.actor,n->actor);});
+        if (shot==g.shots.end()) {auto &o=g.orbit[i];o.angle+=o.speed*dt;HydraSwim::steer(r,b,*n,g.center*0.7+ship*0.3+V(std::cos(o.angle)*o.radius*1.25,std::sin(o.angle)*o.radius*0.82),dt,0.9,true);}
+        else if (g.elapsed<shot->fire_at-LOCK) {const double aim=(ship-n->free_pos).angle();n->angle+=angle_difference(aim-n->angle)*std::min(1.0,dt*10);n->look_angle=n->angle;}
+        else if (!shot->locked) {auto d=(ship-n->free_pos).normalized();if (d.is_zero_approx()) d=V::from_angle(n->angle);n->angle=n->look_angle=d.angle();shot->end=ship+d*REACH;shot->locked=true;}
+        n->strike_pos=n->free_pos;r.state.enemies[n->actor.slot].pos=n->free_pos;if (shot!=g.shots.end()) r.state.enemies[n->actor.slot].facing=n->angle;
+        if (shot!=g.shots.end()) n->glow=std::clamp(1+(g.elapsed-shot->fire_at)/STOP,0.0,1.0);
+        if (shot==g.shots.end() || g.elapsed<shot->fire_at || n->emission.generation) continue;
+        if (!v.playing) {v.playing=true;t.stage=TechniqueStage::Active;cue(r,b,"attack_started",t.definition);}
+        n->emission=emit(r,t,n->actor,{n->strike_pos,shot->end},p.width,0,g.finish_at-shot->fire_at);HydraNormalAttack::cue(r,b,*n,"attack_started",t.definition);
+    }
 }
+bool HydraTechnique::grid_valid(const HydraGridState &g,size_t participants) {if (!g.bearer.is_finite() || !g.center.is_finite() || !std::isfinite(g.elapsed) || g.elapsed<0 || !std::isfinite(g.finish_at) || g.orbit.size()!=participants || g.shots.size()>participants) return false;for (const auto &o:g.orbit) if (!std::isfinite(o.angle) || !std::isfinite(o.radius) || !std::isfinite(o.speed)) return false;for (const auto &q:g.shots) if (!std::isfinite(q.fire_at) || !q.end.is_finite()) return false;return true;}
+void HydraTechnique::grid_snapshot(const HydraGridState &g,godot::Dictionary &out) {out["grid_bearer"]=g.bearer;out["grid_elapsed"]=g.elapsed;out["grid_finish_at"]=g.finish_at;out["grid_stop"]=STOP;out["grid_reach"]=REACH;godot::Array shots;for (const auto &q:g.shots) {godot::Dictionary row;row["actor"]=int64_t(handle_key(q.actor));row["fire_at"]=q.fire_at;row["end"]=q.end;row["locked"]=q.locked;shots.push_back(row);}out["grid_shots"]=shots;}
 }

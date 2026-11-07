@@ -4,6 +4,8 @@
 #include "../runtime/run_runtime.h"
 #include "../output/frame_builder.h"
 #include "../state/boss_states.h"
+#include "../bosses/hydra/state.h"
+#include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -18,6 +20,15 @@ void notify(RunRuntime &r,const char *kind,godot::Vector2 at) {
     }
     FrameBuilder::append(r,"boss_ram_contact",event);
 }
+}
+EnemyHandle BossRamSystem::chain_owner(const RunRuntime &r,EnemyHandle actor) {
+    for (const auto &b:r.state.bosses->bodies) {
+        const uint32_t kind=r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1].kind;if (kind!=3 && kind!=4) continue;
+        if (same_handle(b.actor,actor)) return b.actor;
+        for (const auto &p:b.participants) if (same_handle(p.actor,actor)) return b.actor;
+        if (kind==3) {if (same_handle(b.hydra->bearer.actor,actor)) return b.actor;for (const auto &n:b.hydra->necks) if (same_handle(n.actor,actor)) return b.actor;}
+    }
+    return {};
 }
 void BossRamSystem::cancel_invalid(RunRuntime &r) {
     auto &s=r.state;auto &ram=s.control.boss_ram;

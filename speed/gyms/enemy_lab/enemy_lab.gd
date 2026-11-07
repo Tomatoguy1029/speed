@@ -89,10 +89,13 @@ func _ready() -> void:
 	generator.progress.connect(func(n): _messages.text = TranslationServer.translate("lab.message_0db4675b27") % n)
 	session.changed.connect(_refresh)
 	session.seek_progress.connect(func(v): _messages.text = TranslationServer.translate("lab.message_7591fff9f2") % roundi(v * 100))
-	await session.reset()
+	await session.reset(_start_settings())
 	_fill_palette()
 	canvas.zoom = game_zoom()
 	_refresh()
+
+func _start_settings() -> Dictionary:
+	return {}
 
 func _button(parent: Node, text: String, action: Callable) -> Button:
 	var button := Button.new()

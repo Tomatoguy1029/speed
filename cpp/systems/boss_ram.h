@@ -8,6 +8,7 @@ class BossRamSystem {
 public:
     static bool begin(RunRuntime &,EnemyHandle,const BossImageCut &,godot::Vector2 direction,double ship_radius);
     static void advance(RunRuntime &,double real_dt);
+    static EnemyHandle chain_owner(const RunRuntime &,EnemyHandle);
     static void cancel_invalid(RunRuntime &);
 };
 }

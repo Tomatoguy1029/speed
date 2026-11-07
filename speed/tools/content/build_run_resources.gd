@@ -64,17 +64,41 @@ static func _dependencies(path: String) -> PackedStringArray:
 	if _batch_active: _batch_dependencies[path] = paths
 	return paths
 
+static var _file_memo := {}
+static var _file_memo_path := ""
+static var _file_memo_dirty := false
+## 実験場の作り直しでは、更新時刻が同じファイルの計算結果を使い回す。
+static func use_file_memo(path: String) -> void:
+	_file_memo_path = path
+	if _file_memo.is_empty() and FileAccess.file_exists(path):
+		var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+		if saved is Dictionary: _file_memo = saved
+
+static func save_file_memo() -> void:
+	if _file_memo_dirty:
+		var file := FileAccess.open(_file_memo_path,FileAccess.WRITE)
+		if file!=null: file.store_string(JSON.stringify(_file_memo))
+	_file_memo_dirty = false
+	_file_memo_path = ""
+
 static func _visit(path: String, hashes: Dictionary, pending: Dictionary) -> bool:
 	if hashes.has(path): return true
 	if not path.begins_with("res://") or path.contains("..") or not FileAccess.file_exists(path): return false
 	if pending.has(path): return true
 	pending[path] = true
-	hashes[path] = _batch_hashes[path] if _batch_active and _batch_hashes.has(path) else FileAccess.get_sha256(path)
+	var stamp := float(FileAccess.get_modified_time(path))
+	var known: Array = _file_memo.get(path,[]) if _file_memo_path!="" else []
+	var fresh: bool = not known.is_empty() and float(known[0])==stamp
+	if fresh: hashes[path] = known[1]
+	else: hashes[path] = _batch_hashes[path] if _batch_active and _batch_hashes.has(path) else FileAccess.get_sha256(path)
 	if _batch_active: _batch_hashes[path] = hashes[path]
 	if hashes[path].is_empty(): return false
-	if ResourceLoader.exists(path):
-		for target in _dependencies(path):
-			if not _visit(target,hashes,pending): return false
+	var dependencies: Array = known[2] if fresh else Array(_dependencies(path)) if ResourceLoader.exists(path) else []
+	if _file_memo_path!="" and not fresh:
+		_file_memo[path] = [stamp,hashes[path],dependencies]
+		_file_memo_dirty = true
+	for target in dependencies:
+		if not _visit(target,hashes,pending): return false
 	for companion in [path+".import",path.get_basename()+".regions.json"]:
 		if FileAccess.file_exists(companion) and not _visit(companion,hashes,pending): return false
 	pending.erase(path)

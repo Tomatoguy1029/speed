@@ -9,15 +9,17 @@
 #include <godot_cpp/variant/vector2.hpp>
 namespace speed {
 struct HydraShatterStone {EnemyHandle actor;godot::Vector2 from,to;bool shattered=false;};
-struct HydraShatterState {bool initialized=false;double aim=0;std::vector<HydraShatterStone> rubble;};
-struct HydraTornadoState {bool initialized=false,launched=false;godot::Vector2 center,direction,from;AttackHandle vortex;std::vector<EnemyHandle> rubble;};
+struct HydraShatterState {bool initialized=false,faced=false;double aim=0,face=0;std::vector<HydraShatterStone> rubble;};
+struct HydraTornadoRock {EnemyHandle actor;godot::Vector2 world,aim;double progress=0,settle=0,spin=0,orbit=0,size=0,flight=0,duration=0;};
+struct HydraTornadoState {bool initialized=false,launched=false;godot::Vector2 center,direction,from;double launch_time=0,radius=0,fade=1;AttackHandle vortex;std::vector<EnemyHandle> rubble;std::vector<HydraTornadoRock> rocks;};
 struct HydraCurveState {};
 struct HydraSequenceState {};
 struct HydraSwarmState {std::vector<godot::Vector2> slots;std::vector<bool> arrived;double position_elapsed=0;bool positioning=true;};
 struct HydraNorthState {bool aiming=true,burst=false,followed=false;godot::Vector2 target;};
 struct HydraPincerState {std::vector<double> aims;};
-struct HydraGridPlan {uint32_t layout=0,region=0;std::vector<godot::Vector2> starts,ends,path;godot::Vector2 bearer;double length=0;};
-struct HydraGridState {HydraGridPlan plan;std::vector<bool> arrived;double position_elapsed=0;bool positioning=true;};
+struct HydraGridOrbit {double angle=0,radius=0,speed=0;};
+struct HydraGridShot {EnemyHandle actor;double fire_at=0;godot::Vector2 end;bool locked=false;};
+struct HydraGridState {std::vector<HydraGridOrbit> orbit;std::vector<HydraGridShot> shots;godot::Vector2 bearer,center;double elapsed=0,finish_at=0;uint32_t fired=0;};
 struct HydraTechniqueState {double time=0;bool playing=false;std::vector<EnemyHandle> participants;std::variant<HydraCurveState,HydraGridState,HydraPincerState,HydraTornadoState,HydraShatterState,HydraNorthState,HydraSequenceState,HydraSwarmState> move;};
 enum class HydraSquadRole : uint32_t {Close,Front,Attack,Block,Bearer};
 struct HydraSquadMotion {
@@ -47,6 +49,7 @@ struct HydraNeckState {
     double look_angle=0,elapsed=0,glow=0,turn=0,hit_left=0,sweep=0;
     AttackHandle emission;
     uint32_t normal=0,normal_phase=0,step=0,major=0;
+    double lunge_fire=0,lunge_charge=0;
     bool locked=false,extension=false,lunge_done=false;
     std::vector<godot::Vector2> trail;
     double weights[6]={};

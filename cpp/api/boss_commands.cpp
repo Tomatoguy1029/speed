@@ -82,27 +82,6 @@ Dictionary SpeedRunCore::development_boss_command(const String &kind,const Dicti
         if (operation=="override" && p.size()==3 && p.get("points",Variant()).get_type()==Variant::PACKED_VECTOR2_ARRAY) {const PackedVector2Array points=p["points"];if (points.size()<2 || points.size()>4096) return result(false);for (auto v:points) if (!v.is_finite()) return result(false);body->draco->override_points.clear();for (auto v:points) body->draco->override_points.push_back(v);runtime.state.enemies[body->actor.slot].pos=points[0];speed::DracoPose::update(runtime,*body);return result(true);}
         return result(false);
     }
-    if (kind=="dev_hydra_grid_plan") {
-        if (p.size()!=2 || p.get("entity_id",Variant()).get_type()!=Variant::INT || p.get("definition",Variant()).get_type()!=Variant::INT) return result(false);
-        const int64_t definition=p["definition"];
-        if (definition<=0 || uint64_t(definition)>runtime.content->boss_techniques.size() || runtime.content->boss_techniques[definition-1].kind!=73 ||
-            std::none_of(runtime.content->hydra_grids.begin(),runtime.content->hydra_grids.end(),[&](const auto &grid){return grid.technique==uint64_t(definition);})) return result(false);
-        const auto found=runtime.state.rows_by_id.find(int64_t(p["entity_id"]));
-        if (found==runtime.state.rows_by_id.end()) return result(false);
-        const auto *body=speed::PhaseController::find(runtime,runtime.state.enemy_handles.at(found->second));
-        if (!body || body->mode>=speed::BossMode::Defeated || runtime.content->bosses[runtime.content->boss_bodies[body->definition-1].boss-1].kind!=3) return result(false);
-        const auto plan=speed::HydraTechnique::grid_plan(runtime,*body,uint32_t(definition));
-        Dictionary value;
-        if (plan) {
-            value["layout"]=plan->layout;value["region"]=plan->region;value["bearer"]=plan->bearer;value["length"]=plan->length;
-            PackedVector2Array starts,ends,path;
-            for (auto point:plan->starts) starts.push_back(point);
-            for (auto point:plan->ends) ends.push_back(point);
-            for (auto point:plan->path) path.push_back(point);
-            value["starts"]=starts;value["ends"]=ends;value["path"]=path;
-        }
-        return result(true,value);
-    }
     if (kind=="dev_boss_body_state") return result(p.is_empty(),speed::PhaseController::snapshot(runtime));
     if (kind=="dev_spawn_boss") {
         if (p.size()!=3 || p.get("definition",Variant()).get_type()!=Variant::INT || p.get("position",Variant()).get_type()!=Variant::VECTOR2 || p.get("entrance",Variant()).get_type()!=Variant::BOOL) return result(false);

@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SPEED FX 試作</title>
+<style>
+:root { --bg:#0d0f17; --panel:#161a26; --line:#2a3044; --text:#e6e9f2; --muted:#9aa3b8; --accent:#ffd27a; --cur:#9fd3ff; }
+* { box-sizing: border-box; }
+body { margin:0; background:var(--bg); color:var(--text); font:14px/1.55 system-ui, -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+header { padding:12px 16px; border-bottom:1px solid var(--line); }
+header h1 { margin:0; font-size:18px; } header p { margin:4px 0 0; color:var(--muted); }
+.wrap { padding:12px 16px; }
+.bar { display:flex; flex-wrap:wrap; gap:8px 14px; align-items:center; margin:8px 0; }
+.bar select, .bar input[type=text] { background:var(--panel); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 8px; max-width:100%; }
+#demo { min-width:320px; }
+button { background:#24304a; color:var(--text); border:1px solid #3a4a6e; border-radius:6px; padding:5px 12px; cursor:pointer; }
+button:hover { background:#2e3d5e; }
+.stagebox { overflow:auto; border:1px solid var(--line); border-radius:8px; background:#000; max-width:100%; }
+canvas#stage { display:block; width:1280px; height:720px; image-rendering:pixelated; }
+body.fit canvas#stage { width:100%; height:auto; }
+#scrub { width:min(640px, 100%); }
+.workspace { display:grid; grid-template-columns:minmax(0, 1fr) clamp(300px, 25vw, 380px); gap:14px; align-items:start; }
+.preview { min-width:0; }
+.controls { position:sticky; top:12px; max-height:calc(100dvh - 24px); overflow:auto; }
+#info { margin-top:12px; }
+@media (max-width: 860px) { .wrap { padding:8px; } .workspace { grid-template-columns:minmax(160px, 1fr) 300px; gap:8px; min-width:468px; } #demo { min-width:0; width:100%; } }
+.panel { background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:10px 12px; }
+#params label { display:grid; grid-template-columns:minmax(0, 1fr) 3.5em; gap:4px 6px; align-items:center; margin:10px 0; }
+#params .pl { grid-column:1 / -1; }
+#params input { min-width:0; width:100%; }
+#params select { grid-column:1 / -1; min-width:0; width:100%; background:var(--bg); color:var(--text); border:1px solid var(--line); border-radius:6px; padding:6px; }
+#params input[type=color] { width:100%; height:28px; }
+#params .val { color:var(--muted); font-variant-numeric: tabular-nums; }
+#info h3 { margin:0 0 6px; } #info p { margin:4px 0; } #info .note { color:var(--muted); } #info ul { margin:4px 0; padding-left:18px; color:var(--muted); }
+table { border-collapse:collapse; width:100%; font-size:13px; }
+th, td { border-bottom:1px solid var(--line); padding:5px 6px; text-align:left; vertical-align:top; }
+th { color:var(--muted); font-weight:600; position:sticky; top:0; background:var(--panel); }
+tr.st-proto td:first-child { border-left:4px solid var(--accent); } tr.st-current td:first-child { border-left:4px solid var(--cur); }
+tr.st-todo td:first-child { border-left:4px solid #ff8a8a; } tr.st-wait td:first-child { border-left:4px solid #59627a; } tr.st-check td:first-child { border-left:4px solid #c79bff; }
+.tablebox { max-height:520px; overflow:auto; }
+a { color:var(--cur); }
+.legend span { margin-right:12px; } .muted { color:var(--muted); }
+details { margin-top:12px; } summary { cursor:pointer; font-weight:600; }
+pre { white-space:pre-wrap; color:var(--muted); font-size:12px; }
+</style>
+</head>
+<body class="fit">
+<header>
+  <h1>SPEED エフェクト試作（独立HTML）</h1>
+  <p>現行の素材と攻撃を使い、試作と現行の見た目を切り替えて比較できます。G10・鳳凰・敵・ケンタウルスは設定値も含めて承認済みです。追加した残り4体は見た目の確認待ちです。本番への組み込みはC++移行後に行います。</p>
+</header>
+<div class="wrap">
+  <div class="bar">
+    <select id="cat"></select>
+    <input id="idfilter" type="text" placeholder="改善ID・試作IDで絞り込み（例：G12, C07）">
+    <select id="demo"></select>
+  </div>
+  <div class="bar">
+    <span>表示：<label><input type="radio" name="mode" value="proto" checked> 試作</label> <label><input type="radio" name="mode" value="current"> 現行</label></span>
+    <span>背景：<label><input type="radio" name="bg" value="game" checked> ゲームの背景（近似）</label> <label><input type="radio" name="bg" value="dark"> 暗背景</label></span>
+    <label><input id="scale1" type="checkbox"> 通常倍率 1倍（1280×720）</label>
+  </div>
+  <div class="workspace">
+  <section class="preview" aria-label="試作の再生画面">
+  <div class="stagebox"><canvas id="stage"></canvas></div>
+  <div class="bar">
+    <button id="play">停止</button><button id="reset">リセット</button><button id="prev">◀ 1フレーム</button><button id="next">1フレーム ▶</button>
+    <label><input id="loop" type="checkbox" checked> ループ</label>
+    <span>速度：<label><input type="radio" name="speed" value="0.25"> 0.25倍</label> <label><input type="radio" name="speed" value="0.5"> 0.5倍</label> <label><input type="radio" name="speed" value="1" checked> 1倍</label></span>
+    <input id="scrub" type="range" min="0" max="1" step="0.001" value="0"><span id="time" class="muted"></span>
+  </div>
+    <div class="panel" id="info"></div>
+  </section>
+    <aside class="panel controls" aria-label="調整パネル"><h3 style="margin-top:0">FXの調整・比較条件</h3><div id="params"></div>
+      <div class="bar"><button id="save">全試作の設定を1つのJSONに保存</button><label>JSON を読み込む <input id="load" type="file" accept="application/json,.json"></label></div><div id="status" class="muted"></div><p class="muted">選択中の技に関係なく、初期値を含む全試作の設定をまとめて保存します。</p>
+      <p class="muted">色・サイズ・強度・FXの時間は試作の見た目を変えます。形態・猟犬数・分離・吸い込んだ星の数は、両表示に共通の比較条件です。本番の数値は変わりません。</p></aside>
+  </div>
+  <div class="panel" style="margin-top:14px">
+    <h3 style="margin-top:0">改善台帳 80 件と試作の対応</h3>
+    <p class="muted" id="ledgerCount"></p>
+    <p class="legend muted"><span>■黄：試作あり（承認状態は各行）</span><span>■水色：現行採用の再現のみ</span><span>■赤：今回の対象だが未着手</span><span>■灰：C++移行後</span><span>■紫：確認待ち</span></p>
+    <div class="tablebox"><table id="ledger"><thead><tr><th>ID</th><th>内容</th><th>分類（作業時期）</th><th>今回の状態</th><th>試作ID</th><th>未確認事項・メモ</th></tr></thead><tbody></tbody></table></div>
+    <h3>G12 の内訳（現行の出現構成から列挙した、ステージ1に出ない敵）</h3>
+    <div class="tablebox"><table id="g12"><thead><tr><th>type ID</th><th>名称</th><th>登場ステージ</th><th>固有攻撃</th><th>試作ID</th></tr></thead><tbody></tbody></table></div>
+    <details><summary>追加した4体と、確認が残っているところ</summary>
+      <p>おおいぬ12技、いっかくじゅう8技、うみへび18技、りゅう13技の全身と攻撃FXを追加しました。うみへびには首の撃破・分離後の見え方の比較もあります。今回の追加分は未承認です。</p>
+      <p>現行表示の照明と一部の効果はHTMLでの近似です。障害物のない単独の比較場面で再生し、群れの通常AIや地形への干渉は省いています。うみへびのH22のULT、遮蔽・移動・攻撃数値の未決事項、本番の実験場の不具合は確認待ちのままです。</p>
+    </details>
+    <details><summary>現行の再現で近似している点</summary>
+      <ul class="muted">
+        <li>装甲の法線照明は、向き0のときの光を画像へ焼き込んだ近似（本番は回転に応じて光が変わる）。</li>
+        <li>背景は暗い宇宙色・視差の星・ステージの天体1つの近似。ブルームや画面揺れの後処理は再現していない。</li>
+        <li>鳳凰の予告の火の粉（phoenix_flames.gdshader）と着地・爆発の点の爆発（blast_bursts）は形と時間を簡略化。</li>
+        <li>レチクル座の細いビームと岩の破片、みずがめ座の照射時の画面揺れ・衝撃の粒は簡略または未再現。</li>
+        <li>群れ（猟犬）の整列・かんむり座の捕捉の抽選など、攻撃の見た目に関係しない移動の一部は省略。</li>
+      </ul>
+    </details>
+    <details><summary>ライセンスと帰属</summary>
+      <pre id="license"></pre>
+    </details>
+  </div>
+</div>
+<script>/*DATA*/</script>
+<script>/*PIXELFX*/</script>
+<script>/*APP*/</script>
+<script>
+if (typeof G12_ENEMIES === 'undefined') {
+  const notice = document.createElement('div'); notice.className = 'panel';
+  const message = document.createElement('p'); message.textContent = 'ここは組み立て用のファイルです。試作は完成版HTMLから開いてください。';
+  const link = document.createElement('a'); link.href = '../../speed_fx_prototypes.html'; link.textContent = '完成版の試作を開く';
+  notice.append(message, link); document.querySelector('.wrap').replaceChildren(notice);
+} else {
+document.querySelector('#g12 tbody').append(...G12_ENEMIES.map(([id, n, st, atk, demoId]) => { const tr = document.createElement('tr'); tr.innerHTML = `<td>${id}</td><td>${n}</td><td>${st}</td><td>${atk}</td><td>${demoId}</td>`; return tr; }));
+document.getElementById('license').textContent = LICENSE_TEXT;
+loadImages().then(() => { WATER.data = (() => { const im = IMG.water_noise; const c = document.createElement('canvas'); c.width = 512; c.height = 512; const x = c.getContext('2d'); x.drawImage(im, 0, 0); return x.getImageData(0, 0, 512, 512).data; })(); prepArrow(); boot(); });
+}
+</script>
+</body>
+</html>

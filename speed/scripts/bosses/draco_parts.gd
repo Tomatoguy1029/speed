@@ -4,6 +4,8 @@ const FORM = preload("res://scripts/bosses/draco_form.gd")
 const ARM_ROOT := Vector2(11, 5)
 const ARM_WRIST := Vector2(27, 33)
 const SHADER = preload("res://shaders/draco_part.gdshader")
+const PICARO_SHADER = preload("res://shaders/picaro.gdshader")
+const PICARO_LOOK = preload("res://scripts/render/picaro_look.gd")
 const TEXTURES = {
 	&"head": [preload("res://assets/pixel/draco/head.png"), preload("res://assets/pixel/draco/head_normal.png")],
 	&"arm": [preload("res://assets/pixel/draco/arm.png"), preload("res://assets/pixel/draco/arm_normal.png")],
@@ -24,8 +26,10 @@ var _lighting: ShaderMaterial
 
 func _ready() -> void:
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_lighting = ShaderMaterial.new()
-	_lighting.shader = SHADER
+	if _lighting == null:
+		_lighting = ShaderMaterial.new()
+		_lighting.shader = SHADER
+	_lighting.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	_head = _sprite(&"head")
 	_head.z_index = 1
 	# The snout stays aligned with the existing mouth origin (120 * head_scale).
@@ -40,6 +44,28 @@ func _ready() -> void:
 		claw.centered = false
 		claw.offset = -Vector2(13, 16)
 		_claws.append(claw)
+
+## 全身複製はピカロの一種なので、全部の部位を敵のピカロと同じシェーダーで描く。
+## 絵の腕だけを根元から回す量（ラジアン）。
+var arm_turns := [0.0,0.0,0.0,0.0]
+func use_picaro(seed: float) -> void:
+	var noise: Texture2D = PICARO_LOOK.noise_texture()
+	_lighting = ShaderMaterial.new()
+	_lighting.shader = PICARO_SHADER
+	_lighting.set_shader_parameter("noise_smooth", noise)
+	_lighting.set_shader_parameter("noise_dots", noise)
+	_lighting.set_shader_parameter("seed", seed)
+	if is_inside_tree(): _lighting.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
+	for child in get_children():
+		if child is Sprite2D: child.material = _lighting
+
+## 決着の閃光のあいだだけ、竜の色と切り口を決着の表示から受け取る。
+func set_finale_tone(tone: Dictionary) -> void:
+	_lighting.set_shader_parameter("finale_tone",tone.get("on",false))
+	_lighting.set_shader_parameter("finale_gray",tone.get("gray",0.0))
+	_lighting.set_shader_parameter("finale_lit",tone.get("lit",0.0))
+	_lighting.set_shader_parameter("finale_gap",tone.get("gap",0.0))
+	_lighting.set_shader_parameter("finale_center",tone.get("center",Vector2.ZERO))
 
 func _sprite(part: StringName) -> Sprite2D:
 	var sprite := Sprite2D.new()
@@ -107,7 +133,7 @@ func _pose_arms(points: PackedVector2Array, width: float, total: float, split_or
 		var arm := _arms[i]
 		var direction := (normal * side - tangent * 0.3).normalized()
 		var wrist := (ARM_WRIST - ARM_ROOT) * Vector2(-side, 1)
-		arm.rotation = direction.angle() - wrist.angle()
+		arm.rotation = direction.angle() - wrist.angle() + arm_turns[i]
 		arm.scale = Vector2(-side, 1) * unit
 		arm.position = _split(samples[1] + normal * side * width * FORM.taper(distance / maxf(1.0, total)) * 0.32, split_origin, split_axis)
 		var claw := _claws[i]

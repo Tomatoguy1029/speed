@@ -749,7 +749,9 @@ func _draw_cpp() -> void:
 		var height:=size.y*0.1*bars
 		draw_rect(Rect2(Vector2.ZERO,Vector2(size.x,height)),Color.BLACK)
 		draw_rect(Rect2(Vector2(0,size.y-height),Vector2(size.x,height)),Color.BLACK)
-	if bars>0.0:return
+	if bars>0.0:
+		_draw_finale_text()
+		return
 	if _cpp_ui.get("boss_finish",{}).get("active",false):
 		_draw_banner()
 		return
@@ -1026,6 +1028,58 @@ func _owned_loadout(field: String) -> Dictionary:
 	for item: Dictionary in _cpp_ui.get(field,[]): owned[StringName(item.id)] = int(item.level)
 	return owned
 
+## 決着の場面に重ねる短い案内。時間は戦闘の状態から読む。
+func _draw_finale_text() -> void:
+	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
+		var finale: Dictionary=body.get("finale",{})
+		if not finale.get("active",false): continue
+		var time: float=finale.time
+		if finale.stage=="input" and not finale.began and time>=5.0:
+			var alpha:=smoothstep(5.0,5.7,time)
+			if time>5.7: alpha*=1.0-0.11*(1.0-cos((time-5.7)*PI))
+			draw_string(_font,Vector2(0,size.y*0.1),tr("hud.finale_hint"),HORIZONTAL_ALIGNMENT_CENTER,size.x,22,Color(0.9,0.94,1.0,alpha))
+		if finale.stage=="combine" or (finale.stage=="pose" and time<0.6): _draw_finale_slots(finale)
+
+## 伝説のモジュールが武器欄に並ぶ場面の大きな武器欄。
+func _draw_finale_slots(finale: Dictionary) -> void:
+	var time: float=finale.time
+	var alpha:=smoothstep(0.35,0.7,time) if finale.stage=="combine" else 1.0-smoothstep(0.1,0.6,time)
+	if alpha<=0.0: return
+	var unit:=size.y/720.0
+	var slot:=78.0*unit
+	var gap:=12.0*unit
+	var left:=size.x*0.5-(slot*4.0+gap*3.0)*0.5
+	var top:=size.y*0.778
+	var clock:=time if finale.stage=="combine" else 3.8+time
+	var geometry=preload("res://scripts/ui/legendary_module_geometry.gd")
+	var ids:=["legendary_stern","legendary_keel","legendary_sail","legendary_compass"]
+	for i in 4:
+		var box:=Rect2(left+i*(slot+gap),top,slot,slot)
+		var age:=clock-(0.9+i*0.42)
+		draw_rect(box,Color(0.055,0.07,0.14,0.86*alpha))
+		draw_rect(box,Color(Color("#d9aa4a") if age>0.0 else Color("#3b4468"),alpha),false,2.0*unit)
+		if age>0.0:
+			var scale_:=0.3*unit*(1.0+0.7*exp(-age*9.0))
+			draw_set_transform(box.get_center(),0.0,Vector2.ONE*scale_)
+			geometry.draw(self,ids[i],Color(Color("#ffd777"),alpha))
+			draw_set_transform(Vector2.ZERO)
+			if age<0.25: draw_rect(box,Color(Color("#ffd777"),alpha*(1.0-age*4.0)))
+		else:
+			draw_rect(Rect2(box.get_center()-Vector2.ONE*13.0*unit,Vector2.ONE*26.0*unit),Color(Color("#515a7c"),alpha))
+	var bar:=Rect2(left,top+slot+10.0*unit,slot*4.0+gap*3.0,8.0*unit)
+	draw_rect(bar,Color(Color("#232a44"),alpha))
+	if clock<2.6: draw_rect(Rect2(bar.position,Vector2(bar.size.x*0.62,bar.size.y)),Color(Color("#8fd6ff"),alpha))
+	else:
+		draw_rect(bar,Color(Color("#ffd777"),alpha))
+		var q:=clock-2.6
+		var random:=RandomNumberGenerator.new()
+		random.seed=4
+		for i in 20:
+			var width:=bar.size.x/20.0
+			var fly:=Vector2((random.randf()-0.5)*160.0*q,(random.randf()-0.5)*90.0*q)*unit
+			draw_rect(Rect2(bar.position+Vector2(i*width,0)+fly,Vector2(width-2.0,bar.size.y)),Color(Color("#8fd6ff"),alpha*clampf(1.0-q,0.0,1.0)))
+	if clock>=2.75: draw_string(_font,Vector2(0,top-14.0*unit),tr("hud.finale_unlock"),HORIZONTAL_ALIGNMENT_CENTER,size.x,int(26.0*unit),Color(Color("#ffe6a8"),alpha*smoothstep(2.75,3.0,clock)))
+
 func _update_cpp_cinematic() -> void:
 	if _cpp_ui.is_empty() or _loadout_icons==null:return
 	var bars: float=_cpp_ui.get("cinematic_bars",0.0)
@@ -1033,7 +1087,10 @@ func _update_cpp_cinematic() -> void:
 	var active: bool=int(_cpp_ui.phase)==Phase.Play
 	_speed_indicator.visible=active and bars<=0.0
 	var combat_visible := show_status and bars<=0.0 and int(_cpp_ui.phase) not in [Phase.Dying,Phase.Finishing,Phase.Ended]
-	_loadout_icons.visible=combat_visible or (active and bars>0.0 and not modules.is_empty())
+	var finale_shown:=false
+	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
+		if body.get("finale",{}).get("active",false):finale_shown=true
+	_loadout_icons.visible=not finale_shown and (combat_visible or (active and bars>0.0 and not modules.is_empty()))
 	_entrance_skip.visible=false
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		var intro: Dictionary=body.get("intro",{})

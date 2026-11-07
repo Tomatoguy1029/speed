@@ -9,4 +9,7 @@ script = ExtResource("1")
 technique = &"tail_sweep"
 category = &"single"
 display_name = "尻尾の薙ぎ払い"
+warn = 1.2
+active = 1.25
+recover = 2.8
 visual = ExtResource("visual")

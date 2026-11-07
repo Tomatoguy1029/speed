@@ -56,7 +56,7 @@ conditions = {
 "angle": 0.0,
 "angle_origin": 1,
 "distance_origin": 1,
-"half_angle": 71.6197243913529,
+"half_angle": 180.0,
 &"ignore_when_separated": true,
 "max": 400.0,
 "min": 0.0
@@ -65,7 +65,7 @@ conditions = {
 "angle": 0.0,
 "angle_origin": 1,
 "distance_origin": 1,
-"half_angle": 71.6197243913529,
+"half_angle": 180.0,
 &"ignore_when_separated": true,
 "max": 620.0,
 "min": 0.0
@@ -155,7 +155,7 @@ conditions = {
 "angle": 0.0,
 "angle_origin": 1,
 "distance_origin": 1,
-"half_angle": 71.6197243913529,
+"half_angle": 180.0,
 &"ignore_when_separated": true,
 "max": 650.0,
 "min": 0.0
