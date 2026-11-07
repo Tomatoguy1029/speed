@@ -243,7 +243,7 @@ Main (Node)
 
 | 編集元 | 役割 |
 |---|---|
-| `scripts/bosses/<ボス>/techniques/<技ID>.gd` | 公開する性能値の型・範囲・説明。C++への生成入力 |
+| `scripts/data_types/boss_techniques/<ボス>/<技ID>.gd` | 公開する性能値の型・範囲・説明。C++への生成入力 |
 | `data/bosses/<ボス>_moves/<技ID>.tres` | 技の値、表示名、見た目への参照 |
 | `scenes/bosses/<ボス>/<技ID>_visual.tscn` | 中心原点・正面+Xの予告とエフェクト。`Telegraph` が形の編集口 |
 | `scenes/attacks/*.tscn` | 弾・攻撃の見た目。既定と専用シーンを選べる |

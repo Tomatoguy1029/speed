@@ -46,7 +46,7 @@
 | 前脚の踏みつけ | 近距離・面 | 自機が正面の決めた範囲にいると、止まって前脚を高く上げる予告のあと、踏み下ろして前方の扇の範囲に衝撃を出す。扇の起点は両前足の接地点の中間とし、ポーズ編集の配置・回転・拡大縮小に追従する。予告は踏み下ろしの最初のコマ、当たり中は表示と同じコマの配置を使う。1回の攻撃で1回だけ当たる。扇の外へ抜けるか、踏み下ろした後の停止を攻める。動作の見た目は未決 |
 | 背後攻撃 | 近距離・面 | 自機が背後の決めた範囲へ回ると、背中を向けたまま止まり、体を赤く明滅させて構える。構えのあと決めた時間だけ、背中の後ろの円に当たりが有効になり、1回の攻撃で1回だけ当たる。背後にとどまらず、貫いて抜ける。動作の見た目は未決 |
 
-速射の矢と貫く強弓の矢は光の矢（`scripts/attacks/light_arrow.gd`）で飛び、惑星・月で止まる。貫く強弓は光の矢のコズミック色で描く。矢の雨と降り注ぐ矢は地形に関わらず降り、敵には当たらない。
+速射の矢と貫く強弓の矢は光の矢（`cpp/systems/attacks/light_arrow.cpp`）で飛び、惑星・月で止まる。貫く強弓は光の矢のコズミック色で描く。矢の雨と降り注ぐ矢は地形に関わらず降り、敵には当たらない。
 
 ### 3.1 降り注ぐ矢の置き方
 
@@ -162,10 +162,7 @@
 
 矢の雨は、まだ矢が着いていない帯を薄い色と縁の線で描き、走っている円を輪で描く。帯は円の走りに合わせて伸び、矢が着いた所から消える。矢は着弾点から画面の上方向へずらした位置から、落ちるほど速く下りて着き、同じ間に透明から不透明へキリっと変わる。着いた矢は決めた時間だけ刺さって残り、短く消える。
 
-`scenes/bosses/centaurus_presentation.tscn` を差し替えて、役者の `presentation_scene` に指定する。シーンは `bind_centaurus(actor)` で以下を接続する。
-
-- `presentation_event`：帆走の予告・開始・発射・帆をたたむ合図（`sail_windup`・`sail_run`・`sail_shot`・`sail_folded`）、登場、第2形態への移行、予告、発射前の警告、発射、矢の雨の開始と各トレースの開始、背後攻撃の当たりの開始、硬直、離脱、被弾、撃破、制限時間演出、守る雑魚の補充（`guard_called`）、降り注ぐ矢の射上げ・円の出現・降り始め（`shower_launched`・`shower_mark`・`shower_landed`）、跳び退きと着地（`leap`・`leap_landed`）、踏みつけの予告と当たり（`stomp_windup`・`stomp`）、扇状連射の予告と各発射（`fan_windup`・`fan_released`）。`cue`・`technique`・`phase`・`mode`・`position`・`angle`・`world_time` を渡す。
-- `presentation_advanced`：世界時間の進行。停止中はアニメーションも止まる。
+`scenes/bosses/centaurus_presentation.tscn` を表示シーンとして使う。`scripts/render/run_frame_view.gd` がC++の描画出力と出来事を `scripts/render/bosses/centaurus.gd` の `apply_frame()`・`frame_event()` へ渡す。位置・姿勢・技の段・予告と攻撃形状・世界時間を同じ戦闘状態から表示し、世界時間の停止中はアニメーションも止める。表示資源はランの表示の寿命で保持・解放する。
 
 表現の方針：
 
@@ -176,16 +173,16 @@
 
 ## 7. 実装・調整・接続
 
-- 降り注ぐ矢は `techniques/arrow_shower.gd` と `centaurus_moves/shower_chase.tres`・`shower_wall.tres`・`shower_path.tres`、踏みつけは `techniques/stomp.gd` と `centaurus_moves/stomp.tres`、扇状連射は `techniques/fan_volley.gd` と `centaurus_moves/fan_volley.tres` に置く。技スクリプトの基点は `scripts/bosses/centaurus/`、保存値の基点は `data/bosses/`。
-- 帆走の連射は `scripts/bosses/centaurus/techniques/sail_run.gd` と `data/bosses/centaurus_moves/sail_run.tres`、帆走の3動作は `data/visuals/centaurus_animation.tres` の `sail_windup`・`sail_run`・`sail_recovery` に置く。
-- 連携は `scripts/bosses/centaurus/techniques/combo_shower_shot.gd`・`combo_rain_volley.gd` と、同じIDの `data/bosses/centaurus_moves/*.tres` に置く。
+- 降り注ぐ矢は `scripts/data_types/boss_techniques/centaurus/arrow_shower.gd` と `centaurus_moves/shower_chase.tres`・`shower_wall.tres`・`shower_path.tres`、踏みつけは `scripts/data_types/boss_techniques/centaurus/stomp.gd` と `centaurus_moves/stomp.tres`、扇状連射は `scripts/data_types/boss_techniques/centaurus/fan_volley.gd` と `centaurus_moves/fan_volley.tres` に置く。技の実行は `cpp/bosses/centaurus/`、保存値の基点は `data/bosses/`。
+- 帆走の連射は `scripts/data_types/boss_techniques/centaurus/sail_run.gd` と `data/bosses/centaurus_moves/sail_run.tres`、帆走の3動作は `data/visuals/centaurus_animation.tres` の `sail_windup`・`sail_run`・`sail_recovery` に置く。
+- 連携は `scripts/data_types/boss_techniques/centaurus/combo_shower_shot.gd`・`combo_rain_volley.gd` と、同じIDの `data/bosses/centaurus_moves/*.tres` に置く。
 - 追加技の見た目は `scenes/bosses/centaurus/arrow_shower_visual.tscn`・`stomp_visual.tscn`・`fan_volley_visual.tscn` と `scripts/bosses/centaurus/additional_technique_visual.gd`、ポーズの差し替え口は `data/visuals/centaurus_animation.tres` に置く。
 
-技の動きと公開値は `scripts/bosses/centaurus/techniques/`、技の見た目は `scenes/bosses/centaurus/`、保存値は `data/bosses/centaurus_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
+技の実行は `cpp/bosses/centaurus/`、編集する性能値の型は `scripts/data_types/boss_techniques/centaurus/`、技の見た目は `scenes/bosses/centaurus/`、保存値は `data/bosses/centaurus_moves/` に置く。追加・名前・見た目の操作は[ボスAIの操作ガイド](../../dev/tools/boss-ai.md#技を追加名前と見た目を変える)、共通の構成は[設計書](../../architecture.md#61-敵とボスの-ai)を参照する。
 
 - 本体の数値（HP・装甲・歩く速さ・旋回・好む距離・離脱・位置取り・跳び退きの発動距離と跳ぶ距離・時間・再使用待ち、連れて出る守る雑魚の数・呼ぶ間隔・帆走の間の守る雑魚の速さとばらつき、第2形態へ移るHPの割合と帆を広げる時間）の正は [`speed/data/bosses/centaurus.tres`](../../../speed/data/bosses/centaurus.tres)、技別の性能（予告・矢の数と間隔・速さ・半径・射程・ダメージ・硬直・再使用待ち、強弓の本数と矢どうしの角度・発射前の警告の時間、矢の雨のトレースの回数・前方への距離・円の半径・長さ・速さ・曲がり具合・間隔、円が通ってから矢を落とし始めるまでの時間、矢を落とす間隔と数、降りる時間・不透明になる時間・降りる高さ・刺さって残る時間、背後攻撃の背中から範囲の中心までの距離・範囲の半径・当たりが有効な時間、降り注ぐ矢の置き方ごとの円の数・間隔・半径・予告の時間・着弾後の余韻・置く距離と割合、扇状連射の本数・扇の角度・回数・間隔・矢の速さと長さ、帆走の連射の弧の角度・走る時間・半径の範囲・射る間隔・矢の速さと長さ、前脚の踏みつけの範囲・予告・停止、進む先を塞ぐ発動条件の角度・距離・時間、各技の再使用待ち）は [`centaurus_moves/`](../../../speed/data/bosses/centaurus_moves/) とする。第2形態の値は、同じファイルの同じ名前に `_p2` を付けた項目に置き、第2形態では置いた項目だけを置き換える。「ボス行動」画面では、その項目の名前に「（第2形態）」を添えて示す。どれも試遊調整用の仮値。`use_def_stats` を有効にしてHP・装甲を専用データから読み、共通の敵HP・装甲倍率を掛ける。
 - 技の選択は共通フローで行う。`ai/centaurus_flow.tres` が区間・消費上限・共有スタミナ・休息を、`ai/centaurus_action_rules.tres` が技ごとの距離条件と消費を持つ。「ボス行動」画面のボスの選択に、ケンタウルス座がある。
-- `centaurus_boss_timeline.tres` の `attack` は、発射前の警告・発射・終了、矢の雨の開始、背後攻撃の当たりの開始のメソッドトラックを持つ。役者ごとに複製し、技の開始時に専用データの時間へ合わせて手動更新する。制限時間の一撃は `boss_final_strike.gd` の共通演出を使う。
+- 各技の予告・発射・判定・終了は `cpp/bosses/centaurus/` が世界時間で進める。制限時間の一撃は `cpp/bosses/flow/phase_controller.cpp` が判定し、表示へ出来事を渡す。
 - ステージ2の `boss_id` が `centaurus` を参照し、`boss_time` の時刻に登場する。撃破を最終勝利の接続点とし、共通のボス撃破演出と伝説モジュール（`legendary_sail`）獲得演出へ渡す。
 - `gyms/centaurus_trial.tscn` をF6で起動すると、敵・ルート実験場がステージ2の設定で開き、ケンタウルス座と守る雑魚を置いた試遊ができる。シーンのInspectorで、開始位置・無敵・試遊用の攻撃倍率・守る雑魚の数・繰り返す技・第2形態から始めるかを変える。役者の `lab_ranges()` が返す攻撃範囲を、実験場の攻撃範囲の表示が描く。ボスを選ぶと、構えていない間の背後攻撃の範囲も描く。実験場の配置からも `centaurus` を置ける。
 
