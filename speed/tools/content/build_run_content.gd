@@ -1216,7 +1216,7 @@ static func hydra_set_package(definition: BossDef, rules: Resource, config: Game
 	if _prepare_reference_fx(package.records) != OK: return {}
 	return package
 
-## 同じ入力の生成を一度で済ませる。実験場の作り直しの間だけ使う。
+## 同じ入力の生成を一度で済ませる。実験場ごとにリセットまで保持する。
 static var _package_memo = null
 static func begin_package_memo(memo := {}) -> void:
 	_package_memo = memo
@@ -1227,11 +1227,17 @@ static func _memoized(kind: String, inputs: Array, make: Callable) -> Dictionary
 	# 定義と行動データは複製されるので中身で見分ける。
 	var key := kind
 	for value in inputs: key += "/"+("-" if value==null else value if value is String else str(value.get_instance_id()) if value is GameConfig or value is RuntimeStage else BossProgram.fingerprint(value))
-	if not _package_memo.has(key): _package_memo[key] = make.call()
-	return _package_memo[key].duplicate(true)
+	# 調整するたびに旧版を溜めず、種類ごとに最後の入力と結果だけを持つ。
+	var slot := kind+"/"+String(inputs[0].id) if inputs[0] is EnemyDef or inputs[0] is BossDef else kind
+	var cached: Dictionary = _package_memo.get(slot,{})
+	if cached.get("key","")!=key:
+		cached = {"key":key,"value":make.call()}
+		_package_memo[slot] = cached
+	return cached.value.duplicate(true)
 
 static func boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
-	return _memoized("boss",[definition,config,stage,program],func(): return _boss_package(definition,config,stage,program))
+	var stage_values: Variant = [stage.time_limit,stage.legendary_module_id] if stage!=null else null
+	return _memoized("boss",[definition,config,stage_values,program],func(): return _boss_package(definition,config,stage,program))
 
 static func _boss_package(definition: BossDef, config: GameConfig, stage: RuntimeStage = null, program: Dictionary = {}) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"hydra",&"draco"]: return {}
@@ -2840,18 +2846,26 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 	var profiles_error: Error = preload("res://tools/content/build_visuals.gd").validate()
 	if profiles_error!=OK: return profiles_error
 	var previous_keys: Dictionary = previous_resources.keys if previous_resources!=null else {}
-	var manifest := _memoized("manifest",[var_to_bytes([paths,visuals,previous_keys]).hex_encode().sha256_text()],func(): return preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_keys))
+	# 資源探索が使う番号とパスだけを鍵にする。色・照明は参照先を変えない。
+	var visual_paths: Array = visuals.map(func(entry: Dictionary): return [entry.id,entry.path])
+	var manifest := _memoized("manifest",[var_to_bytes([paths,visual_paths,previous_keys]).hex_encode().sha256_text()],func(): return preload("res://tools/content/build_run_resources.gd").collect(paths,visuals,_catalog(),previous_keys))
 	if manifest.is_empty(): return ERR_INVALID_DATA
+	# 初回に割り当てた資源番号を次のライブ編集の入力にも対応させる。
+	if _package_memo!=null:
+		_package_memo.manifest.key = "manifest/"+var_to_bytes([paths,visual_paths,manifest.keys]).hex_encode().sha256_text()
 	paths = manifest.paths
 	var resolved_input := source_sha256.to_utf8_buffer()
-	resolved_input.append_array(_write_reference_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0])))
+	var resolved_content := _write_reference_content(data,PackedByteArray([0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]))
+	if resolved_content.is_empty(): return ERR_INVALID_DATA
+	resolved_input.append_array(resolved_content)
 	resolved_input.append_array("\n".join(paths).to_utf8_buffer())
 	resolved_input.append_array(var_to_bytes(appearance_metadata))
 	resolved_input.append_array(var_to_bytes([stage.background_color,stage.backgrounds.map(func(item): return [item.texture_path,item.offset,item.scale,item.rotation_degrees,item.display_tint(),item.bounds(),item.parallax,item.fire_preset_path,item.fire_offset,item.fire_scale]),stage.fire_uses]))
 	resolved_input.append_array(var_to_bytes(manifest.hashes))
 	resolved_input.append_array(var_to_bytes([manifest.keys,manifest.equipment,manifest.order,manifest.signatures,visuals]))
 	input_sha256 = Schema.sha256(resolved_input).hex_encode()
-	var bytes := _write_reference_content(data,input_sha256.hex_decode())
+	# 署名計算の時点で固定FXは解決済み。画像由来の表を二度生成しない。
+	var bytes := Schema.write_content(data,input_sha256.hex_decode())
 	if bytes.is_empty() or not ClassDB.class_exists(&"SpeedRunCore"): return ERR_INVALID_DATA
 	var validator = ClassDB.instantiate(&"SpeedRunCore")
 	if not validator.configure_content(bytes): return ERR_INVALID_DATA

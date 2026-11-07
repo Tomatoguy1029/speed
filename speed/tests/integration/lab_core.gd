@@ -12,6 +12,11 @@ func check(ok: bool, label: String) -> void:
 		push_error("[lab_core] " + label)
 
 func _ready() -> void:
+	if "--cpp-lab-appearance-edits" in OS.get_cmdline_user_args():
+		await cpp_lab_appearance_edits()
+		print("[cpp_lab_appearance_edits] passed=%d failed=%d" % [passed,failed])
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-lab-operation-ui" in OS.get_cmdline_user_args() or "--cpp-lab-undo-only" in OS.get_cmdline_user_args() or "--cpp-lab-appearance-only" in OS.get_cmdline_user_args() or "--cpp-lab-paint-display" in OS.get_cmdline_user_args():
 		await cpp_lab_operation_ui()
 		print("[実験場の実操作] 成功=%d 失敗=%d" % [passed,failed])
@@ -542,3 +547,74 @@ func cpp_lab_boss() -> void:
 	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"ボス編集後の読取と通知配信が成功する")
 	lab.queue_free()
 	await get_tree().process_frame
+
+## 外観の連続編集は時計・保持済み資源・判定を守り、表示だけなら戦闘生成を呼ばない。
+func cpp_lab_appearance_edits() -> void:
+	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
+	add_child(lab)
+	await lab.reset({"empty":true})
+	check(lab.run!=null,"外観編集の検査用ランを開始する")
+	if lab.run==null: lab.free(); return
+	lab.perform("spawn",{"type":"biter","pos":[800,0]})
+	var id: int = lab.run.enemies.table.id[lab.selected]
+	lab.perform("spawn",{"type":"drifter","pos":[-800,0]})
+	var other: int = lab.run.enemies.table.id[lab.selected]
+	for n in 120: lab.step()
+	var at: int = lab.tick
+	var original_radius: float = lab.run.enemies.table.r[lab.row_for_id(id)] / lab.run.enemies.def_of(&"biter").visual_value("scale",1.0) / lab.run.enemies.def_of(&"biter").visual_value("collision_scale",1.0)
+	var other_radius: float = lab.run.enemies.table.r[lab.row_for_id(other)]
+	var position: Vector2 = lab.run.enemies.table.pos[lab.row_for_id(id)]
+	var held_resources: Resource = lab.scene.cpp_resources
+	var held_visuals: Array = held_resources.visuals.duplicate(true)
+	var held_enemy: EnemyDef = lab.run.enemies.def_of(&"biter")
+	var held_boss: BossDef = lab.run.bosses.definitions[&"monoceros"]
+	var boss_parts := held_boss.part_appearance.duplicate(true)
+	var signature: String = lab.bridge.read_recording(true).value.identity.payload_sha256
+	var builder = load("res://tools/content/build_run_content.gd")
+	var builds: int = builder.preparation_build_count
+	var index_path: String = lab._output.path_join("stage_%d.json" % lab._source.index)
+	var index_hash := FileAccess.get_sha256(index_path)
+	for ambient in [0.5,0.7]:
+		check(lab.perform("parameter",{"type":"biter","key":"visual.ambient","value":ambient}),"照明を連続変更できる")
+	var visual_id: int = lab._source.resources.enemy_ids.find("biter")+6
+	var entries: Array = lab.scene.cpp_resources.visuals.filter(func(entry): return entry.id==visual_id)
+	check(entries.size()==1 and is_equal_approx(entries[0].settings.ambient,0.7),"照明を現在の表示定義へ反映する")
+	check(not is_equal_approx(held_enemy.visual_value("ambient",-1.0),0.7),"保持した敵定義の照明を変更しない")
+	check(lab.perform("boss_appearance",{"type":"monoceros","parts":{"body":{"color":"ff8844","offset":[2,3]}}}),"ボスの色と位置を表示専用で変更できる")
+	check(lab.scene.cpp_resources.visuals.any(func(entry): return entry.get("boss","")=="monoceros" and entry.appearance.body.color=="ff8844"),"ボスの表示定義へ配色を反映する")
+	check(held_boss.part_appearance==boss_parts and held_resources.visuals==held_visuals,"以前の定義と表示資源を変更しない")
+	await lab.undo_edit()
+	check(lab.run.bosses.definitions[&"monoceros"].part_appearance==boss_parts,"表示専用の編集を取り消せる")
+	await lab.redo_edit()
+	check(lab.run.bosses.definitions[&"monoceros"].part_appearance.body.color=="ff8844","表示専用の編集をやり直せる")
+	check(builder.preparation_build_count==builds and lab.bridge.read_recording(true).value.identity.payload_sha256==signature,"照明・ボス外観の変更と取消で戦闘定義を生成・交換しない")
+	var memo_size: int = lab._program_memo.size()
+	for factor in [1.1,1.2,1.3]:
+		var began := Time.get_ticks_usec()
+		check(lab.perform("parameter",{"type":"biter","key":"visual.scale","value":factor}),"サイズを連続変更できる")
+		print("[appearance_edit] scale_ms=",(Time.get_ticks_usec()-began)/1000.0)
+		check(is_equal_approx(lab.run.enemies.table.r[lab.row_for_id(id)],original_radius*factor),"サイズの変更を当たり判定にも従来どおり反映する")
+	check(lab._program_memo.size()==memo_size,"サイズを連続変更しても旧版の生成結果を溜めない")
+	await lab.undo_edit()
+	check(is_equal_approx(lab.run.enemies.table.r[lab.row_for_id(id)],original_radius*1.2),"サイズの取消で判定を戻す")
+	await lab.redo_edit()
+	check(lab.perform("parameter",{"type":"biter","key":"visual.collision_scale","value":1.4}),"当たり判定倍率も更新できる")
+	check(is_equal_approx(lab.run.enemies.table.r[lab.row_for_id(id)],original_radius*1.3*1.4),"サイズと当たり判定倍率を掛け合わせる")
+	check(lab.tick==at and lab.run.enemies.table.pos[lab.row_for_id(id)]==position and is_equal_approx(lab.run.enemies.table.r[lab.row_for_id(other)],other_radius),"連続編集で時計・配置・他の種類の判定を変えない")
+	check(lab.perform("config",{"key":"base_attack","value":37.0}) and is_equal_approx(lab.run.cfg.base_attack,37.0),"共通設定の編集は古い生成結果を使わない")
+	check(lab.perform("parameter",{"type":"biter","key":"visual.scale","value":1.5}),"共通設定変更後もサイズを変更できる")
+	builds = builder.preparation_build_count
+	var unchanged_history: int = lab.history.size()
+	for command in [["config",{"key":"base_attack","value":37.0}],["parameter",{"type":"biter","key":"visual.scale","value":1.5}]]:
+		check(lab.perform(command[0],command[1]),"同じ値の再確定を受け付ける")
+	check(builder.preparation_build_count==builds and lab.history.size()==unchanged_history,"同じ値の再確定で生成や取消履歴を増やさない")
+	var before: Dictionary = lab.run.enemies.def_of(&"biter").visual_settings.duplicate(true)
+	var history: int = lab.history.size()
+	check(not lab.perform("parameter",{"type":"biter","key":"visual.scale","value":NAN}) and lab.run.enemies.def_of(&"biter").visual_settings==before and lab.history.size()==history,"不正な外観値を部分変更せず拒否する")
+	var fresh := {}
+	check(builder.build(lab._source,lab._config,lab._output,"実験場".sha256_text(),lab._definitions,lab._formation_sources,lab._boss_definitions,lab.scene.cpp_resources,lab._boss_programs,PackedStringArray(),false,fresh)==OK,"同じ入力をキャッシュなしでも生成できる")
+	if fresh.has("bytes"):
+		check(fresh.bytes.slice(56,88).hex_encode()==lab.bridge.read_recording(true).value.identity.payload_sha256,"キャッシュ経路と通常生成の戦闘バイナリが一致する")
+		check(fresh.resources.visuals==lab.scene.cpp_resources.visuals,"キャッシュ経路と通常生成の外観が一致する")
+	check(FileAccess.get_sha256(index_path)==index_hash,"連続編集では生成済みの起動ファイルを書き換えない")
+	lab.free()

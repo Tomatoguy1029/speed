@@ -178,6 +178,7 @@ func _rebuild() -> void:
 	_source.resources.enemy_ids = PackedStringArray()
 	_load_support_memo()
 	_program_memo = {}
+	RESOURCES.begin_batch()
 	BUILDER.begin_package_memo(_program_memo)
 	_definitions = {}
 	for id in _baseline_definitions:
@@ -201,6 +202,7 @@ func _rebuild() -> void:
 	for id in spec.get("boss_overrides",{}):
 		if not _boss_definitions.has(StringName(id)):
 			BUILDER.end_package_memo()
+			RESOURCES.end_batch()
 			last_error = {"ok":false,"message":"このボスの編集はまだ移行していません: "+String(id)}
 			run = null
 			return
@@ -211,6 +213,7 @@ func _rebuild() -> void:
 	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions,null,_boss_programs)
 	RESOURCES.save_file_memo()
 	BUILDER.end_package_memo()
+	RESOURCES.end_batch()
 	_save_support_memo()
 	if built!=OK:
 		last_error = {"ok":false,"message":"実験の定義を生成できません: "+error_string(built)}
@@ -390,6 +393,7 @@ func perform(kind: String, args := {}) -> bool:
 	if seeking or not is_instance_valid(run): return false
 	var inverse := _inverse_edit(kind,args) if kind!="input" else []
 	if not _apply(kind,args): return false
+	if last_error.get("unchanged",false): return true
 	if kind!="input":
 		edit_undo.append({"history":history.duplicate(true),"end":furthest,"tick":tick,"commands":inverse,"opposite":[{"kind":kind,"args":args.duplicate(true)}]})
 		if edit_undo.size()>20: edit_undo.pop_front()
@@ -444,7 +448,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			var next_sources := _formation_sources.duplicate(true)
 			next_sources.append(source)
 			var bundle := {}
-			var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,next_sources,_boss_definitions,null,_boss_programs,PackedStringArray(),false,bundle)
+			var built: Error = _build_live_bundle(_source,_config,_definitions,next_sources,_boss_definitions,bundle)
 			if built!=OK: return {"ok":false,"message":"配置の定義を生成できません"}
 			var result: Dictionary = bridge.replace_scenario("formation",{"layout":int(args.get("layout",0)),"entry":int(args.get("entry",0))},bundle.bytes)
 			if result.ok: _formation_sources = next_sources
@@ -536,7 +540,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 				if not ContentManager.phases.has(StringName(id)): return {"ok":false,"message":"時間帯の定義がありません"}
 				next.phases.append(ContentManager.phases[StringName(id)].duplicate(true))
 			var bundle := {}
-			var built: Error = BUILDER.build(next,_config,_output,"実験場".sha256_text(),_definitions,_formation_sources,_boss_definitions,null,_boss_programs,PackedStringArray(),false,bundle)
+			var built: Error = _build_live_bundle(next,_config,_definitions,_formation_sources,_boss_definitions,bundle)
 			if built!=OK: return {"ok":false,"message":"時間帯の定義を生成できません"}
 			var result: Dictionary = bridge.replace_scenario("phase_set",{},bundle.bytes)
 			if result.ok:
@@ -566,8 +570,8 @@ func set_boss_program(id: String, program: Dictionary) -> Dictionary:
 	return result
 
 func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
-	var next := _definitions.duplicate(true)
-	var bosses := _boss_definitions.duplicate(true)
+	var next := _definitions.duplicate()
+	var bosses := _boss_definitions.duplicate()
 	var config: GameConfig = _config.duplicate(true) if kind=="config" else _config
 	var type := StringName(args.get("type",""))
 	var key := String(args.get("key",""))
@@ -609,25 +613,41 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		elif key in ["hp","toughness","armor","speed","radius","accel","turn","xp","weak_arc","attack_weight","hitstop_multiplier"]:
 			definition.set(key,clampi(int(args.value),-1,1) if key=="toughness" else maxf(0.01 if key in ["hp","radius"] else 0.0,float(args.value)))
 		else: return {"ok":false}
-	if kind=="armor_paint":
-		# 塗装は表示専用。戦闘バイナリを生成せず、対象の外観だけを差し替える。
-		var resources = scene.cpp_resources.duplicate(true)
+	if kind!="boss_program":
+		var original: Resource = _config if kind=="config" else _boss_definitions[type] if kind in ["boss_parameter","boss_appearance"] else _definitions[type]
+		var edited: Resource = config if kind=="config" else bosses[type] if kind in ["boss_parameter","boss_appearance"] else next[type]
+		if preload("res://tools/content/build_boss_program.gd").fingerprint(original)==preload("res://tools/content/build_boss_program.gd").fingerprint(edited):
+			return {"ok":true,"unchanged":true}
+	var lighting_edit := kind=="parameter" and key.begins_with("visual.") and key not in ["visual.scale","visual.collision_scale"]
+	if kind in ["armor_paint","boss_appearance"] or lighting_edit:
+		# 表示だけの編集は戦闘定義を作り直さない。停止中の別Sessionへ変更を漏らさない。
+		var resources = scene.cpp_resources.duplicate()
+		resources.visuals = scene.cpp_resources.visuals.duplicate(true)
 		for entry: Dictionary in resources.visuals:
+			if kind=="boss_appearance":
+				if entry.get("boss","")==String(type): entry.appearance = bosses[type].part_appearance.duplicate(true)
+				continue
 			if entry.role!=6 or entry.id!=_source.resources.enemy_ids.find(String(type))+6: continue
-			var look: EnemyLook = load(entry.path)
-			entry.paint = look.colors_key(next[type].armor_colors)
-			entry.hull_preview = look.preview_key(next[type].armor_colors)
-			if entry.get("ruler",false): entry.lower_paint = look.split_other.colors_key(next[type].armor_colors) if look.split_other!=null else ""
+			if lighting_edit:
+				var field := key.trim_prefix("visual.")
+				var lighting: Resource = load("res://data/visuals/enemy_lighting.tres")
+				entry.settings[field] = next[type].visual_value(field,lighting.get(field))
+			else:
+				var look: EnemyLook = load(entry.path)
+				entry.paint = look.colors_key(next[type].armor_colors)
+				entry.hull_preview = look.preview_key(next[type].armor_colors)
+				if entry.get("ruler",false): entry.lower_paint = look.split_other.colors_key(next[type].armor_colors) if look.split_other!=null else ""
 		_definitions = next
+		_boss_definitions = bosses
 		run.enemies.data.definitions = next
-		_replace_visuals(resources, type)
+		run.bosses.definitions = bosses
+		_replace_visuals(resources,type if kind=="armor_paint" else &"")
 		return {"ok":true}
 	var bundle := {}
-	# 行動データの編集では敵と他のボスが変わらないので、前回の結果を使い回す。
-	if kind!="boss_program": _program_memo = {}
-	BUILDER.begin_package_memo(_program_memo)
-	var built: Error = BUILDER.build(_source,config,_output,"実験場".sha256_text(),next,_formation_sources,bosses,scene.cpp_resources,_boss_programs,PackedStringArray(),false,bundle)
-	BUILDER.end_package_memo()
+	# サイズ・判定を含む編集も、入力が変わった種類だけ再生成する。
+	# 共通設定は全種類へ影響するので、前回の結果を残さない。
+	if kind=="config": _program_memo = {}
+	var built := _build_live_bundle(_source,config,next,_formation_sources,bosses,bundle)
 	if built!=OK: return {"ok":false,"message":"編集の定義を生成できません"}
 	var result: Dictionary = bridge.replace_definition("config" if kind=="config" else String(type),bundle.bytes,"config" if kind=="config" else "boss_parameter" if kind in ["boss_parameter","boss_appearance","boss_program"] else "parameter")
 	if result.ok:
@@ -638,6 +658,15 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		run.cfg = config
 		run.enemies.data.definitions = next
 		_replace_visuals(bundle.resources)
+	return result
+
+## 数値・配置・時間帯の編集で、同じ固定画像の解析と種類の生成を繰り返さない。
+func _build_live_bundle(stage: RuntimeStage, config: GameConfig, definitions: Dictionary, formations: Array, bosses: Dictionary, bundle: Dictionary) -> Error:
+	RESOURCES.begin_batch()
+	BUILDER.begin_package_memo(_program_memo)
+	var result: Error = BUILDER.build(stage,config,_output,"実験場".sha256_text(),definitions,formations,bosses,scene.cpp_resources,_boss_programs,PackedStringArray(),false,bundle)
+	BUILDER.end_package_memo()
+	RESOURCES.end_batch()
 	return result
 
 ## 既存のScopeを複製して、巻き戻し用Sessionの画像を変更しない。
