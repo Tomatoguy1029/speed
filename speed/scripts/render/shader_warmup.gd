@@ -11,6 +11,7 @@ var _material_index := 0
 var _batch := 1
 var _batch_count := 0
 var _batch_longest := 0.0
+var _frame_started_usec := 0
 var _layers: Array[CanvasLayer] = []
 var _texture: Texture2D
 var _lit_texture: CanvasTexture
@@ -124,8 +125,9 @@ func _collect_materials() -> void:
 			_scope.warm_materials.append(material)
 		elif resource is ShaderMaterial: _scope.warm_materials.append(resource)
 
-func _process(delta: float) -> void:
+func _process(_delta: float) -> void:
 	if _scope == null: return
+	var now := Time.get_ticks_usec()
 	if _scope.cancelled:
 		_scope.warming = false
 		_scope = null
@@ -139,7 +141,9 @@ func _process(delta: float) -> void:
 	# 並べる数はフレームの長さを見て増減し、ロード表示を止めない範囲でまとめる。
 	if _frames > 0:
 		_frames += 1
-		_batch_longest = maxf(_batch_longest, delta)
+		# deltaは長い停止やtime_scaleの影響を受けるため、CPU・GPU待ちを含む実時間で判定する。
+		_batch_longest = maxf(_batch_longest, float(now - _frame_started_usec) / 1_000_000.0)
+		_frame_started_usec = now
 		if _frames < 3: return
 		for layer in _layers:
 			for child in layer.get_children():
@@ -159,6 +163,8 @@ func _process(delta: float) -> void:
 		for index in _layers.size():
 			_geometry(_layers[index], _scope.warm_materials[_material_index + offset], _lit_texture if index == 1 else _texture)
 	_batch_longest = 0.0
+	# この回の幾何の作成時間も、次のフレームで測る待ち時間へ含める。
+	_frame_started_usec = now
 	_frames = 1
 func _finish() -> void:
 	_scope.warmup_complete = true
