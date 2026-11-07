@@ -56,10 +56,9 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 
 @export_group("報酬演出")
 @export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
-@export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
+## 英雄の力の獲得演出の長さ（Esc で飛ばせる）
+@export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 2.3
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
-## 800×450 の演出座標。任意で setup(HeroDef) / set_progress(0..1) を受け取る Control シーン。
-@export var ult_cutin_scene: PackedScene
 
 var _cards_accept_at := 0
 var _reward_advanced_frame := -1
@@ -71,7 +70,7 @@ var _card_discard: Dictionary = {}
 var _cpp_retry: Button
 var _cpp_cancel: Button
 
-## 通常 ULT のカットインと独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
+## 英雄の力の獲得演出と独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
 @export_group("伝説獲得の仮演出")
 @export var legendary_reveal_scene: PackedScene
 @export_file("*.tscn") var legendary_reveal_path := "res://scenes/run/legendary_reveal.tscn"
@@ -503,6 +502,12 @@ func _draw_hero_slot_values(at: Vector2,power: StringName,active: float,cooldown
 			draw_circle(center + (point - bounds.get_center()) * factor, 1, gold)
 	if active > 0.0:
 		draw_rect(rect, Color(gold, 0.2 + 0.1 * sin(Time.get_ticks_msec() / 120.0)))
+	# 獲得演出で粒が機体へ流れ込みきるころ、特別枠も光る
+	var acquire := acquire_state()
+	if not acquire.is_empty():
+		var t := float(acquire.time) / maxf(float(acquire.seconds), 0.01)
+		var flash := smoothstep(0.88, 0.93, t) * (1.0 - smoothstep(0.93, 1.0, t))
+		if flash > 0.0: draw_rect(rect.grow(2.0 * flash), Color(1.0, 0.95, 0.75, 0.85 * flash))
 	if cooldown > 0.0 and definition != null and definition.cooldown > 0.0:
 		var k := clampf(cooldown / definition.cooldown, 0, 1)
 		draw_rect(Rect2(rect.position + Vector2(0, rect.size.y * (1 - k)), Vector2(rect.size.x, rect.size.y * k)), Color(0, 0, 0, 0.65))
@@ -597,6 +602,10 @@ func _exit_tree() -> void:
 	AudioManager.end_dash()
 
 ## C++の値のスナップショットだけを保持する。表示時計と乱数はHUDが所有する。
+## 英雄の力の獲得演出の英雄と経過秒（reward_presentation.acquire_state）。フィールドの演出とカメラが読む
+func acquire_state() -> Dictionary:
+	return _rewards.acquire_state() if _rewards != null else {}
+
 func apply_snapshot(ui: Dictionary) -> void:
 	var previous: Dictionary = _cpp_ui.get("cards",{})
 	var rerolls := int(_cpp_ui.get("rerolls_left",0))
@@ -639,9 +648,8 @@ func _ready_cpp() -> void:
 	_prepare_cpp_finish()
 	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
 	_rewards.continuation_seconds = continuation_seconds
-	_rewards.ult_cutin_seconds = ult_cutin_seconds
+	_rewards.ult_acquire_seconds = ult_acquire_seconds
 	_rewards.ult_details_seconds = ult_details_seconds
-	_rewards.ult_cutin_scene = ult_cutin_scene
 	_rewards.add_module_icon = _add_icon
 	add_child(_rewards)
 	_rewards.active_changed.connect(func(active: bool):
@@ -869,6 +877,11 @@ func _input_cpp(event: InputEvent) -> void:
 		if float(_cpp_ui.get("boss_finish",{}).get("elapsed",0.0))>=0.35 and not event.is_echo() and (event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_accept")):
 			bridge.command("skip_finish")
 			get_viewport().set_input_as_handled()
+		return
+	# 英雄の力の獲得演出は Esc（ポーズのキー）で飛ばす
+	if _menu_overlay==null and _rewards.is_acquiring() and event.is_action_pressed(&"pause") and not event.is_echo():
+		_rewards.skip_acquire()
+		get_viewport().set_input_as_handled()
 		return
 	if _menu_overlay==null and event.is_action_pressed(&"pause") and not event.is_echo():
 		bridge.command("pause",{"paused":int(_cpp_ui.phase)!=Phase.Paused})
