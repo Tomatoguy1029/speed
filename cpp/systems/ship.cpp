@@ -3,6 +3,7 @@
 #include "boss_contact_feedback.h"
 #include "geometry.h"
 #include "../behaviors/heroes/leo.h"
+#include "../behaviors/heroes/gemini.h"
 #include "../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
@@ -139,6 +140,9 @@ bool SpeedRunCore::step_ship_input(double real_dt, double world_dt, const speed:
     // しし座の獅子は弾かれず、獅子の体で当たる
     if (speed::LeoBehavior::active(runtime)) { if (runtime.state.combat_ready) speed::LeoBehavior::contact(runtime, from, runtime.state.ship.pos); }
     else if (runtime.state.combat_ready) collide_ship(from, c.ship_radius);
+    if (runtime.state.phase!=Phase::Play) return true;
+    // ふたご座の影も、機体の右横で機体と同じ体当たりをする
+    speed::GeminiBehavior::ram(runtime, from, [&](Vector2 twin_from) { return runtime.state.combat_ready && collide_ship(twin_from, c.ship_radius); });
     if (runtime.state.phase!=Phase::Play) return true;
     speed::FieldSystem::collide_ship(runtime);
     if (!runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.heading = runtime.state.ship.vel.normalized();
