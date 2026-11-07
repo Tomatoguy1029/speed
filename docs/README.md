@@ -15,7 +15,7 @@
 | `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](game/catalog/rules.md) |
 | `docs/game/stages/` | ステージごとの個別仕様（`stage-1.md`〜`stage-5.md`） |
 | `docs/game/bosses/` | ボスごとの詳しい仕様。ステージの個別仕様からリンクする |
-| `docs/dev/` | 制作手順。ステージ制作の進め方とAI向けの参照 |
+| `docs/dev/` | 制作手順。ステージ制作の進め方、AI向けの参照、演出の試作の移植 |
 | `docs/dev/tools/` | 制作ツールの一覧と、入口ごとの短い操作ガイド |
 
 置ける文書は次のものだけ。増やすときは、この表と `tools/check_docs.py` を同じ作業で直す。
@@ -38,6 +38,7 @@
 | [game/bosses/draco.md](game/bosses/draco.md) | りゅう座の個別仕様。戦闘・行動判断の要件・素材と演出・最終決着 |
 | [dev/stage-production.md](dev/stage-production.md) | ステージ制作ガイド。制作者が使う制作・操作・試遊調整の入口 |
 | [dev/stage-production-ai.md](dev/stage-production-ai.md) | AI向けの制作参照。編集先・記録分析・変更確認の進め方 |
+| [dev/fx-porting.md](dev/fx-porting.md) | 演出の試作の移植。HTML試作の見た目を本番で再現するための確認表と比べ方 |
 | [dev/tools/index.md](dev/tools/index.md)・`dev/tools/*.md` | Godotの制作ツール一覧と各ツールの操作・保存範囲 |
 
 タスク・担当・進捗・残件は、Git管理対象外の `.local/speed-work-items.md` に集約し、ほかの文書は参照先を案内する。採用前の案、計測・実装の報告、特定の作業のための計画・引継ぎは、会話や各自のローカルに置く。

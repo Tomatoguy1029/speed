@@ -16,7 +16,7 @@ ALLOWED = {
     "docs/game/catalog": None,
     "docs/game/stages": {f"stage-{n}.md" for n in range(1, 6)},
     "docs/game/bosses": None,
-    "docs/dev": {"stage-production.md", "stage-production-ai.md"},
+    "docs/dev": {"stage-production.md", "stage-production-ai.md", "fx-porting.md"},
     "docs/dev/tools": {
         "index.md", "stage-launch.md", "enemy-lab.md", "visual-editor.md",
         "background-editor.md", "data-editor.md", "boss-ai.md",

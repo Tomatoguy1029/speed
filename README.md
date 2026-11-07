@@ -128,7 +128,7 @@ python3 tools/dev/workspace.py create <名前> --with-generated
 | `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
 | `docs/game/stages/` | ステージ1〜5の個別仕様（例：[ステージ4](docs/game/stages/stage-4.md)） |
 | `docs/game/bosses/` | ボスの個別仕様（[うみへび座](docs/game/bosses/hydra.md)） |
-| `docs/dev/` | 制作手順：[ステージ制作ガイド](docs/dev/stage-production.md)・[AI向けの制作参照](docs/dev/stage-production-ai.md) |
+| `docs/dev/` | 制作手順：[ステージ制作ガイド](docs/dev/stage-production.md)・[AI向けの制作参照](docs/dev/stage-production-ai.md)・[演出の試作の移植](docs/dev/fx-porting.md) |
 | `demo/docs/` | demo の仕様・課題 |
 | [AGENTS.md](AGENTS.md) | 本番開発と共通の作業方針 |
 | [demo/AGENTS.md](demo/AGENTS.md) | 移行前の指示を保存した demo 向け作業方針 |
