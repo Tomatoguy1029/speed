@@ -16,6 +16,7 @@ var _canvas: Control
 var _picture: Control
 var _text: Label
 var _next: Button
+var _auto_play: Button
 var _hint: Label
 var _stars: Array[TextureRect] = []
 var _transition: Tween
@@ -60,11 +61,16 @@ func _ready() -> void:
 	_hint.position = Vector2(82, 328)
 	_hint.add_theme_font_size_override("font_size", 9)
 	_hint.modulate = Color("92a7b3")
-	_hint.text = tr("intro.continue")
+	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_hint.z_index = 2
 	_canvas.add_child(_hint)
 	_next = _button("NextIntro", tr("intro.next"), Vector2(492, 325), Vector2(66, 20))
 	_next.pressed.connect(advance)
+	_auto_play = _button("AutoPlayIntro", "", Vector2(378, 325), Vector2(106, 20))
+	_auto_play.toggle_mode = true
+	_auto_play.set_pressed_no_signal(bool(SaveManager.settings.get("intro_auto_advance", false)))
+	_auto_play.toggled.connect(_set_auto_play)
+	_update_playback_labels()
 	var skip := _button("SkipIntro", tr("intro.skip"), Vector2(548, 10), Vector2(80, 23))
 	skip.pressed.connect(_finish)
 	resized.connect(_layout)
@@ -88,6 +94,16 @@ func _button(node_name: String, caption: String, at: Vector2, dimensions: Vector
 	_canvas.add_child(button)
 	button.size = dimensions
 	return button
+
+func _set_auto_play(enabled: bool) -> void:
+	SaveManager.set_setting("intro_auto_advance", enabled)
+	# 切替前の待ち時間を持ち越さず、今の文章から読み進める。
+	_hold = 0.0
+	_update_playback_labels()
+
+func _update_playback_labels() -> void:
+	_auto_play.text = tr("intro.auto_on" if _auto_play.button_pressed else "intro.auto_off")
+	_hint.text = tr("intro.auto_hint" if _auto_play.button_pressed else "intro.continue")
 
 func _layout() -> void:
 	if _canvas == null:
@@ -161,7 +177,7 @@ func _process(delta: float) -> void:
 		_text.visible_characters = mini(int(_characters), total)
 		if _text.visible_characters == total:
 			_next.text = tr("intro.next")
-	else:
+	elif _auto_play.button_pressed:
 		_hold += delta
 		if _hold >= text_hold_seconds:
 			advance()

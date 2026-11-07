@@ -44,6 +44,7 @@ func _build() -> void:
 		1:
 			_slider_row("screen_shake", tr("settings.screen_shake"))
 			_toggle("hitstop", "settings.hitstop")
+			_toggle("intro_auto_advance", "settings.intro_auto_advance")
 			_section(tr("settings.window_mode"))
 			_display_dropdown()
 		2:
