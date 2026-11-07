@@ -32,6 +32,9 @@ var _hero_fire_canvas: DrawLayer
 const HeroPowers := preload("res://scripts/render/equipment/heroes.gd")
 var _hero_power_visual: HeroPowers
 var _hero_canvas: DrawLayer
+## 英雄の星座を解放したときの獲得演出（hero_acquire.gd）と、報酬表示から受けたその進み（reward_presentation.acquire_state）
+var hero_acquire: Node2D
+var acquire_state: Dictionary = {}
 var _hero_frame := {}
 var _hero_aura: MeshInstance2D
 var _hero_material: ShaderMaterial
@@ -224,6 +227,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_hero_fire_canvas.draw_fn = _hero_power_visual.draw_fire
 	hero_sky.add_child(_hero_fire_canvas)
 	_hero_power_visual.setup(_pixel,hero_sky,_layer(2))
+	hero_acquire = preload("res://scripts/render/hero_acquire.gd").new()
+	hero_acquire.px = _pixel
+	mark_layer.add_child(hero_acquire)
 	_hero_canvas = DrawLayer.new()
 	_hero_canvas.draw_fn = _draw_hero_values
 	_layer(2).add_child(_hero_canvas)
@@ -1641,6 +1647,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
 	_hero_power_visual.pipeline = pipeline
 	_hero_power_visual.frame_tick(effect_dt,_ship_visual_position if _ship_visual_position.is_finite() else ui.ship.ship_pos,ui.get("hero",{}),ui.ship.ship_heading,ui.ship_vel,_ship_transform,{"drones":Array(ui.get("escort",{}).get("drones",[]))+Array(ui.get("interceptor",{}).get("drones",[]))})
+	# 獲得演出は止めた時間の中で進むので、実時間の dt で進める
+	hero_acquire.tick(dt,acquire_state,ui.get("hero",{}),_ship_visual_position if _ship_visual_position.is_finite() else ui.ship.ship_pos,1.0/maxf(0.01,float(frame.camera.zoom)))
 	# しし座が効いている間は機体の代わりに獅子を、ふたご座の間は形だけ残した光の機体を描くので、機体を隠す
 	_lion_on = HeroPowers.lion_active(ui.get("hero",{})) or _hero_power_visual.twin_light()>0.5
 	for id: int in [17,18]:

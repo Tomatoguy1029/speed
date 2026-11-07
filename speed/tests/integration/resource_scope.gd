@@ -9,7 +9,7 @@ func _ready() -> void:
 	var session := RunManager.create_session(self, {"lab": true, "seed": 42}, false)
 	session.auto_step = false
 	for path in ["res://assets/pixel/meteor_spritesheet.png", "res://assets/pixel/drone.png",
-		"res://assets/pixel/airship.png", "res://scenes/run/ult_cutin.tscn", "res://scenes/run/legendary_reveal.tscn"]:
+		"res://assets/pixel/airship.png", "res://scenes/run/legendary_reveal.tscn"]:
 		check(not ResourceLoader.has_cached(path), "表示なしのランが専用資源を読まない: " + path)
 	session.free()
 	await get_tree().process_frame
@@ -20,7 +20,7 @@ func _ready() -> void:
 	session = RunManager.create_session(self, {"lab": true, "seed": 42, "config": config}, true)
 	session.auto_step = false
 	for path in ["res://assets/pixel/meteor_spritesheet.png", "res://assets/pixel/drone.png",
-		"res://scenes/run/ult_cutin.tscn", "res://scenes/run/legendary_reveal.tscn"]:
+		"res://scenes/run/legendary_reveal.tscn"]:
 		check(not ResourceLoader.has_cached(path), "未使用の演出・隕石は表示付きでも専用資源を読まない: " + path)
 	session.free()
 	await get_tree().process_frame

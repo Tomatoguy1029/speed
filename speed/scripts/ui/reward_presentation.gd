@@ -2,16 +2,16 @@
 extends Control
 
 signal active_changed(active: bool)
+## 英雄の力の獲得演出が終わった（飛ばした場合も）。
+signal acquire_finished
 
 ## クリック後の光の動きの長さ。結果は次の押下まで保持する。
 @export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
 ## 継続シールが貼り付くまでの長さ。次のクリックはこの途中でも即座に受け付ける。
 @export_range(0.12, 0.4, 0.01) var continuation_stamp_seconds := 0.22
 
-## 正式なカットインは Control シーンとして差し替える。任意で setup(hero) / set_progress(0..1) を実装する。
-@export var ult_cutin_scene: PackedScene
-@export_file("*.tscn") var ult_cutin_path := "res://scenes/run/ult_cutin.tscn"
-@export_range(0.5, 3.0, 0.05) var ult_cutin_seconds := 1.15
+## 英雄の力の獲得演出（フィールドで星座に絵が重なり機体へ流れ込む。hero_acquire.gd）の長さ。この間は画面を暗くせず、力の説明は出さない
+@export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
 const DESIGN_SIZE := Vector2(800, 450)
@@ -43,7 +43,9 @@ var _count: Label
 var _heading: Label
 var _detail: Label
 var _trail: Label
-var _cutin: Control
+var _dim: ColorRect
+## 今の獲得演出の終わりを知らせたか
+var _acquire_told := false
 var _ult_block: PanelContainer
 var _ult_name: Label
 var _ult_desc: Label
@@ -75,11 +77,11 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	var dim := ColorRect.new()
-	dim.color = Color(0.015, 0.025, 0.045, 0.82)
-	dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(dim)
+	_dim = ColorRect.new()
+	_dim.color = Color(0.015, 0.025, 0.045, 0.82)
+	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_dim)
 	_build_ult_canvas()
 	_heading = _label(Rect2(100, 58, 600, 36), 20, Color("#efcb70"))
 	_build_bonus()
@@ -245,10 +247,8 @@ func enqueue_ult(event: Dictionary) -> void:
 ## 最終勝利への切替用。獲得済みの報酬には触れず、表示だけを閉じる。
 func cancel() -> void:
 	_queue.clear()
+	if is_acquiring(): _tell_acquired()
 	_current = {}
-	if _cutin != null:
-		_cutin.queue_free()
-		_cutin = null
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	hide()
@@ -265,10 +265,27 @@ func advance_bonus() -> void:
 func is_active() -> bool:
 	return not _current.is_empty()
 
+## 英雄の力の獲得演出の最中か。
+func is_acquiring() -> bool:
+	return not _current.is_empty() and _current.type == &"hero_freed" and _elapsed < ult_acquire_seconds
+
+## 獲得演出の英雄と経過秒。演出の最中でなければ空。
+func acquire_state() -> Dictionary:
+	if not is_acquiring(): return {}
+	return {"id": StringName(_current.id), "time": _elapsed, "seconds": ult_acquire_seconds}
+
+## 獲得演出を飛ばして力の説明へ進む。
+func skip_acquire() -> void:
+	if not is_acquiring(): return
+	_elapsed = ult_acquire_seconds
+	_tell_acquired()
+
+func _tell_acquired() -> void:
+	if _acquire_told: return
+	_acquire_told = true
+	acquire_finished.emit()
+
 func _begin_next() -> void:
-	if _cutin != null:
-		_cutin.queue_free()
-		_cutin = null
 	_ult_block.hide()
 	if _queue.is_empty():
 		_current = {}
@@ -279,9 +296,12 @@ func _begin_next() -> void:
 		return
 	_current = _queue.pop_front()
 	_elapsed = 0.0
+	_acquire_told = false
 	show()
 	active_changed.emit(true)
 	var ult: bool = _current.type == &"hero_freed"
+	_dim.modulate.a = 0.0 if ult else 1.0
+	_heading.modulate.a = 0.0 if ult else 1.0
 	_canvas.visible = ult
 	_ult_output.visible = ult
 	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if ult else SubViewport.UPDATE_DISABLED
@@ -334,11 +354,6 @@ func _begin_ult() -> void:
 	_ult_name.text = "%s — %s" % [definition.display_name, tr("hero.%s.power" % definition.id)]
 	_ult_desc.text = tr("hero.%s.desc" % definition.id)
 	_ult_key.text = tr("hud.ult_key").format({key = OS.get_keycode_string(InputActions.key_of(&"hero"))})
-	var scene: PackedScene = ult_cutin_scene if ult_cutin_scene != null else load(ult_cutin_path)
-	_cutin = scene.instantiate() as Control
-	_canvas.add_child(_cutin)
-	if _cutin.has_method("setup"):
-		_cutin.setup(definition)
 	AudioManager.play(&"levelup", -4.0, 0.65)
 
 func _process(delta: float) -> void:
@@ -358,12 +373,14 @@ func _process(delta: float) -> void:
 	_ult_output.position = ((size - BONUS_SIZE * factor) * 0.5).round()
 	_ult_output.size = BONUS_SIZE * factor
 	if _current.type == &"hero_freed":
-		var cutin_progress := clampf(_elapsed / ult_cutin_seconds, 0.0, 1.0)
-		if _cutin.has_method("set_progress"):
-			_cutin.set_progress(cutin_progress)
-		_cutin.visible = _elapsed < ult_cutin_seconds
-		_ult_block.visible = not _cutin.visible
-		_ult_block.modulate.a = smoothstep(ult_cutin_seconds, ult_cutin_seconds + 0.22, _elapsed)
-		if _elapsed >= ult_cutin_seconds + ult_details_seconds:
+		# 獲得演出の間はフィールドを見せ、終わってから暗くして力の説明を出す
+		var shown := smoothstep(ult_acquire_seconds, ult_acquire_seconds + 0.22, _elapsed)
+		if _elapsed >= ult_acquire_seconds: _tell_acquired()
+		_dim.modulate.a = shown
+		_ult_output.visible = _elapsed >= ult_acquire_seconds
+		_ult_block.visible = _ult_output.visible
+		_ult_block.modulate.a = shown
+		_heading.modulate.a = shown
+		if _elapsed >= ult_acquire_seconds + ult_details_seconds:
 			_begin_next()
 		return

@@ -197,7 +197,7 @@ func _operation_runtime() -> void:
 		_clear_choice()
 	else:
 		await _operation_runtime_buttons()
-	hud._rewards.ult_cutin_seconds = 0.01
+	hud._rewards.ult_acquire_seconds = 0.01
 	hud._rewards.ult_details_seconds = 0.01
 	bridge.command("dev_hero_place",{"id":"perseus"})
 	var hero: Dictionary = bridge.read_frame().value.ui.hero

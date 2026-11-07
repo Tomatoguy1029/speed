@@ -137,7 +137,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hud.level&#95;bonus | おまけ | Bonus |
 | hud.level&#95;bonus&#95;more | 継続！ | More! |
 | hud.ult&#95;granted | 英雄の力を授かった | ULT ACQUIRED |
-| hud.ult&#95;placeholder | 仮カットイン · 正式素材へ差し替え予定 | PLACEHOLDER CUT-IN · ART PENDING |
 | hud.ult&#95;key | {key}：英雄の星座の力を発動 | {key}: Activate constellation power |
 | hero.leo.power | 獅子になる | Become the Lion |
 | hero.leo.desc | 星の獅子になって駆け回り、触れた敵を装甲に関係なく貫く。その間は被弾せず、武器・特性・ブーストは止まる。 | Become a lion of stars and rush around, piercing enemies on contact regardless of armor. While active you take no damage, and weapons, traits and boost stop. |

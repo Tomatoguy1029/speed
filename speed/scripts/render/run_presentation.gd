@@ -162,6 +162,11 @@ func _present_cpp(delta: float) -> void:
 		return
 	var frame: Dictionary = snapshot.value
 	var view: Dictionary = view_override if view_override is Dictionary else {}
+	# 英雄の星座の獲得演出の間は、星座全体が入るまでカメラを引く
+	var hud_root := get_node(world_path).get_parent().get_node_or_null("Hud/HudRoot")
+	frame_view.acquire_state = hud_root.acquire_state() if hud_root!=null and hud_root.has_method("acquire_state") else {}
+	if view.is_empty() and frame_view.hero_acquire!=null:
+		view = frame_view.hero_acquire.camera_view(frame.camera.center,float(frame.camera.zoom),get_viewport().get_visible_rect().size)
 	cam_center = view.get("center",frame.camera.center)
 	cam_zoom = float(view.get("zoom",frame.camera.zoom))
 	_camera.position = cam_center
