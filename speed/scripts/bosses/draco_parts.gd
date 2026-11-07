@@ -29,6 +29,7 @@ func _ready() -> void:
 	if _lighting == null:
 		_lighting = ShaderMaterial.new()
 		_lighting.shader = SHADER
+	_lighting.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	_head = _sprite(&"head")
 	_head.z_index = 1
 	# The snout stays aligned with the existing mouth origin (120 * head_scale).
@@ -54,6 +55,7 @@ func use_picaro(seed: float) -> void:
 	_lighting.set_shader_parameter("noise_smooth", noise)
 	_lighting.set_shader_parameter("noise_dots", noise)
 	_lighting.set_shader_parameter("seed", seed)
+	if is_inside_tree(): _lighting.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	for child in get_children():
 		if child is Sprite2D: child.material = _lighting
 

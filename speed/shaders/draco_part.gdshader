@@ -13,6 +13,7 @@ uniform float key_energy = 1.1;
 uniform float fill_energy = 0.6;
 uniform vec3 key_direction = vec3(0.686, -0.686, 0.243);
 uniform vec3 fill_direction = vec3(-0.686, 0.686, 0.243);
+uniform bool linear_target = false;
 uniform bool finale_tone = false;
 uniform float finale_gray = 0.0;
 uniform float finale_lit = 0.0;
@@ -37,10 +38,13 @@ void fragment() {
 		float jag = 6.0 * sin(at.y * 0.07) + 5.0 * sin(at.y * 0.19 + 1.0) + 3.0 * sin(at.y * 0.41 + 2.0);
 		if (abs(at.x - jag) < finale_gap) { discard; }
 	}
-	vec3 albedo = pixel.rgb;
+	// 陰影は絵の色のまま掛ける。決着の階調は出力の色で決めてある。
+	bool srgb_light = linear_target && !finale_tone;
+	vec3 albedo = srgb_light ? pow(pixel.rgb, vec3(1.0 / 2.2)) : pixel.rgb;
 	if (painted) {
 		float shade = max(pixel.r, max(pixel.g, pixel.b));
-		albedo = paint.rgb * shade;
+		float shade_paint = srgb_light ? max(albedo.r, max(albedo.g, albedo.b)) : shade;
+		albedo = (srgb_light ? pow(paint.rgb, vec3(1.0 / 2.2)) : paint.rgb) * shade_paint;
 	}
 	float light_amount = 1.0;
 	if (use_normal) {
@@ -63,5 +67,6 @@ void fragment() {
 		vec3 shadow = mix(vec3(0.02, 0.04, 0.094), gray, finale_gray);
 		result = mix(shadow, result, finale_lit);
 	}
-	COLOR = vec4(mix(result, vec3(1.0), boss_hit_white), pixel.a) * vertex_tint;
+	result = mix(result, vec3(1.0), boss_hit_white);
+	COLOR = vec4(srgb_light ? pow(max(result, vec3(0.0)), vec3(2.2)) : result, pixel.a) * vertex_tint;
 }

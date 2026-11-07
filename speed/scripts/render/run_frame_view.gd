@@ -1840,6 +1840,7 @@ func _sync_cpp_picaro(bodies: Array) -> void:
 		_picaro_material.shader = preload("res://shaders/picaro.gdshader")
 		_picaro_material.set_shader_parameter("noise_smooth",PICARO_LOOK.noise_texture())
 		_picaro_material.set_shader_parameter("noise_dots",PICARO_LOOK.noise_texture())
+		_picaro_material.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	if _picaro_fx==null:
 		_picaro_fx = Node2D.new()
 		_picaro_fx.draw.connect(_draw_picaro_fx)

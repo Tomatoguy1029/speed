@@ -18,6 +18,7 @@ uniform float jig = 0.0;
 uniform float seed = 0.0;
 uniform float blob_radius = 10.0;
 uniform float flash : hint_range(0.0, 1.0) = 0.0;
+uniform bool linear_target = false;
 
 const vec3 VIOLET[6] = vec3[6](vec3(0.051, 0.031, 0.125), vec3(0.114, 0.078, 0.275), vec3(0.208, 0.165, 0.486), vec3(0.369, 0.322, 0.722), vec3(0.604, 0.549, 0.941), vec3(0.902, 0.878, 1.0));
 const vec3 BLOB[6] = vec3[6](vec3(0.165, 0.047, 0.306), vec3(0.290, 0.102, 0.525), vec3(0.478, 0.184, 0.769), vec3(0.698, 0.361, 1.0), vec3(0.890, 0.722, 1.0), vec3(1.0));
@@ -34,7 +35,7 @@ void vertex() {
 
 // 形ができたピカロの色（p：絵の画素の位置）
 vec3 formed_color(vec2 p, vec2 texel, float t, vec3 base, bool rim) {
-	float lum = dot(base, vec3(0.3, 0.59, 0.11));
+	float lum = dot(linear_target ? pow(base, vec3(1.0 / 2.2)) : base, vec3(0.3, 0.59, 0.11));
 	vec3 color = VIOLET[min(4, int(floor(lum * 4.2)))];
 	float neb = texture(noise_smooth, vec2(p.x * 0.11 + t * 0.33 + seed, p.y * 0.11 - t * 0.165) / 8.0).r;
 	float neb2 = texture(noise_smooth, vec2(p.x * 0.07 - t * 0.14 + 2.8, p.y * 0.07 + t * 0.07 + seed * 0.35) / 8.0).g;
@@ -98,5 +99,5 @@ void fragment() {
 		if (show > 0.0 && inside) color = mix(color, formed_color(p, texel, t, base.rgb, rim), show);
 	}
 	color = mix(color, vec3(1.0), max(boss_hit_white, flash));
-	COLOR = vec4(color, modulate.a);
+	COLOR = vec4(linear_target ? pow(color, vec3(2.2)) : color, modulate.a);
 }

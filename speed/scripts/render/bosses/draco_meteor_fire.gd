@@ -56,6 +56,8 @@ func _shard() -> Sprite2D:
 	return sprite
 
 func apply_frame(rows: Array, clock: float, shards: Array = []) -> void:
+	_under.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
+	_over.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	_shard_used = 0
 	for row: Dictionary in shards:
 		var sprite := _shard()

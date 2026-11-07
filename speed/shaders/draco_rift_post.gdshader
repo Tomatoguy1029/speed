@@ -69,7 +69,9 @@ void fragment() {
 			if (v > lum) { lum = v; best = sampled; }
 		}
 		float tint = 0.32 * fade * fade * fade * open2;
-		out_color = mix(best, to_target(vec3(0.588, 0.392, 1.0)), tint);
+		// 色の混ぜ方は試作の表示色で行う。
+		vec3 shown = linear_target ? pow(best, vec3(1.0 / 2.2)) : best;
+		out_color = to_target(mix(shown, vec3(0.588, 0.392, 1.0), tint));
 		out_a = 2.0;
 	}
 	if (out_a < 0.5) discard;
