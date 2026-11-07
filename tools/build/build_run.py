@@ -161,6 +161,10 @@ def package(root, lock, args):
     # importで型・資源索引を準備してから、正規の共通生成へ渡す。
     run([*engine, '--editor', '--import', '--log-file', destination / 'import.log'])
     run([*engine, '--script', 'res://tools/content/build_all.gd', '--log-file', destination / 'generate.log', '--', '--force'])
+    # 配布コピーの通常Resourceへ集約し、次のeditor scanとShader Bakerに渡す。
+    if args.platform == 'macos':
+        run([*engine, '--script', root / 'tools/build/prepare_shader_bake.gd',
+             '--log-file', destination / 'shader-bake-targets.log', '--', 'macOS'])
     (project / 'scripts/managers/save_manager.gd').write_text(original_save)
     original_main = (root / 'speed/scripts/ui/main.gd').read_text()
     if (project / 'scripts/ui/main.gd').read_text() != original_main or 'func _package_runtime(' in original_main:
