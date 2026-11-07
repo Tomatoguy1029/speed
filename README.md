@@ -124,7 +124,7 @@ python3 tools/dev/workspace.py create <名前> --with-generated
 | `demo/` | ブラウザ版の試作、新機能・新スキルの実験 |
 | `docs/README.md` | [文書の運用規定](docs/README.md)。文書を触る前に必ず読む |
 | `docs/` | ゲーム全体を定義する同じ階層の文書：[企画書](docs/treatment.md)・[仕様書](docs/spec.md)・[設計書](docs/architecture.md) |
-| `docs/game/` | 個別資料：[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[ゲーム内文言](docs/game/text.md)・[課題](docs/game/backlog.md) |
+| `docs/game/` | 個別資料：[世界観とストーリー](docs/game/world.md)・[デザインとアートスタイル](docs/game/art-style.md)・[ゲーム内文言](docs/game/text.md) |
 | `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](docs/game/catalog/rules.md) |
 | `docs/game/stages/` | ステージ1〜5の個別仕様（例：[ステージ4](docs/game/stages/stage-4.md)） |
 | `docs/game/bosses/` | ボスの個別仕様（[うみへび座](docs/game/bosses/hydra.md)） |
