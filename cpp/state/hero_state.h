@@ -25,6 +25,8 @@ struct HeroState {
         uint64_t afterimage_echo=0;
         // 助走（T32）は突進の最初の命中だけを強めるので、影の最初の命中も影ごとに数える
         bool run_up_first=false;
+        // 機体の処理を影として呼んでいる間だけ true（影は被弾しないので、その間の機体への被弾を受けない）。保存しない
+        bool acting=false;
     } twin;
     uint32_t hero=0,power=0;
     godot::Vector2 center,previous;
