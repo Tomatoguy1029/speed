@@ -11,7 +11,7 @@ signal acquire_finished
 @export_range(0.12, 0.4, 0.01) var continuation_stamp_seconds := 0.22
 
 ## 英雄の力の獲得演出（フィールドで星座に絵が重なり機体へ流れ込む。hero_acquire.gd）の長さ。この間は画面を暗くせず、力の説明は出さない
-@export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 2.3
+@export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
 const DESIGN_SIZE := Vector2(800, 450)

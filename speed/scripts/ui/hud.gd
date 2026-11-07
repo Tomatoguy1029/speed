@@ -56,8 +56,8 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 
 @export_group("報酬演出")
 @export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
-## 英雄の力の獲得演出の長さ（Esc で飛ばせる）
-@export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 2.3
+## 英雄の力の獲得演出の長さ（クリック・タップ・Space で飛ばせる）
+@export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
 var _cards_accept_at := 0
@@ -506,7 +506,7 @@ func _draw_hero_slot_values(at: Vector2,power: StringName,active: float,cooldown
 	var acquire := acquire_state()
 	if not acquire.is_empty():
 		var t := float(acquire.time) / maxf(float(acquire.seconds), 0.01)
-		var flash := smoothstep(0.88, 0.93, t) * (1.0 - smoothstep(0.93, 1.0, t))
+		var flash := smoothstep(0.93, 0.955, t) * (1.0 - smoothstep(0.955, 1.0, t))
 		if flash > 0.0: draw_rect(rect.grow(2.0 * flash), Color(1.0, 0.95, 0.75, 0.85 * flash))
 	if cooldown > 0.0 and definition != null and definition.cooldown > 0.0:
 		var k := clampf(cooldown / definition.cooldown, 0, 1)
@@ -878,8 +878,9 @@ func _input_cpp(event: InputEvent) -> void:
 			bridge.command("skip_finish")
 			get_viewport().set_input_as_handled()
 		return
-	# 英雄の力の獲得演出は Esc（ポーズのキー）で飛ばす
-	if _menu_overlay==null and _rewards.is_acquiring() and event.is_action_pressed(&"pause") and not event.is_echo():
+	# 英雄の力の獲得演出は、クリック・タップ・決定キー（Space など）で飛ばす。Esc は設定などのメニュー用
+	var skip_press: bool = (event is InputEventMouseButton and event.button_index==MOUSE_BUTTON_LEFT and event.pressed and event.device!=-1) or (event is InputEventScreenTouch and event.pressed) or (event.is_action_pressed(&"ui_accept") and not event.is_echo())
+	if _menu_overlay==null and _rewards.is_acquiring() and skip_press:
 		_rewards.skip_acquire()
 		get_viewport().set_input_as_handled()
 		return

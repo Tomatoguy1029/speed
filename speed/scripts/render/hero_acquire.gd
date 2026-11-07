@@ -1,14 +1,14 @@
 ## 英雄の星座を解放したときの獲得演出。報酬表示（reward_presentation.gd）が止めた時間の中で、フィールドの星座の上に描く。
-## 流れ（長さ 2.3 秒を基準に、設定の長さへ伸び縮みする）：
+## 流れ（長さ 4.3 秒を基準に、設定の長さへ伸び縮みする）：
 ## ① 0〜0.3：カメラが星座全体の入るところまで引く（camera_view）。
-## ② 0.3〜1.0：星座の線が強く光り、星図の線画が最初の星から描き出される（hero_acquire_art.gdshader）。
-## ③ 1.0〜1.6：線画が英雄の色で光り、英雄の色の粒が立ちのぼる。
-## ④ 1.6〜2.3：線画が散って粒になり、機体へ流れ込む。流れ込みきると機体から光の粒が散り、カメラが戻る。
+## ② 0.3〜1.3：星座の線が強く光り、星図の線画が最初の星から描き出される（hero_acquire_art.gdshader）。
+## ③ 1.3〜3.3：描き出した線画を2秒見せる。線画が英雄の色で光り、英雄の色の粒が立ちのぼる。
+## ④ 3.3〜4.3：線画が散って粒になり、機体へ流れ込む。流れ込みきると機体から光の粒が散り、カメラが戻る。
 ## 線画は星座の星の範囲に MARGIN の余白を足し、星座の座標の1を ART_SCALE 画素にした絵（speed/assets/heroes/acquire/<id>.png）。
 ## フィールドの星座は回転・拡大して置かれるので、星の位置から同じ回転・拡大を求めて重ねる。
 extends Node2D
 
-const BASE := 2.3
+const BASE := 4.3
 const ART_SCALE := 3.0
 const MARGIN := 160.0
 const ART_DIR := "res://assets/heroes/acquire/%s.png"
@@ -70,11 +70,11 @@ func tick(dt: float, state: Dictionary, hero: Dictionary, ship: Vector2, unit: f
 	_ship = ship
 	_step_particles(dt)
 	_step_burst(dt)
-	var reveal := smoothstep(0.3, 1.0, _time)
-	var dissolve := smoothstep(1.6, 2.15, _time)
+	var reveal := smoothstep(0.3, 1.3, _time)
+	var dissolve := smoothstep(3.3, 3.9, _time)
 	_material.set_shader_parameter("reveal", reveal)
 	_material.set_shader_parameter("dissolve", dissolve)
-	_material.set_shader_parameter("glow", 0.9 + 1.4 * smoothstep(1.0, 1.4, _time) * (1.0 - dissolve))
+	_material.set_shader_parameter("glow", 0.9 + 1.4 * smoothstep(1.3, 1.8, _time) * (1.0 - dissolve))
 	_material.set_shader_parameter("linear_output", get_viewport().use_hdr_2d)
 	_art.visible = _time > 0.3 and dissolve < 1.0
 	queue_redraw()
@@ -87,7 +87,7 @@ func camera_view(center: Vector2, zoom: float, screen: Vector2) -> Dictionary:
 	bounds = bounds.expand(_ship).grow(160.0)
 	var fit := minf(screen.x / bounds.size.x, screen.y / bounds.size.y)
 	var target := minf(zoom, fit)
-	var k := smoothstep(0.0, 0.3, _time) * (1.0 - smoothstep(1.9, BASE, _time))
+	var k := smoothstep(0.0, 0.3, _time) * (1.0 - smoothstep(3.9, BASE, _time))
 	return {"center": center.lerp(bounds.get_center(), k), "zoom": lerpf(zoom, target, k)}
 
 func _begin(id: StringName, hero: Dictionary) -> void:
@@ -142,7 +142,7 @@ func _on_links() -> Vector2:
 
 func _step_particles(dt: float) -> void:
 	# ③ 線画が光る間、星座線から英雄の色の粒が立ちのぼる
-	if _time > 1.0 and _time < 1.7:
+	if _time > 1.3 and _time < 3.4:
 		_rise_carry += RISE_RATE * dt
 		while _rise_carry >= 1.0:
 			_rise_carry -= 1.0
@@ -152,15 +152,15 @@ func _step_particles(dt: float) -> void:
 		p.pos += p.vel * dt
 	_rise = _rise.filter(func(p): return p.age < p.life)
 	# ④ 線画が散る所から粒が出て、曲がりながら機体へ流れ込む
-	if _time >= 1.6 and not _flow_started:
+	if _time >= 3.3 and not _flow_started:
 		_flow_started = true
 		for i in FLOW_COUNT:
 			var from := _on_links() + Vector2(randf_range(-40, 40), randf_range(-40, 40))
 			var side := (_ship - from).orthogonal().normalized() * randf_range(-0.45, 0.45) * from.distance_to(_ship)
-			_flow.append({"from": from, "bend": from.lerp(_ship, 0.4) + side, "start": randf_range(1.6, 2.0), "end": randf_range(2.08, 2.25), "color": _palette[1 + randi() % 2]})
+			_flow.append({"from": from, "bend": from.lerp(_ship, 0.4) + side, "start": randf_range(3.3, 3.75), "end": randf_range(3.9, 4.1), "color": _palette[1 + randi() % 2]})
 
 func _step_burst(dt: float) -> void:
-	if _time >= 2.1 and not _burst_started:
+	if _time >= 4.05 and not _burst_started:
 		_burst_started = true
 		for i in 48:
 			var dir := Vector2.from_angle(randf() * TAU)
@@ -175,7 +175,7 @@ func _draw() -> void:
 	if _id == &"": return
 	var cell := px * _unit
 	# ② 星座の線が強く光る
-	var lit := smoothstep(0.3, 0.7, _time) * (1.0 - smoothstep(1.7, 2.1, _time))
+	var lit := smoothstep(0.3, 0.8, _time) * (1.0 - smoothstep(3.4, 3.9, _time))
 	if lit > 0.0:
 		for i in range(0, _links.size(), 2):
 			var a := _stars[_links[i]]
