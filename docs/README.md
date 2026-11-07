@@ -11,7 +11,7 @@
 | 置き場 | 置くもの |
 |---|---|
 | `docs/` | ゲーム全体の企画書・仕様書・設計書と、この文書運用規定 |
-| `docs/game/` | 世界観・アート・文言の個別資料と課題 |
+| `docs/game/` | 世界観・アート・文言の個別資料 |
 | `docs/game/catalog/` | 武器・特性・敵・素材など量産する項目の一覧と、[一覧の運用ルール](game/catalog/rules.md) |
 | `docs/game/stages/` | ステージごとの個別仕様（`stage-1.md`〜`stage-5.md`） |
 | `docs/game/bosses/` | ボスごとの詳しい仕様。ステージの個別仕様からリンクする |
@@ -29,7 +29,6 @@
 | [game/art-style.md](game/art-style.md) | デザインとアートスタイル。見た目 |
 | [game/graphics-improvements.md](game/graphics-improvements.md) | グラフィック改善ポイント。UIのレイアウト・色・アニメーション・エフェクトの改善要件 |
 | [game/text.md](game/text.md) | ゲーム内文言の編集元と反映手順 |
-| [game/backlog.md](game/backlog.md) | 課題 |
 | `game/catalog/*.md` | 量産する項目の一覧と、その運用ルール。[共有アート素材リスト](game/catalog/art-assets.md)は必要な絵・要照合の候補を洗い出し、依頼・納品・組込・確認の状態を管理する |
 | `game/stages/stage-1.md`〜`stage-5.md` | ステージの個別仕様。狙う体験・フェーズ・敵の役割・ボス戦 |
 | [game/bosses/monoceros.md](game/bosses/monoceros.md) | いっかくじゅう座の個別仕様。戦闘・行動判断の要件・素材と演出・実装と調整 |
@@ -41,7 +40,7 @@
 | [dev/stage-production-ai.md](dev/stage-production-ai.md) | AI向けの制作参照。編集先・記録分析・変更確認の進め方 |
 | [dev/tools/index.md](dev/tools/index.md)・`dev/tools/*.md` | Godotの制作ツール一覧と各ツールの操作・保存範囲 |
 
-採用前の案、計測・実装の報告、特定の作業のための計画・タスク一覧・引継ぎは、リポジトリの外（会話や各自のローカル）に置く。
+タスク・担当・進捗・残件は、Git管理対象外の `.local/speed-work-items.md` に集約し、ほかの文書は参照先を案内する。採用前の案、計測・実装の報告、特定の作業のための計画・引継ぎは、会話や各自のローカルに置く。
 
 ## 2. 書き方
 
