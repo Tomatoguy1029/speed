@@ -1519,7 +1519,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"draco_roar":
 			ruler_shake = maxf(ruler_shake,12.0)
 			if pipeline!=null: pipeline.add_wave(event.pos,event.radius,0.8)
-			_rings.append({"pos":event.pos,"radius":event.radius,"color":Color("#c2b8ff"),"life":0.8,"max":0.8})
 		if event.type==&"shield_stolen":
 			_shield_transfers.append({"pos":event.pos,"facing":event.facing,"r":event.r,"arc":event.arc,"life":0.3,"max":0.3})
 			_rings.append({"pos":event.pos,"radius":event.r*1.7,"color":Color("#65e8ff"),"life":0.3,"max":0.3})

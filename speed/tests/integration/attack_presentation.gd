@@ -1863,7 +1863,7 @@ func check_cpp_visual_contracts() -> void:
 	check(display._batches[1].texture.resource_path.ends_with("iron_debris_2.png") and display._batches[2].texture.resource_path.ends_with("iron_debris_3.png"),"鉄がれきの別素材を資源範囲から受け取る")
 	view._queued_events.append({"type":&"draco_roar","pos":cpp_origin,"radius":700.0})
 	view.update_effects(cpp_bridge.read_frame().value,0.0)
-	check(view.ruler_shake==12.0 and view._rings.any(func(ring): return ring.radius==700.0),"竜の咆哮通知を揺れと輪へ接続する")
+	check(view.ruler_shake==12.0,"竜の咆哮通知を揺れへ接続する")
 	var mono = preload("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
 	add_child(mono)
 	mono.hit_feedback = view.boss_hit_feedback
