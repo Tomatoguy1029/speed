@@ -546,24 +546,23 @@ static func tornado_rock(canvas, center: Vector2, rock: Dictionary, fade: float,
 		var r0 := (2.0+9.0*u)*(0.8+0.4*DRACO_FX._hash(m*2.3+size))
 		canvas.back.blend(q.x+cos(an)*r0,q.y+sin(an)*r0,STONE[3],1.0-u)
 
-## 着地点の予告：牙の形の光が小さくちらつき、狙いが決まると止まって強まる。
-static func mark(canvas, at: Vector2, direction: float, k: float, locked: bool, radius: float, color: Color, seed: float, time: float) -> void:
+## ビームで砕けた岩の破片：熱いうちは色が明るく尾が長く、冷えると石の色へ戻る。
+static func shard(canvas, at: Vector2, angle: float, age: float, color: Color) -> void:
 	var pal := PRIM.ramp(color)
-	var fw := Vector2.from_angle(direction)
-	var sd := Vector2(-fw.y,fw.x)
-	var rr := radius*0.8
-	var jit := 0.0 if locked else 1.0
-	for side: float in [-1.0,1.0]:
-		var P0 := at+sd*side*rr
-		var P1 := at+fw*rr*0.7
-		var steps := ceili(rr*1.6*float(canvas.world_scale))
-		for i in steps+1:
-			if DRACO_FX._hash(i*3.0+seed+floorf(time*12.0))>0.55+0.45*k: continue
-			var u := float(i)/steps
-			var q: Vector2 = canvas.to_logical(P0.lerp(P1,u)+sd*side*sin(u*PI)*rr*0.25+Vector2((DRACO_FX._hash(i+seed+floorf(time*20.0))-0.5)*6.0*jit,0.0))
-			canvas.back.dot(q.x,q.y,pal[3 if locked else 2],0.25+0.55*k)
-	var c: Vector2 = canvas.to_logical(at)
-	canvas.back.glow(c.x,c.y,6.0,pal[2],0.2*k)
+	var heat := exp(-age/0.35)
+	var fw := Vector2.from_angle(angle)
+	var q: Vector2 = canvas.to_logical(at)
+	var tail := 7.0+8.0*heat
+	var d := 0.0
+	while d<tail:
+		var w: Vector2 = q-fw*d
+		var k := 1.0-d/tail
+		if k>0.6: canvas.front.px(w.x,w.y,pal[3] if heat>0.5 else STONE[4])
+		else: canvas.front.dot(w.x,w.y,pal[2] if heat>0.4 else STONE[2],k*1.2)
+		d += 0.5
+	canvas.front.px(q.x,q.y,pal[4] if heat>0.5 else STONE[4])
+	canvas.front.px(q.x+1.0,q.y,STONE[3])
+	canvas.front.light(q.x,q.y,pal[2],0.4*heat)
 
 ## 竜巻の走った跡：通った所に土ぼこりが残り、ふくらんで薄れる。
 static func tornado_wake(canvas, center: Vector2, direction: Vector2, speed: float, width: float, a: float, fade: float) -> void:

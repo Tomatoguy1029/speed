@@ -133,8 +133,9 @@ static func _major(neck: Dictionary, mem: Dictionary, clock: float) -> Dictionar
 	if mode in LUNGES:
 		if not neck.locked:
 			mem.erase("lock_at")
-			out.coil = _smooth(0.0,0.6,clampf(time/warn,0.0,1.0))
-			var fz := _smooth(0.6,0.85,clampf(time/warn,0.0,1.0))
+			var wind := clampf(time/(warn+float(neck.get("lunge_fire",0.0))),0.0,1.0) if mode!="north" else clampf(time/warn,0.0,1.0)
+			out.coil = _smooth(0.0,0.6,wind)
+			var fz := _smooth(0.6,0.85,wind)
 			out.head = at-fw*12.0*float(out.coil)*COIL+_orth(fw)*sin(clock*95.0+float(neck.id))*1.5*fz
 			out.sy = 1.0-0.07*float(out.coil)
 			out.sx = 1.0+0.05*float(out.coil)

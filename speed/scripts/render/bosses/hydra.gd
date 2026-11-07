@@ -29,10 +29,13 @@ var _masks := {}
 var _ferns := {}
 const LIGHT := preload("res://scripts/render/enemies/aquila_lightning.gd")
 var _light = LIGHT.new()
-const HIDDEN_LINES := ["beam","wind","wind_blade","rubble","bolt","bite"]
+const HIDDEN_LINES := ["beam","wind","wind_blade","rubble","bolt","bite","lightning"]
 var _raster := SpeedFxRaster.new()
 var _raster_back := SpeedFxRaster.new()
 var _rock_last := {}
+var _rock_sprites: Array[Sprite2D] = []
+var _rocks_now: Array = []
+const ROCK_TEXTURE := preload("res://assets/pixel/meteor_0.png")
 var _reference_canvas
 func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
@@ -44,13 +47,9 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var ramp: Array[Color] = _light.palette(FX.COLORS.thunder)
 	for neck: Dictionary in state.get("necks",[]):
 		if neck.get("alive",false) and neck.has("pose"): _draw_neck(canvas,neck,t,factor,ramp)
-	for target: Dictionary in state.get("north_targets",[]):
-		var from: Vector2 = target.from
-		var at: Vector2 = target.target
-		var k := 1.0 if target.locked else 0.5
-		FX.rail(canvas,from,at,k,FX.COLORS.bite,t,3.0,false)
-		FX.mark(canvas,at,(at-from).angle(),k,target.locked,float(target.radius),FX.COLORS.bite,7.0,t)
 	var beam_color: Color = FX.COLORS.beam
+	for shard: Dictionary in state.get("shatter_shards",[]):
+		FX.shard(canvas,shard.position,float(shard.angle),float(shard.age),beam_color)
 	if state.has("grid_shots"):
 		var elapsed := float(state.grid_elapsed)
 		var stop := float(state.grid_stop)
@@ -65,6 +64,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var heavy := false
 	for effect: Dictionary in effects_now:
 		if String(effect.kind) in ["wind","wind_blade","bolt","rubble","tornado","tornado_charge"]: heavy = true
+	if state.has("shatter_stones"): heavy = true
 	if heavy:
 		_raster.begin(canvas.front.colors,canvas.front.lights,canvas.front.width,canvas.front.height,float(canvas.world_scale),canvas._camera_position)
 		_raster_back.begin(canvas.back.colors,canvas.back.lights,canvas.back.width,canvas.back.height,float(canvas.world_scale),canvas._camera_position)
@@ -103,12 +103,23 @@ func draw_reference(canvas, _real_dt: float) -> void:
 					speed = lerpf(speed,step.length()*60.0,0.3 if speed>0.0 else 1.0)
 				rocks[id] = {"at":points[0],"angle":angle,"speed":speed}
 				if speed>0.0: _raster_back.rock_comet(points[0],angle,speed,float(effect.age),float(effect.width)*0.5,float(id%97),1.0 if speed>300.0 else 0.4)
+				var seed := float(id%97)
+				var spin := float(effect.age)*(3.0+3.0*DRACO_FX._hash(seed))*2.0*(1.0 if DRACO_FX._hash(seed*3.0)>0.5 else -1.0)
+				var half := float(effect.width)*0.625
+				for back in range(4,0,-1): _rocks_now.append([Vector2(points[0])-Vector2.from_angle(angle)*speed*0.016*back,spin-back*0.08,half,0.26-back*0.05])
+				_rocks_now.append([points[0],spin,half,1.0])
 	_rock_last = rocks
+	for stone: Dictionary in state.get("shatter_stones",[]):
+		var seed := float(stone.seed)
+		_raster_back.rock_comet(stone.position,float(stone.angle),float(stone.speed),float(state.get("shatter_time",0.0)),22.0,seed,float(stone.speed)/676.0)
+		_rocks_now.append([stone.position,t*1.6+seed,26.4,1.0])
 	if heavy and state.has("tornado_rocks"):
 		var seed_rock := 1.0
 		for rock: Dictionary in state.tornado_rocks:
 			if float(rock.progress)<1.0: _raster_back.rock_comet(rock.position,float(rock.aim),float(rock.speed),float(rock.age),float(rock.size),seed_rock*3.0+1.0,1.0)
+			if float(rock.progress)>0.0: _rocks_now.append([rock.position,t*(4.0+seed_rock),float(rock.size),float(state.get("tornado_fade",1.0))])
 			seed_rock += 1.0
+	_show_rocks()
 	if heavy:
 		canvas.front.colors = _raster.take_colors()
 		canvas.front.lights = _raster.take_lights()
@@ -139,8 +150,30 @@ func draw_reference(canvas, _real_dt: float) -> void:
 					DRACO_FX.gather(canvas,points[0],46.0,k,t,float(effect.id),beam_color)
 				else: FX.beam(canvas,points[0],end,float(effect.width),beam_color,t,clampf((e-(life-0.1))/0.1,0.0,1.0),clampf(e/0.07,0.0,1.0))
 			"lightning":
-				if points[0].distance_to(points[-1])<1.0 and e>=0.0:
+				if String(effect.technique)=="thunder_drop" and points[0].distance_to(points[-1])<1.0 and e>=0.0:
 					FX.bolt_strike(canvas,_light,canvas.to_logical(points[0]),float(effect.width)*0.5*float(canvas.world_scale),e,int(effect.id)%97+1,ramp,canvas.to_logical(effect.get("source",position)))
+
+## 岩は渦や本体の上に出す。試作と同じ画像を、残像も含めて回して描く。
+func _show_rocks() -> void:
+	while _rock_sprites.size()<_rocks_now.size():
+		var sprite := Sprite2D.new()
+		sprite.texture = ROCK_TEXTURE
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		sprite.top_level = true
+		sprite.z_index = 18
+		add_child(sprite)
+		_rock_sprites.append(sprite)
+	var size := float(maxi(ROCK_TEXTURE.get_width(),ROCK_TEXTURE.get_height()))
+	for i in _rock_sprites.size():
+		var sprite := _rock_sprites[i]
+		sprite.visible = i<_rocks_now.size()
+		if not sprite.visible: continue
+		var row: Array = _rocks_now[i]
+		sprite.global_position = row[0]
+		sprite.rotation = row[1]
+		sprite.scale = Vector2.ONE*2.0*float(row[2])/size
+		sprite.modulate.a = row[3]
+	_rocks_now.clear()
 
 func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[Color]) -> void:
 	var pose: Dictionary = neck.pose
@@ -158,23 +191,33 @@ func _draw_neck(canvas, neck: Dictionary, t: float, factor: float, ramp: Array[C
 	var trail: Array = _heads.get(id,[])
 	if String(pose.type)=="major":
 		var lunge: bool = pose.get("lunge",false)
-		var k := clampf(float(neck.get("major_time",0.0))/warn,0.0,1.0) if mode!="grid" else glow
+		var time := float(neck.get("major_time",0.0))
+		var fire := float(neck.get("lunge_fire",0.0))
+		var wait := fire-float(neck.get("lunge_charge",0.0))
+		var k := clampf(time/warn,0.0,1.0) if mode!="grid" else glow
+		if mode=="sequence": k = clampf(time/(warn+fire),0.0,1.0)
+		if mode=="swarm": k = clampf((time-wait)/(warn+fire-wait),0.0,1.0)
 		if rel<0.0:
-			if kind=="bite": FX.bite_eyes(canvas,head,facing,pow(k,0.7),color,t,factor)
+			if kind=="bite" or lunge: FX.bite_eyes(canvas,head,facing,pow(k,0.7),FX.COLORS.bite,t,factor)
 			else: FX.eyes(canvas,head,facing,k,color,factor)
 			if mode in ["curve","beam_pincer","debris_shatter","grid"] and kind in ["beam","vortex","thunder"]: DRACO_FX.gather(canvas,mouth,42.0,k,t,float(id),color)
 			if kind=="debris" and mode in ["tornado","debris_shatter"]: FX.rubble_warn(canvas,neck.points,mouth,k,t,false)
-			if lunge: FX.rail(canvas,mouth,neck.target,0.4+0.6*k,color,t,60.0+id,false)
+			if lunge and (mode=="north" or time-warn>wait):
+				var strength := 0.4+0.6*k
+				if mode=="north":
+					var targets: Array = state.get("north_targets",[])
+					strength = 0.6+0.4*k if not targets.is_empty() and targets[0].locked else 0.3*k
+				FX.rail(canvas,mouth,neck.target,strength,FX.COLORS.bite,t,60.0+id,false)
 		elif lunge:
 			var flight := float(pose.get("flight",0.25))
 			var radius := float(neck.get("bite_radius",70.0))
-			if rel<flight+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,flight,color)
-			if rel<flight: _ghost(canvas,neck,5,0.2,color,factor,id*7.0)
+			if rel<flight+0.2: FX.air(canvas,neck.strike_from,neck.target,rel,flight,FX.COLORS.bite)
+			if rel<flight: _ghost(canvas,neck,5,0.2,FX.COLORS.bite,factor,id*7.0)
 			var bite := rel-flight+0.03
 			var to: Vector2 = neck.target
 			var way := (to-Vector2(neck.strike_from)).normalized()
 			var at := to+way*11.5*factor
-			FX.fangs(canvas,at,way.angle(),bite,radius,float(id)*23.0,color)
+			FX.fangs(canvas,at,way.angle(),bite,radius,float(id)*23.0,FX.COLORS.bite)
 			DRACO_FX.dust(canvas,at+way*0.3*radius,bite-0.05,41.0+id*23.0,way.angle(),0.8)
 		return
 	var age := float(neck.elapsed)

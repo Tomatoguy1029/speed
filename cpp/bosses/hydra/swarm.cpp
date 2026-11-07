@@ -28,7 +28,7 @@ bool HydraTechnique::swarm_position(RunRuntime &r,TechniqueState &t,double dt) {
 }
 void HydraTechnique::swarm(RunRuntime &r,TechniqueState &t,double dt) {
     auto &b=*PhaseController::find(r,t.actor);auto &v=t.detail.get<HydraTechniqueState>();const auto &p=swarm_rule(r,t.definition);
-    for (size_t i=0;i<v.participants.size();++i) {auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n)) continue;const double local=v.time-i*p.gap;if (local<0) continue;
+    for (size_t i=0;i<v.participants.size();++i) {auto *n=HydraNormalAttack::neck(b,v.participants[i]);if (!n || !HydraRegrow::alive(r,*n)) continue;n->lunge_fire=i*p.gap+p.charge;n->lunge_charge=p.charge;const double local=v.time-i*p.gap;if (local<0) continue;
         if (!n->emission.generation) {n->emission=emit(r,t,n->actor,{n->strike_from,n->target},p.radius,p.charge,0.001,Cause::Bite);if (const auto *a=AttackSystem::get(r.state,n->emission)) r.state.hazards[a->row].damage=0;}
         if (local<p.charge) continue;if (!n->locked) {n->locked=true;n->angle=(n->target-n->strike_from).angle();HydraNormalAttack::cue(r,b,*n,"target_locked",t.definition);HydraNormalAttack::cue(r,b,*n,"attack_started",t.definition);}
         const double fraction=std::clamp((local-p.charge)/p.flight,0.,1.);if (n->step!=2) {const auto before=n->strike_pos;n->strike_pos=n->strike_from.lerp(n->target,fraction);n->free_pos=n->strike_pos;emit(r,t,n->actor,{before,n->strike_pos},p.radius,0,dt+0.001,Cause::Bite);if (fraction>=1) n->step=2;}

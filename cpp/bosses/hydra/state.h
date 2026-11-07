@@ -49,6 +49,7 @@ struct HydraNeckState {
     double look_angle=0,elapsed=0,glow=0,turn=0,hit_left=0,sweep=0;
     AttackHandle emission;
     uint32_t normal=0,normal_phase=0,step=0,major=0;
+    double lunge_fire=0,lunge_charge=0;
     bool locked=false,extension=false,lunge_done=false;
     std::vector<godot::Vector2> trail;
     double weights[6]={};
