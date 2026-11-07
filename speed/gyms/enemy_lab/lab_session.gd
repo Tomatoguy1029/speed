@@ -64,7 +64,9 @@ var _accumulator := 0.0
 var viewport: SubViewport
 ## 試遊中の本番の入力を返す（試遊していなければ null）。記録して再生すると同じ展開になる
 var live_input: Callable
-const SUPPORT_MEMO := "res://.content/dev/lab_support.json"
+const SUPPORT_MEMO := "res://.content/dev/lab_support_%d.json"
+const HASH_MEMO := "res://.content/dev/lab_file_hashes.json"
+const RESOURCES := preload("res://tools/content/build_run_resources.gd")
 var _support_memo := {}
 var _support_signature := ""
 var _support_dirty := false
@@ -112,15 +114,18 @@ func reset(settings := {}) -> void:
 	_baseline_bosses = ContentManager.bosses.duplicate(true)
 	baseline = FORMAT.baseline()
 	furthest = 0
+	if spec.get("defer_build",false):
+		spec.erase("defer_build")
+		changed.emit()
+		return
 	await _rebuild()
 	_restore_seek_view()
 	changed.emit()
 
 ## 作り直しのたびに全種類の生成を試すと遅いので、入力が同じあいだの結果をファイルにも覚えておく。
 func _supported(kind: String, id: String, edits: Variant, check: Callable) -> bool:
-	# ボスの行動データは Resource を含むので、値の編集がないときだけ覚える。
-	if edits is Array and not edits[1].is_empty(): return check.call()
-	var key := "%s/%s/%d/%d/%d" % [kind,id,hash(var_to_str(edits[0] if edits is Array else edits)),hash(var_to_str(spec.get("config",{}))),int(spec.get("stage",1))]
+	var program := preload("res://tools/content/build_boss_program.gd").fingerprint(edits[1]) if edits is Array and not edits[1].is_empty() else ""
+	var key := "%s/%s/%d/%d/%s" % [kind,id,hash(var_to_str(edits[0] if edits is Array else edits)),hash(var_to_str(spec.get("config",{}))),program]
 	if not _support_memo.has(key):
 		_support_memo[key] = check.call()
 		_support_dirty = true
@@ -131,14 +136,19 @@ func _load_support_memo() -> void:
 	if signature==_support_signature: return
 	_support_signature = signature
 	_support_memo = {}
-	var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(SUPPORT_MEMO)) if FileAccess.file_exists(SUPPORT_MEMO) else null
+	var path := _support_path()
+	var saved: Variant = JSON.parse_string(FileAccess.get_file_as_string(path)) if FileAccess.file_exists(path) else null
 	if saved is Dictionary and saved.get("signature","")==signature: _support_memo = saved.results
+
+## ステージごとに入力が違うので、覚えた結果もステージごとに分ける。
+func _support_path() -> String:
+	return SUPPORT_MEMO % int(spec.get("stage",1))
 
 func _save_support_memo() -> void:
 	if not _support_dirty: return
 	_support_dirty = false
-	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SUPPORT_MEMO.get_base_dir()))
-	var file := FileAccess.open(SUPPORT_MEMO,FileAccess.WRITE)
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(_support_path().get_base_dir()))
+	var file := FileAccess.open(_support_path(),FileAccess.WRITE)
 	if file!=null: file.store_string(JSON.stringify({"signature":_support_signature,"results":_support_memo}))
 
 func _rebuild() -> void:
@@ -197,7 +207,9 @@ func _rebuild() -> void:
 	# 未移行種類は配置時に失敗として返す。旧ランで補完しない。
 	_formation_sources = []
 	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
+	RESOURCES.use_file_memo(HASH_MEMO)
 	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions,null,_boss_programs)
+	RESOURCES.save_file_memo()
 	BUILDER.end_package_memo()
 	_save_support_memo()
 	if built!=OK:

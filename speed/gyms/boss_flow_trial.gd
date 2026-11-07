@@ -38,9 +38,13 @@ var _repeat_wait := 0.0
 ## 技が終わってから撃ち直すまでの間（秒）
 const REPEAT_GAP := 0.6
 
+## 開始直後にボスの行動データ入りで作り直すので、最初の作り直しは省く。
+func _start_settings() -> Dictionary:
+	return {"defer_build":scene_file_path=="res://gyms/boss_flow_trial.tscn"}
+
 func _ready() -> void:
 	await super._ready()
-	if not OS.is_debug_build() or not is_instance_valid(session.run): return
+	if not OS.is_debug_build(): return
 	_build_trial_ui()
 	if scene_file_path == "res://gyms/boss_flow_trial.tscn":
 		var request := _editor_preview_request()
