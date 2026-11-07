@@ -5,44 +5,35 @@ signal active_changed(active: bool)
 ## 英雄の力の獲得演出が終わった（飛ばした場合も）。
 signal acquire_finished
 
-## クリック後の光の動きの長さ。結果は次の押下まで保持する。
-@export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
-## 継続シールが貼り付くまでの長さ。次のクリックはこの途中でも即座に受け付ける。
-@export_range(0.12, 0.4, 0.01) var continuation_stamp_seconds := 0.22
-
 ## 英雄の力の獲得演出（フィールドで星座に絵が重なり機体へ流れ込む。hero_acquire.gd）の長さ。この間は画面を暗くせず、力の説明は出さない
 @export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
 const DESIGN_SIZE := Vector2(800, 450)
 const BONUS_SIZE := Vector2(640, 360)
-const STAMP_POSITION := Vector2(388, 76)
-const STAMP_ANGLE := 0.18
+const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
+const CONTINUATION_FX := preload("res://scripts/ui/continuation_fx.gd")
+const COMPOSITE := preload("res://assets/ui/rewards/continuation_composite.gdshader")
+const SNAPSHOT := preload("res://assets/ui/rewards/continuation_snapshot.gdshader")
 var _queue: Array[Dictionary] = []
 var _current: Dictionary = {}
 var _elapsed := 0.0
-var _history: Array[String] = []
 var _canvas: Control
 var _ult_viewport: SubViewport
 var _ult_output: TextureRect
 var _bonus_viewport: SubViewport
 var _bonus_output: TextureRect
-var _bonus_canvas: Control
-var _bonus_heading: Label
-var _bonus_hint: Label
-var _bonus_icon: Control
-var _bonus_level: Label
-var _bonus_stamp: Panel
-var _stamp_style: StyleBoxFlat
-var _stamp_trim: Panel
+var _continuation: Node2D
+var _composite: ShaderMaterial
+## 画面の写し（3択・割る直前の画面）と、連鎖ごとのカード
+var _snap_viewport: SubViewport
+var _snap_image: TextureRect
+var _card_viewports: Array[SubViewport] = []
 ## HUD の実アイコン追加処理を受け取り、表示先だけを継続画面へ変える。
 var add_module_icon: Callable
-var _light: ColorRect
-var _material: ShaderMaterial
-var _count: Label
+## 3択で選んだカードの画面上の範囲。HUD が選んだ時に渡す。
+var picked_rect := Rect2()
 var _heading: Label
-var _detail: Label
-var _trail: Label
 var _dim: ColorRect
 ## 今の獲得演出の終わりを知らせたか
 var _acquire_told := false
@@ -114,73 +105,83 @@ func _build_ult_canvas() -> void:
 	_ult_output.hide()
 
 func _build_bonus() -> void:
-	# タイトル画面と同じ低解像度描画＋最近傍拡大。文字も光も同じピクセル幅で見せる。
+	# 試作と同じ 640×360 の層へ描き、画面とはsRGB上で重ねる。層の中の加算・半透明もsRGBで計算する。
+	_snap_viewport = SubViewport.new()
+	_snap_viewport.size = Vector2i(BONUS_SIZE)
+	_snap_viewport.world_2d = World2D.new()
+	_snap_viewport.use_hdr_2d = false
+	_snap_viewport.gui_disable_input = true
+	_snap_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_snap_viewport)
+	_snap_image = TextureRect.new()
+	_snap_image.size = BONUS_SIZE
+	_snap_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_snap_image.stretch_mode = TextureRect.STRETCH_SCALE
+	var snap_material := ShaderMaterial.new()
+	snap_material.shader = SNAPSHOT
+	_snap_image.material = snap_material
+	_snap_viewport.add_child(_snap_image)
+	for i in 3:
+		var card_viewport := SubViewport.new()
+		card_viewport.size = Vector2i(145, 193)
+		card_viewport.transparent_bg = true
+		card_viewport.use_hdr_2d = false
+		card_viewport.gui_disable_input = true
+		card_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+		add_child(card_viewport)
+		_card_viewports.append(card_viewport)
 	_bonus_viewport = SubViewport.new()
 	_bonus_viewport.size = Vector2i(BONUS_SIZE)
 	_bonus_viewport.transparent_bg = true
 	_bonus_viewport.world_2d = World2D.new()
-	_bonus_viewport.use_hdr_2d = get_viewport().use_hdr_2d
+	_bonus_viewport.use_hdr_2d = false
 	_bonus_viewport.gui_disable_input = true
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_bonus_viewport)
-	_bonus_canvas = Control.new()
-	_bonus_canvas.size = BONUS_SIZE
-	_bonus_canvas.theme = get_theme()
-	_bonus_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_bonus_viewport.add_child(_bonus_canvas)
-	_light = ColorRect.new()
-	_light.size = BONUS_SIZE
-	_light.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_material = ShaderMaterial.new()
-	_material.shader = load("res://assets/ui/rewards/continuation.gdshader")
-	_light.material = _material
-	_bonus_canvas.add_child(_light)
-	_bonus_heading = _label(Rect2(80, 26, 480, 18), 10, Color("#a6b4cb"), _bonus_canvas)
-	_bonus_icon = Control.new()
-	_bonus_icon.position = Vector2(273, 83)
-	_bonus_icon.size = Vector2(94, 94)
-	_bonus_icon.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bonus_canvas.add_child(_bonus_icon)
-	_detail = _label(Rect2(80, 185, 480, 40), 24, Color("#efcb70"), _bonus_canvas)
-	_detail.add_theme_color_override("font_outline_color", Color("#efcb70"))
-	_detail.add_theme_constant_override("outline_size", 1)
-	_bonus_level = _label(Rect2(80, 227, 480, 22), 14, Color("#d5dbea"), _bonus_canvas)
-	_trail = _label(Rect2(100, 273, 440, 40), 10, Color("#a6b4cb"), _bonus_canvas)
-	_bonus_hint = _label(Rect2(80, 327, 480, 18), 10, Color("#5bc8db"), _bonus_canvas)
-	_bonus_hint.text = tr("hud.continuation_next")
-	# アイコンの右上に重なる紙片。文字も輪郭も同じ低解像度の中で回転する。
-	_bonus_stamp = Panel.new()
-	_bonus_stamp.size = Vector2(136, 42)
-	_bonus_stamp.pivot_offset = _bonus_stamp.size * 0.5
-	_bonus_stamp.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_stamp_style = StyleBoxFlat.new()
-	_stamp_style.bg_color = Color("#efcb70")
-	_stamp_style.border_color = Color("#9c804b")
-	_stamp_style.set_border_width_all(2)
-	_stamp_style.anti_aliasing = false
-	_bonus_stamp.add_theme_stylebox_override("panel", _stamp_style)
-	_bonus_canvas.add_child(_bonus_stamp)
-	_stamp_trim = Panel.new()
-	_stamp_trim.position = Vector2(5, 5)
-	_stamp_trim.size = _bonus_stamp.size - Vector2(10, 10)
-	_stamp_trim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var trim_style := StyleBoxFlat.new()
-	trim_style.draw_center = false
-	trim_style.border_color = Color("#9c804b")
-	trim_style.set_border_width_all(1)
-	trim_style.anti_aliasing = false
-	_stamp_trim.add_theme_stylebox_override("panel", trim_style)
-	_bonus_stamp.add_child(_stamp_trim)
-	_count = _label(Rect2(4, 8, 128, 27), 17, Color("#0f1424"), _bonus_stamp)
-	_count.add_theme_constant_override("shadow_offset_y", 0)
-	_update_continuation_stamp()
+	_continuation = CONTINUATION_FX.new()
+	_bonus_viewport.add_child(_continuation)
+	_continuation.font = get_theme_default_font()
+	var bold := FontVariation.new()
+	bold.base_font = _continuation.font
+	bold.variation_embolden = 0.6
+	_continuation.bold_font = bold
 	_bonus_output = TextureRect.new()
 	_bonus_output.texture = _bonus_viewport.get_texture()
 	_bonus_output.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_bonus_output.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_bonus_output.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_composite = ShaderMaterial.new()
+	_composite.shader = COMPOSITE
+	_composite.set_shader_parameter("layer_pixels", _bonus_viewport.get_texture())
+	_bonus_output.material = _composite
 	add_child(_bonus_output)
 	_bonus_output.hide()
+
+## 前のフレームの画面全体（HUD・前の継続画面を含む）を 640×360 のsRGBへ写す。
+func _capture_screen() -> Texture2D:
+	_snap_image.texture = get_tree().root.get_texture()
+	_snap_image.material.set_shader_parameter("linear_source", get_tree().root.use_hdr_2d)
+	_snap_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	return _snap_viewport.get_texture()
+
+func _render_card(index: int, info: Dictionary, definition: Resource) -> Texture2D:
+	var card_viewport := _card_viewports[index]
+	for child in card_viewport.get_children():
+		card_viewport.remove_child(child)
+		child.queue_free()
+	var card := CARD_VIEW.create(info, -1, 145, 10, definition)
+	card.theme = get_theme()
+	card.focus_mode = Control.FOCUS_NONE
+	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	card_viewport.add_child(card)
+	card_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	return card_viewport.get_texture()
+
+## 画面上の範囲を継続画面の 640×360 の座標へ直す。
+func _to_bonus(area: Rect2) -> Rect2:
+	var factor := minf(size.x / BONUS_SIZE.x, size.y / BONUS_SIZE.y)
+	var origin := global_position + (size - BONUS_SIZE * factor) * 0.5
+	return Rect2((area.position - origin) / factor, area.size / factor)
 
 func _build_ult_block() -> void:
 	_ult_block = PanelContainer.new()
@@ -235,7 +236,6 @@ func _label(area: Rect2, font_size: int, color: Color, parent: Control = null) -
 func enqueue_bonus(event: Dictionary) -> void:
 	_queue.append(event.duplicate())
 	if _current.is_empty():
-		_history.clear()
 		_begin_next()
 
 func enqueue_ult(event: Dictionary) -> void:
@@ -258,8 +258,9 @@ func cancel() -> void:
 func is_bonus_active() -> bool:
 	return not _current.is_empty() and _current.type == &"level_bonus"
 
+## 画面切替とカードの着地が終わり、止まっている間だけ次へ進む。
 func advance_bonus() -> void:
-	if is_bonus_active():
+	if is_bonus_active() and _continuation.is_holding():
 		_begin_next()
 
 func is_active() -> bool:
@@ -289,6 +290,7 @@ func _begin_next() -> void:
 	_ult_block.hide()
 	if _queue.is_empty():
 		_current = {}
+		_continuation.reset()
 		_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		hide()
@@ -300,52 +302,34 @@ func _begin_next() -> void:
 	show()
 	active_changed.emit(true)
 	var ult: bool = _current.type == &"hero_freed"
-	_dim.modulate.a = 0.0 if ult else 1.0
+	# 継続画面は自分の層で暗くする
+	_dim.modulate.a = 0.0
 	_heading.modulate.a = 0.0 if ult else 1.0
 	_canvas.visible = ult
 	_ult_output.visible = ult
 	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if ult else SubViewport.UPDATE_DISABLED
 	_bonus_output.visible = not ult
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED if ult else SubViewport.UPDATE_ALWAYS
-	_material.set_shader_parameter("progress", 0.0)
 	if ult:
 		_begin_ult()
 		return
-	if int(_current.count) == 1:
-		_history.clear()
-	var step := int(_current.count) + 1
-	var definition := ContentManager.catalog.find(&"weapons" if _current.kind == &"weapon" else &"traits", _current.id)
+	var step := clampi(int(_current.count), 1, 3)
+	var weapon: bool = _current.kind == &"weapon"
+	var definition := ContentManager.catalog.find(&"weapons" if weapon else &"traits", _current.id)
 	var title: String = definition.get_display_name() if definition != null else String(_current.id)
-	var reward := "%s Lv%d" % [title, _current.level]
-	_bonus_heading.text = tr("hud.continuation")
-	_count.text = tr("hud.continuation_count").format({n = step})
-	_stamp_style.bg_color = Color("#5bc8db") if step == 2 else Color("#efcb70") if step == 3 else Color("#d5dbea")
-	_stamp_style.border_color = Color("#0f1424") if step == 2 else Color("#9c804b")
-	_stamp_style.set_border_width_all(2 if step < 4 else 3)
-	_stamp_trim.visible = step >= 3
-	var trim_style := _stamp_trim.get_theme_stylebox("panel") as StyleBoxFlat
-	trim_style.border_color = Color("#d5dbea") if step == 3 else Color("#9c804b")
-	_detail.text = title
-	_bonus_level.text = "Lv%d → Lv%d" % [int(_current.level) - 1, int(_current.level)]
-	for child in _bonus_icon.get_children():
-		_bonus_icon.remove_child(child)
-		child.queue_free()
-	if add_module_icon.is_valid():
-		add_module_icon.call(_bonus_icon, definition, Rect2(Vector2.ZERO, _bonus_icon.size))
-	_history.append("%d  %s" % [step, reward])
-	_trail.text = "\n".join(_history)
-	_update_continuation_stamp()
-	_material.set_shader_parameter("chain_step", float(step))
-	AudioManager.play(&"levelup", -5.0, 1.0 + 0.12 * (step - 2))
-
-func _update_continuation_stamp() -> void:
-	var t := clampf(_elapsed / continuation_stamp_seconds, 0.0, 1.0)
-	var landing := 1.0 - pow(1.0 - minf(t / 0.65, 1.0), 3.0)
-	# 上から素早く貼り、短い押し込みから静止する。点滅・待機・次送りを伴わない。
-	var scale_factor := lerpf(1.28, 0.94, landing) if t < 0.65 else lerpf(0.94, 1.0, (t - 0.65) / 0.35)
-	_bonus_stamp.position = (STAMP_POSITION + Vector2(10, -42) * (1.0 - landing)).round()
-	_bonus_stamp.rotation = STAMP_ANGLE - 0.14 * (1.0 - landing)
-	_bonus_stamp.scale = Vector2.ONE * scale_factor
+	var info := {"tag": tr("card.weapon_up" if weapon else "card.trait_up"), "name": title,
+		"desc": "Lv%d → Lv%d" % [int(_current.level) - 1, int(_current.level)]}
+	var card := _render_card(step - 1, info, definition)
+	_continuation.heading = tr("hud.continuation")
+	_continuation.hint = tr("hud.continuation_next")
+	_continuation.count_format = tr("hud.continuation_count")
+	if step == 1:
+		_continuation.reset()
+		_continuation.select_snapshot = _capture_screen()
+		_continuation.picked_rect = _to_bonus(picked_rect) if picked_rect.size.x > 0.0 else Rect2()
+		picked_rect = Rect2()
+	_continuation.begin(step, card, _capture_screen() if step == 3 else null)
+	AudioManager.play(&"levelup", -5.0, 1.0 + 0.12 * (step - 1))
 
 func _begin_ult() -> void:
 	var definition: HeroDef = ContentManager.heroes.get(_current.id)
@@ -365,9 +349,7 @@ func _process(delta: float) -> void:
 		var factor := minf(size.x / BONUS_SIZE.x, size.y / BONUS_SIZE.y)
 		_bonus_output.position = (size - BONUS_SIZE * factor) * 0.5
 		_bonus_output.size = BONUS_SIZE * factor
-		var progress := clampf(_elapsed / continuation_seconds, 0.0, 1.0)
-		_material.set_shader_parameter("progress", progress)
-		_update_continuation_stamp()
+		_composite.set_shader_parameter("linear_target", get_viewport().use_hdr_2d)
 		return
 	var factor := minf(size.x / BONUS_SIZE.x, size.y / BONUS_SIZE.y)
 	_ult_output.position = ((size - BONUS_SIZE * factor) * 0.5).round()

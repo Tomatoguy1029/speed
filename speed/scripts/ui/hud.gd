@@ -55,7 +55,6 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 @export_range(0.0, 1.0, 0.05) var card_input_delay := 0.3
 
 @export_group("報酬演出")
-@export_range(0.3, 1.0, 0.05) var continuation_seconds := 0.55
 ## 英雄の力の獲得演出の長さ（クリック・タップ・Space で飛ばせる）
 @export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
 @export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
@@ -195,6 +194,8 @@ func _card_command(command: StringName, args := {}) -> void:
 	if command==&"choose_card":
 		var index := int(args.get("index",-1))
 		if index<0 or index>=cards.get("candidates",[]).size(): return
+		# 継続演出は選んだカードを弾ませてから画面を閉じる
+		_rewards.picked_rect = _cards_row.get_child(index).get_global_rect() if _cards_row.visible and index<_cards_row.get_child_count() else Rect2()
 		payload.candidate_id = cards.candidates[index].candidate_id
 		if cards.candidates[index].kind=="swap":
 			command = &"choose_swap"
@@ -647,7 +648,6 @@ func _ready_cpp() -> void:
 	add_child(_entrance_skip)
 	_prepare_cpp_finish()
 	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
-	_rewards.continuation_seconds = continuation_seconds
 	_rewards.ult_acquire_seconds = ult_acquire_seconds
 	_rewards.ult_details_seconds = ult_details_seconds
 	_rewards.add_module_icon = _add_icon
