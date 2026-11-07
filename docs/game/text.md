@@ -135,12 +135,12 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hud.ult&#95;granted | 英雄の力を授かった | ULT ACQUIRED |
 | hud.ult&#95;placeholder | 仮カットイン · 正式素材へ差し替え予定 | PLACEHOLDER CUT-IN · ART PENDING |
 | hud.ult&#95;key | {key}：英雄の星座の力を発動 | {key}: Activate constellation power |
-| hero.leo.power | 線が太くなる | Wider Line |
-| hero.leo.desc | 線が太くなり、帯に触れた敵を装甲に関係なく貫く。 | Widen the line and pierce enemies in its path regardless of armor. |
+| hero.leo.power | 獅子になる | Become the Lion |
+| hero.leo.desc | 星の獅子になって駆け回り、触れた敵を装甲に関係なく貫く。その間は被弾せず、武器・特性・ブーストは止まる。 | Become a lion of stars and rush around, piercing enemies on contact regardless of armor. While active you take no damage, and weapons, traits and boost stop. |
 | hero.perseus.power | メドゥーサの首 | Medusa's Head |
 | hero.perseus.desc | 画面の中の敵（ボスと障害物のほか）と敵の弾を石にする。石は触れると砕ける。ボスは短時間止まる。 | Petrify enemies (except bosses and obstacles) and hostile shots on screen. Touch stone to shatter it. Bosses stop briefly. |
-| hero.gemini.power | 線を2本 | Two Lines |
-| hero.gemini.desc | 線を2本描き、機体と双子が同時に駆け抜ける。 | Draw two lines. Your ship and its twin dash along them together. |
+| hero.gemini.power | 光と影の兄弟 | Light and Shadow Twins |
+| hero.gemini.desc | 機体が光と影に分かれ、影は描いた線を左右反転した経路を同時に駆け抜け、同じ武器を使う。 | Your ship splits into light and shadow. The shadow dashes the mirrored path at the same time and uses the same weapons. |
 | hero.hercules.power | 火の隕石 | Fiery Meteors |
 | hero.hercules.desc | 機体の周りに火の隕石を落とし、落ちた跡を燃やす。 | Drop fiery meteors around the ship and leave burning ground. |
 | hud.skip&#95;finish | 演出をスキップ | Skip sequence |

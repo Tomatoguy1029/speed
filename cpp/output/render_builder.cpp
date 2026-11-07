@@ -2,6 +2,7 @@
 #include "../bosses/canis_major/body.h"
 #include "../bosses/hydra/body.h"
 #include "../behaviors/weapons/massTow.h"
+#include "../behaviors/heroes/gemini.h"
 #include "render_builder.h"
 #include "../systems/boss_contact_feedback.h"
 #include "../bosses/flow/technique_runner.h"
@@ -239,6 +240,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         godot::Vector2 deform;double amount=0;bool flash=false;
         for (const auto &w:state.loadout->contact_wave.waves) for (const auto &h:w.caught) if (h.id==enemy.id && state.enemy_handles.contains(h.target)) {const double p=std::clamp(h.age/0.16,0.0,1.0);deform=enemy.pos-w.pos;amount=std::sin(p*3.141592653589793);flash=p<0.45;}
         if (flash) color.r=1;
+        // ペルセウス座で石になった敵：色の b に石になってからの秒を渡し、絵を石の灰色へ置き換える
+        if (!definition.polygon_visual && enemy.stone>0 && !run.content->perseus.empty()) color.b=std::clamp(run.content->perseus.front().shatter_delay+0.5-enemy.stone,0.004,1.0);
         enemy_batch.add(enemy.id,pose.position,pose.angle+definition.sprite_angle,radius,iron?Color(0,0,0,1):color,iron?int32_t((state.field.rock_handles.contains(enemy.rock)?int64_t(enemy.rock.slot):enemy.id)%3):(enemy.flash>0 || warning || flash?1:0));
         const auto *parent=state.enemy_handles.contains(enemy.parent)?&state.enemies[enemy.parent.slot]:nullptr;
         enemy_batch.marks.push_back((enemy.landmark || (parent && parent->landmark)?1:0) | (enemy.elite || (parent && parent->elite)?2:0));
@@ -414,20 +417,14 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     for (uint32_t row=0;row<state.friends.size();++row) {FriendDebrisSystem::render(run,row,view,shapes,alpha);FriendHullSystem::render(run,row,view,shapes,alpha);}
     for (uint32_t row=0;row<state.hazards.size();++row) {BeamSystem::render(run,row,view,shapes);WaveSystem::render(run,row,view,shapes);WallSystem::render(run,row,view,shapes);BlastSystem::render(run,row,view,shapes);ZoneSystem::render(run,row,view,shapes);FloodSystem::render(run,row,view,shapes);}
     for (uint32_t row=0;row<state.hostiles.size();++row) {SlashSystem::render(run,row,view,shapes);BoltSystem::render(run,row,view,shapes);LightArrowSystem::render(run,row,view,shapes);ShellSystem::render(run,row,view,shapes);}
-    for (const auto *twin:{&state.heroes.twin.first,&state.heroes.twin.path}) if (twin->size()>1) {
-        Dictionary line;line["kind"]=int(RenderShapeKind::Polyline);line["layer"]=3;line["order"]=2;line["owner_id"]=0;PackedVector2Array points;for (auto p:*twin) points.push_back(p);line["points"]=points;
-        PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(points.size());line["offsets"]=offsets;PackedFloat32Array widths;widths.push_back(config.trace_radius*2);line["widths"]=widths;PackedColorArray colors;colors.push_back(Color(0.75,0.9,1,0.5));line["colors"]=colors;shapes.push_back(line);
-    }
-    if (state.heroes.twin.tracing) {
-        Dictionary head;head["kind"]=int(RenderShapeKind::Circle);head["layer"]=3;head["order"]=3;head["owner_id"]=0;PackedVector2Array points;points.push_back(state.heroes.twin.position);points.push_back(state.heroes.twin.position);head["points"]=points;PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);offsets.push_back(2);head["offsets"]=offsets;PackedFloat32Array widths;widths.push_back(state.ship_config.ship_radius*1.3);widths.push_back(state.ship_config.ship_radius*0.7);head["widths"]=widths;PackedColorArray colors;colors.push_back(Color(0.75,0.92,1,0.55));colors.push_back(Color(1,1,1,0.9));head["colors"]=colors;shapes.push_back(head);
-    }
     const auto &points=state.draw.drawing?state.draw.points:state.draw.path;
-    if ((state.draw.drawing || state.draw.tracing) && points.size()>1) {
-        const double width=HeroesSystem::trace_width(run),radius=config.trace_radius*width;
+    // ふたご座の間は、光と影の線を表示側（heroes.gd）が描くので、通常のなぞり線を出さない
+    if ((state.draw.drawing || state.draw.tracing) && points.size()>1 && !GeminiBehavior::active(run)) {
+        const double radius=config.trace_radius;
         Dictionary band;band["kind"]=int(RenderShapeKind::Polyline);band["layer"]=3;band["order"]=0;band["owner_id"]=0;band["points"]=points;band["rounded"]=true;
         PackedInt32Array band_offsets;band_offsets.push_back(0);band_offsets.push_back(points.size());band["offsets"]=band_offsets;
         PackedFloat32Array band_widths;band_widths.push_back(radius*2);band["widths"]=band_widths;
-        PackedColorArray band_colors;band_colors.push_back(width>1?Color(1.0,0.85,0.45):Color(0.55,0.9,1));band["colors"]=band_colors;shapes.push_back(band);
+        PackedColorArray band_colors;band_colors.push_back(Color(0.55,0.9,1));band["colors"]=band_colors;shapes.push_back(band);
         Dictionary joints;joints["kind"]=int(RenderShapeKind::Circle);joints["layer"]=3;joints["order"]=1;joints["owner_id"]=0;joints["points"]=points;
         PackedInt32Array joint_offsets;PackedFloat32Array joint_radii;PackedColorArray joint_colors;
         for (int64_t i=0;i<points.size();++i) {joint_offsets.push_back(i);joint_radii.push_back(radius);joint_colors.push_back(band_colors[0]);}joint_offsets.push_back(points.size());joints["offsets"]=joint_offsets;joints["widths"]=joint_radii;joints["colors"]=joint_colors;shapes.push_back(joints);

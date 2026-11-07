@@ -1,4 +1,6 @@
 #include "../systems/heroes.h"
+#include "../behaviors/heroes/leo.h"
+#include "../behaviors/heroes/gemini.h"
 #include "../behaviors/weapons/bipolar.h"
 #include "../behaviors/weapons/interceptor.h"
 #include "../behaviors/weapons/dashRangeDrone.h"
@@ -138,7 +140,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         if (input.hero_press) HeroesSystem::activate(core.runtime);
         timed("heroes",[&]{HeroesSystem::step(core.runtime,dt,world_dt);});
     }
-    if (state.phase==Phase::Play && !state.controls_locked) {
+    // しし座の獅子の間は、武器と特性が止まる
+    if (state.phase==Phase::Play && !state.controls_locked && !LeoBehavior::active(core.runtime)) {
         MetricsDetailTimer equipment_time(core.runtime.frame_workspace.metrics,"equipment");
         timed("light_lances",[&]{LightLancesSystem::step(core.runtime,world_dt);});
         for (const auto &owned:state.loadout->weapons) {
@@ -147,6 +150,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         }
         if (state.phase!=Phase::Play) return true;
         // 取得順で更新し、各武器の後に進行状態を確認する。
+        // ふたご座の影は、このあと武器が撃った弾を自分の位置からも撃つ
+        GeminiBehavior::follow(core.runtime);
+        const int64_t first_shot=state.attacks.next_id;
         if (state.loadout->ready) {
             for (const auto &owned:state.loadout->weapons) {
                 const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
@@ -169,6 +175,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
                 if (state.phase!=Phase::Play) break;
             }
         } else if (state.forward.ready) core.step_forward(world_dt);
+        if (state.phase==Phase::Play) GeminiBehavior::duplicate(core.runtime,first_shot);
+        if (state.phase==Phase::Play && state.loadout->ready) GeminiBehavior::weapons(core.runtime,world_dt);
         if (state.phase==Phase::Play) for (const auto &owned:state.loadout->traits) {
             const auto &id=core.runtime.content->equipment[owned.definition-1].external_id;
             MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,"equipment.",id);

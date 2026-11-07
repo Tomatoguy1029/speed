@@ -29,7 +29,8 @@ var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
 var _cepheus := {"values":PackedFloat64Array(),"marks":PackedFloat64Array()}
 var _hero_fire_canvas: DrawLayer
-var _hero_power_visual: Node2D
+const HeroPowers := preload("res://scripts/render/equipment/heroes.gd")
+var _hero_power_visual: HeroPowers
 var _hero_canvas: DrawLayer
 var _hero_frame := {}
 var _hero_aura: MeshInstance2D
@@ -168,6 +169,9 @@ var _shield_transfer_canvas: DrawLayer
 var _shield_layer := 2
 var _ship_white_material: ShaderMaterial
 var _ship_visible := true
+## しし座が効いていて、機体の代わりに獅子を描いているか
+var _lion_on := false
+var _ship_transform := Transform2D.IDENTITY
 var _ship_visual_position := Vector2.INF
 var _zoom := 1.0
 var _finale_overlay: Dictionary={}
@@ -211,11 +215,15 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	elite_crackle = preload("res://scripts/render/elite_crackle.gd").new()
 	mark_layer.add_child(elite_crackle)
 	elite_crackle.setup(scope)
-	_hero_power_visual = preload("res://scripts/render/equipment/heroes.gd").new()
+	_hero_power_visual = HeroPowers.new()
 	_layer(9).add_child(_hero_power_visual)
+	var hero_sky := Node2D.new()
+	mark_layer.add_child(hero_sky)
+	# ふたご座の光と影の線は、敵より上・光と影の機体より下に描く
 	_hero_fire_canvas = DrawLayer.new()
 	_hero_fire_canvas.draw_fn = _hero_power_visual.draw_fire
-	_layer(2).add_child(_hero_fire_canvas)
+	hero_sky.add_child(_hero_fire_canvas)
+	_hero_power_visual.setup(_pixel,hero_sky,_layer(2))
 	_hero_canvas = DrawLayer.new()
 	_hero_canvas.draw_fn = _draw_hero_values
 	_layer(2).add_child(_hero_canvas)
@@ -448,6 +456,9 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 			batch.setup_texture(_scope.resources.get(entry.path) as Texture2D,entry.get("rect",Rect2()))
 			var material := ShaderMaterial.new()
 			material.shader = load("res://shaders/xp_crystal.gdshader" if entry.role==3 else "res://shaders/pixel_sprite.gdshader")
+			if entry.role==VISUAL_ROLE.EnemySprite:
+				material.set_shader_parameter("stone_enabled",true)
+				material.set_shader_parameter("stone_linear",RenderingServer.get_current_rendering_method()!="gl_compatibility")
 			batch.material = material
 	_layer(layer).add_child(batch)
 	batches[id] = batch
@@ -1091,6 +1102,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		var sprite: Sprite2D = parts[key]
 		if visuals[row.part_key].role==1:
 			_ship_visual_position = row.transform.origin
+			_ship_transform = row.transform
 			_ship_visible = row.visible
 		sprite.transform = row.transform
 		sprite.visible = row.visible
@@ -1275,6 +1287,16 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_rear_shells.clear()
 		_rear_world_time = -1.0
 	_hero_power_visual.fire = frame.ui.get("hero",{}).get("hercules",{})
+	var twin_hero: Dictionary = frame.ui.get("hero",{})
+	var twin_draw: Dictionary = frame.ui.get("draw",{})
+	var twin_on := StringName(twin_hero.get("power",&""))==&"gemini" and float(twin_hero.get("active",0.0))>0.0
+	var twin_run: Dictionary = twin_hero.get("twin",{})
+	if twin_on and bool(twin_draw.get("drawing",false)):
+		_hero_power_visual.twin_preview = {"drawing":true,"light":twin_draw.get("draw_points",PackedVector2Array()),"ship":frame.ui.ship.ship_pos,"heading":frame.ui.ship.ship_heading,"width":_pixel*22.0}
+	elif bool(twin_draw.get("tracing",false)) and bool(twin_run.get("tracing",false)):
+		_hero_power_visual.twin_preview = {"light":twin_draw.get("trace_path",PackedVector2Array()),"shadow":twin_run.get("path",PackedVector2Array()),"ship":frame.ui.ship.ship_pos,"twin":twin_run.get("position",Vector2.INF),"width":_pixel*22.0}
+	else:
+		_hero_power_visual.twin_preview = {}
 	_hero_power_visual.world_time = float(frame.ui.world_time)
 	_hero_fire_canvas.queue_redraw()
 	_hero_power_visual.unit = 1.0/maxf(0.01,float(frame.camera.zoom))
@@ -1468,12 +1490,13 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	for event: Dictionary in _queued_events:
 		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
 	for event: Dictionary in _queued_events:
+		var stone_kill := _hero_power_visual.frame_event(event)
 		if event.type==&"kill" and not captured.has(event.id):
 			_elite_deaths.add_event(event,frame.ui.world_time,death_view)
 			var enemy_type := StringName(event.enemy_type)
 			if enemy_type not in [&"meteor", &"iron", &"saw", &"hydra_rubble"] and ContentManager.catalog.table(&"enemies").has(enemy_type) and death_view.grow(96.0).has_point(event.pos):
 				var radius: float = event.r
-				if not event.has("death_visual") and enemy_type != &"pump":
+				if not event.has("death_visual") and enemy_type != &"pump" and not stone_kill:
 					_burst(event.pos, event.color, 6 + roundi(radius / 3.0), 260.0 + radius * 4.0, event.dir)
 				# 他の揺れと最大値で合成し、カメラ側で設定の強度を掛ける。
 				if radius > 25.0:
@@ -1499,6 +1522,8 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"beam" and event.get("visual_key","")=="weapon/bipolar": ruler_shake = maxf(ruler_shake,5.0)
 		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
 		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
+		if event.type==&"meteor_impact": ruler_shake = maxf(ruler_shake,5.0)
+		if event.type==&"hero_power" and StringName(event.get("id",&""))==&"hercules": ruler_shake = maxf(ruler_shake,8.0)
 		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
 		_boss_sword_visual.frame_event(event)
 		if event.type==&"draco_roar":
@@ -1614,6 +1639,12 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_dim.queue_redraw()
 	for display: Node in enemy_frames.values(): display.set_death_brightness(1.0-_dim_strength)
 	var effect_dt := 0.0 if ui.get("presentation_frozen",not ui.input_enabled) else dt
+	_hero_power_visual.pipeline = pipeline
+	_hero_power_visual.frame_tick(effect_dt,_ship_visual_position if _ship_visual_position.is_finite() else ui.ship.ship_pos,ui.get("hero",{}),ui.ship.ship_heading,ui.ship_vel,_ship_transform,{"drones":Array(ui.get("escort",{}).get("drones",[]))+Array(ui.get("interceptor",{}).get("drones",[]))})
+	# しし座が効いている間は機体の代わりに獅子を、ふたご座の間は形だけ残した光の機体を描くので、機体を隠す
+	_lion_on = HeroPowers.lion_active(ui.get("hero",{})) or _hero_power_visual.twin_light()>0.5
+	for id: int in [17,18]:
+		if _layers.has(id): _layers[id].visible = not _lion_on
 	finish_flash = maxf(0.0,finish_flash-effect_dt*2.0)
 	if ui.has("light_lances"):
 		if not ui.light_lances.is_empty() and not is_instance_valid(_critical_lances):
@@ -1729,7 +1760,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_vortex_world_time = ui.world_time if equipped_vortex else -1.0
 	if _vortex_visual!=null:
 		_vortex_visual.sync_frame(ui.vortex.visuals,vortex_dt)
-		_vortex_visual.frame_tick(vortex_dt,ui.ship.ship_pos)
+		_vortex_visual.frame_tick(vortex_dt,ui.ship.ship_pos,Vector2(ui.get("hero",{}).get("twin",{}).get("position",Vector2.INF)))
 	var mines_dt: float = 0.0 if _mines_world_time<0.0 else maxf(0.0,ui.world_time-_mines_world_time)
 	_mines_world_time = ui.world_time if equipped_mines else -1.0
 	if _mines_visual!=null:
@@ -1738,7 +1769,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var run_up_dt: float = 0.0 if _run_up_world_time<0.0 else maxf(0.0,ui.world_time-_run_up_world_time)
 	_run_up_world_time = ui.world_time if equipped_run_up else -1.0
 	if _run_up_visual!=null:
-		_run_up_visual.frame_tick(run_up_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance,ui.run_up.distance,ui.run_up.first,ui.draw.tracing,ui.world_time,_ship_visible)
+		_run_up_visual.frame_tick(run_up_dt,ui.ship.ship_pos,ui.ship.ship_heading,ui.full_charge.distance,ui.run_up.distance,ui.run_up.first,ui.draw.tracing,ui.world_time,_ship_visible,ui.run_up)
 		_run_up_visual.sync_frame(ui.run_up.hits)
 	var end_blast_dt: float = 0.0 if _end_blast_world_time<0.0 else maxf(0.0,ui.world_time-_end_blast_world_time)
 	_end_blast_world_time = ui.world_time if equipped_end_blast else -1.0
@@ -1773,7 +1804,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		sprite.position = ui.ship.ship_pos
 		sprite.rotation = ui.ship.ship_heading.angle()+PI/2.0
 		sprite.frame = int(_jet_time*12.0)%3
-		sprite.visible = (ui.phase==0 or ui.phase==4) and not (equipped_escort and ui.draw.tracing)
+		sprite.visible = (ui.phase==0 or ui.phase==4) and not (equipped_escort and ui.draw.tracing) and not _lion_on
 
 func _death_burst(at: Vector2) -> void:
 	_burst(at,Color("#9fe8ff"),60,500.0)

@@ -1418,11 +1418,14 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 		data.HeroDefinition.append({"id":hero_id,"external_id":String(definition_hero.id),"stage":definition_hero.stage,"cooldown":definition_hero.cooldown,"duration":definition_hero.duration})
 		if definition_hero.id==&"hercules":
 			var fire := {"id":data.HerculesDefinition.size()+1,"hero":hero_id}
-			for key in ["interval","fall_time","power","radius","burn_time","burn_power"]: fire[key] = float(definition_hero.params[key])
+			for key in ["interval","fall_time","start_delay","power","radius","burn_time","burn_power"]: fire[key] = float(definition_hero.params[key])
 			data.HerculesDefinition.append(fire)
 		if definition_hero.id==&"gemini": data.GeminiDefinition.append({"id":data.GeminiDefinition.size()+1,"hero":hero_id})
-		if definition_hero.id==&"leo": data.LeoDefinition.append({"id":data.LeoDefinition.size()+1,"hero":hero_id,"width_mult":float(definition_hero.params.width_mult)})
-		if definition_hero.id==&"perseus": data.PerseusDefinition.append({"id":data.PerseusDefinition.size()+1,"hero":hero_id,"boss_stun":float(definition_hero.params.boss_stun)})
+		if definition_hero.id==&"leo":
+			var leo_record := {"id":data.LeoDefinition.size()+1,"hero":hero_id}
+			for key in ["speed","turn_mult","power","hit_interval","front","back","radius"]: leo_record[key] = float(definition_hero.params[key])
+			data.LeoDefinition.append(leo_record)
+		if definition_hero.id==&"perseus": data.PerseusDefinition.append({"id":data.PerseusDefinition.size()+1,"hero":hero_id,"boss_stun":float(definition_hero.params.boss_stun),"open_delay":float(definition_hero.params.open_delay),"shatter_delay":float(definition_hero.params.shatter_delay),"big_damage_ratio":float(definition_hero.params.big_damage_ratio),"boss_damage_ratio":float(definition_hero.params.boss_damage_ratio)})
 		for star in definition_hero.stars: data.HeroStar.append({"id":data.HeroStar.size()+1,"hero":hero_id,"x":star.x,"y":star.y})
 		for link in range(0,definition_hero.links.size(),2): data.HeroLink.append({"id":data.HeroLink.size()+1,"hero":hero_id,"a":definition_hero.links[link],"b":definition_hero.links[link+1]})
 	data.PopulationDefinition = [{"id":1,"active":false,"density":config.density_mult,"bonus_pop":config.bonus_pop,"boss_start":0.0,"recycle_scale":config.spawn_recycle_scale,"region_cap":config.spawn_region_cap,"margin":config.spawn_margin,"field_radius":config.field_radius,"planet_radius":config.planet_radius,"total_cap":config.spawn_total_cap,"refill_time":config.spawn_refill_time}]

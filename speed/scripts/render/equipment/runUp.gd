@@ -30,10 +30,12 @@ func sync_frame(values: Array) -> void:
 		hits[-1].age = value.age
 	_frame_seen = alive
 
-func frame_tick(dt: float, pos: Vector2, heading: Vector2, distance: float, limit: float, first: bool, tracing: bool, clock: float, enabled: bool) -> void:
+## twin はふたご座の影が走っている間の、影の位置・向きと、影の最初の命中がまだかどうか（空なら影はいない）。
+func frame_tick(dt: float, pos: Vector2, heading: Vector2, distance: float, limit: float, first: bool, tracing: bool, clock: float, enabled: bool, twin := {}) -> void:
 	var p: PixelPainter = _painter
 	p.begin()
 	if enabled and tracing and first: _streaks(p,pos,heading,distance,limit,clock)
+	if twin.get("twin_first", false): _streaks(p,twin.twin_pos,twin.twin_heading,distance,limit,clock)
 	for h in hits:
 		h.age += dt
 		_hit(p,h)

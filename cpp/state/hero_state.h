@@ -4,18 +4,27 @@
 #include <array>
 #include <vector>
 #include <unordered_set>
+#include <unordered_map>
 namespace speed {
 // 星座、目印二枠、力をランと一緒に値で保持する。
 struct HeroState {
     struct FirePosition {godot::Vector2 position;double remaining=0;};
     struct Hercules {std::vector<FirePosition> falls,burns;double fire_time=0,burn_tick=0;} hercules;
     struct Twin {
-        std::vector<godot::Vector2> first,path;
+        std::vector<godot::Vector2> path;
         godot::Vector2 position;
-        std::unordered_set<int64_t> inside;
+        std::unordered_map<int64_t,size_t> inside;
         double rate=0,segment_position=0;
         size_t segment=0;
         bool tracing=false;
+        // 影が使う機体の武器のうち、影ごとに持つ小さな値（ソニックブームの発射の状態、走らせているミラージュの残像の番号）
+        godot::Vector2 sonic_last;
+        double sonic_emission=0,sonic_distance=0,sonic_pulse=0,sonic_speed=0;
+        bool sonic_active=false;
+        std::unordered_set<int64_t> sonic_hits;
+        uint64_t afterimage_echo=0;
+        // 助走（T32）は突進の最初の命中だけを強めるので、影の最初の命中も影ごとに数える
+        bool run_up_first=false;
     } twin;
     uint32_t hero=0,power=0;
     godot::Vector2 center,previous;

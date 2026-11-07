@@ -1702,11 +1702,21 @@ struct PerseusDefinition {
     uint32_t id{};
     uint32_t hero{};
     double boss_stun{};
+    double open_delay{};
+    double shatter_delay{};
+    double big_damage_ratio{};
+    double boss_damage_ratio{};
 };
 struct LeoDefinition {
     uint32_t id{};
     uint32_t hero{};
-    double width_mult{};
+    double speed{};
+    double turn_mult{};
+    double power{};
+    double hit_interval{};
+    double front{};
+    double back{};
+    double radius{};
 };
 struct GeminiDefinition {
     uint32_t id{};
@@ -1717,6 +1727,7 @@ struct HerculesDefinition {
     uint32_t hero{};
     double interval{};
     double fall_time{};
+    double start_delay{};
     double power{};
     double radius{};
     double burn_time{};

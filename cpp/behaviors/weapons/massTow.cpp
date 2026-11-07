@@ -6,27 +6,38 @@
 #include "../../output/frame_builder.h"
 #include "../../state/loadout_state.h"
 #include "../../content/content_bundle.h"
+#include "../heroes/gemini.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
 bool MassTowBehavior::capture(RunRuntime &r,const DeathContext &death) {
     auto &s=r.state;auto &w=s.loadout->mass_tow;const auto &e=death.corpse;
-    if (!w.ready || !s.draw.tracing || e.is_boss || r.content->definitions[e.definition-1].kind==EnemyDefinition::Kind::Meteor || s.ship.pos.distance_squared_to(e.pos)>std::pow(w.capture_radius*(1+w.area_increment*double(s.loadout->post_area_stacks))+e.radius,2)) return false;
-    w.cargo.push_back({e.pos,e.pos-s.ship.pos,e.radius,e.facing,e.definition,e.id,false});
-    godot::Dictionary event;event["id"]=e.id;event["pos"]=e.pos;event["to"]=s.ship.pos-s.ship.heading*70;FrameBuilder::append(r,"anchor_capture",event);return true;
+    if (!w.ready || e.is_boss || r.content->definitions[e.definition-1].kind==EnemyDefinition::Kind::Meteor) return false;
+    const double reach=std::pow(w.capture_radius*(1+w.area_increment*double(s.loadout->post_area_stacks))+e.radius,2);
+    // 突進中の機体のそばで倒れた敵をつかむ。ふたご座の影が走っている間は、影のそばで倒れた敵は影がつかむ
+    godot::Vector2 at=s.ship.pos,heading=s.ship.heading,velocity;bool twin=false;
+    if (!s.draw.tracing || s.ship.pos.distance_squared_to(e.pos)>reach) {
+        if (!GeminiBehavior::motion(r,at,heading,velocity) || !s.heroes.twin.tracing || at.distance_squared_to(e.pos)>reach) return false;
+        twin=true;
+    }
+    w.cargo.push_back({e.pos,e.pos-at,e.radius,e.facing,e.definition,e.id,false,twin});
+    godot::Dictionary event;event["id"]=e.id;event["pos"]=e.pos;event["to"]=at-heading*70;FrameBuilder::append(r,"anchor_capture",event);return true;
 }
-void MassTowBehavior::end(RunRuntime &r) {auto &w=r.state.loadout->mass_tow;if (!w.ready) return;for (auto &c:w.cargo) c.ready=true;w.fire.remaining=w.hold;}
+void MassTowBehavior::end(RunRuntime &r) {auto &w=r.state.loadout->mass_tow;if (!w.ready) return;for (auto &c:w.cargo) if (!c.twin) c.ready=true;w.fire.remaining=w.hold;}
 void MassTowBehavior::step(RunRuntime &r,double dt) {
     auto &s=r.state;auto &w=s.loadout->mass_tow;if (!w.ready || dt<=0 || w.cargo.empty()) return;
-    const auto u=s.ship.vel.length()>1?s.ship.vel.normalized():s.ship.heading;const size_t count=std::min(size_t(w.visible),w.cargo.size());
-    const auto center=-u*(70+w.clump_spacing*std::sqrt(double(count))*0.6);const double follow=1-std::exp(-w.follow*dt);
-    for (size_t j=0;j<w.cargo.size();++j) {auto &c=w.cargo[j];c.angle+=dt*(j%2?-0.6:0.6);auto target=center;
+    // 牽く敵は、つかんだ機（機体か、ふたご座の影）の後ろへ集まる
+    godot::Vector2 twin_pos=s.ship.pos,twin_heading=s.ship.heading,twin_velocity=s.ship.vel;GeminiBehavior::motion(r,twin_pos,twin_heading,twin_velocity);
+    const auto back=[&](godot::Vector2 velocity,godot::Vector2 heading){return velocity.length()>1?velocity.normalized():heading;};
+    const auto u=back(s.ship.vel,s.ship.heading),twin_u=back(twin_velocity,twin_heading);const size_t count=std::min(size_t(w.visible),w.cargo.size());
+    const double follow=1-std::exp(-w.follow*dt);
+    for (size_t j=0;j<w.cargo.size();++j) {auto &c=w.cargo[j];c.angle+=dt*(j%2?-0.6:0.6);auto target=-(c.twin?twin_u:u)*(70+w.clump_spacing*std::sqrt(double(count))*0.6);
         if (j<count) target+=godot::Vector2::from_angle(j*2.39996323)*w.clump_spacing*0.6*std::sqrt(double(j))+godot::Vector2(std::sin(s.time*2+j),std::cos(s.time*1.7+j*1.3))*5;
-        c.relative+=(target-c.relative)*follow;c.pos=s.ship.pos+c.relative;
+        c.relative+=(target-c.relative)*follow;c.pos=(c.twin?twin_pos:s.ship.pos)+c.relative;
     }
     w.fire.advance(dt);const double floor=std::min(w.interval,std::max(w.minimum_interval,w.interval*w.minimum_ratio));const double interval=std::max(floor,w.interval*(1-w.interval_increment*double(s.loadout->post_weapon_interval_stacks)));
     while (w.fire.due() && !w.cargo.empty() && w.cargo.front().ready) {
-        const auto c=w.cargo.front();w.cargo.erase(w.cargo.begin());const auto direction=s.ship.heading;
+        const auto c=w.cargo.front();w.cargo.erase(w.cargo.begin());const auto direction=c.twin?twin_heading:s.ship.heading;
         FriendHullParams p;p.position=c.pos;p.velocity=direction*w.shot_speed*(1+w.projectile_increment*double(s.loadout->post_projectile_speed_stacks));p.radius=c.radius*s.loadout->effects.area;p.damage=CombatResolver::attack_power(r)*EquipmentSystem::weapon_damage_factor(r,w.definition)*w.damage*std::max(1.0,c.radius/w.size_ref);p.life=w.life*(1+w.duration_increment*double(s.loadout->post_duration_stacks));p.knock=w.knock*(1+w.knockback_increment*double(s.loadout->post_knockback_stacks));p.source_definition=c.definition;p.source_id=c.source_id;p.angle=direction.angle();FriendHullSystem::emit(r,p);
         godot::Dictionary event;event["pos"]=c.pos;event["dir"]=direction;event["radius"]=c.radius;FrameBuilder::append(r,"anchor_fire",event);w.fire.fired(interval);
     }

@@ -5,6 +5,7 @@
 #include "../../output/frame_builder.h"
 #include "../../state/loadout_state.h"
 #include "../../content/content_bundle.h"
+#include "../heroes/gemini.h"
 #include <algorithm>
 namespace speed {
 void VortexBehavior::end(RunRuntime &run) {
@@ -18,8 +19,10 @@ void VortexBehavior::step(RunRuntime &run,double dt) {
     auto &v=run.state.loadout->vortex;if (!v.ready) return;
     for (auto &visual:v.visuals) visual.age+=dt;
     v.visuals.erase(std::remove_if(v.visuals.begin(),v.visuals.end(),[](const auto &visual){return visual.age>=visual.life;}),v.visuals.end());
+    // 穴は、あけた機（機体か、ふたご座の影）に付いて動く
+    godot::Vector2 twin_pos=run.state.ship.pos,twin_heading,twin_velocity;GeminiBehavior::motion(run,twin_pos,twin_heading,twin_velocity);
     for (auto &instance:v.items) {
-        instance.pos=run.state.ship.pos;instance.age+=dt;
+        instance.pos=instance.twin?twin_pos:run.state.ship.pos;instance.age+=dt;
         if (instance.age>=v.charge && instance.age<instance.duration) {
             const double reach=instance.radius+std::max(run.state.combat_config.max_enemy_radius,run.state.grid.max_radius);
             const auto rows=CollisionQuery::enemy_rows(run.state,instance.pos-godot::Vector2(reach,reach),instance.pos+godot::Vector2(reach,reach));
@@ -34,7 +37,7 @@ void VortexBehavior::step(RunRuntime &run,double dt) {
                 CombatResolver::damage_enemy(run,request);EventBuilder::flush_combat(run);
                 const bool remains=run.state.enemy_handles.contains(target);
                 if (lethal && remains && run.state.enemies[target.slot].dead) {
-                    ++instance.kills;VortexVisual visual;visual.id=++v.serial;visual.kind=1;visual.pos=enemy.pos;visual.radius=enemy.radius;visual.color=run.content->definitions[enemy.definition].color;visual.facing=enemy.facing;visual.definition=uint32_t(enemy.definition+1);visual.life=0.6;v.visuals.push_back(visual);
+                    ++instance.kills;VortexVisual visual;visual.id=++v.serial;visual.kind=1;visual.pos=enemy.pos;visual.radius=enemy.radius;visual.color=run.content->definitions[enemy.definition].color;visual.facing=enemy.facing;visual.definition=uint32_t(enemy.definition+1);visual.life=0.6;visual.twin=instance.twin;v.visuals.push_back(visual);
                     godot::Dictionary event;event["pos"]=visual.pos;event["radius"]=visual.radius;event["enemy_type"]=run.content->definitions[enemy.definition].id;event["color"]=visual.color;event["facing"]=visual.facing;FrameBuilder::append(run,"hole_capture",event);
                 } else if (remains) run.state.enemies[target.slot].hull_scattered=enemy.hull_scattered;
             }
@@ -42,7 +45,7 @@ void VortexBehavior::step(RunRuntime &run,double dt) {
         if (instance.age>=instance.duration) {
             const double amount=std::min(1.0,double(instance.kills)/v.kills);
             run.state.draw.gauge=std::min(run.state.draw_config.capacity,run.state.draw.gauge+amount);
-            VortexVisual visual;visual.id=++v.serial;visual.kind=2;visual.pos=run.state.ship.pos;visual.amount=amount;visual.life=0.78;v.visuals.push_back(visual);
+            VortexVisual visual;visual.id=++v.serial;visual.kind=2;visual.pos=instance.pos;visual.amount=amount;visual.life=0.78;visual.twin=instance.twin;v.visuals.push_back(visual);
             godot::Dictionary event;event["pos"]=visual.pos;event["amount"]=amount;FrameBuilder::append(run,"hole_recover",event);
         }
     }

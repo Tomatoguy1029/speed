@@ -71,6 +71,10 @@ func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, 
 	base.setup_texture(base_texture)
 	var base_material := ShaderMaterial.new()
 	base_material.shader = load("res://shaders/pixel_sprite.gdshader")
+	base_material.set_shader_parameter("stone_enabled",true)
+	# ペルセウス座の石の色は、HDR の画面（Compatibility 以外）ではリニアで出す
+	var hdr := RenderingServer.get_current_rendering_method() != "gl_compatibility"
+	base_material.set_shader_parameter("stone_linear",hdr)
 	base.material = base_material
 	_canvas.add_child(base)
 	var armor := InstanceBatch.new()
@@ -82,6 +86,7 @@ func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, 
 	material.shader = load("res://shaders/biter_part_armor.gdshader" if _biter else "res://shaders/pixel_armor.gdshader")
 	material.set_shader_parameter("ambient",settings.ambient)
 	material.set_shader_parameter("normal_strength",settings.normal_strength)
+	material.set_shader_parameter("stone_linear",hdr)
 	if _biter: material.set_shader_parameter("paint_tex",paint)
 	if _death_map != null:
 		for shader_material: ShaderMaterial in [base_material,material]:

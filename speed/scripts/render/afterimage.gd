@@ -38,7 +38,8 @@ func step_frame(dt: float, character_scale: float, echoes: Array) -> void:
 			for i in echo.copies.size():
 				var copy: Dictionary=echo.copies[i]
 				if copy.alpha<=0.0:continue
-				var key := "%s/%d" % [echo.start,i]
+				# 同じ時刻に始まる残像（ふたご座の影の残像など）を混ぜないよう、残像の番号で見分ける
+				var key := "%s/%d" % [echo.get("id",echo.start),i]
 				live[key]=true
 				if not _seen.has(key):_seen[key]={"pos":copy.pos,"start":_clock}
 				var previous: Dictionary=_seen[key]

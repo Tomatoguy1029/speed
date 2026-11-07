@@ -29,6 +29,8 @@ func _draw() -> void:
 		return
 	_draw_ship_trail()
 	for d in _frame.drones:
+		# ふたご座の影のドローンは、影の粒が集まって形になるまで描かない（集まる粒は gemini_twins.gd が描く）
+		if d.get("twin", false) and float(d.get("appear", 1.0)) < 1.0: continue
 		var points: Array = d.trail
 		var remaining: float = float(_frame.tail) * _scale
 		for i in range(points.size() - 1, 0, -1):

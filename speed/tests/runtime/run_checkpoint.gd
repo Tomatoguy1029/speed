@@ -276,12 +276,10 @@ func check_restore_heroes() -> void:
 			bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
 		bridge=restore_hero_point(bridge,fixture,behavior,id+"/発動中")
 		if id=="gemini" and not failed:
-			behavior._cpp_second_line(bridge)
-			bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
 			bridge._core.step_draw(0.01)
 			bridge.command("dev_tick_heroes",{"dt":0.0,"run_time":0.0})
-			check(bridge.read_frame().value.ui.hero.twin.tracing,"独立復元する双子が二本目を実際に進む")
-			bridge=restore_hero_point(bridge,fixture,behavior,"gemini/二本目の途中")
+			check(bridge.read_frame().value.ui.hero.twin.tracing,"独立復元する影が反転した経路を実際に進む")
+			bridge=restore_hero_point(bridge,fixture,behavior,"gemini/影の走行途中")
 		if id=="hercules" and not failed:
 			behavior._cpp_hero_tick(bridge,0.3,0.3);behavior._cpp_hero_tick(bridge,0.3,0.6)
 			check(not bridge.read_frame().value.ui.hero.hercules.falls.is_empty() and not bridge.read_frame().value.ui.hero.hercules.burns.is_empty(),"独立復元する落下と燃焼が同時に存在する")

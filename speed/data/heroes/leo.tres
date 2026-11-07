@@ -9,8 +9,14 @@ display_name = "しし座"
 stage = 1
 stars = PackedVector2Array(0, 0, -20, -110, 30, -200, -10, -290, -90, -320, -150, -260, 260, -170, 400, -90, 250, -60)
 links = PackedInt32Array(0, 1, 1, 2, 2, 3, 3, 4, 4, 5, 2, 6, 6, 7, 7, 8, 8, 0)
-cooldown = 45.0
-duration = 14.0
+cooldown = 60.0
+duration = 10.0
 params = {
-"width_mult": 4.0
+"back": 60.0,
+"front": 60.0,
+"hit_interval": 0.4,
+"power": 2.5,
+"radius": 60.0,
+"speed": 600.0,
+"turn_mult": 1.5
 }

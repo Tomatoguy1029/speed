@@ -131,6 +131,26 @@
           "name": "boss_stun",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "open_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "shatter_delay",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "big_damage_ratio",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "boss_damage_ratio",
+          "type": "f64",
+          "min": 0
         }
       ]
     },
@@ -149,7 +169,37 @@
           "ref": "HeroDefinition"
         },
         {
-          "name": "width_mult",
+          "name": "speed",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "turn_mult",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "power",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hit_interval",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "front",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "back",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "radius",
           "type": "f64",
           "min": 0
         }
@@ -192,6 +242,11 @@
         },
         {
           "name": "fall_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "start_delay",
           "type": "f64",
           "min": 0
         },

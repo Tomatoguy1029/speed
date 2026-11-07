@@ -1,4 +1,5 @@
 #include "heroes.h"
+#include "../behaviors/heroes/leo.h"
 #include "combat_resolver.h"
 #include "../behaviors/enemies/defender.h"
 #include "combat_hooks.h"
@@ -206,7 +207,7 @@ ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageReq
     else if (state.ship.shield_t>0) {
         if (state.ship.shield_flash<=0) {CombatEvent event;event.kind=CombatEventKind::ShieldBlock;event.pos=state.ship.pos;state.combat_events.push_back(event);}
         state.ship.shield_flash=0.12;result.reason=CombatReason::Shield;
-    } else if (state.ship.invuln>0) result.reason=CombatReason::Invulnerability;
+    } else if (state.ship.invuln>0 || LeoBehavior::active(run)) result.reason=CombatReason::Invulnerability;
     else if (state.invincible) result.reason=CombatReason::DebugInvincible;
     else if (result.amount>0 && request.cause!=Cause::FinalStrike && request.cause!=Cause::Debug && run.combat_hooks.barrier(run,request,result.amount)) {
         state.ship.invuln=state.ship_config.invulnerability;result.reason=CombatReason::Barrier;
