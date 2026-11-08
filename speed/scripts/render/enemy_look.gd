@@ -32,6 +32,13 @@ extends Resource
 @export_storage var armor_key := ""
 @export_storage var painted_armors: Dictionary = {}
 @export_storage var previews: Dictionary = {}
+## 外周を OUTLINE_PAD ドット広げ、縁を焼き込んだ戦闘用の絵（下地・塗装キーごとの装甲・法線）
+@export_storage var outlined_base: Texture2D
+@export_storage var outlined_normal: Texture2D
+@export_storage var outlined_armors: Dictionary = {}
+
+const OUTLINE_PAD := 1
+const OUTLINE_COLOR := Color8(2, 4, 10)
 
 func armor_palette(palettes: Dictionary) -> Dictionary:
 	if armor_color_regions.is_empty(): return palettes.get(armor_key, {})

@@ -127,6 +127,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
             timed("field.gravity",[&]{FieldSystem::step_gravity(core.runtime,wd);});
             if (!timed("enemies",[&]{return core.advance_enemies(wd);})) return false;
             if (!timed("avoidance",[&]{return core.avoid_strong(wd);})) return false;
+            if (!timed("crowd",[&]{return core.separate_crowd(wd);})) return false;
             BossImageSystem::refresh(core.runtime);
         }
         if (core.check_run_end()) return true;

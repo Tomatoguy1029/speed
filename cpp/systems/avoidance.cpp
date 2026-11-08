@@ -101,3 +101,54 @@ bool SpeedRunCore::avoid_strong(double dt) {
     }
     return true;
 }
+
+// 雑魚同士のゆるい押し合い。群れの中でも個体の形が読めるよう、重なりすぎた分の一部だけ毎回位置を戻す。
+// 半径の和の CROWD_ALLOW 倍までは重なってよく、それより近いと重さ（半径の2乗）の比で押し合う。
+// 移動中でない雑魚は動かない相手として扱う。強敵・ボスは対象外で、雑魚は avoid_strong で回り込む。
+// 細かい格子の周り9マスだけを見て、1体が押される相手は CROWD_NEIGHBORS 体までにする。
+bool SpeedRunCore::separate_crowd(double dt) {
+    if (!runtime.state.started || runtime.state.closed || !std::isfinite(dt) || dt < 0) return false;
+    if (dt == 0) return true;
+    constexpr double CROWD_ALLOW = 0.7, CROWD_STRENGTH = 0.1, CROWD_REFERENCE_DT = 1.0 / 60.0;
+    constexpr int CROWD_NEIGHBORS = 8;
+    auto &state = runtime.state; auto &cells = runtime.workspace.crowd_cells; auto &shift = runtime.workspace.crowd_shift;
+    cells.clear();
+    double cell_size = 0;
+    for (size_t row = 0; row < state.enemies.size(); ++row) {
+        const auto &e = state.enemies[row];
+        if (!e.alive || e.dead || e.is_boss || runtime.content->definitions[e.definition].rank > 2 || e.radius <= 0) continue;
+        cell_size = std::max(cell_size, 2.0 * e.radius * CROWD_ALLOW);
+        cells.emplace_back(0, uint32_t(row));
+    }
+    if (cells.size() < 2 || cell_size <= 0) return true;
+    auto cell_key = [cell_size](Vector2 p, int64_t dx, int64_t dy) {
+        return ((int64_t(std::floor(p.x / cell_size)) + dx) << 32) ^ ((int64_t(std::floor(p.y / cell_size)) + dy) & 0xffffffffLL);
+    };
+    for (auto &entry : cells) entry.first = cell_key(state.enemies[entry.second].pos, 0, 0);
+    std::sort(cells.begin(), cells.end());
+    shift.assign(state.enemies.size(), Vector2());
+    // 基準の1/60秒あたり CROWD_STRENGTH の割合で戻す。更新間隔が変わっても同じ速さで離れる。
+    const double rate = 1.0 - std::pow(1.0 - CROWD_STRENGTH, dt / CROWD_REFERENCE_DT);
+    for (const auto &entry : cells) {
+        const size_t row = entry.second;
+        if (!can_avoid_strong(row)) continue;
+        const auto &e = state.enemies[row]; const double weight = e.radius * e.radius;
+        int seen = 0;
+        for (int64_t dy = -1; dy <= 1 && seen < CROWD_NEIGHBORS; ++dy) for (int64_t dx = -1; dx <= 1 && seen < CROWD_NEIGHBORS; ++dx) {
+            const int64_t key = cell_key(e.pos, dx, dy);
+            for (auto it = std::lower_bound(cells.begin(), cells.end(), std::make_pair(key, uint32_t(0))); it != cells.end() && it->first == key && seen < CROWD_NEIGHBORS; ++it) {
+                if (it->second == row) continue;
+                const auto &other = state.enemies[it->second];
+                const double reach = (e.radius + other.radius) * CROWD_ALLOW;
+                Vector2 offset = e.pos - other.pos; double distance = offset.length();
+                if (distance >= reach) continue;
+                ++seen;
+                if (distance < 0.001) { offset = Vector2::from_angle(double((e.id * 17 + other.id * 31) % 360) * godot::Math::PI / 180.0); distance = 1.0; }
+                const double share = can_avoid_strong(it->second) ? other.radius * other.radius / (weight + other.radius * other.radius) : 1.0;
+                shift[row] += offset / distance * ((reach - distance) * share * rate);
+            }
+        }
+    }
+    for (const auto &entry : cells) state.enemies[entry.second].pos += shift[entry.second];
+    return true;
+}

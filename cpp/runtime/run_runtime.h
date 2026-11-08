@@ -11,6 +11,8 @@ struct RunWorkspace {
     std::vector<std::vector<AttackHandle>> friend_birth_batches;
     std::vector<int64_t> avoidance_ids;
     std::vector<godot::Vector2> avoidance_from;
+    std::vector<std::pair<int64_t,uint32_t>> crowd_cells;
+    std::vector<godot::Vector2> crowd_shift;
 };
 struct ContentBundle;
 class RunRuntime {

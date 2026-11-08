@@ -137,7 +137,41 @@ static func valid_palettes(value: Variant) -> bool:
 				return false
 	return true
 
-static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> EnemyLook:
+## 画像を外周へ余白分だけ広げる。
+static func _padded(image: Image) -> Image:
+	var source := image.duplicate() as Image
+	if source.is_compressed(): source.decompress()
+	source.convert(Image.FORMAT_RGBA8)
+	var pad := EnemyLook.OUTLINE_PAD
+	var result := Image.create_empty(source.get_width() + pad * 2, source.get_height() + pad * 2, false, Image.FORMAT_RGBA8)
+	result.blit_rect(source, Rect2i(Vector2i.ZERO, source.get_size()), Vector2i(pad, pad))
+	return result
+
+## 群れの中でも個体の境目が読めるよう、絵の外周に1ドットの縁を焼き込んだ下地を作る。
+## 縁は下地・装甲（分離する外観は相手側も含む）を合わせた外形の、上下左右の隣だけに置く。
+static func _outlined_base(base: Image, shapes: Array[Image]) -> Image:
+	var result := _padded(base)
+	var width := result.get_width()
+	var height := result.get_height()
+	var filled := PackedByteArray()
+	filled.resize(width * height)
+	var pad := EnemyLook.OUTLINE_PAD
+	for shape in shapes:
+		var image := shape.duplicate() as Image
+		if image.is_compressed(): image.decompress()
+		image.convert(Image.FORMAT_RGBA8)
+		for y in mini(image.get_height(), height - pad * 2):
+			for x in mini(image.get_width(), width - pad * 2):
+				if image.get_pixel(x, y).a > 0.0: filled[(y + pad) * width + x + pad] = 1
+	for y in height:
+		for x in width:
+			if filled[y * width + x] == 1: continue
+			if (x > 0 and filled[y * width + x - 1] == 1) or (x < width - 1 and filled[y * width + x + 1] == 1) \
+					or (y > 0 and filled[(y - 1) * width + x] == 1) or (y < height - 1 and filled[(y + 1) * width + x] == 1):
+				result.set_pixel(x, y, EnemyLook.OUTLINE_COLOR)
+	return result
+
+static func prepare_look(source: EnemyLook, palettes: Array[Dictionary], pair: EnemyLook = null) -> EnemyLook:
 	var result := source.duplicate() as EnemyLook
 	result.prepared = true
 	result.source_path = source.resource_path
@@ -156,11 +190,18 @@ static func prepare_look(source: EnemyLook, palettes: Array[Dictionary]) -> Enem
 		image.blend_rect(source.decorations.get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
 		result.base = ImageTexture.create_from_image(image)
 	result.decorations = null
-	if source.split_other != null: result.split_other = prepare_look(source.split_other, palettes)
+	if source.split_other != null: result.split_other = prepare_look(source.split_other, palettes, source)
+	var shapes: Array[Image] = [result.base.get_image(), source.armor.get_image()]
+	var partner := source.split_other if source.split_other != null else pair
+	if partner != null: shapes.append_array([partner.base.get_image(), partner.armor.get_image()])
+	result.outlined_base = ImageTexture.create_from_image(_outlined_base(result.base.get_image(), shapes))
+	result.outlined_normal = ImageTexture.create_from_image(_padded(source.normal.get_image())) if source.normal != null else null
+	result.outlined_armors = {}
 	for palette in palettes:
 		var armor_id := result.colors_key(palette)
 		if not result.painted_armors.has(armor_id):
 			result.painted_armors[armor_id] = source.armor if armor_id.is_empty() else ImageTexture.create_from_image(painted_image(source.armor, result.paint_palettes(palette)))
+			result.outlined_armors[armor_id] = ImageTexture.create_from_image(_padded(result.painted_armors[armor_id].get_image()))
 		var preview_id := result.preview_key(palette)
 		if result.previews.has(preview_id): continue
 		var image := result.base.get_image().duplicate()
