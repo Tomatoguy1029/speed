@@ -1,4 +1,5 @@
 #include "spiral.h"
+#include "../../output/event_builder.h"
 #include "body.h"
 #include "pose.h"
 #include "picaro.h"
@@ -51,7 +52,7 @@ void DracoSpiral::windup(RunRuntime &r,TechniqueState &t,double dt) {
 void DracoSpiral::active(RunRuntime &r,TechniqueState &t,double dt) {
     auto &v=t.detail.get<DracoTechniqueState>();auto &s=std::get<DracoSpiralState>(v.move);auto &b=*PhaseController::find(r,t.actor);const auto &p=r.content->boss_techniques[t.definition-1];const auto &d=rule(r,t);const double at=v.stage_time,shrink_at=s.coil+s.pause;
     if (at<s.coil) {if (!s.holding) {s.held_ship=r.state.ship_pos;s.holding=true;r.state.controls_locked=r.state.encounter_protected=true;}r.state.ship_pos=r.state.ship.pos=s.held_ship;r.state.ship.vel={};}else release(r,s);
-    if (at>=s.coil && !s.charging) {s.charging=true;t.locked=true;godot::Dictionary event;event["pos"]=s.center;event["radius"]=std::min(s.horizontal,s.extent)*0.8;FrameBuilder::append(r,"draco_roar",event);}
+    if (at>=s.coil && !s.charging) {s.charging=true;t.locked=true;EventBuilder::audio(r,"boss.draco.contract",s.center);godot::Dictionary event;event["pos"]=s.center;event["radius"]=std::min(s.horizontal,s.extent)*0.8;FrameBuilder::append(r,"draco_roar",event);}
     if (!t.locked && !s.holding) {const auto shift=follow(r,t,dt);for (auto *points:{&s.trail,&s.entry}) for (auto &q:*points) q+=shift;}
     camera(r,s,dt);v.warning_paths.clear();if (at>=s.coil && at<shrink_at) {const auto at=r.state.enemies[t.actor.slot].pos;v.warning_paths.push_back({at,at+godot::Vector2(0,1)*s.extent*2.0});}
     const double shrink=std::clamp((at-shrink_at)/s.shrink,0.0,1.0);

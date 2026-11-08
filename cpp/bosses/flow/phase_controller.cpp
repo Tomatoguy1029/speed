@@ -1,3 +1,4 @@
+#include "../../output/event_builder.h"
 #include "phase_controller.h"
 #include "../monoceros/body.h"
 #include "../centaurus/body.h"
@@ -123,7 +124,7 @@ void PhaseController::step(RunRuntime &r,double dt) {
             b.final_elapsed=std::max(0.0,s.time-b.final_started);const auto aim=TrackingPolicy{s.draw.tracing,e.held,s.enemy_handles.contains(e.pump_owner)}.target(e.pos,e.facing,s.ship_pos);const auto direction=aim-e.pos;
             e.vel={};e.facing+=std::clamp(angle_difference(direction.angle()-e.facing),-definition.turn*dt,definition.turn*dt);e.guard=1;e.charge=std::clamp(b.final_elapsed/b.final_charge,0.0,1.0);
             b.final_to=e.pos+direction.normalized()*p.final_reach;const double widen=std::clamp((b.final_elapsed-(b.final_charge-p.final_widen_time))/p.final_widen_time,0.0,1.0);b.final_width=p.final_warn_width+(p.final_beam_width-p.final_warn_width)*widen*widen;
-            if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;TechniqueRunner::observe_scripted(r,b,"final_strike","final_strike_replay",ObservationEvent::Execute);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.observation_id=b.final_observation_id;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;request.source=e.definition+1;CombatResolver::ship_damage(r,request);TechniqueRunner::finish_scripted(r,b);}
+            if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;EventBuilder::audio(r,"scene.time_up.strike",e.pos);TechniqueRunner::observe_scripted(r,b,"final_strike","final_strike_replay",ObservationEvent::Execute);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.observation_id=b.final_observation_id;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;request.source=e.definition+1;CombatResolver::ship_damage(r,request);TechniqueRunner::finish_scripted(r,b);}
         } else if (definition.kind==1 && b.centaurus->leaping) {
             CentaurusFinish::leap_tick(r,b,dt);
         } else if (!busy(r,b.actor)) {

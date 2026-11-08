@@ -10,6 +10,7 @@
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "field.h"
+#include "../output/event_builder.h"
 #include "../behaviors/traits/fullCharge.h"
 #include "../behaviors/traits/rampage.h"
 #include "../behaviors/traits/killSonic.h"
@@ -64,6 +65,7 @@ void SpeedRunCore::begin_draw(bool press, Vector2 pen, int64_t clock_msec) {
     runtime.state.draw.points.clear();
     if (press) { runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
     emit_event("draw_start");
+    speed::EventBuilder::audio_loop(runtime, "ship.boost.draw_loop", 0, true);
 }
 
 void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
@@ -95,6 +97,7 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 }
 
 void SpeedRunCore::commit_draw() {
+    speed::EventBuilder::audio_loop(runtime, "ship.boost.draw_loop", 0, false);
     if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
     runtime.state.draw.gauge = std::max(0.0, runtime.state.draw.gauge - runtime.state.draw.start_charge * std::min(1.0, runtime.state.draw.length / runtime.state.draw.limit));
     if (runtime.state.control.bonus_remaining>0) runtime.state.draw.gauge=1;
@@ -166,12 +169,15 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
     if (!runtime.state.draw.drawing) return true;
     if (!runtime.state.draw.started) {
         if (press) { runtime.state.draw.started = true; runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
-        else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); }
+        else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); speed::EventBuilder::audio_loop(runtime, "ship.boost.draw_loop", 0, false); }
         return true;
     }
     if (bool(input.has_cursor)) extend_draw(pen, camera_zoom);
     if (touch && (release || alt)) commit_draw();
-    else if (runtime.state.draw.length >= runtime.state.draw.limit - 0.5 || runtime.state.draw.blocked) commit_draw();
+    else if (runtime.state.draw.length >= runtime.state.draw.limit - 0.5 || runtime.state.draw.blocked) {
+        if (!runtime.state.draw.blocked) speed::EventBuilder::audio(runtime, "ship.boost.draw_full", runtime.state.ship.pos);
+        commit_draw();
+    }
     else if (press && clock_msec - runtime.state.draw.first_msec >= runtime.state.draw_config.confirm_delay * 1000.0 && runtime.state.draw.points.size() >= 2) commit_draw();
     return true;
 }

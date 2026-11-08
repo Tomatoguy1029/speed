@@ -1,4 +1,5 @@
 #include "aquarius.h"
+#include "../../output/event_builder.h"
 #include "pursuit.h"
 #include "../../systems/enemy_motion.h"
 #include "../../systems/enemy_system.h"
@@ -63,7 +64,7 @@ void AquariusBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     if (e.mode==EnemyMode::Windup) {
         if (e.timer>p.beam_time) {e.vel*=std::max(0.0,1.0-2.5*dt);EnemyMotion::turn(e,(s.ship_pos-e.pos).angle(),2.0,dt,tracking);}else e.vel*=std::max(0.0,1.0-8.0*dt);
         const double before=e.timer;e.timer-=dt;
-        if (before>p.beam_time && e.timer<=p.beam_time) {godot::Dictionary ev;ev["id"]=e.id;FrameBuilder::append(r,"enemy_laser_fire",ev);}
+        if (before>p.beam_time && e.timer<=p.beam_time) {godot::Dictionary ev;ev["id"]=e.id;ev["own_sound"]=true;FrameBuilder::append(r,"enemy_laser_fire",ev);EventBuilder::audio(r,"elite.aquarius.flow",e.pos);}
         e.charge=std::clamp(1.0-(e.timer-p.beam_time)/p.telegraph,0.0,1.0);
         if (e.timer<=0) {e.charge=0;e.mode=EnemyMode::Recover;e.timer=p.rest;}return;
     }
@@ -77,6 +78,6 @@ void AquariusBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     std::vector<AttackHandle> volley;
     for (uint32_t k=0;k<p.beams;++k) {BeamParams beam;beam.position=source;beam.angle=angle+k*godot::Math::TAU/p.beams;beam.length=p.beam_length;beam.half_width=p.half_width*p.fx_size;beam.arc=p.spread;beam.delay=p.telegraph;beam.active=p.beam_time;beam.damage=p.damage;beam.color=color;beam.owner=self;if (e.attack_managed) beam.budget.value=budget.token(owner);const auto h=FloodSystem::emit(r,beam);if (const auto *record=AttackSystem::get(s,h)) {auto &visual=std::get<BeamHazard>(s.hazards[record->row].shape);visual.flood_index=k;visual.flood_reference=true;volley.push_back(h);}}
     if (!volley.empty()) {const int64_t group=AttackSystem::get(s,volley.front())->id;for (auto h:volley) if (const auto *record=AttackSystem::get(s,h)) std::get<BeamHazard>(s.hazards[record->row].shape).flood_group=group;}
-    e.mode=EnemyMode::Windup;e.timer=p.telegraph+p.beam_time;godot::Dictionary charge;charge["id"]=e.id;charge["row"]=row;FrameBuilder::append(r,"enemy_laser_charge",charge);
+    e.mode=EnemyMode::Windup;e.timer=p.telegraph+p.beam_time;godot::Dictionary charge;charge["id"]=e.id;charge["row"]=row;charge["own_sound"]=true;FrameBuilder::append(r,"enemy_laser_charge",charge);
 }
 }

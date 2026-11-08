@@ -169,6 +169,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             if (runtime.state.draw.tracing) runtime.state.draw.inside[health.id] = target.slot;
             Dictionary event; event["pos"] = enemy.pos; event["normal"] = -direction;
             event["enemy_pos"] = enemy.pos; event["r"] = enemy.radius; emit_event("block_impact", event);
+            speed::EventBuilder::audio(runtime, "hero.perseus.crumble", enemy.pos);
             kill_enemy(hit.row, false, fast ? StringName("ram") : StringName("touch"), direction);
             continue;
         }
@@ -179,7 +180,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             const double vn=runtime.state.ship.vel.dot(normal);
             if (vn<0) {runtime.state.ship.vel-=normal*2.0*vn;runtime.state.ship.vel*=c.bounce_keep;}
             if (health.hit_cd<=0) {
-                health.hit_cd=0.25;Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
+                health.hit_cd=0.25;speed::EventBuilder::audio(runtime,runtime.state.field.rocks[enemy.rock.slot].kind==speed::RockKind::Iron?"field.iron.block":"field.meteor.hit",position);Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
                 damage_enemy(hit.row,attack*0.25,"bump",false,-normal);
             }
             continue;
@@ -204,6 +205,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             speed::DamageRequest request;request.struck=runtime.state.enemy_handles.at(uint32_t(hit.row));request.amount=damage;request.cause=speed::Cause::Ram;request.crit=crit;request.direction=direction;request.impact=position;request.has_impact=true;
             request.boss_ram_visual=hit.image;
             const auto result=speed::CombatResolver::damage_enemy(runtime,request);speed::EventBuilder::flush_combat(runtime);
+            if (runtime.state.heroes.twin.acting && result.applied>0) speed::EventBuilder::audio(runtime,"hero.gemini.hit",position);
             health.hit_cd = c.contact_cooldown;
             if (runtime.state.draw.tracing) {
                 runtime.state.draw.inside[health.id] = target.slot;
@@ -227,7 +229,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         runtime.state.ship.glide = false;
         Vector2 normal = position - enemy.pos;
         normal = normal.length_squared() > 0 ? normal.normalized() : -direction;
-        Dictionary impact; impact["pos"] = position; impact["normal"] = normal; impact["enemy_pos"] = enemy.pos; impact["r"] = enemy.radius;
+        Dictionary impact; impact["pos"] = position; impact["normal"] = normal; impact["enemy_pos"] = enemy.pos; impact["r"] = enemy.radius; impact["armor_bounce"] = true;
         emit_event("block_impact", impact);
         runtime.state.ship.pos = enemy.pos + normal * (enemy.radius + runtime.state.ship_config.ship_radius + 1.0);
         const double vn = runtime.state.ship.vel.dot(normal);

@@ -40,7 +40,9 @@ func _ready() -> void:
 		var button := Button.new()
 		button.text = tr(SECTIONS[i][0])
 		button.toggle_mode = true
-		button.pressed.connect(_select_tab.bind(i))
+		button.pressed.connect(func():
+			AudioManager.play(&"ui.menu.codex_tab")
+			_select_tab(i))
 		_tab_buttons.append(button)
 		tabs.add_child(button)
 	_list_scroll = ScrollContainer.new()
@@ -195,6 +197,8 @@ func _layout_grid() -> void:
 
 func _show(def: Resource, has: bool, number: int, rare: bool, button: Button) -> void:
 	_selection=button
+	AudioManager.play(&"ui.menu.codex_pick")
+	if has: AudioManager.play(&"ui.menu.codex_projection")
 	_preview.setup(def,has,true)
 	_detail_scroll.scroll_vertical=0
 	_detail_panel.add_theme_stylebox_override("panel",_style(rare,true))

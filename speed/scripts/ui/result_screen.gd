@@ -19,8 +19,11 @@ func _ready() -> void:
 	_value(str(result.get("level", 1)), Rect2(175, 176, 139, 24))
 	_value(str(result.get("kills", 0)), Rect2(175, 221, 139, 24))
 	%Scroll.visible = cleared
+	AudioManager.play(&"ui.result.show")
+	if result.get("new_record", false): AudioManager.play(&"ui.result.record")
 	if cleared:
 		_show_modules(result)
+		if not result.get("modules", []).is_empty() or not str(result.get("legendary", "")).is_empty(): AudioManager.play(&"ui.result.module")
 	%RetryButton.pressed.connect(func(): AudioManager.play(&"ui.common.confirm"); GameManager.retry_run())
 	%MenuButton.pressed.connect(func(): AudioManager.play(&"ui.common.confirm"); GameManager.reset_to_main_menu())
 	resized.connect(_fit_canvas)

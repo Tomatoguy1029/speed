@@ -46,6 +46,16 @@ CombatEvent event_for(RunRuntime &run,const DamageRequest &request,EnemyHandle t
 }
 void append(RunRuntime &run,const char *type,godot::Dictionary data) {FrameBuilder::append(run,godot::StringName(type),data);}
 }
+void EventBuilder::audio(RunRuntime &run,const char *cue,godot::Vector2 pos) {
+    godot::Dictionary data;data["cue"]=godot::StringName(cue);data["pos"]=pos;FrameBuilder::append(run,"audio_cue",data);
+}
+void EventBuilder::audio_loop(RunRuntime &run,const char *cue,int64_t key,bool on) {
+    godot::Dictionary data;data["cue"]=godot::StringName(cue);data["key"]=key;data["loop"]=on;FrameBuilder::append(run,"audio_cue",data);
+}
+void EventBuilder::audio_for(RunRuntime &run,const char *cue,int64_t key,double life,godot::Vector2 pos) {
+    if (!std::isfinite(life) || life<=0) return;
+    godot::Dictionary data;data["cue"]=godot::StringName(cue);data["key"]=key;data["life"]=life;data["pos"]=pos;FrameBuilder::append(run,"audio_cue",data);
+}
 void EventBuilder::budget_started(RunRuntime &run,const std::string &owner,int64_t id,uint32_t row,const std::vector<AttackCategory> &categories,int64_t token) {
     RecordingBuilder::budget(run);
     flush_combat(run);godot::Dictionary data;godot::Array cats;

@@ -49,13 +49,13 @@ void RulerBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     const auto direction=godot::Vector2::from_angle(e.facing);e.timer-=dt;
     if (e.mode==EnemyMode::Dash) {
         const auto normal=godot::Vector2(-direction.y,direction.x);EnemyMotion::steer(e,s.ship_pos+normal*(double(v.side)*p.half_gap)-direction*p.emit_back,p.deploy_speed,6,dt,tracking);
-        if (e.timer<=0) {e.mode=EnemyMode::Windup;e.timer=p.warn;godot::Dictionary event;event["id"]=e.id;event["row"]=int64_t(row);FrameBuilder::append(r,"enemy_laser_charge",event);}return;
+        if (e.timer<=0) {e.mode=EnemyMode::Windup;e.timer=p.warn;godot::Dictionary event;event["id"]=e.id;event["row"]=int64_t(row);event["own_sound"]=true;FrameBuilder::append(r,"enemy_laser_charge",event);}return;
     }
     e.vel*=std::max(0.0,1-8*dt);
     if (e.mode==EnemyMode::Windup) {
         e.charge=1-std::max(0.0,e.timer)/p.warn;if (e.timer>0) return;
         WallParams wall;wall.position=beam_origin(r,row);wall.angle=e.facing;wall.length=p.beam_len;wall.half_width=p.beam_width*0.5;wall.active=p.beam_time;wall.damage=p.damage;wall.color=d.color;wall.style=WallStyle::Ray;wall.blocking=true;wall.attached=true;wall.owner=self;if (e.attack_managed) wall.budget.value=budget.token(owner);
-        v.beam=WallSystem::emit(r,wall);godot::Dictionary event;event["id"]=e.id;FrameBuilder::append(r,"enemy_laser_fire",event);e.charge=0;e.mode=EnemyMode::Recover;e.timer=p.beam_time;return;
+        v.beam=WallSystem::emit(r,wall);godot::Dictionary event;event["id"]=e.id;event["own_sound"]=true;FrameBuilder::append(r,"enemy_laser_fire",event);e.charge=0;e.mode=EnemyMode::Recover;e.timer=p.beam_time;return;
     }
     if (e.mode==EnemyMode::Recover) {
         if (e.timer<=0) {AttackSystem::end(s,v.beam,AttackEndReason::TechniqueEnd);v.beam={};e.mode=EnemyMode::Dash;e.timer=p.deploy_time;}

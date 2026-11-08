@@ -1,4 +1,5 @@
 #include "power_shot.h"
+#include "../../output/event_builder.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/attacks/light_arrow.h"
 #include "../../systems/tracking_policy.h"
@@ -23,7 +24,7 @@ void cue(RunRuntime &r,const TechniqueState &t,const char *name) {
 }
 }
 bool CentaurusPower::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {return definition && definition<=r.content->boss_techniques.size() && r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead;}
-void CentaurusPower::begin(RunRuntime &r,TechniqueState &t) {t.detail=CentaurusPowerState{};t.aim=r.state.ship_pos;t.previous_ship=r.state.ship_pos;r.state.enemies[t.actor.slot].vel={};cue(r,t,"telegraph");}
+void CentaurusPower::begin(RunRuntime &r,TechniqueState &t) {t.detail=CentaurusPowerState{};t.aim=r.state.ship_pos;t.previous_ship=r.state.ship_pos;r.state.enemies[t.actor.slot].vel={};EventBuilder::audio(r,"boss.centaurus.bow_draw",r.state.enemies[t.actor.slot].pos);cue(r,t,"telegraph");}
 void CentaurusPower::step(RunRuntime &r,TechniqueState &t,double dt) {
     auto &e=r.state.enemies[t.actor.slot];e.vel={};const auto &p=r.content->boss_techniques[t.definition-1];const auto &v=t.detail.get<CentaurusPowerState>();
     if (t.stage==TechniqueStage::Recovery) {t.remaining=std::max(0.0,t.remaining-dt);if (t.remaining<=0) t.stage=TechniqueStage::Finished;return;}
@@ -40,7 +41,7 @@ void CentaurusPower::command(RunRuntime &r,TechniqueState &t,TechniqueCommand co
         const auto from=v.alerting?v.origin:mouth(r,t);const auto target=p.track_during_warn?r.state.ship_pos:t.aim;
         const bool locked=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked();const double angle=v.alerting?v.angle:locked?e.facing:(target-from).angle();
         for (uint32_t k=0;k<power.count;++k) {LightArrowParams shot;shot.position=from;shot.angle=angle+(double(k)-double(power.count-1)*0.5)*power.spread;shot.speed=p.speed;shot.radius=power.radius;shot.travel=power.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.cosmic=true;shot.owner=t.actor;shot.definition=power.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));LightArrowSystem::emit(r,shot);++v.released;}
-        t.stage=TechniqueStage::Active;cue(r,t,"released");
+        t.stage=TechniqueStage::Active;EventBuilder::audio(r,"boss.centaurus.bow_shot",r.state.enemies[t.actor.slot].pos);cue(r,t,"released");
     } else if (command==TechniqueCommand::FinishVolley && (t.stage==TechniqueStage::Windup || t.stage==TechniqueStage::Active)) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;v.alerting=false;cue(r,t,"recovery_started");}
 }
 bool CentaurusPower::validate(const TechniqueState &t,const ContentBundle &c) {const auto *v=t.detail.get_if<CentaurusPowerState>();return v && v->origin.is_finite() && std::isfinite(v->angle) && v->released<=rule(c,t).count;}

@@ -59,6 +59,7 @@ func _show(screen: GameManager.Screen) -> void:
 		_current.process_mode = Node.PROCESS_MODE_DISABLED
 		if screen == GameManager.Screen.RUN:
 			_prepared_run = RunManager.create_run()
+		AudioManager.play(&"ui.common.transition")
 		await _fade.cover(fade_out_time)
 		if request != _screen_request:
 			return
@@ -84,12 +85,18 @@ func _show(screen: GameManager.Screen) -> void:
 func _sync_screen_music(screen: GameManager.Screen) -> void:
 	if screen == GameManager.Screen.RUN:
 		return # 戦闘のHUDが通常曲とボス曲を所有する。
+	# 強化・図鑑・結果・導入の曲は、曲を割り当てるまでメニューの曲（導入は無音）のままにする。
 	if screen == GameManager.Screen.STAGE_SELECT:
 		AudioManager.play_music(&"music.stage_select", 0.6, self)
 	elif screen == GameManager.Screen.RESULT and not GameManager.last_result.get("cleared", false):
 		AudioManager.play_music(&"music.game_over", 1.0, self)
+	elif screen == GameManager.Screen.RESULT and AudioManager.has_music(&"music.result"):
+		AudioManager.play_music(&"music.result", 0.6, self)
 	elif screen == GameManager.Screen.INTRO:
-		AudioManager.stop_music()
+		if AudioManager.has_music(&"music.intro"): AudioManager.play_music(&"music.intro", 0.6, self)
+		else: AudioManager.stop_music()
+	elif screen in [GameManager.Screen.UPGRADE, GameManager.Screen.ENCYCLOPEDIA] and AudioManager.has_music(&"music.hangar"):
+		AudioManager.play_music(&"music.hangar", 0.6, self)
 	else:
 		AudioManager.play_music(&"music.menu", 0.6, self)
 

@@ -1,3 +1,4 @@
+#include "../output/event_builder.h"
 #include "../systems/heroes.h"
 #include "../behaviors/heroes/leo.h"
 #include "../behaviors/heroes/gemini.h"
@@ -106,7 +107,9 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     control.world_scale=core.world_scale();
     const double world_dt=dt*control.world_scale;
     if (control.bonus_remaining>0) {
-        control.bonus_remaining-=dt;
+        const double before=control.bonus_remaining;control.bonus_remaining-=dt;
+        // 終わりの3秒前に一度だけ残り時間を知らせる。
+        if (before>3.0 && control.bonus_remaining<=3.0) speed::EventBuilder::audio(core.runtime,"field.bonus.warning");
         if (control.bonus_remaining<=0) leave_bonus(core);
     } else state.time+=dt;
     if (!control.time_limit_reached && control.time_limit>=0 && state.time>=control.time_limit) {

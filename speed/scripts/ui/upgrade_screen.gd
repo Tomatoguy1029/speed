@@ -290,6 +290,8 @@ func _part_surface(outline: BitMap) -> Texture2D:
 	return ImageTexture.create_from_image(image)
 
 func _connect_part(button: BaseButton, id: StringName) -> void:
+	button.set_meta(&"own_hover", true)
+	button.mouse_entered.connect(func(): AudioManager.play(&"ui.menu.part_hover"))
 	button.pressed.connect(_select.bind(id))
 	button.mouse_entered.connect(_hover.bind(id))
 	button.mouse_exited.connect(_hover.bind(&""))
@@ -371,6 +373,7 @@ func _refresh_details() -> void:
 	_price.text = tr("upgrade.max") if maxed else tr("upgrade.price").format({n = def.costs[level]})
 	_buy_button.text = tr("upgrade.max") if maxed else tr("upgrade.action")
 	_buy_button.disabled = maxed or not SaveManager.can_afford_upgrade(def.costs[level])
+	_buy_button.set_meta(&"denied_sound", &"ui.common.denied" if maxed else &"ui.menu.upgrade_short")
 
 func _buy() -> void:
 	if _leaving:

@@ -92,6 +92,8 @@ var reveal_settings: Resource = REVEAL_SETTINGS
 var _transition_progress := 0.0
 var _debug_unlock: Button
 var _dragging := false
+## 起動中に星図で見えていたステージ数。クリアで増えたら、新しいステージの出現を鳴らす。
+static var _known_stage_count := 0
 var _pointer_down := false
 var _press_position := Vector2.ZERO
 var _last_pointer := Vector2.ZERO
@@ -438,6 +440,7 @@ func _input(event: InputEvent) -> void:
 		var point: Vector2 = get_global_transform_with_canvas().affine_inverse() * event.position
 		if not _dragging and point.distance_to(_press_position) >= DRAG_THRESHOLD:
 			_dragging = true
+			AudioManager.play(&"ui.map.map_rotate")
 			if _turn != null:
 				_turn.kill()
 			_hide_details()
@@ -536,6 +539,8 @@ func set_transition(progress: float) -> void:
 func _update_star_phases() -> void:
 	# 通常進行では最高クリア地点までがクリア済み。最終段階は5枚を重ねる。
 	var visible_count := clampi(int(SaveManager.data.cleared_stage) + 1, 1, _star_phases.size())
+	if _known_stage_count > 0 and visible_count > _known_stage_count: AudioManager.play(&"ui.map.stage_reveal")
+	_known_stage_count = maxi(_known_stage_count, visible_count)
 	for i in _star_phases.size():
 		_star_phases[i].visible = i < visible_count
 
@@ -588,4 +593,5 @@ func _start() -> void:
 	if _selected < _visible_stage_count():
 		_launch_requested = true
 		AudioManager.play(&"ui.common.confirm")
+		AudioManager.play(&"ui.map.launch")
 		GameManager.start_run(_selected + 1)

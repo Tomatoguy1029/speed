@@ -27,6 +27,9 @@ const UNLOCK_AT := 2.6
 var f := {}
 var stage := ""
 var t := 0.0
+## 最終決着の音を鳴らし終えた段階と時刻。段階に入った時と、段階の中の決まった時刻を越えた時に鳴らす。
+var _sound_stage := ""
+var _sound_t := 0.0
 var clock := 0.0
 var zoom := 1.0
 var view_rect := Rect2()
@@ -242,6 +245,8 @@ func hide_view() -> void:
 		_fine_port.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	f = {}
 	stage = ""
+	_sound_stage = ""
+	AudioManager.stop_loop(&"scene.finale.draw")
 
 func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, view_half: Vector2, view_zoom: float, character_scale: float) -> void:
 	if not visible:
@@ -278,7 +283,49 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_under.position = position
 		_under.queue_redraw()
 	_stage_shake()
+	_play_stage_sounds()
 	for node: Node2D in [_grade,_back,_dim,_fx,_hi,_mix,_top,_over]: node.queue_redraw()
+
+## 段階ごとの音（scene.finale.*）。北極星とこぐま座の咆哮は C++ の合図（draco_cue）で AudioManager が鳴らす。
+func _play_stage_sounds() -> void:
+	var entered := stage != _sound_stage
+	var before := -1.0 if entered else _sound_t
+	if entered and _sound_stage == "input": AudioManager.stop_loop(&"scene.finale.draw")
+	if entered and _sound_stage == "charge": AudioManager.play(&"scene.finale.charged")
+	var crossed := func(at: float) -> bool: return before < at and t >= at
+	match stage:
+		"release":
+			if entered: AudioManager.play(&"scene.finale.writhe")
+			if crossed.call(0.4): AudioManager.play(&"scene.finale.core_swell")
+		"combine":
+			if entered: AudioManager.play(&"scene.finale.gather")
+			for i in MODULES.size():
+				if crossed.call(DOCK_FIRST + i * DOCK_STEP): AudioManager.play(&"scene.finale.attach")
+			if crossed.call(UNLOCK_AT): AudioManager.play(&"scene.finale.unlock")
+		"pose":
+			if entered: AudioManager.play(&"scene.finale.coil")
+		"input":
+			if entered: AudioManager.play(&"scene.finale.freeze")
+			if f.get("began", false): AudioManager.start_loop(&"scene.finale.draw")
+			# HUD が案内を出す時刻（hud.gd の _draw_finale_text）に合わせる。
+			if not f.get("began", false) and crossed.call(5.0): AudioManager.play(&"scene.finale.hint")
+		"strikes":
+			if entered: AudioManager.play(&"scene.finale.barrage")
+			var hits := RUSH.hits
+			for row in range(0, hits.size(), DracoFinaleRush.HIT_FIELDS):
+				if crossed.call(hits[row]): AudioManager.play(&"scene.finale.pass")
+		"charge":
+			if entered: AudioManager.play(&"scene.finale.charge")
+		"flash":
+			if entered: AudioManager.play(&"scene.finale.line")
+			if not times.is_empty() and crossed.call(_impact()): AudioManager.play(&"scene.finale.flash")
+		"sight":
+			if entered: AudioManager.play(&"scene.finale.recover")
+		"explode":
+			if entered: AudioManager.play(&"scene.finale.explode")
+			if crossed.call(1.0): AudioManager.play(&"scene.finale.afterglow")
+	_sound_stage = stage
+	_sound_t = t
 
 func set_shake_offset(offset: Vector2) -> void:
 	_shake_offset = offset

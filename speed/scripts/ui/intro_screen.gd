@@ -72,7 +72,9 @@ func _ready() -> void:
 	_auto_play.toggled.connect(_set_auto_play)
 	_update_playback_labels()
 	var skip := _button("SkipIntro", tr("intro.skip"), Vector2(548, 10), Vector2(80, 23))
-	skip.pressed.connect(_finish)
+	skip.pressed.connect(func():
+		AudioManager.play(&"ui.title.intro_skip")
+		_finish())
 	resized.connect(_layout)
 	_layout()
 	_show_scene(0)
@@ -122,6 +124,7 @@ func _art(texture: Texture2D, parent: Control) -> TextureRect:
 	return art
 
 func _show_scene(index: int) -> void:
+	if index > 0: AudioManager.play(&"ui.title.intro_scene")
 	scene_index = index
 	paragraph_index = 0
 	_stars.clear()
@@ -174,7 +177,9 @@ func _process(delta: float) -> void:
 	var total := _text.get_total_character_count()
 	if _text.visible_characters < total:
 		_characters += delta * characters_per_second
+		var shown := _text.visible_characters
 		_text.visible_characters = mini(int(_characters), total)
+		if _text.visible_characters > shown: AudioManager.play(&"ui.title.intro_type")
 		if _text.visible_characters == total:
 			_next.text = tr("intro.next")
 	elif _auto_play.button_pressed:

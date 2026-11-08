@@ -146,10 +146,13 @@ func record_run(result: Dictionary) -> bool:
 		best.clears = int(best.clears) + 1
 		var t := float(result.get("time", 0.0))
 		if float(best.fastest_clear) < 0.0 or t < float(best.fastest_clear):
+			# 初めてのクリアは記録更新として扱わない。結果画面の記録更新の音に使う。
+			if float(best.fastest_clear) >= 0.0: result["new_record"] = true
 			best.fastest_clear = t
 		mark_stage_cleared(int(result.get("stage", 0)))
 		add_legendary(StringName(result.get("legendary", "")))
 	if result.get("endless", false):
+		if int(result.get("score", 0)) > int(data.endless_high_score) and int(data.endless_high_score) > 0: result["new_record"] = true
 		data.endless_high_score = maxi(int(data.endless_high_score), int(result.get("score", 0)))
 	for id in result.get("modules", []):
 		unlock_module(StringName(id))

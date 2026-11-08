@@ -284,6 +284,7 @@ func skip_acquire() -> void:
 func _tell_acquired() -> void:
 	if _acquire_told: return
 	_acquire_told = true
+	if _current.get("type", &"") == &"hero_freed": AudioManager.play(&"hero.find.ult_get")
 	acquire_finished.emit()
 
 func _begin_next() -> void:
@@ -339,6 +340,7 @@ func _begin_ult() -> void:
 	_ult_desc.text = tr("hero.%s.desc" % definition.id)
 	_ult_key.text = tr("hud.ult_key").format({key = OS.get_keycode_string(InputActions.key_of(&"hero"))})
 	AudioManager.play(&"growth.level.levelup_step", 0.65)
+	AudioManager.play(&"hero.find.acquire_art")
 
 func _process(delta: float) -> void:
 	if _authoring_surface != null: return

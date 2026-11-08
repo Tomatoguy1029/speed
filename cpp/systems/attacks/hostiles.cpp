@@ -77,7 +77,11 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         auto end_reason=speed::AttackEndReason::Lifetime;
         const auto release = [&]() { speed::AttackSystem::end(runtime.state,processing_handle,end_reason); };
         double life = shot.life;
-        if (life <= 0) { release(); continue; }
+        if (life <= 0) {
+            const Vector2 offset = (shot.pos - runtime.state.view_center).abs();
+            if (shot.kind==int64_t(speed::HostileKind::Bullet) && offset.x < runtime.state.view_half.x && offset.y < runtime.state.view_half.y) speed::EventBuilder::audio(runtime,"enemy.bullet.vanish",shot.pos);
+            release(); continue;
+        }
         const Vector2 from = shot.pos;
         if (shot.stone > 0) {
             shot.stone = speed::remaining_time(shot.stone,world_dt);

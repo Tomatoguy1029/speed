@@ -25,7 +25,7 @@ void ContactWaveBehavior::step(RunRuntime &run,double dt) {
         const godot::Vector2 pad(radius+s.grid.max_radius,radius+s.grid.max_radius);
         for (auto row:CollisionQuery::enemy_rows(s,wave.pos-pad,wave.pos+pad)) {
             const auto &e=s.enemies[row];if (e.dead || wave.done.count(e.id) || e.pos.distance_to(wave.pos)>radius+e.radius) continue;
-            if (std::none_of(wave.caught.begin(),wave.caught.end(),[&](const auto &h){return h.id==e.id;})) wave.caught.push_back({s.enemy_handles.at(uint32_t(row)),e.id,0});
+            if (std::none_of(wave.caught.begin(),wave.caught.end(),[&](const auto &h){return h.id==e.id;})) {wave.caught.push_back({s.enemy_handles.at(uint32_t(row)),e.id,0});EventBuilder::audio(run,"weapon.space_quake.push",e.pos);}
         }
         for (auto &held:wave.caught) {
             if (!s.enemy_handles.contains(held.target) || s.enemies[held.target.slot].dead) {held.id=0;continue;}
@@ -33,7 +33,7 @@ void ContactWaveBehavior::step(RunRuntime &run,double dt) {
             const double scale=e.is_boss || (s.enemy_handles.contains(e.parent) && s.enemies[e.parent.slot].is_boss)?0:def.knockback;
             if (scale>0) e.pos+=direction*150.0*1.82*run.content->config.character_scale*dt*scale;
             if (held.age>=0.16 || progress>=1) {
-                wave.done.insert(held.id);held.id=0;DamageRequest request;request.struck=held.target;request.amount=wave.damage;request.cause=Cause::ContactWave;
+                wave.done.insert(held.id);held.id=0;EventBuilder::audio(run,"weapon.space_quake.impact",e.pos);DamageRequest request;request.struck=held.target;request.amount=wave.damage;request.cause=Cause::ContactWave;
                 request.direction=direction;request.knock=w.knock*(1+w.knockback_increment*double(s.loadout->post_knockback_stacks));CombatResolver::damage_enemy(run,request);
             }
         }

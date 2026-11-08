@@ -2220,6 +2220,10 @@
       {
         "name": "DebugRankHitstopChanged",
         "value": "debug_rank_hitstop_changed"
+      },
+      {
+        "name": "AudioCue",
+        "value": "audio_cue"
       }
     ],
     "ResultKind": [
@@ -2739,10 +2743,12 @@
     ],
     "enemy_laser_charge": [
       "id",
-      "row"
+      "row",
+      "own_sound"
     ],
     "enemy_laser_fire": [
-      "id"
+      "id",
+      "own_sound"
     ],
     "enemy_laser_cancel": [
       "id"
@@ -3306,6 +3312,13 @@
     "debug_rank_hitstop_changed": [
       "rank",
       "multiplier"
+    ],
+    "audio_cue": [
+      "cue",
+      "pos",
+      "key",
+      "loop",
+      "life"
     ]
   },
   "includes": [

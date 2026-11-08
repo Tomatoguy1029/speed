@@ -1,4 +1,5 @@
 #include "../../api/run_core.h"
+#include "../../output/event_builder.h"
 #include "../../systems/field.h"
 #include "../../systems/attack_system.h"
 #include "../../systems/attack_budget.h"
@@ -54,6 +55,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
                 if (!runtime.content->contacts.empty()) speed::AttackSystem::configure_contact(*runtime.content,2,spec);
                 const auto attack=speed::AttackSystem::emit_hazard(runtime.state,zone,spec);emitted=speed::AttackSystem::get(runtime.state,attack)!=nullptr;
             }
+            if (emitted && def.kind==speed::EnemyDefinition::Kind::Biter) speed::EventBuilder::audio(runtime,"enemy.biter.bite",at);
             if (emitted && (def.kind==speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender)) {
                 Dictionary cue;cue["id"]=enemy.id;cue["pos"]=from;cue["angle"]=enemy.facing;cue["radius"]=enemy.radius;cue["sprite_radius"]=enemy.radius*def.sprite_scale;cue["cue"]=def.kind==speed::EnemyDefinition::Kind::Hound?"hound":"defender";
                 speed::FrameBuilder::append(runtime,"biter_cue",cue);
@@ -72,6 +74,7 @@ void SpeedRunCore::advance_biter(size_t row, double dt, bool far) {
         if (distance * distance <= reach * reach && admit_bite(row, bdt)) {
             enemy.mode = EnemyMode::Windup; enemy.timer = def.bite.telegraph;
             enemy.vel = Vector2();
+            if (def.kind==speed::EnemyDefinition::Kind::Biter) speed::EventBuilder::audio(runtime,"enemy.biter.tell",enemy.pos);
             if (def.id!=StringName("biter")) enemy.flash = 0.1;
         }
     }

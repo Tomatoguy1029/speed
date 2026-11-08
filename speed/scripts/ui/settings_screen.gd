@@ -59,7 +59,9 @@ func _toggle(key: String, label_key: String) -> void:
 	box.add_theme_constant_override("h_separation", 16)
 	box.add_theme_stylebox_override("focus", _focus_skin)
 	box.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
-	box.toggled.connect(func(on): SaveManager.set_setting(key, on))
+	box.toggled.connect(func(on):
+		SaveManager.set_setting(key, on)
+		if key == "muted": AudioManager.play(&"ui.settings.mute"))
 	%Content.add_child(box)
 
 func _build_bindings() -> void:
@@ -163,7 +165,10 @@ func _slider_row(key: String, label_text: String) -> void:
 	value.text = "%d%%" % roundi(s.value * 100)
 	s.value_changed.connect(func(v):
 		value.text = "%d%%" % roundi(v * 100)
-		SaveManager.set_setting(key, v))
+		SaveManager.set_setting(key, v)
+		AudioManager.play(&"ui.settings.slider"))
+	# 効果音の音量は、つまみを離した直後に今の音量で試しに鳴らす。
+	if key == "sfx_volume": s.drag_ended.connect(func(_changed): AudioManager.play(&"ui.settings.sfx_preview"))
 	row.add_child(s)
 	row.add_child(value)
 	%Content.add_child(row)

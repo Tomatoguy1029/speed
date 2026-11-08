@@ -1,4 +1,5 @@
 #include "perseus.h"
+#include "../../output/event_builder.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attacks/bullet.h"
 #include "../../systems/combat_resolver.h"
@@ -12,6 +13,7 @@ const PerseusDefinition *definition(const RunRuntime &run) {
 // 目が開ききった瞬間：画面の中の敵と弾を、砕けるまで石にして止める。ボスは止めるだけ
 void petrify(RunRuntime &run,const PerseusDefinition &d) {
     auto &s=run.state;const godot::Rect2 view(s.view_center-s.view_half,s.view_half*2);const double hold=d.shatter_delay+0.5;
+    EventBuilder::audio(run,"hero.perseus.eye",s.ship.pos);EventBuilder::audio(run,"hero.perseus.stone",s.ship.pos);
     for (auto &e:s.enemies) {
         if (!e.alive || e.dead || s.field.rock_handles.contains(e.rock) || !view.has_point(e.pos)) continue;
         if (e.is_boss) s.heroes.boss_stun=d.boss_stun;
@@ -22,7 +24,7 @@ void petrify(RunRuntime &run,const PerseusDefinition &d) {
 // 石の敵を一斉に砕き、石の弾を消す。大物（星6以上）とボスは砕けずに、最大HPの割合のダメージを受ける
 void shatter(RunRuntime &run,const PerseusDefinition &d) {
     auto &s=run.state;const godot::Rect2 view(s.view_center-s.view_half,s.view_half*2);
-    std::vector<EnemyHandle> broken,struck;
+    std::vector<EnemyHandle> broken,struck;EventBuilder::audio(run,"hero.perseus.crumble",s.ship.pos);
     for (size_t row=0;row<s.enemies.size();++row) {
         auto &e=s.enemies[row];if (!e.alive || e.dead) continue;const auto handle=s.enemy_handles.at(uint32_t(row));
         if (e.is_boss) {if (view.has_point(e.pos)) struck.push_back(handle);continue;}

@@ -1,4 +1,5 @@
 #include "rampage.h"
+#include "../../output/event_builder.h"
 #include "../../runtime/run_runtime.h"
 #include "../../state/loadout_state.h"
 #include <algorithm>
@@ -25,6 +26,7 @@ void RampageBehavior::end(RunRuntime &run) {
     auto &rampage=run.state.loadout->rampage;
     if (!rampage.ready) return;
     rampage.strength=std::min(1.0,double(rampage.kills)/rampage.target_kills);refresh(run);
+    if (rampage.kills>0) EventBuilder::audio(run,"trait.momentum.buff",run.state.ship.pos);
 }
 void RampageBehavior::step(RunRuntime &run,double dt) {
     auto &rampage=run.state.loadout->rampage;

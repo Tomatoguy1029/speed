@@ -1,4 +1,5 @@
 #include "technique_runner.h"
+#include "../../output/event_builder.h"
 #include "../hydra/normal_attack.h"
 #include "../hydra/technique.h"
 #include "../draco/technique.h"
@@ -43,6 +44,38 @@
 namespace speed {
 namespace {
 bool live(TechniqueStage stage) {return stage<TechniqueStage::Finished;}
+/// いっかくじゅう座・りゅう座の技の段階 → 欄。段階に入った時に鳴らす。technique が空なら、そのボスのどの技でも鳴らす。
+/// ほかのボスは技ごとの合図（hydra_cue・centaurus_cue・canis_cue）から Godot が欄を選ぶ。
+struct StageSound {const char *boss,*technique;TechniqueStage stage;const char *cue;};
+constexpr StageSound STAGE_SOUNDS[]={
+    {"monoceros","charge",TechniqueStage::Windup,"boss.monoceros.rush_stance"},{"monoceros","charge",TechniqueStage::Active,"boss.monoceros.rush_jet"},{"monoceros","charge",TechniqueStage::Active,"boss.monoceros.rush"},
+    {"monoceros","return_charge",TechniqueStage::Windup,"boss.monoceros.rush_stance"},{"monoceros","return_charge",TechniqueStage::Active,"boss.monoceros.multi_rush"},
+    {"monoceros","sweep",TechniqueStage::Windup,"boss.monoceros.step"},{"monoceros","sweep",TechniqueStage::Active,"boss.monoceros.sweep"},
+    {"monoceros","horn_wave",TechniqueStage::Windup,"boss.monoceros.horn_glow"},
+    {"monoceros","kick",TechniqueStage::Active,"boss.monoceros.kick"},
+    {"monoceros","lance",TechniqueStage::Windup,"boss.monoceros.lance_charge"},
+    {"monoceros","horn_dance",TechniqueStage::Windup,"boss.monoceros.dance_charge"},{"monoceros","horn_dance",TechniqueStage::Active,"boss.monoceros.dance"},
+    {"monoceros","",TechniqueStage::Stuck,"boss.monoceros.planet_stick"},{"monoceros","",TechniqueStage::Extract,"boss.monoceros.planet_free"},
+    {"draco","tail_sweep",TechniqueStage::Windup,"boss.draco.tail_wind"},{"draco","tail_sweep",TechniqueStage::Active,"boss.draco.tail_sweep"},
+    {"draco","star_fan",TechniqueStage::Active,"boss.draco.star_shot"},
+    {"draco","bite",TechniqueStage::Windup,"boss.draco.bite_tell"},{"draco","bite",TechniqueStage::Active,"boss.draco.bite"},
+    {"draco","meteor",TechniqueStage::Active,"boss.draco.meteor_throw"},
+    {"draco","breath",TechniqueStage::Active,"boss.draco.breath"},
+    {"draco","tail_slam",TechniqueStage::Windup,"boss.draco.slam_wind"},{"draco","tail_slam",TechniqueStage::Active,"boss.draco.slam"},
+    {"draco","charge",TechniqueStage::Windup,"boss.draco.rush_tell"},{"draco","charge",TechniqueStage::Active,"boss.draco.rush"},
+    {"draco","picaro_wall",TechniqueStage::Windup,"boss.draco.picaro_spawn"},{"draco","picaro_wall",TechniqueStage::Active,"boss.draco.volley"},
+    {"draco","leap",TechniqueStage::Windup,"boss.draco.pounce_tell"},{"draco","leap",TechniqueStage::Active,"boss.draco.pounce"},
+    {"draco","clones",TechniqueStage::Active,"boss.draco.clone"},
+    {"draco","spiral",TechniqueStage::Active,"boss.draco.spiral"},
+    {"draco","rifts",TechniqueStage::Windup,"boss.draco.claw"},{"draco","rifts",TechniqueStage::Active,"boss.draco.rift"},
+    {"draco","inhale",TechniqueStage::Active,"boss.draco.inhale"},{"draco","inhale",TechniqueStage::Recovery,"boss.draco.exhale"},
+};
+void stage_audio(RunRuntime &run,const TechniqueState &t,TechniqueStage before) {
+    if (t.stage==before || !t.definition || t.definition>run.content->boss_techniques.size() || !run.state.enemy_handles.contains(t.actor)) return;
+    const auto &p=run.content->boss_techniques[t.definition-1];if (!p.boss || p.boss>run.content->bosses.size()) return;
+    const auto &boss=run.content->bosses[p.boss-1].external_id;const auto at=run.state.enemies[t.actor.slot].pos;
+    for (const auto &sound:STAGE_SOUNDS) if (sound.stage==t.stage && boss==sound.boss && (!*sound.technique || p.external_id==sound.technique)) EventBuilder::audio(run,sound.cue,at);
+}
 bool kick(const RunRuntime &r,const TechniqueState &t) {return r.content->boss_techniques[t.definition-1].kind==1;}
 void command(RunRuntime &r,TechniqueState &t,TechniqueCommand c) {if (r.content->boss_techniques[t.definition-1].kind==40) CanisCommand::command(r,t,c);else if (r.content->boss_techniques[t.definition-1].kind==11) CentaurusPower::command(r,t,c);else if (r.content->boss_techniques[t.definition-1].kind==10) CentaurusRain::command(r,t,c);else if (r.content->boss_techniques[t.definition-1].kind==9) CentaurusRear::command(r,t,c);else if (r.content->boss_techniques[t.definition-1].kind==8) CentaurusVolley::command(r,t,c);else if (kick(r,t)) MonocerosKick::command(r,t,c);else MonocerosCharge::command(r,t,c);TechniqueRunner::observe_boundaries(r,t);}
 godot::PackedVector2Array snapshot_shape(const RunRuntime &r,const TechniqueState &t,bool warning=false) {return r.content->boss_techniques[t.definition-1].kind>=8?godot::PackedVector2Array():r.content->boss_techniques[t.definition-1].kind==7?MonocerosSword::horn(r,t):r.content->boss_techniques[t.definition-1].kind==6?MonocerosDance::horn(r,t):r.content->boss_techniques[t.definition-1].kind==5?MonocerosHornWave::horn(r,t):r.content->boss_techniques[t.definition-1].kind==4?MonocerosReturn::horn(r,t,warning):r.content->boss_techniques[t.definition-1].kind==3?MonocerosLance::horn(r,t):r.content->boss_techniques[t.definition-1].kind==2?MonocerosSweep::horn(r,t):kick(r,t)?MonocerosKick::horn(r,t,warning):MonocerosCharge::horn(r,t,warning);}
@@ -96,6 +129,7 @@ void TechniqueRunner::begin_part(RunRuntime &run,TechniqueState &technique,uint3
         if (technique.stage!=TechniqueStage::Windup && technique.stage!=TechniqueStage::Active) break;
     }
     observe_boundaries(run,technique);
+    stage_audio(run,technique,TechniqueStage::Finished);
 }
 void TechniqueRunner::cancel(RunRuntime &run,TechniqueHandle handle,const char *reason) {
     if (!running(run,handle)) return;
@@ -117,7 +151,7 @@ void TechniqueRunner::step(RunRuntime &run,double dt) {
         if (HydraNormalAttack::supports(run.content->boss_techniques[technique.definition-1].kind) || HydraTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) continue;
         // 本体の待機反応・着地で今始めた技は、その更新のdtを使わない。
         if (const auto *body=PhaseController::find(run,technique.actor);body && technique.elapsed==0 && technique.started_at==body->clock) continue;
-        if (DracoTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) {DracoTechnique::step(run,technique,dt);observe_boundaries(run,technique);technique.previous_ship=s.ship_pos;if (!live(technique.stage)) AttackSystem::end_technique(s,handle,technique.stage!=TechniqueStage::Finished);continue;}
+        if (DracoTechnique::supports(run.content->boss_techniques[technique.definition-1].kind)) {const auto draco_before=technique.stage;DracoTechnique::step(run,technique,dt);stage_audio(run,technique,draco_before);observe_boundaries(run,technique);technique.previous_ship=s.ship_pos;if (!live(technique.stage)) AttackSystem::end_technique(s,handle,technique.stage!=TechniqueStage::Finished);continue;}
         if (CentaurusCombo::advance(run,technique,dt)) continue;
         const auto before=technique.stage;
         if (run.content->boss_techniques[technique.definition-1].kind==51) CanisSiriusFlame::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==50) CanisRelay::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==49) CanisNova::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==48) CanisHuntPounce::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==47) CanisHunt::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==46) CanisStream::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==45) CanisBlaze::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==44) CanisBay::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==43) CanisSirius::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==42) CanisPounce::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==41) CanisHowl::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==40) CanisCommand::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==15) CentaurusSail::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==14) CentaurusShower::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==13) CentaurusFan::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==12) CentaurusStomp::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==11) CentaurusPower::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==10) CentaurusRain::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==9) CentaurusRear::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==8) CentaurusVolley::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==7) MonocerosSword::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==6) MonocerosDance::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==5) MonocerosHornWave::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==4) MonocerosReturn::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==3) MonocerosLance::step(run,technique,dt);else if (run.content->boss_techniques[technique.definition-1].kind==2) MonocerosSweep::step(run,technique,dt);else if (kick(run,technique)) MonocerosKick::step(run,technique,dt);else MonocerosCharge::step(run,technique,dt);
@@ -131,6 +165,7 @@ void TechniqueRunner::step(RunRuntime &run,double dt) {
             }
         }
         observe_boundaries(run,technique);
+        stage_audio(run,technique,before);
         CentaurusCombo::transition(run,technique);
         const auto &p=run.content->boss_techniques[technique.definition-1];auto &e=s.enemies[technique.actor.slot];
         e.charge=p.kind==51?(technique.stage==TechniqueStage::Windup?CanisSiriusFlame::progress(technique,run.content->boss_techniques[technique.definition-1]):0):p.kind==50?CanisRelay::progress(run,technique):p.kind==49?CanisNova::progress(run,technique):p.kind==48?CanisHuntPounce::progress(run,technique):p.kind==47?CanisHunt::progress(run,technique):p.kind==45?CanisBlaze::progress(technique,p):p.kind==44?CanisBay::progress(run,technique):p.kind==43?CanisSirius::progress(technique,p):p.kind==42?CanisPounce::progress(technique.detail.get<CanisPounceState>()):p.kind==7?technique.detail.get<MonocerosSwordState>().glow:p.kind==6?technique.detail.get<MonocerosDanceState>().glow:p.kind==5?technique.detail.get<MonocerosHornWaveState>().glow:p.kind==4?technique.detail.get<MonocerosReturnState>().glow:p.kind==3?technique.detail.get<MonocerosLanceState>().glow:p.kind==2 && (technique.stage==TechniqueStage::Windup || technique.stage==TechniqueStage::Active)?technique.detail.get<MonocerosSweepState>().glow:technique.stage==TechniqueStage::Windup?std::clamp(technique.elapsed/std::max(0.001,p.warn),0.0,1.0):0;

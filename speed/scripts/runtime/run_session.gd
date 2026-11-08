@@ -107,6 +107,7 @@ func _notification(what: int) -> void:
 		_pending_cpp_bridge = null
 		_pending_cpp.clear()
 		if cpp_laser_audio!=null: cpp_laser_audio.clear()
+		AudioManager.stop_loops()
 		if resources != null: resources.cancel()
 		if bridge!=null and is_instance_valid(view):
 			view.free()
@@ -235,7 +236,7 @@ func _poll_cpp_loading() -> void:
 		else: view.get_node("Hud").free()
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)
-		bridge.subscribe("audio",AudioManager.consume_cpp_frame,[],AudioManager.event_types().map(func(type: StringName) -> String: return String(type)))
+		bridge.subscribe("audio",AudioManager.consume_cpp_frame,["phase"],AudioManager.event_types().map(func(type: StringName) -> String: return String(type)))
 		cpp_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
 		add_child(cpp_laser_audio)
 		bridge.subscribe("laser_audio",cpp_laser_audio.consume_cpp_frame,["laser_voices","world_scale"],["enemy_laser_charge","enemy_laser_cancel","enemy_laser_fire"])

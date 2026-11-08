@@ -2,6 +2,8 @@
 extends Node
 
 var _voices: Dictionary = {}
+## 自分の欄で溜め・発射を鳴らす敵（みなみじゅうじ座・じょうぎ座・みずがめ座）。共通の音を鳴らさない。
+var _own_sound: Dictionary = {}
 var _cpp_epoch := 0
 
 func consume_cpp_frame(frame: Dictionary) -> bool:
@@ -16,7 +18,7 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 	var active := {}
 	for voice: Dictionary in frame.ui.get("laser_voices",[]):
 		active[voice.id] = voice
-		if not _voices.has(voice.id): handle({"id":voice.id,"row":0,"type":&"enemy_laser_charge"})
+		if not _voices.has(voice.id) and not _own_sound.has(voice.id): handle({"id":voice.id,"row":0,"type":&"enemy_laser_charge"})
 	for id in _voices.keys():
 		if not active.has(id):
 			stop(id)
@@ -29,6 +31,10 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 func handle(event: Dictionary) -> void:
 	var id := int(event.id)
 	stop(id)
+	if event.get("own_sound", false): _own_sound[id] = true
+	if _own_sound.has(id):
+		if event.type == &"enemy_laser_cancel": _own_sound.erase(id)
+		return
 	if event.type == &"enemy_laser_fire":
 		AudioManager.play(&"enemy.beamer.fire")
 	elif event.type == &"enemy_laser_charge":
@@ -53,3 +59,4 @@ func stop(id: int) -> void:
 
 func clear() -> void:
 	for id in _voices.keys(): stop(id)
+	_own_sound.clear()

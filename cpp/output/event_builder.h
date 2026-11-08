@@ -3,6 +3,7 @@
 #include <string>
 #include <vector>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/vector2.hpp>
 namespace speed {
 class RunRuntime;
 struct CrystalState;
@@ -13,6 +14,12 @@ enum class CrystalRemoval;
 enum class CargoLoss;
 class EventBuilder {
 public:
+    /// 音の欄（cue は欄ID）を1回鳴らす合図。Godot の AudioManager が欄の音で鳴らす。
+    static void audio(RunRuntime &,const char *cue,godot::Vector2 pos=godot::Vector2());
+    /// ループする欄を key ごとに鳴らし始める（on）・止める合図。
+    static void audio_loop(RunRuntime &,const char *cue,int64_t key,bool on);
+    /// ループする欄を key ごとに life 秒（実時間）だけ鳴らす合図。
+    static void audio_for(RunRuntime &,const char *cue,int64_t key,double life,godot::Vector2 pos=godot::Vector2());
     static void capsule_collected(RunRuntime &,const CapsuleState &,double effect_value);
     static void crystals_collected(RunRuntime &,const std::vector<CrystalCollection> &,double base,double actual,double multiplier,CrystalCollectMethod);
     static void crystal_transferred(RunRuntime &,const CrystalState &,int64_t enemy_id,bool was_absorber);

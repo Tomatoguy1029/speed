@@ -20,7 +20,7 @@ void SonicBehavior::emit(RunRuntime &r,double dt,godot::Vector2 pos,godot::Vecto
     w.pulse=std::max(0.0,w.pulse-dt);w.speed=move/dt;moving=w.active && moving;
     if (moving && w.speed<=w.min_speed*scale) w.emission=0;
     else if (moving) {
-        w.distance+=move;if (w.distance>=w.pulse_distance*scale) {w.distance=std::fmod(w.distance,w.pulse_distance*scale);w.pulse=w.pulse_time;}
+        w.distance+=move;if (w.distance>=w.pulse_distance*scale) {w.distance=std::fmod(w.distance,w.pulse_distance*scale);w.pulse=w.pulse_time;EventBuilder::audio(r,"weapon.sonic_boom.ring",pos);}
         w.emission+=move;const double spacing=w.emit_spacing*scale;const auto nose=forward*w.nose*scale;
         while (w.emission>=spacing) {w.emission-=spacing;const double back=w.emission/std::max(move,0.001);w.frames.push_back({w.last.lerp(pos,1-back)+nose,back*dt,twin});}
     } else if (w.active) w.active=false;

@@ -1,6 +1,7 @@
 #include "progression.h"
 #include "equipment.h"
 #include "../api/run_core.h"
+#include "../output/event_builder.h"
 #include "../behaviors/weapons/forward.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
@@ -277,7 +278,7 @@ bool ProgressionSystem::open(SpeedRunCore &core,bool initial) {
         p.comet_weapon=id;p.comet_direct=p.weapons.size()<run.content->progression.weapon_slots;
         std::vector<CardCandidate> cards;
         if (p.comet_direct) cards.push_back({1,CardKind::Weapon,id,run.content->equipment[id-1].maximum_level});
-        else {for (const auto &owned:p.weapons) cards.push_back({int64_t(cards.size()+1),CardKind::Swap,owned.definition,owned.level});cards.push_back({int64_t(cards.size()+1),CardKind::Keep,0,1});}
+        else {for (const auto &owned:p.weapons) cards.push_back({int64_t(cards.size()+1),CardKind::Swap,owned.definition,owned.level});cards.push_back({int64_t(cards.size()+1),CardKind::Keep,0,1});EventBuilder::audio(run,"weapon.get.swap_open");}
         publish(run,std::move(cards),false);if (p.comet_direct) p.selected_id=1;return true;
     }
     if (!initial && !p.pending_levels) return false;
@@ -328,8 +329,9 @@ void ProgressionSystem::poll(SpeedRunCore &core) {
     if (p.comet_weapon) {
         if (card.kind!=CardKind::Keep) {
             const auto id=p.comet_weapon;const auto &d=run.content->equipment[id-1];
-            if (card.kind==CardKind::Swap) {if (!EquipmentSystem::remove_weapon(run,card.definition)) return;CardCandidate removed{0,CardKind::Weapon,card.definition,0};notify_grant(run,removed);}
+            if (card.kind==CardKind::Swap) {if (!EquipmentSystem::remove_weapon(run,card.definition)) return;CardCandidate removed{0,CardKind::Weapon,card.definition,0};notify_grant(run,removed);EventBuilder::audio(run,"weapon.get.swap_drop");}
             if (!EquipmentSystem::grant(run,id,d.maximum_level)) return;
+            EventBuilder::audio(run,"weapon.get.comet_equip");
             CardCandidate gained{0,CardKind::Weapon,id,d.maximum_level};notify_grant(run,gained);
             if (card.kind==CardKind::Swap) {Dictionary event;event["card"]=chosen_value;core.emit_event("upgrade",event);}
             else {Dictionary text;text["pos"]=run.state.ship.pos+Vector2(0,-60);text["text"]=String::utf8(d.external_id.c_str());text["color"]=Color::html("efcb70");text["size"]=24;core.emit_event("text",text);}

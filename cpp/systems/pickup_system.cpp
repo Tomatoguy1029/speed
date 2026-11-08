@@ -208,6 +208,7 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor && !run.content->rock_fields.empty();
     const double chance=meteor?run.content->rock_fields.front().meteor_coin_chance:0.03;
     const int64_t count=enemy.elite?3+state.control.rng.randi_range(0,3).value():(state.control.rng.randf()<chance?(meteor?1+state.control.rng.randi_range(0,2).value():1):0);
+    if (count>0) EventBuilder::audio(run,"field.parts.drop",enemy.pos);
     for (int64_t i=0;i<count;++i) {
         const double angle=state.control.rng.randf()*2.0*godot::Math::PI,share=state.control.rng.randf();
         const godot::RunState::Coin coin{enemy.pos+godot::Vector2::from_angle(angle)*share*enemy.radius,true,false};
@@ -215,8 +216,8 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     }
     if (meteor) {
         const auto &config=run.content->rock_fields.front();
-        if (state.control.rng.randf()<config.meteor_heal_chance) state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Heal});
-        if (state.control.rng.randf()<config.meteor_magnet_chance) state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Magnet});
+        if (state.control.rng.randf()<config.meteor_heal_chance) {state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Heal});EventBuilder::audio(run,"field.repair.drop",enemy.pos);}
+        if (state.control.rng.randf()<config.meteor_magnet_chance) {state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Magnet});EventBuilder::audio(run,"field.beacon.drop",enemy.pos);}
         if (enemy.rare_weapon) state.pickups.capsules.push_back({enemy.pos,0,CapsuleKind::CometWeapon,enemy.rare_weapon,false});
     }
 }

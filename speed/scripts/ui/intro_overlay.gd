@@ -24,7 +24,9 @@ func _ready() -> void:
 	var skip := Button.new()
 	skip.name = "SkipIntro"
 	skip.text = tr("intro.skip")
-	skip.pressed.connect(GameManager.finish_intro)
+	skip.pressed.connect(func():
+		AudioManager.play(&"ui.title.intro_skip")
+		GameManager.finish_intro())
 	root.add_child(skip)
 	skip.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
 	skip.offset_left = -150

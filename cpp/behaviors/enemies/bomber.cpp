@@ -1,4 +1,6 @@
 #include "bomber.h"
+#include "../../systems/attack_system.h"
+#include "../../output/event_builder.h"
 #include "pursuit.h"
 #include "../../systems/enemy_motion.h"
 #include "../../systems/enemy_system.h"
@@ -25,6 +27,9 @@ void BomberBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     e.timer-=dt;e.charge=std::clamp(1.0-e.timer/std::max(p.blast_delay,0.001),0.0,1.0);
     if (e.timer>0) return;
     ZoneParams zone;zone.position=e.pos;zone.radius=p.blast_radius;zone.damage=p.blast_damage;zone.style=ZoneStyle::Bomber;zone.color=d.color;zone.owner=self;if (e.attack_managed) zone.budget.value=budget.token(owner);
-    ZoneSystem::emit(r,zone);EnemySystem::mark_dead(r,self);godot::Dictionary ev;ev["pos"]=e.pos;FrameBuilder::append(r,"bomber_explode",ev);
+    const auto fire=ZoneSystem::emit(r,zone);
+    // 炎は自爆した敵の撃破より長く残るので、撃破で止まる敵IDとは別の番号で鳴らす。
+    if (const auto *record=AttackSystem::get(s,fire)) EventBuilder::audio_for(r,"enemy.bomber.fire",-e.id,s.hazards[record->row].duration,e.pos);
+    EnemySystem::mark_dead(r,self);godot::Dictionary ev;ev["pos"]=e.pos;FrameBuilder::append(r,"bomber_explode",ev);
 }
 }

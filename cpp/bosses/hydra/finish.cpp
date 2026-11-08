@@ -1,3 +1,4 @@
+#include "../../output/event_builder.h"
 #include "finish.h"
 #include "body.h"
 #include "normal_attack.h"
@@ -22,6 +23,6 @@ void HydraFinish::tick(RunRuntime &r,BossBodyState &b,double dt) {
         if (it==b.hydra->final_beams.end()) {HazardState hazard;hazard.pos=part.pos;hazard.damage=0;hazard.delay=std::max(0.,b.final_charge-p.final_widen_time-b.final_elapsed);hazard.duration=b.final_charge+10;hazard.shape=HydraShapeHazard{points,b.final_width};auto &shape=std::get<HydraShapeHazard>(hazard.shape);shape.delay=hazard.delay;shape.life=hazard.duration;AttackSpec spec;spec.observation_id=b.final_observation_id;spec.owner.live_source=n.actor;spec.owner.attached=true;spec.boss=s.bosses->body_handles.at(uint32_t(&b-s.bosses->bodies.data()));spec.cause=Cause::Beam;spec.policies=EndPolicy::NaturalLifetime|EndPolicy::ClearWithBoss;spec.policies|=policy(EndPolicy::CancelWithParticipant);b.hydra->final_beams[n.id]=AttackSystem::emit_hazard(s,hazard,spec);it=b.hydra->final_beams.find(n.id);}
         if (const auto *a=AttackSystem::get(s,it->second)) {auto &hazard=s.hazards[a->row];auto &shape=std::get<HydraShapeHazard>(hazard.shape);shape.points=points;shape.width=b.final_width;hazard.pos=part.pos;}
     };
-    for (auto &n:b.hydra->necks) head(n);if (b.hydra->separated) head(b.hydra->bearer);if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;TechniqueRunner::observe_scripted(r,b,"final_strike","final_strike_replay",ObservationEvent::Execute);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest damage;damage.observation_id=b.final_observation_id;damage.amount=s.ship.hp+1;damage.cause=Cause::FinalStrike;damage.source=body.definition+1;CombatResolver::ship_damage(r,damage);TechniqueRunner::finish_scripted(r,b);}
+    for (auto &n:b.hydra->necks) head(n);if (b.hydra->separated) head(b.hydra->bearer);if (!b.final_landed && b.final_elapsed>=b.final_charge) {b.final_landed=true;EventBuilder::audio(r,"scene.time_up.strike",r.state.enemies[b.actor.slot].pos);TechniqueRunner::observe_scripted(r,b,"final_strike","final_strike_replay",ObservationEvent::Execute);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest damage;damage.observation_id=b.final_observation_id;damage.amount=s.ship.hp+1;damage.cause=Cause::FinalStrike;damage.source=body.definition+1;CombatResolver::ship_damage(r,damage);TechniqueRunner::finish_scripted(r,b);}
 }
 }

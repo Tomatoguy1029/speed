@@ -1,4 +1,5 @@
 #include "../behaviors/heroes/hercules.h"
+#include "../output/event_builder.h"
 #include "../behaviors/heroes/leo.h"
 #include "../behaviors/heroes/perseus.h"
 #include "heroes.h"
@@ -99,17 +100,19 @@ void HeroesSystem::place(RunRuntime &run,uint32_t id) {
 bool HeroesSystem::captive(const RunRuntime &run) {const auto &h=run.state.heroes;return h.hero && std::find(h.lit.begin(),h.lit.end(),0)!=h.lit.end();}
 void HeroesSystem::step(RunRuntime &run,double real_dt,double world_dt) {
     auto &s=run.state;auto &h=s.heroes;const auto &cfg=run.content->hero_config;
-    h.cooldown=std::max(0.0,h.cooldown-real_dt);
+    const double cooling=h.cooldown;h.cooldown=std::max(0.0,h.cooldown-real_dt);
+    if (cooling>0 && h.cooldown<=0 && h.power) EventBuilder::audio(run,"hero.ult.ready",s.ship.pos);
     if (h.active>0) {const double before=h.active;h.active=std::max(0.0,h.active-real_dt);PerseusBehavior::step(run,before,h.active);if (h.active<=0) {Dictionary data;data["id"]=name(run,h.power);emit(run,"hero_power_end",data);}}
     if (h.next>=0) {h.next-=real_dt;if (h.next<0) place(run,random_hero(run,h.power));}
     HerculesBehavior::step(run,real_dt);
     const auto from=h.previous;h.previous=s.ship.pos;if (!captive(run)) return;
-    if (!h.guarded && s.ship.pos.distance_squared_to(h.center)<cfg.guard_range*cfg.guard_range) guards(run);
-    if (s.ship.pos.distance_squared_to(h.center)<cfg.glow_range*cfg.glow_range) h.seen=true;
+    if (!h.guarded && s.ship.pos.distance_squared_to(h.center)<cfg.guard_range*cfg.guard_range) {guards(run);EventBuilder::audio(run,"hero.find.guards",h.center);}
+    if (!h.seen && s.ship.pos.distance_squared_to(h.center)<cfg.glow_range*cfg.glow_range) {h.seen=true;EventBuilder::audio(run,"hero.find.glow",h.center);}
     if (!s.control.lab_mode && s.control.bonus_remaining<=0 && h.landmarks.size()<2) for (size_t i=0;i<2;++i) {
         if (h.done[i] || s.time<h.landmark_times[i] || (valid_carrier(run,i) && !s.enemies[h.carriers[i].slot].dead)) continue;
         auto row=pick_carrier(run);if (row<0) row=spawn_carrier(run);if (row<0) continue;
         s.enemies[row].landmark=true;h.carriers[i]=s.enemy_handles.at(row);h.carrier_ids[i]=s.enemies[row].id;
+        EventBuilder::audio(run,"hero.find.landmark_spawn",s.enemies[row].pos);
     }
     if (!h.announced && (h.seen || h.landmarks.size()>=2)) {h.announced=true;Dictionary data;data["id"]=name(run,h.hero);emit(run,"hero_discovered",data);}
     if (s.draw.tracing) pass_stars(run,from,s.ship.pos,s.draw.dash_id);
@@ -130,7 +133,7 @@ void HeroesSystem::recovered(RunRuntime &run,EnemyHandle enemy) {
 }
 void HeroesSystem::select_power(RunRuntime &run,uint32_t id) {run.state.heroes.power=id;run.state.heroes.active=0;}
 void HeroesSystem::activate(RunRuntime &run) {
-    auto &h=run.state.heroes;if (!h.power || h.cooldown>0) return;const auto &d=run.content->heroes[h.power-1].definition;
+    auto &h=run.state.heroes;if (!h.power) return;if (h.cooldown>0) {EventBuilder::audio(run,"hero.ult.denied",run.state.ship.pos);return;}const auto &d=run.content->heroes[h.power-1].definition;
     // しし座はなぞりを止める力なので、描画中・なぞり中には発動しない
     if (d.external_id=="leo" && (run.state.draw.drawing || run.state.draw.tracing)) return;
     h.cooldown=d.cooldown;h.active=d.duration;Dictionary data;data["id"]=name(run,h.power);data["pos"]=run.state.ship.pos;emit(run,"hero_power",data);

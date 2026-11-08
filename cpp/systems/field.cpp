@@ -1,6 +1,7 @@
 #include "field.h"
 #include "collision_query.h"
 #include "../output/frame_builder.h"
+#include "../output/event_builder.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
 #include <cmath>
@@ -111,7 +112,7 @@ void FieldSystem::collide_ship(RunRuntime &run) {
     for (const auto &a:run.state.field.arenas) {const auto safe=a.bounds.grow(-c.ship_radius);const auto at=ship.pos.clamp(safe.position,safe.get_end());if (at!=ship.pos) {const auto inward=(at-ship.pos).normalized();ship.pos=at;const double vn=ship.vel.dot(inward);if (vn<0) ship.vel-=inward*vn*(1+c.crash_restitution);ship.glide=false;}}
     if (radius>wall && run.state.field.arenas.empty()) {
         ship.glide=false;const auto normal=ship.pos/radius;ship.pos=normal*wall;const double vn=ship.vel.dot(normal);
-        if (vn>0) ship.vel-=normal*2.0*vn;
+        if (vn>0) {ship.vel-=normal*2.0*vn;EventBuilder::audio(run,"ship.combat.boundary",ship.pos);}
     }
 }
 bool FieldSystem::validate(const godot::RunState &state,const ContentBundle &content) {
@@ -149,6 +150,8 @@ double FieldSystem::sight_reach(godot::Vector2 direction,double length,const std
 }
 
 namespace {
+/// 重力の音のループを重力ごとに分ける番号。生まれた時刻から決める。
+int64_t well_key(const GravityWell &w) {return int64_t(w.born*1000.0);}
 godot::Vector2 well_pull(godot::Vector2 center,godot::Vector2 at,double reach,double strength) {
     const auto delta=center-at;const double distance=delta.length();if (distance>=reach || distance<1.0) return {};
     return delta/distance*strength*(1.0-distance/reach);
@@ -156,7 +159,8 @@ godot::Vector2 well_pull(godot::Vector2 center,godot::Vector2 at,double reach,do
 }
 bool FieldSystem::add_well(RunRuntime &r,godot::Vector2 position,double life,double radius,double pull) {
     if (!position.is_finite() || !std::isfinite(life) || life<=0 || !std::isfinite(radius) || radius<0 || !std::isfinite(pull) || pull<0 || !std::isfinite(float(radius)) || !std::isfinite(float(pull))) return false;
-    r.state.field.wells.push_back({position,r.state.world_time,life,radius,pull});return true;
+    r.state.field.wells.push_back({position,r.state.world_time,life,radius,pull});
+    EventBuilder::audio(r,"field.gravity.spawn",position);EventBuilder::audio_loop(r,"field.gravity.pull",well_key(r.state.field.wells.back()),true);return true;
 }
 bool FieldSystem::spawn_well(RunRuntime &r) {
     auto &s=r.state;godot::Vector2 position;
@@ -168,6 +172,7 @@ bool FieldSystem::spawn_well(RunRuntime &r) {
 }
 void FieldSystem::step_gravity(RunRuntime &r,double dt) {
     if (dt<=0) return;auto &s=r.state;auto &wells=s.field.wells;const double now=s.world_time;
+    for (const auto &w:wells) if (now-w.born>=w.life) {EventBuilder::audio(r,"field.gravity.fade",w.position);EventBuilder::audio_loop(r,"field.gravity.pull",well_key(w),false);}
     wells.erase(std::remove_if(wells.begin(),wells.end(),[&](const auto &w){return now-w.born>=w.life;}),wells.end());
     const bool fast=s.draw.tracing || s.ship.glide || s.ship.vel.length()>=s.ship_config.max_speed*s.combat_config.ram_speed_ratio;
     for (const auto &well:wells) {
@@ -179,6 +184,14 @@ void FieldSystem::step_gravity(RunRuntime &r,double dt) {
 }
 void FieldSystem::comet_gravity(RunRuntime &r,const DeathContext &death) {
     const auto cause=death.request.cause;
+    if (r.state.enemy_handles.contains(death.target)) {
+        const auto handle=r.state.enemies[death.target.slot].rock;
+        if (r.state.field.rock_handles.contains(handle) && r.state.field.rocks[handle.slot].kind==RockKind::Comet) {
+            const bool rare=r.state.field.rocks[handle.slot].rare_weapon;
+            EventBuilder::audio(r,rare?"field.rare_comet.break":"field.comet.break",death.corpse.pos);EventBuilder::audio_loop(r,"field.comet.pass",int64_t(handle.slot),false);
+            if (rare) EventBuilder::audio(r,"weapon.get.capsule_drop",death.corpse.pos);
+        }
+    }
     if (cause==Cause::None || cause==Cause::Wave || cause==Cause::Chain || cause==Cause::PumpBurst || cause==Cause::Marlin || cause==Cause::Collapse || !r.state.enemy_handles.contains(death.target)) return;
     const auto rock=r.state.enemies[death.target.slot].rock;if (!r.state.field.rock_handles.contains(rock)) return;const auto &source=r.state.field.rocks[rock.slot];
     if (source.kind!=RockKind::Comet || source.rare_weapon) return;const auto &p=r.content->gravity;add_well(r,death.corpse.pos,p.life,p.radius,p.pull);
@@ -193,11 +206,13 @@ void FieldSystem::spawn_warp(RunRuntime &r) {
         if (body_gap(r,s.field.warp_pos,p.radius)>50 && s.field.warp_pos.length()<s.ship_config.field_radius-200) break;
     }
     s.field.warp_gone=s.world_time+p.life;
+    EventBuilder::audio(r,"field.warp.appear",s.field.warp_pos);EventBuilder::audio_loop(r,"field.warp.idle",0,true);
 }
 bool FieldSystem::take_warp(RunRuntime &r) {
-    auto &s=r.state;if (s.field.warp_gone<0) return false;if (s.world_time>=s.field.warp_gone) {s.field.warp_gone=-1;return false;}
+    auto &s=r.state;if (s.field.warp_gone<0) return false;
+    if (s.world_time>=s.field.warp_gone) {s.field.warp_gone=-1;EventBuilder::audio(r,"field.warp.vanish",s.field.warp_pos);EventBuilder::audio_loop(r,"field.warp.idle",0,false);return false;}
     const double reach=r.content->warp.radius+s.ship_config.ship_radius;if (s.ship.pos.distance_squared_to(s.field.warp_pos)>reach*reach) return false;
-    s.field.warp_gone=-1;return true;
+    s.field.warp_gone=-1;EventBuilder::audio(r,"field.warp.enter",s.field.warp_pos);EventBuilder::audio_loop(r,"field.warp.idle",0,false);return true;
 }
 
 RockHandle FieldSystem::spawn_comet(RunRuntime &r,bool rare) {
@@ -214,7 +229,9 @@ RockHandle FieldSystem::spawn_comet(RunRuntime &r,bool rare) {
             for (const auto &d:r.content->equipment) if (d.kind==0 && d.comet_only && std::none_of(s.loadout->weapons.begin(),s.loadout->weapons.end(),[&](const auto &owned){return owned.definition==d.id;})) choices.push_back(d.id);
             if (!choices.empty()) rock.rare_weapon=choices[s.control.rng.randi_range(0,int64_t(choices.size()-1)).value()];
         }
-        return add_rock(r,rock);
+        const auto handle=add_rock(r,rock);
+        if (handle.generation) {EventBuilder::audio(r,rock.rare_weapon?"field.rare_comet.appear":"field.comet.appear",from);EventBuilder::audio_loop(r,"field.comet.pass",int64_t(handle.slot),true);}
+        return handle;
     }return {};
 }
 void FieldSystem::step_comets(RunRuntime &r,double dt) {

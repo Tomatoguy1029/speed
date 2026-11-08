@@ -5,6 +5,7 @@
 #include "../bosses/canis_major/hound_lunge.h"
 #include "../bosses/canis_major/howl.h"
 #include "run_core.h"
+#include "../output/enemy_audio.h"
 #include "../systems/timing.h"
 #include "../bosses/flow/technique_runner.h"
 #include "../bosses/flow/flow_runner.h"
@@ -283,13 +284,14 @@ bool SpeedRunCore::advance_enemies(double delta) {
         if (enemy.guard > 0) enemy.guard=speed::remaining_time(enemy.guard,delta);
         if (enemy.flash > 0) enemy.flash=speed::remaining_time(enemy.flash,delta);
         enemy.age += delta;
+        const bool first_update = enemy.age <= delta; const auto mode_before = enemy.mode;
         const auto &def = runtime.content->definitions[enemy.definition];
         if (enemy.slash_hold) { enemy.vel = Vector2(); continue; }
         const Vector2 from=enemy.pos;
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const bool far = def.kind!=speed::EnemyDefinition::Kind::Aquila && def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
-        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) { advance_biter(row, delta, far); continue; }
+        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) { if (!far && first_update) speed::EnemyAudio::spawned(runtime,uint32_t(row)); advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind==speed::EnemyDefinition::Kind::Crow) {
                 speed::CrowBehavior::step(runtime,uint32_t(row));
@@ -361,6 +363,8 @@ bool SpeedRunCore::advance_enemies(double delta) {
             }
         }
         if (!runtime.state.enemy_handles.contains(update_handles[row]) || runtime.state.enemies[row].dead) continue;
+        // 見えている敵だけ、技の予兆・発動の音を鳴らす
+        if (!far) {if (first_update) speed::EnemyAudio::spawned(runtime,uint32_t(row));speed::EnemyAudio::mode_changed(runtime,uint32_t(row),mode_before);}
         if (def.kind==speed::EnemyDefinition::Kind::Aquila) speed::AquilaBehavior::before_move(runtime,update_handles[row],delta);
         if (def.kind==speed::EnemyDefinition::Kind::Marlin) {
             speed::MarlinBehavior::before_move(runtime,update_handles[row],delta);

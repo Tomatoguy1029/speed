@@ -88,6 +88,8 @@ void hit_stop(RunRuntime &run,EnemyHandle target,bool fresh,bool crit) {
     if (def.hitstop_multiplier<=0 || rank_mult<=0) return;
     const double stop=std::min(seconds*def.hitstop_multiplier*rank_mult,std::max(0.0,config.kill_hitstop_cap-state.dash_stop));
     state.hitstop=std::max(state.hitstop,stop);state.dash_stop+=stop;
+    // 強いヒットストップ（会心の撃破ほどの長さ）だけ音を付ける。
+    if (stop>=0.05) EventBuilder::audio(run,"scene.run.hitstop",enemy.pos);
 }
 }
 EnemyHandle CombatResolver::damage_target(const RunRuntime &run,EnemyHandle struck) {
@@ -161,6 +163,7 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     result.reason=result.hp_after>result.hp_before-result.resolved?CombatReason::PhaseFloor:CombatReason::Applied;
     // ダメージの観測は、撃破hookが再び攻撃を生成するより前に確定する。
     EventBuilder::enemy_damage(run,request,result);
+    if (result.applied>0 && state.enemy_handles.contains(result.target) && state.enemies[result.target.slot].is_boss) EventBuilder::audio(run,"boss.common.damage",state.enemies[result.target.slot].pos);
     run.combat_hooks.damage_applied(run,request,result);
     if (request.cause==Cause::Ram && result.applied>0 && state.enemy_handles.contains(result.target)) hit_stop(run,result.target,fresh,request.crit);
     if (!state.enemy_handles.contains(result.target)) return result;
@@ -188,6 +191,7 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     if (request.cause>=Cause::Count || request.shatter_depth<0 || !request.direction.is_finite()) result.reason=CombatReason::Invalid;
     if (result.reason!=CombatReason::Applied) return result;
     const auto enemy=state.enemies[result.target.slot];
+    if (state.enemy_handles.contains(enemy.picaro_owner)) EventBuilder::audio(run,"boss.draco.picaro_kill",enemy.pos);
     DeathContext death;death.request=request;death.target=result.target;death.one_shot=one_shot;
     death.corpse={enemy.id,uint32_t(enemy.definition+1),enemy.pos,enemy.vel,enemy.radius,enemy.facing,enemy.max_hp,enemy.xp,enemy.elite,enemy.is_boss};
     death.corpse.attack_priority=enemy.attack_priority;

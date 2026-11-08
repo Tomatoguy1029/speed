@@ -2,6 +2,7 @@
 #include "field.h"
 #include "boss_contact_feedback.h"
 #include "geometry.h"
+#include "../output/event_builder.h"
 #include "../behaviors/heroes/leo.h"
 #include "../behaviors/heroes/gemini.h"
 #include "../content/content_bundle.h"
@@ -58,6 +59,8 @@ void SpeedRunCore::steer_ship(double want, double dt) {
 
 void SpeedRunCore::move_ship(double dt, Vector2 accel) {
     const auto &c = runtime.state.ship_config;
+    const double fast_speed = c.max_speed * runtime.state.combat_config.ram_speed_ratio;
+    const bool was_fast = runtime.state.draw.tracing || runtime.state.ship.glide || runtime.state.ship.vel.length() >= fast_speed;
     // しし座の獅子：勢いや減速はかけず、場の境界の押し戻しだけ受けて、いつも定義の速さで駆ける
     if (const auto *lion = speed::LeoBehavior::active(runtime)) {
         auto &ship = runtime.state.ship;
@@ -108,6 +111,7 @@ void SpeedRunCore::move_ship(double dt, Vector2 accel) {
     }
     runtime.state.ship.pos += runtime.state.ship.vel * dt;
     if (!runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.heading = runtime.state.ship.vel.normalized();
+    if (!was_fast && runtime.state.ship.vel.length() >= fast_speed) speed::EventBuilder::audio(runtime, "ship.boost.high_speed", runtime.state.ship.pos);
 }
 
 bool SpeedRunCore::step_ship(double real_dt, double world_dt, const Dictionary &input) {

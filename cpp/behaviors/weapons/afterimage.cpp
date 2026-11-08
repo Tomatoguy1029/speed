@@ -10,7 +10,7 @@ namespace speed {
 void AfterimageBehavior::end(RunRuntime &r) {auto &w=r.state.loadout->afterimage;for (auto &e:w.echoes) if (e.id==w.current) e.ended=true;w.current=0;}
 void AfterimageBehavior::clear(RunRuntime &r) {auto &w=r.state.loadout->afterimage;w.echoes.clear();w.current=0;}
 void AfterimageBehavior::launch(RunRuntime &r) {auto &w=r.state.loadout->afterimage;if (!w.ready) return;end(r);AfterimageEcho e;e.id=w.next_id++;e.start=e.until=w.clock;e.share=w.total*EquipmentSystem::weapon_damage_factor(r,w.definition)/w.count;
-    for (uint32_t k=0;k<w.count;++k) {AfterimageCopy c;c.delay=w.delay*(k+1);c.pos=r.state.ship.pos;c.dir=r.state.ship.heading;e.copies.push_back(c);}w.current=e.id;w.echoes.push_back(std::move(e));if (w.echoes.size()>8) w.echoes.erase(w.echoes.begin());
+    for (uint32_t k=0;k<w.count;++k) {AfterimageCopy c;c.delay=w.delay*(k+1);c.pos=r.state.ship.pos;c.dir=r.state.ship.heading;e.copies.push_back(c);}w.current=e.id;w.echoes.push_back(std::move(e));EventBuilder::audio(r,"weapon.mirage.spawn",r.state.ship.pos);if (w.echoes.size()>8) w.echoes.erase(w.echoes.begin());
 }
 void AfterimageBehavior::trail(RunRuntime &r,godot::Vector2 a,godot::Vector2 b) {auto &s=r.state;auto &w=s.loadout->afterimage;if (!w.ready || !w.current || !s.draw.tracing || a.is_equal_approx(b)) return;
     for (auto &e:w.echoes) if (e.id==w.current) {if (e.legs.size()>=2048 || w.clock-e.start>=4) {end(r);return;}const double start=std::max(w.clock,e.until),finish=start+a.distance_to(b)/std::max(s.draw.rate,1.0);e.legs.push_back({a,b,start,finish,CombatResolver::attack_power(r),r.content->config.trace_radius*s.loadout->effects.area});e.until=finish;return;}

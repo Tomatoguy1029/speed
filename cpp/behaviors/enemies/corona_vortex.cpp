@@ -1,4 +1,5 @@
 #include "corona_vortex.h"
+#include "../../output/event_builder.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_budget.h"
 #include "../../systems/combat_resolver.h"
@@ -36,7 +37,7 @@ void capture(RunRuntime &r,EnemyHandle owner,CoronaState &o,const CoronaDefiniti
         if (e.corona || e.dead || e.is_boss || s.field.rock_handles.contains(e.rock) || e.parent.generation || d.rank>2 || d.gate!=EnemyDefinition::Gate::None || e.stone>0 || e.knock_t>0 || e.shove_time>0) continue;
         const auto *type=ammo(r,s.enemies[owner.slot],uint32_t(e.definition));const auto offset=e.pos-center;if (!type || type->weight<=0 || offset.length()>p.pull_radius) continue;
         auto bucket=std::find_if(o.types.begin(),o.types.end(),[&](const auto &b){return b.definition==e.definition;});if (bucket==o.types.end()) {o.types.push_back({uint32_t(e.definition),{}});bucket=std::prev(o.types.end());}
-        CoronaMember a;a.owner=owner;a.definition=uint32_t(e.definition);a.slot=bucket->items.size();a.serial=++s.corona_serial;a.angle=offset.angle();a.radius=std::max(1.0,double(offset.length()));a.from=e.pos;a.ship_from=s.ship_pos;a.effect=p.effect;e.corona=a;bucket->items.push_back(h);++o.count;e.held=true;e.charge=0;s.corona_members.push_back({h,a.serial});
+        CoronaMember a;a.owner=owner;a.definition=uint32_t(e.definition);a.slot=bucket->items.size();a.serial=++s.corona_serial;a.angle=offset.angle();a.radius=std::max(1.0,double(offset.length()));a.from=e.pos;a.ship_from=s.ship_pos;a.effect=p.effect;e.corona=a;bucket->items.push_back(h);++o.count;e.held=true;e.charge=0;s.corona_members.push_back({h,a.serial});EventBuilder::audio(r,"elite.corona.capture",e.pos);
     }
 }
 void orbit(RunRuntime &r,EnemyHandle h,CoronaMember &a,CoronaState &o,const CoronaDefinition &p,double dt) {
@@ -48,7 +49,7 @@ void orbit(RunRuntime &r,EnemyHandle h,CoronaMember &a,CoronaState &o,const Coro
         if (e0*e1<=0 && std::abs(e1-e0)<PI) {double lo=0,hi=1;for (int k=0;k<10;++k) {const double mid=(lo+hi)*0.5,err=error(center0.lerp(center1,mid),center_v,angle0+(angle1-angle0)*mid,radius1,p.spin,s.ship_pos);if (err*e0>0) lo=mid;else hi=mid;}f=(lo+hi)*0.5;}else if (std::abs(e0)<=p.align_angle) f=0;
         if (f>=0) {
             const double angle=angle0+(angle1-angle0)*f;const auto at=center0.lerp(center1,f)+godot::Vector2::from_angle(angle)*radius1,direction=velocity(center_v,angle,radius1,p.spin).normalized();
-            if (direction!=godot::Vector2() && direction.dot((s.ship_pos-at).normalized())>0) {unstock(r,h,a);a.thrown=true;a.slot=owner.definition;a.angle=angle;const auto owner_key=AttackBudgetSystem::owner(s,owner.id,owner.attack_group);a.attack_token=AttackBudgetSystem::token(s,owner_key);if (a.attack_token) AttackBudgetSystem(r).external(a.attack_token,key(h,e),true);a.life=p.throw_life;if (const auto *type=ammo(r,owner,a.definition)) a.damage=type->damage;a.from=at;a.release_fraction=f;e.vel=direction*p.throw_speed;e.pos=at+e.vel*dt*(1.0-f);e.facing=direction.angle();cancel(r,a.owner,o);owner.fire_t=r.content->definitions[owner.definition].fire_interval;return;}
+            if (direction!=godot::Vector2() && direction.dot((s.ship_pos-at).normalized())>0) {unstock(r,h,a);a.thrown=true;EventBuilder::audio(r,"elite.corona.throw",at);a.slot=owner.definition;a.angle=angle;const auto owner_key=AttackBudgetSystem::owner(s,owner.id,owner.attack_group);a.attack_token=AttackBudgetSystem::token(s,owner_key);if (a.attack_token) AttackBudgetSystem(r).external(a.attack_token,key(h,e),true);a.life=p.throw_life;if (const auto *type=ammo(r,owner,a.definition)) a.damage=type->damage;a.from=at;a.release_fraction=f;e.vel=direction*p.throw_speed;e.pos=at+e.vel*dt*(1.0-f);e.facing=direction.angle();cancel(r,a.owner,o);owner.fire_t=r.content->definitions[owner.definition].fire_interval;return;}
         }
     }
     a.angle=angle1;a.radius=radius1;a.settled=godot::Math::is_equal_approx(radius1,p.ring);e.pos=finish;e.vel=(finish-start)/dt;e.facing=e.vel.angle();
@@ -78,7 +79,7 @@ void CoronaVortex::tick(RunRuntime &r,double dt,const std::vector<EnemyHandle> &
         else if (!o.selected.generation && e.fire_t<=0 && (!e.attack_managed || (budget.owns(owner_key,e.id) && EnemySystem::attack_active(s,h)) || budget.request({owner_key,{AttackCategory::Aimed},h,p.admission_duration,e.attack_priority,s.world.attack_formation_mode?e.attack_value:r.content->definitions[e.definition].attack_weight}))) {
             double total=0;for (const auto &b:o.types) if (const auto *type=ammo(r,e,b.definition)) total+=type->weight;
             if (total>0) {double roll=s.control.rng.randf()*total;const CoronaBucket *bucket=nullptr;for (const auto &b:o.types) {if (const auto *type=ammo(r,e,b.definition)) roll-=type->weight;if (roll<0) {bucket=&b;break;}}
-                if (bucket && !bucket->items.empty()) {o.selected=bucket->items.front();double best=std::numeric_limits<double>::infinity();const auto center_v=(e.pos-o.center)/std::max(dt,0.001);for (auto candidate:bucket->items) {if (!s.enemy_handles.contains(candidate) || !s.enemies[candidate.slot].corona) continue;const auto &a=*s.enemies[candidate.slot].corona;double turn=turn_to_aim(e.pos,center_v,a.angle+p.spin*p.telegraph,p.ring,p.spin,s.ship_pos,p.align_angle);if (!a.settled) turn+=TAU;if (turn<best) {best=turn;o.selected=candidate;}}o.wait=p.telegraph;e.mode=EnemyMode::Windup;}
+                if (bucket && !bucket->items.empty()) {o.selected=bucket->items.front();double best=std::numeric_limits<double>::infinity();const auto center_v=(e.pos-o.center)/std::max(dt,0.001);for (auto candidate:bucket->items) {if (!s.enemy_handles.contains(candidate) || !s.enemies[candidate.slot].corona) continue;const auto &a=*s.enemies[candidate.slot].corona;double turn=turn_to_aim(e.pos,center_v,a.angle+p.spin*p.telegraph,p.ring,p.spin,s.ship_pos,p.align_angle);if (!a.settled) turn+=TAU;if (turn<best) {best=turn;o.selected=candidate;}}o.wait=p.telegraph;e.mode=EnemyMode::Windup;EventBuilder::audio(r,"elite.corona.tell",e.pos);}
             }
         }
         if (o.selected.generation) {o.wait-=dt;e.charge=std::clamp(1.0-o.wait/std::max(p.telegraph,0.001),0.0,1.0);if (o.wait<-TAU/std::max(std::abs(p.spin),0.1)) {cancel(r,h,o);e.fire_t=r.content->definitions[e.definition].fire_interval;}}
