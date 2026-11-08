@@ -140,6 +140,7 @@ func _ready_cpp() -> void:
 	bonus_visual = preload("res://scripts/render/fx/bonus_stage_visual.gd").new()
 	add_child(bonus_visual)
 	bonus_visual.setup(pipeline,cpp_background)
+	frame_view.place_screen_effects(pipeline)
 	_roar_post = preload("res://scripts/render/bosses/roar_post.gd").new()
 	add_child(_roar_post)
 	_rift_post = preload("res://scripts/render/bosses/draco_rift_post.gd").new()
