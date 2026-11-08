@@ -66,6 +66,7 @@ var _hitstop_baselines := {}
 var _hitstop_last_target := ""
 var _hitstop_notice := ""
 var _hitstop_details: Control
+var _hitstop_view_state: Array = []
 
 func _ready() -> void:
 	if not OS.is_debug_build():
@@ -281,6 +282,11 @@ func _inherit_hitstop() -> void:
 func _refresh_hitstop() -> void:
 	if _hitstop_value == null or not is_instance_valid(session.run): return
 	var target := _hitstop_target()
+	# 試遊tickごとに同じ欄を設定し直すと、入力途中の文字とUIの再描画を巻き込む。
+	var view_state := [target, session.spec.get("stage", 1), _hitstop_scope.selected, _hitstop_notice]
+	if not target.is_empty(): view_state.append_array([_authored_hitstop(target), _effective_hitstop(target)])
+	if view_state == _hitstop_view_state: return
+	_hitstop_view_state = view_state
 	_hitstop_value.editable = not target.is_empty()
 	_hitstop_scope.disabled = target.is_empty() or target.boss
 	_hitstop_save_button.disabled = target.is_empty()
