@@ -149,7 +149,7 @@ func save_current() -> void:
 	if FileAccess.get_md5(path) != _hashes[_section]:
 		_message = "保存先が外部で変わりました。再読込してください: " + path
 		return
-	var error := ResourceSaver.save((_working[_section] as EnemyMarkSettings).duplicate(), path)
+	var error := TresSaver.save((_working[_section] as EnemyMarkSettings).duplicate(), path)
 	if error != OK:
 		_message = "保存に失敗しました: " + error_string(error)
 		return

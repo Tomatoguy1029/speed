@@ -459,7 +459,7 @@ func save_current() -> void:
 	if FileAccess.get_md5(path) != _hashes[_editing_kind]:
 		_message = "保存先が外部で変更されました。未保存値を控え、再読込してから保存してください: " + path
 		return
-	var result := ResourceSaver.save(s.duplicate(true), path)
+	var result := TresSaver.save(s.duplicate(true), path)
 	if result != OK: _message = "保存に失敗しました: " + error_string(result); return
 	_hashes[_editing_kind] = FileAccess.get_md5(path)
 	_dirty[_editing_kind] = false

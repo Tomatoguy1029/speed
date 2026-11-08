@@ -1,6 +1,6 @@
-[gd_resource type="Resource" format=3]
+[gd_resource type="Resource" format=3 uid="uid://ctkhtt7jw5dyx"]
 
-[ext_resource type="Script" path="res://scripts/data_types/boss_action_rules.gd" id="1"]
+[ext_resource type="Script" uid="uid://dwy2yh1oyxoln" path="res://scripts/data_types/boss_action_rules.gd" id="1"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/bite.tres" id="2"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/breath.tres" id="move_breath"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/charge.tres" id="move_charge"]
@@ -9,7 +9,7 @@
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/leap.tres" id="move_leap"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/meteor.tres" id="move_meteor"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/picaro_wall.tres" id="move_picaro_wall"]
-[ext_resource type="Resource" path="res://data/bosses/draco_moves/rifts.tres" id="move_rifts"]
+[ext_resource type="Resource" uid="uid://dlfrbgea3gijn" path="res://data/bosses/draco_moves/rifts.tres" id="move_rifts"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/spiral.tres" id="move_spiral"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/star_fan.tres" id="move_star_fan"]
 [ext_resource type="Resource" path="res://data/bosses/draco_moves/tail_slam.tres" id="move_tail_slam"]

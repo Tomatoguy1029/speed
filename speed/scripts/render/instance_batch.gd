@@ -26,14 +26,16 @@ func setup_polygon(points: PackedVector2Array) -> void:
 	_setup_mesh(mesh)
 
 ## スプライトは下向きで作成。縦横比を保ち、長辺を直径2にそろえる。
-func setup_texture(sprite: Texture2D, region := Rect2()) -> void:
+## margin：外周に足した余白のドット数。余白を除いた絵の長辺を直径2にそろえる。
+func setup_texture(sprite: Texture2D, region := Rect2(), margin := 0) -> void:
 	var size := sprite.get_size()
 	if region.size == Vector2.ZERO:
 		region = Rect2(Vector2.ZERO, size)
 	var uv_start := region.position / size
 	var uv_end := region.end / size
 	size = region.size
-	var half := size / maxf(size.x, size.y)
+	var content := size - Vector2(margin, margin) * 2.0
+	var half := size / maxf(content.x, content.y)
 	# QuadMeshの3D向けUVでは上下が反転するため、2Dの上端をUV.y=0にする。
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)

@@ -242,7 +242,7 @@ func _save_hitstop() -> void:
 	else:
 		var source: Resource = ResourceLoader.load(fresh.path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP)
 		source.hitstop_multiplier = value
-		error = ResourceSaver.save(source, fresh.path)
+		error = TresSaver.save(source, fresh.path)
 		if error == OK:
 			if target.boss: ContentManager.bosses[StringName(target.id)].hitstop_multiplier = value
 			else: ContentManager.enemies[StringName(target.id)].hitstop_multiplier = value

@@ -832,7 +832,7 @@ func _write_preset(path: String) -> bool:
 	if settings == null:
 		return false
 	# 書き出すコピーだけにパスを付け、共有キャッシュと調整中Resourceを分離する。
-	var error := ResourceSaver.save(settings.duplicate(), path)
+	var error := TresSaver.save(settings.duplicate(), path)
 	if error != OK:
 		_set_status("保存に失敗しました: " + error_string(error))
 		return false

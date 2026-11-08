@@ -48,6 +48,6 @@ static func save(path: String, values: Dictionary, baseline: Dictionary) -> Dict
 	if stage == null: return {"error": "ステージを読み込めません。"}
 	if stage.enemy_tuning != baseline: return {"error": "別の編集で敵調整が変わりました。再読込してから保存してください。"}
 	stage.enemy_tuning = values.duplicate(true)
-	var error := ResourceSaver.save(stage, path)
+	var error := TresSaver.save(stage, path)
 	if error != OK: return {"error": "保存に失敗: %s" % error_string(error)}
 	return {"stage": stage}

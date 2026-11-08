@@ -699,7 +699,7 @@ func _save() -> void:
 	if FileAccess.get_sha256(_source_path) != _source_hash:
 		_status.text = tr("centaurus.anim.conflict")
 		return
-	var problem := ResourceSaver.save(_data, _source_path)
+	var problem := TresSaver.save(_data, _source_path)
 	if problem != OK:
 		_status.text = tr("centaurus.parts.failed")
 		return

@@ -435,12 +435,12 @@ func _save_tuning() -> void:
 			condition_changed = condition_changed or draft["condition_" + field] != _saved[key]["condition_" + field]
 	if condition_changed:
 		rules.conditions[id] = gate
-		var rules_error := ResourceSaver.save(rules, _rules_paths[key])
+		var rules_error := TresSaver.save(rules, _rules_paths[key])
 		if rules_error != OK:
 			_tuning_status.text = "発動条件を保存できません: " + error_string(rules_error)
 			return
 	if move_changed:
-		var error := ResourceSaver.save(saved, path)
+		var error := TresSaver.save(saved, path)
 		if error != OK:
 			_tuning_status.text = "技の値を保存できません: " + error_string(error)
 			return

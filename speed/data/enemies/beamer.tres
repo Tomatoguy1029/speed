@@ -4,6 +4,12 @@
 
 [resource]
 script = ExtResource("1")
+armor_colors = {
+"res://assets/pixel/beamer/armor.png|25x25|142cccf47d7ab534bfa5246b74c02a7937a61ef4a1b33daa332f9ed66a33f53a": {
+"12": "b1cbd9",
+"359": "5d8499"
+}
+}
 rank = 2
 radius = 18.0
 hp = 16.0
@@ -12,6 +18,7 @@ speed = 90.0
 accel = 1.5
 turn = 3.0
 xp = 4.0
+xp_reward_counts = PackedInt32Array()
 color = Color(1, 0.5, 0.8, 1)
 shape = &"diamond"
 behavior = &"beamer"

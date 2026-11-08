@@ -301,7 +301,7 @@ func _save() -> bool:
 	if FileAccess.get_md5(_selected) != _hashes[_selected]:
 		_status.text = "別の場所でファイルが更新されました。保存を止めました。再読込して確認してください。"
 		return false
-	var error := ResourceSaver.save(_read(_selected), _selected)
+	var error := TresSaver.save(_read(_selected), _selected)
 	if error != OK:
 		_status.text = "保存できませんでした（%d）" % error
 		return false
