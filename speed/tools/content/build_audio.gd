@@ -1,5 +1,5 @@
 ## 音の表（assets/audio/sound_table.tres）を制作工程で音声バンクへまとめる。
-## 素材のない欄は合成音を作り、ループする欄は繰り返す設定にする。
+## 素材のない欄は合成音を作り、ループする欄は繰り返す設定にする。音なしの欄は音を入れない。
 @tool
 extends RefCounted
 const SAMPLE_RATE := 22050
@@ -18,15 +18,16 @@ static func build(output: String) -> Error:
 		var entry := table.entry(id)
 		if entry == null: entry = SoundEntry.new()
 		bank.params[id] = {"volume_db": entry.volume_db, "pitch_min": entry.pitch_min, "pitch_max": maxf(entry.pitch_min, entry.pitch_max),
-			"max_voices": entry.max_voices, "loop": entry.loop, "trim_start": entry.trim_start, "trim_end": entry.trim_end, "loop_start": entry.loop_start}
+			"max_voices": entry.max_voices, "loop": entry.loop, "silent": entry.silent, "trim_start": entry.trim_start, "trim_end": entry.trim_end, "loop_start": entry.loop_start}
 		var stream := _stream(entry, music)
 		if stream == null: continue
 		if music: bank.music[id] = stream
 		else: bank.sounds[id] = stream
 	return ResourceSaver.save(bank, output)
 
-## 素材を繰り返しの設定つきで複製する。素材がなければ合成音、それもなければ null。
+## 素材を繰り返しの設定つきで複製する。素材がなければ合成音。音なしの欄と、どちらもない欄は null。
 static func _stream(entry: SoundEntry, music: bool) -> AudioStream:
+	if entry.silent: return null
 	if entry.stream == null:
 		if entry.synth_wave == "" or entry.synth_seconds <= 0.0: return null
 		return _looped(_tone(entry.synth_from_hz, entry.synth_to_hz, entry.synth_seconds, entry.synth_wave), entry.loop, 0.0)

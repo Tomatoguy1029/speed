@@ -1310,12 +1310,14 @@ loop = true
 script = ExtResource("1_6fvma")
 stream = ExtResource("20_e6jbx")
 loop = true
+trim_end = 222.0408
 
 [sub_resource type="Resource" id="Resource_gykgn"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("21_7gpho")
 loop = true
 trim_start = 26.0
+trim_end = 159.1902
 loop_start = 26.0
 
 [sub_resource type="Resource" id="Resource_jtr0v"]
@@ -1327,6 +1329,7 @@ script = ExtResource("1_6fvma")
 stream = ExtResource("22_us7m1")
 volume_db = -9.5
 loop = true
+trim_end = 132.049
 
 [sub_resource type="Resource" id="Resource_kaf53"]
 script = ExtResource("1_6fvma")
@@ -1337,6 +1340,7 @@ script = ExtResource("1_6fvma")
 stream = ExtResource("23_xif7w")
 volume_db = -9.5
 loop = true
+trim_end = 65.4367
 
 [sub_resource type="Resource" id="Resource_rhst1"]
 script = ExtResource("1_6fvma")
@@ -1353,6 +1357,7 @@ loop = true
 [sub_resource type="Resource" id="Resource_32ecx"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("24_g2ahs")
+trim_end = 16.6139
 
 [sub_resource type="Resource" id="Resource_noqya"]
 script = ExtResource("1_6fvma")

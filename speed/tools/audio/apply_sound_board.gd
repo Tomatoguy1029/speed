@@ -25,6 +25,7 @@ func _init() -> void:
 			push_error("音を読み込めません: %s %s" % [id, path])
 			quit(1)
 			return
+		entry.silent = bool(row.get("silent", false))
 		entry.volume_db = float(row.volume_db)
 		entry.pitch_min = float(row.pitch_min)
 		entry.pitch_max = maxf(float(row.pitch_min), float(row.pitch_max))

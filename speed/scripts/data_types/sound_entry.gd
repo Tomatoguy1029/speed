@@ -1,9 +1,11 @@
-## 音の表の1欄。ファイルがあればそれを、なければ合成音を鳴らし、どちらもなければ鳴らさない。
+## 音の表の1欄。ファイルがあればそれを、なければ合成音を鳴らす。音なしの欄とどちらもない欄は無音。
 ## 値の正は共有の音づけ表で、取り込みのたびに上書きされる（設計書 13）。
 @tool
 class_name SoundEntry
 extends Resource
 
+## 音なし。音や合成音を持っていても無音にする。
+@export var silent := false
 ## 鳴らす音。取り込んだ効果音は使う範囲で切り出し済み。
 @export var stream: AudioStream
 @export_range(-60.0, 12.0, 0.5, "suffix:dB") var volume_db := 0.0
@@ -31,4 +33,4 @@ extends Resource
 @export var synth_seconds := 0.0
 
 func is_synth() -> bool:
-	return stream == null and synth_wave != ""
+	return not silent and stream == null and synth_wave != ""

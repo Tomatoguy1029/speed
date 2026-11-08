@@ -4,6 +4,7 @@
 入力は音づけ表の欄（slots の文書を1欄1ファイルの JSON にしたもの）と、上げられた音（素材ID.json）。
 効果音は使う範囲で切り出して speed/assets/audio/sfx/board/<欄ID>.wav に、曲はそのまま
 speed/assets/audio/music/board/<欄ID>.<拡張子> に置く。曲の範囲とループは実行時に当てる。
+既存の素材と同じ音を切らずに使う欄は、既存の素材をそのまま参照する。
 欄の一覧を speed/scripts/data_types/sound_slots.gd に書き出し、Godot で import してから
 speed/tools/audio/apply_sound_board.gd で speed/assets/audio/sound_table.tres を上書きする。
 
@@ -105,6 +106,12 @@ def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> Non
             writer.writeframes(data)
 
 
+def uncut(d: dict) -> bool:
+    """効果音の使う範囲が音全体のままなら True。"""
+    end = number(d, "trim_end", 0.0)
+    return number(d, "trim_start", 0.0) <= 0.0005 and (end <= 0.0 or end >= number(d, "duration", 0.0) - 0.0005)
+
+
 def number(d: dict, key: str, default: float) -> float:
     value = d.get(key)
     return float(value) if isinstance(value, (int, float)) else default
@@ -118,6 +125,7 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
         row = {
             "id": sid,
             "stream": "",
+            "silent": bool(d.get("silent", False)),
             "volume_db": number(d, "volume_db", 0.0),
             "pitch_min": number(d, "pitch_min", 1.0),
             "pitch_max": number(d, "pitch_max", 1.0),
@@ -135,15 +143,20 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             if assets is None:
                 sys.exit("--assets がありません: 上げられた音のある欄があります")
             raw, suffix = unpack(find_asset(assets, asset_id))
-            if music:
+            folder = "music" if music else "sfx"
+            original = project / "assets/audio" / folder / d["repo"] if d.get("repo") else None
+            if original is not None and original.exists() and original.read_bytes() == raw and (music or uncut(d)):
+                row["stream"] = f"res://assets/audio/{folder}/{d['repo']}"
+            elif music:
                 out = project / MUSIC_BOARD / (sid + suffix)
                 out.parent.mkdir(parents=True, exist_ok=True)
                 out.write_bytes(raw)
             else:
                 out = project / SFX_BOARD / (sid + ".wav")
                 cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out)
-            kept.add(out)
-            row["stream"] = "res://" + out.relative_to(project).as_posix()
+            if not row["stream"]:
+                kept.add(out)
+                row["stream"] = "res://" + out.relative_to(project).as_posix()
         elif d.get("repo"):
             folder = "music" if music else "sfx"
             row["stream"] = f"res://assets/audio/{folder}/{d['repo']}"
