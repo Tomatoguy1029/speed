@@ -1001,7 +1001,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::GaugeFull: return false;
     case EventType::Hit: return field=="pos" || field=="crit" || field=="dmg" || field=="cause" || field=="id";
     case EventType::HullScatter: return field=="pos" || field=="count" || field=="visual_key";
-    case EventType::Hurt: return field=="pos" || field=="amount" || field=="cause" || field=="source" || field=="hp_after";
+    case EventType::Hurt: return field=="pos" || field=="amount" || field=="cause" || field=="source" || field=="hp_after" || field=="dir";
     case EventType::Kill: return field=="pos" || field=="id" || field=="r" || field=="crit" || field=="enemy_type" || field=="meteor_index" || field=="facing" || field=="elite" || field=="cause" || field=="dir" || field=="color" || field=="silent" || field=="death_visual";
     case EventType::Launch: return field=="pos" || field=="dir" || field=="gauge";
     case EventType::LevelBonus: return field=="kind" || field=="id" || field=="level" || field=="count";

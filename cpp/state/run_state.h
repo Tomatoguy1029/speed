@@ -124,6 +124,7 @@ struct RunState {
         double base_attack, atk_scale, ram_speed_ratio, crit_armor, touch_damage, contact_cooldown;
         double bounce_keep, bounce_min_speed, kill_hitstop, kill_hitstop_cap, kill_hitstop_regen;
         double hitstop_big_mult, hitstop_crit_mult, max_enemy_radius, attack_mult, crit_chance, crit_mult;
+        double hurt_hitstop;
     } combat_config{};
     bool combat_ready = false;
     double hitstop = 0, dash_stop = 0;

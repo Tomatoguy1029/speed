@@ -67,6 +67,7 @@ struct RunConfig {
     double combat_kill_hitstop{};
     double combat_kill_hitstop_cap{};
     double combat_kill_hitstop_regen{};
+    double combat_hurt_hitstop{};
     double combat_hitstop_big_mult{};
     double combat_hitstop_crit_mult{};
     double combat_max_enemy_radius{};

@@ -32,6 +32,8 @@ func handle(event: Dictionary) -> void:
 	if event.type == &"enemy_laser_fire":
 		AudioManager.play(&"enemy_laser_fire", -12.0)
 	elif event.type == &"enemy_laser_charge":
+		# 何体もが同時に溜めても、溜め音は同時に鳴らす上限までにする。
+		if _voices.size() >= AudioManager.MAX_SAME_SOUND: return
 		var stream := AudioManager.sound(&"enemy_laser_charge")
 		if stream == null: return
 		var player := AudioStreamPlayer.new()

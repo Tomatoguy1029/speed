@@ -90,6 +90,24 @@ void EventBuilder::enemy_kill(RunRuntime &run,const DeathContext &death) {
     }
     run.state.combat_events.push_back(event);
 }
+namespace {
+// 攻撃の出どころから機体へ向かう向き。出どころが分からないときは、攻撃した種類の一番近い敵から決める。
+godot::Vector2 hurt_direction(const RunRuntime &run,const ShipDamageRequest &request) {
+    const auto ship=run.state.ship.pos;godot::Vector2 origin;bool found=false;
+    if (request.has_origin) {origin=request.origin;found=true;}
+    else if (request.has_impact) {origin=request.impact;found=true;}
+    else if (request.source) {
+        double best=0;
+        for (const auto &enemy:run.state.enemies) {
+            if (!enemy.alive || enemy.dead || enemy.definition+1!=request.source) continue;
+            const double d=enemy.pos.distance_squared_to(ship);
+            if (!found || d<best) {origin=enemy.pos;best=d;found=true;}
+        }
+    }
+    if (!found || origin.distance_squared_to(ship)<1.0) return {};
+    return (ship-origin).normalized();
+}
+}
 void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &request,const ShipDamageResult &result) {
     RecordingBuilder::player_damage(run,request,result);
     const double applied=std::max(0.0,result.hp_before-result.hp_after);
@@ -98,7 +116,7 @@ void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &reques
     CombatEvent event;event.observation_id=request.observation_id;event.effect_id=request.effect_id;event.kind=CombatEventKind::ShipDamage;event.cause=request.cause;event.source=request.source;event.source_is_explicit=request.source_is_explicit;event.technique=request.technique;event.borrowed_technique=request.borrowed_technique;
     event.pos=run.state.ship.pos;event.time=run.state.time;event.world_time=run.state.world_time;event.reason=result.reason;
     event.requested=request.amount;event.resolved=result.amount;event.hp_before=result.hp_before;event.hp_after=result.hp_after;event.accepted=result.accepted;
-    if (result.accepted) {event.kind=CombatEventKind::Hurt;run.state.combat_events.push_back(event);event.kind=CombatEventKind::ShipDamage;}
+    if (result.accepted) {event.kind=CombatEventKind::Hurt;event.direction=hurt_direction(run,request);run.state.combat_events.push_back(event);event.kind=CombatEventKind::ShipDamage;event.direction={};}
     run.state.combat_events.push_back(event);
 }
 void EventBuilder::flush_combat(RunRuntime &run) {
@@ -143,7 +161,7 @@ void EventBuilder::flush_combat(RunRuntime &run) {
         case CombatEventKind::ShieldBlock:append(run,"shield_block",d);break;
         case CombatEventKind::Hurt:
             d["amount"]=e.resolved;d["cause"]=cause;d["source"]=e.cause==Cause::FinalStrike?godot::StringName("boss"):definition_name(run,e.source);d["t"]=e.time;
-            d["world_t"]=e.world_time;d["hp_after"]=e.hp_after;append(run,"hurt",d);break;
+            d["world_t"]=e.world_time;d["hp_after"]=e.hp_after;d["dir"]=e.direction;append(run,"hurt",d);break;
         case CombatEventKind::ShipDamage:
             if (e.borrowed_technique && e.borrowed_technique<=run.content->boss_techniques.size()) {
                 const auto &borrowed=run.content->boss_techniques[e.borrowed_technique-1];

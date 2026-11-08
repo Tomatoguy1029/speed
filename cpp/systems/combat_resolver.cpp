@@ -17,7 +17,30 @@
 #include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
+#include <type_traits>
+#include <variant>
 namespace speed {
+namespace {
+// 機体に最も近い線上の点。機体が線に重なるときは、弾の来た側（線の始点）を出どころにする。
+godot::Vector2 segment_origin(godot::Vector2 ship,godot::Vector2 from,godot::Vector2 to) {
+    const auto delta=to-from;const double length=delta.length_squared();
+    const auto nearest=length>0?from+delta*std::clamp(double((ship-from).dot(delta))/length,0.0,1.0):from;
+    return nearest.distance_squared_to(ship)<1.0?from:nearest;
+}
+godot::Vector2 contact_origin(const ContactShape &shape,godot::Vector2 ship) {
+    return std::visit([&](const auto &s)->godot::Vector2 {
+        using T=std::decay_t<decltype(s)>;
+        if constexpr (std::is_same_v<T,SegmentCircle> || std::is_same_v<T,SweptSegment>) return segment_origin(ship,s.from,s.to);
+        else if constexpr (std::is_same_v<T,Polyline>) {
+            if (s.points.empty()) return ship;
+            godot::Vector2 best=s.points.front();double distance=best.distance_squared_to(ship);
+            for (size_t i=1;i<s.points.size();++i) {const auto p=segment_origin(ship,s.points[i-1],s.points[i]);const double d=p.distance_squared_to(ship);if (d<distance) {best=p;distance=d;}}
+            return best;
+        } else if constexpr (std::is_same_v<T,TaperedBeam>) return s.from;
+        else return s.center;
+    },shape);
+}
+}
 double CombatResolver::attack_power(const RunRuntime &run) {
     const auto &c=run.state.combat_config;const auto &effects=run.state.loadout->effects;
     return c.base_attack*c.attack_mult*c.atk_scale*effects.burst_power*effects.damage_multiplier;
@@ -37,6 +60,7 @@ ShipContactResult CombatResolver::attack_ship_damage(RunRuntime &run,AttackHandl
     request.source_is_explicit=spec.damage_source!=0;request.source=spec.damage_source?spec.damage_source:spec.owner.source_definition;request.technique=spec.damage_technique?spec.damage_technique:spec.source_technique;
     if (spec.damage_technique && spec.damage_technique!=spec.source_technique) request.borrowed_technique=spec.source_technique;
     request.scale=policy.scale;request.hit_policy=policy.hit_policy;
+    request.origin=contact_origin(shape,run.state.ship.pos);request.has_origin=true;
     result.attempted=true;result.damage=ship_damage(run,request);
     if (policy.hit_policy==HitPolicy::MarkAfter || (policy.hit_policy==HitPolicy::MarkIfAccepted && result.damage.accepted)) AttackSystem::mark_ship_hit(run.state,handle);
     return result;
@@ -223,7 +247,11 @@ ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageReq
     }
     if (result.accepted) {state.lifecycle.last_request=request;state.lifecycle.last_damage=result;state.lifecycle.has_damage=true;}
     EventBuilder::player_damage(run,request,result);
-    if (result.accepted && result.hp_after>0) run.combat_hooks.hurt(run,request,result);
+    if (result.accepted && result.hp_after>0) {
+        // 被弾の瞬間を見せる短い停止。突進ごとの停止の上限には数えない。とどめの一撃は敗北演出が止める。
+        if (state.hitstop_enabled && state.combat_config.hurt_hitstop>0) state.hitstop=std::max(state.hitstop,state.combat_config.hurt_hitstop);
+        run.combat_hooks.hurt(run,request,result);
+    }
     return result;
 }
 }

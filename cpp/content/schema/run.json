@@ -429,6 +429,13 @@
           "config": "kill_hitstop_regen"
         },
         {
+          "name": "combat_hurt_hitstop",
+          "type": "f64",
+          "min": 0,
+          "runtime": "combat_config.hurt_hitstop",
+          "config": "hurt_hitstop"
+        },
+        {
           "name": "combat_hitstop_big_mult",
           "type": "f64",
           "min": 0,
@@ -2600,7 +2607,8 @@
       "amount",
       "cause",
       "source",
-      "hp_after"
+      "hp_after",
+      "dir"
     ],
     "kill": [
       "pos",
