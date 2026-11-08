@@ -30,16 +30,16 @@ func handle(event: Dictionary) -> void:
 	var id := int(event.id)
 	stop(id)
 	if event.type == &"enemy_laser_fire":
-		AudioManager.play(&"enemy_laser_fire", -12.0)
+		AudioManager.play(&"enemy.beamer.fire")
 	elif event.type == &"enemy_laser_charge":
 		# 何体もが同時に溜めても、溜め音は同時に鳴らす上限までにする。
 		if _voices.size() >= AudioManager.MAX_SAME_SOUND: return
-		var stream := AudioManager.sound(&"enemy_laser_charge")
+		var stream := AudioManager.sound(&"enemy.beamer.charge")
 		if stream == null: return
 		var player := AudioStreamPlayer.new()
 		player.stream = stream
 		player.bus = &"SFX"
-		player.volume_db = -16.0
+		player.volume_db = float(AudioManager.settings(&"enemy.beamer.charge").get("volume_db", 0.0))
 		add_child(player)
 		_voices[id] = {"row": int(event.row), "player": player}
 		player.play()

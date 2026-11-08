@@ -4,7 +4,7 @@ var failed := 0
 
 class SilentAudio:
 	extends "res://scripts/managers/audio_manager.gd"
-	func play(_name: StringName, _volume_db := 0.0, _pitch := 1.0) -> void:
+	func play(_id: StringName, _pitch_scale := 1.0) -> void:
 		pass
 
 func check(ok: bool, label: String) -> void:

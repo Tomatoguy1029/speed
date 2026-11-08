@@ -5,19 +5,21 @@ var sustain: AudioStreamPlayer
 var release: AudioStreamPlayer
 var ending := false
 var _fade_done := true
-func start(sounds: Dictionary, volume_db: float, pitch: float) -> void:
-	attack = _player(sounds[&"dash"], volume_db, pitch)
-	sustain = _player(sounds[&"dash_loop"], volume_db, pitch)
-	release = _player(sounds[&"dash_end"], volume_db, pitch)
+## voices は開始・移動中・終了の順に {stream, volume_db, pitch}。開始音がなければすぐ移動中の音にする。
+func start(voices: Array[Dictionary]) -> void:
+	attack = _player(voices[0])
+	sustain = _player(voices[1])
+	release = _player(voices[2])
 	attack.finished.connect(_attack_finished)
 	release.finished.connect(_collect)
-	attack.play()
-func _player(stream: AudioStream, volume: float, pitch: float) -> AudioStreamPlayer:
+	if attack.stream == null: _attack_finished()
+	else: attack.play()
+func _player(voice: Dictionary) -> AudioStreamPlayer:
 	var player := AudioStreamPlayer.new()
 	player.bus = &"Dash"
-	player.stream = stream
-	player.volume_db = volume
-	player.pitch_scale = pitch
+	player.stream = voice.stream
+	player.volume_db = voice.volume_db
+	player.pitch_scale = voice.pitch
 	add_child(player)
 	return player
 func finish() -> void:

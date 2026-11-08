@@ -21,8 +21,8 @@ func _ready() -> void:
 	%Scroll.visible = cleared
 	if cleared:
 		_show_modules(result)
-	%RetryButton.pressed.connect(func(): AudioManager.play(&"ui"); GameManager.retry_run())
-	%MenuButton.pressed.connect(func(): AudioManager.play(&"ui"); GameManager.reset_to_main_menu())
+	%RetryButton.pressed.connect(func(): AudioManager.play(&"ui.common.confirm"); GameManager.retry_run())
+	%MenuButton.pressed.connect(func(): AudioManager.play(&"ui.common.confirm"); GameManager.reset_to_main_menu())
 	resized.connect(_fit_canvas)
 	_fit_canvas()
 	super()

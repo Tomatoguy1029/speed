@@ -195,7 +195,7 @@ static func _build_units(force: bool, output: String) -> Error:
 		["catalog",["res://data/","res://scripts/data_types/","res://scripts/render/","res://scenes/attacks/","res://assets/","res://shaders/","res://tools/content/build_catalog.gd","res://tools/content/build_stage_resources.gd"],func():
 			var path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
 			return _result(load("res://tools/content/build_catalog.gd").build(path),PackedStringArray([path]))],
-		["audio",["res://assets/audio/","res://tools/content/build_audio.gd","res://scripts/data_types/audio_bank.gd"],func(): return _result(load("res://tools/content/build_audio.gd").build(output.path_join("audio.res")),PackedStringArray([output.path_join("audio.res")]))],
+		["audio",["res://assets/audio/","res://tools/content/build_audio.gd","res://scripts/data_types/audio_bank.gd","res://scripts/data_types/sound_entry.gd","res://scripts/data_types/sound_table.gd","res://scripts/data_types/sound_slots.gd"],func(): return _result(load("res://tools/content/build_audio.gd").build(output.path_join("audio.res")),PackedStringArray([output.path_join("audio.res")]))],
 		["probe",["res://data/config.tres","res://data/enemies/drifter.tres","res://data/weapons/W01_forward.tres","res://scripts/data_types/","res://tools/content/build_native_data.gd"],func(): return _result(load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json")),PackedStringArray([output.path_join("dev/native_probe.json")]))]]
 	for unit: Array in units:
 		var inputs := _select(files,unit[1])

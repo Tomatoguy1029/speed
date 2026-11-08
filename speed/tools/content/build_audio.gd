@@ -1,56 +1,51 @@
-## 納品音声と仮の合成音を制作工程で音声バンクへまとめる。
+## 音の表（assets/audio/sound_table.tres）を制作工程で音声バンクへまとめる。
+## 素材のない欄は合成音を作り、ループする欄は繰り返す設定にする。
 @tool
 extends RefCounted
 const SAMPLE_RATE := 22050
+const TABLE := "res://assets/audio/sound_table.tres"
+const SLOTS = preload("res://scripts/data_types/sound_slots.gd")
 
 static func build(output: String) -> Error:
+	var table := ResourceLoader.load(TABLE, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as SoundTable
+	if table == null:
+		push_error("音の表を読み込めません: " + TABLE)
+		return ERR_CANT_OPEN
 	var bank := AudioBank.new()
-	var _sounds := bank.sounds
-	_sounds[&"hit"] = _tone(520.0, 260.0, 0.06, "square")
-	_sounds[&"kill"] = load("res://assets/audio/sfx/khoamthanh-punch-sound-effect-7ehhx2evi5k-500092.mp3")
-	_sounds[&"block"] = _tone(180.0, 140.0, 0.08, "square")
-	_sounds[&"bounce"] = load("res://assets/audio/sfx/bounce_robot.mp3")
-	_sounds[&"hurt"] = load("res://assets/audio/sfx/hurt_robot.mp3")
-	var heartbeat := load("res://assets/audio/sfx/shidenbeatsmusic-heartbeat-sound-effect-111218.mp3").duplicate() as AudioStreamMP3
-	heartbeat.loop = true
-	_sounds[&"heartbeat"] = heartbeat
-	_sounds[&"levelup"] = _tone(440.0, 880.0, 0.25, "sine")
-	_sounds[&"levelup_notice"] = load("res://assets/audio/sfx/levelup_notice.mp3")
-	_sounds[&"pickup"] = _tone(880.0, 1200.0, 0.05, "sine")
-	_sounds[&"dash"] = load("res://assets/audio/sfx/dash_start.wav")
-	var sustain := load("res://assets/audio/sfx/dash_loop.wav").duplicate() as AudioStreamWAV
-	sustain.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	sustain.loop_begin = 0
-	sustain.loop_end = int(sustain.data.size() / (4 if sustain.stereo else 2))
-	_sounds[&"dash_loop"] = sustain
-	_sounds[&"dash_end"] = load("res://assets/audio/sfx/dash_end.wav")
-	_sounds[&"shoot"] = _tone(700.0, 500.0, 0.04, "square")
-	_sounds[&"blaster"] = load("res://assets/audio/sfx/blaster_shot.wav")
-	_sounds[&"contact_arc"] = load("res://assets/audio/sfx/contact_arc.mp3")
-	_sounds[&"bomber_explode"] = load("res://assets/audio/sfx/bomber_explode.wav")
-	_sounds[&"enemy_laser_charge"] = load("res://assets/audio/sfx/enemy_laser_charge.mp3")
-	_sounds[&"enemy_laser_fire"] = load("res://assets/audio/sfx/enemy_laser_fire.mp3")
-	_sounds[&"roar"] = _tone(90.0,38.0,1.0,"saw")
-	_sounds[&"boom"] = _tone(120.0, 30.0, 0.5, "noise")
-	_sounds[&"menu_open"] = load("res://assets/audio/sfx/menu_open.mp3")
-	_sounds[&"upgrade_apply"] = load("res://assets/audio/sfx/upgrade_apply.mp3")
-	_sounds[&"ui"] = load("res://assets/audio/sfx/ui_confirm.mp3")
-	_sounds[&"stage_select_click"] = load("res://assets/audio/sfx/stage_select_click.mp3")
-
-	for name in _sounds:
-		if _sounds[name] == null:
-			push_error("音源を読み込めません: %s" % name)
-			return ERR_CANT_OPEN
-	for entry in [[&"battle", "kulakovka-space-283176.mp3"], [&"boss", "nastelbom-war-391660.mp3"], [&"menu", "leberch-space-ambient-509783.mp3"],
-		[&"stage_select", "atlasaudio-space-music-625739.mp3"],
-		[&"game_over", "luminewave-i-know-this-is-the-end-short-version-621150.mp3"]]:
-		var song := load("res://assets/audio/music/" + entry[1]) as AudioStreamMP3
-		if song == null: return ERR_CANT_OPEN
-		song = song.duplicate() as AudioStreamMP3
-		song.loop = entry[0] != &"game_over"
-		if entry[0] == &"stage_select": song.loop_offset = 26.0
-		bank.music[entry[0]] = song
+	for row: Array in SLOTS.ROWS:
+		var id := StringName(row[0])
+		var music: bool = row[4] == "music"
+		var entry := table.entry(id)
+		if entry == null: entry = SoundEntry.new()
+		bank.params[id] = {"volume_db": entry.volume_db, "pitch_min": entry.pitch_min, "pitch_max": maxf(entry.pitch_min, entry.pitch_max),
+			"max_voices": entry.max_voices, "loop": entry.loop, "trim_start": entry.trim_start, "trim_end": entry.trim_end, "loop_start": entry.loop_start}
+		var stream := _stream(entry, music)
+		if stream == null: continue
+		if music: bank.music[id] = stream
+		else: bank.sounds[id] = stream
 	return ResourceSaver.save(bank, output)
+
+## 素材を繰り返しの設定つきで複製する。素材がなければ合成音、それもなければ null。
+static func _stream(entry: SoundEntry, music: bool) -> AudioStream:
+	if entry.stream == null:
+		if entry.synth_wave == "" or entry.synth_seconds <= 0.0: return null
+		return _looped(_tone(entry.synth_from_hz, entry.synth_to_hz, entry.synth_seconds, entry.synth_wave), entry.loop, 0.0)
+	return _looped(entry.stream.duplicate(), entry.loop, entry.loop_start if music else 0.0)
+
+static func _looped(stream: AudioStream, loop: bool, loop_start: float) -> AudioStream:
+	if stream is AudioStreamWAV:
+		var wav := stream as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
+		if loop:
+			wav.loop_begin = int(loop_start * wav.mix_rate)
+			wav.loop_end = int(wav.get_length() * wav.mix_rate)
+	elif stream is AudioStreamMP3:
+		stream.loop = loop
+		stream.loop_offset = loop_start
+	elif stream is AudioStreamOggVorbis:
+		stream.loop = loop
+		stream.loop_offset = loop_start
+	return stream
 
 static func _tone(f0: float, f1: float, length: float, wave: String) -> AudioStreamWAV:
 	var n := int(SAMPLE_RATE * length)

@@ -26,5 +26,5 @@ func _ready() -> void:
 	super()
 
 func _start(stage: int) -> void:
-	AudioManager.play(&"ui")
+	AudioManager.play(&"ui.common.confirm")
 	GameManager.start_run(stage)

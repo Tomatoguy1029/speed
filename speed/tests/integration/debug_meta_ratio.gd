@@ -83,7 +83,7 @@ func _test_upgrade_screen() -> void:
 		await get_tree().create_timer(1.0).timeout
 		var screen: Control = app._current
 		check(screen.get_script().resource_path == "res://scripts/ui/upgrade_screen.gd", "機体強化画面へ遷移する")
-		check(AudioManager._music_track == &"menu" and AudioManager._music_player.playing, "機体強化画面でメニューBGMを流す")
+		check(AudioManager._music_track == &"music.menu" and AudioManager._music_player.playing, "機体強化画面でメニューBGMを流す")
 		screen.find_child("Part_speed", true, false).pressed.emit()
 		check(screen._information.text.contains("2 / 5"), "購入画面はデバッグの4段でなく保存された2段を表示する")
 		check(screen._price.text.contains("90"), "保存された次の段の費用を表示する")
@@ -119,7 +119,7 @@ func _test_debug_upgrade_controls(screen: Control) -> void:
 	screen._buy()
 	check(SaveManager.meta_level(&"atk") == level + 1 and SaveManager.coins() == 0, "無限中は部品を消費しない")
 	var voice: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
-	check(is_equal_approx(db_to_linear(voice.volume_db), 0.5), "機体強化の確定音を半分にする")
+	check(voice.get_meta(&"sound_name") == &"ui.menu.upgrade_buy" and is_equal_approx(voice.volume_db, float(AudioManager.settings(&"ui.menu.upgrade_buy").volume_db)), "機体強化の確定音を音の表の音量で鳴らす")
 	var maximum: int = ContentManager.catalog.find(&"meta_upgrades", &"atk").costs.size()
 	for i in maximum: screen._buy()
 	check(SaveManager.meta_level(&"atk") == maximum, "無限中も最大段階を超えない")

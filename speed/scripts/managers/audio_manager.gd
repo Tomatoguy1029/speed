@@ -1,33 +1,97 @@
 ## 音。Autoload（設計書 4.3・13）。
 ##
+## 鳴らす音と鳴らし方（音量・ピッチ・同時に鳴らす数・ループ）は音の表の欄ごとに決まる（仕様書 18）。
+## 呼び出し側は欄ID（例: weapon.blaster.fire）だけを渡す。音のない欄は何も鳴らさない。
 ## ダッシュは専用バスでスロー減衰を除外し、音量と消音は設定（SaveManager）に従う。
-## 制作工程でまとめた納品音声と短い仮の合成音を読む（仕様書 18）。
-## 通常効果音は再生口を使い回し、ダッシュとBGMは専用の再生口を持つ。
+## 通常効果音は再生口を使い回し、ダッシュ・ループ・BGMは専用の再生口を持つ。
 extends Node
 
 const MAX_VOICES := 12
-## 同じ効果音を同時に鳴らす数の上限。超えたら一番古い音を止めて新しい音に入れ替える。
+## 同じ効果音を同時に鳴らす数の標準。欄の max_voices が0のときに使う。超えたら一番古い音を止めて入れ替える。
 const MAX_SAME_SOUND := 2
 ## 同じ効果音がこの時間（ミリ秒）より近く続けて来たら、1つの音にまとめる。
 const SAME_SOUND_MERGE_MS := 50
-const MENU_RESUME_TRACKS := [&"menu", &"stage_select"]
+const MENU_RESUME_TRACKS := [&"music.menu", &"music.stage_select"]
 const MENU_RESUME_WINDOW_MS := 10000
 const DASH_VOICE = preload("res://scripts/managers/dash_audio_voice.gd")
-## 被弾音の素材は大きいので、基本の音量から下げて鳴らす。
-const HURT_TRIM_DB := 6.0
-## 心音の素材で、最初の拍が鳴る位置と拍の間隔（秒）。
+const DASH_SOUNDS := [&"ship.boost.dash", &"ship.boost.dash_loop", &"ship.boost.dash_end"]
+const HEARTBEAT := &"ship.combat.low_hp"
+## 心音の素材で、最初の拍が鳴る位置と拍の間隔（秒）。心音の素材を替えたら合わせる。
 const HEARTBEAT_FIRST_BEAT := 0.24
 const HEARTBEAT_PERIOD := 1.125
-const HEARTBEAT_DB := -6.0
+## C++ のイベント → 鳴らす欄。中身で鳴らす欄が変わるイベントは _event_sound で選ぶ。
+const EVENT_SOUNDS := {
+	&"levelup": &"growth.level.levelup_notice",
+	&"hurt": &"ship.combat.hurt",
+	&"block_impact": &"ship.combat.bounce",
+	&"critical_hit": &"ship.combat.critical",
+	&"draw_start": &"ship.boost.draw_start",
+	&"gauge_full": &"ship.boost.gauge_full",
+	&"xp_gold_roll": &"growth.level.gold_roll",
+	&"gem_burst": &"growth.level.gem_burst",
+	&"strong_spawn": &"elite.common.spawn",
+	&"boss_spawn": &"boss.common.warning",
+	&"boss_phase": &"boss.common.phase",
+	&"boss_explode": &"boss.common.explode",
+	&"time_limit_reached": &"field.stage.time_limit",
+	&"wave": &"field.stage.wave",
+	&"rock_break": &"field.rock.break",
+	&"clear_banner": &"scene.boss_finish.clear",
+	&"ship_explode": &"scene.defeat.explode",
+	&"space_quake": &"weapon.space_quake.spawn",
+	&"sonic_impact": &"weapon.sonic_boom.impact",
+	&"bolt": &"weapon.arc_field.discharge",
+	&"slash_mark": &"weapon.flash_slash.mark",
+	&"slash_release": &"weapon.flash_slash.start",
+	&"flash_slash": &"weapon.flash_slash.slash",
+	&"escort_deploy": &"weapon.escort_wing.deploy",
+	&"escort_slash": &"weapon.escort_wing.slash",
+	&"anchor_capture": &"weapon.anchor.capture",
+	&"anchor_fire": &"weapon.anchor.fire",
+	&"bipolar_charge": &"weapon.bipolar.charge",
+	&"barrier_hit": &"weapon.barrier.block",
+	&"barrier_restore": &"weapon.barrier.restore",
+	&"chain_shock": &"trait.chain_shock.wave",
+	&"critical_lance": &"trait.critical_lance.launch",
+	&"critical_lance_hit": &"trait.critical_lance.hit",
+	&"run_up_hit": &"trait.run_up.hit",
+	&"end_hole": &"trait.end_hole.spawn",
+	&"hole_recover": &"trait.end_hole.heal",
+	&"duplicate": &"trait.duplicator.copy",
+	&"full_burst_ready": &"trait.full_burst.ready",
+	&"bomber_explode": &"enemy.bomber.explode",
+	&"shield_block": &"elite.shield.block",
+	&"shield_reflect": &"elite.shield.reflect",
+	&"shield_stolen": &"elite.shield.stolen",
+	&"telescope_charge": &"elite.telescope.charge",
+	&"telescope_fire": &"elite.telescope.fire",
+	&"cepheus_summon": &"elite.cepheus.summon",
+	&"ruler_split": &"elite.ruler.split",
+	&"landmark": &"hero.find.landmark_take",
+	&"hero_discovered": &"hero.find.discover",
+	&"hero_link": &"hero.find.link",
+	&"hero_freed": &"hero.find.free",
+	&"hero_power_end": &"hero.ult.end",
+	&"meteor_impact": &"hero.hercules.impact",
+}
+## 中身で鳴らす欄を選ぶイベント。EVENT_SOUNDS と合わせて購読する。
+const EVENT_SPECIAL := [&"kill", &"weapon_fire", &"launch", &"trace_end", &"game_over", &"pickup", &"xp_collect", &"explode", &"shoot", &"hero_power"]
+const PICKUP_SOUNDS := {&"heal": &"field.repair.pick", &"magnet": &"field.beacon.pick", &"comet_weapon": &"weapon.get.capsule_pick"}
+const EXPLODE_SOUNDS := {"endBlast": &"weapon.end_blast.blast", "mine": &"weapon.mine.blast", "runUp": &"trait.run_up.area", "pump_burst": &"elite.pump.release"}
+const HERO_SOUNDS := {"leo": &"hero.leo.transform", "perseus": &"hero.perseus.cast", "gemini": &"hero.gemini.split", "hercules": &"hero.hercules.cast"}
+const XP_RANK := {"low": 0, "mid": 1, "high": 2}
+
 var _dash_voice: Node
 var _heartbeat_player: AudioStreamPlayer
 var _heartbeat_fade: Tween
-
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
 var _sounds: Dictionary = {}
-var _missing_sounds: Dictionary = {}
 var _music: Dictionary = {}
+var _params: Dictionary = {}
+var _unknown: Dictionary = {}
+## start_loop のキー → 鳴らしている再生口。
+var _loops: Dictionary = {}
 var _music_player: AudioStreamPlayer
 var _music_track: StringName = &""
 ## フェード待ちの要求と、再生口が実際に鳴らしている曲を区別する。
@@ -70,6 +134,7 @@ func _exit_tree() -> void:
 		player.stop()
 		player.stream = null
 	_menu_music_positions.clear()
+	_loops.clear()
 	_sounds.clear()
 	_music.clear()
 	# stop()は次の音声ミックスで再生参照を解放する。終了処理が先に
@@ -82,6 +147,15 @@ func _exit_tree() -> void:
 		if sampled_at - since_mix > stopped_at: break
 		OS.delay_usec(1000)
 
+## 曲の終わりを決めた欄は、そこでループの戻り先へ戻すか止める。
+func _process(_delta: float) -> void:
+	if _playing_music_track == &"" or not _music_player.playing: return
+	var p := settings(_playing_music_track)
+	var end: float = p.get("trim_end", 0.0)
+	if end <= 0.0 or _music_player.get_playback_position() < end: return
+	if p.get("loop", false): _music_player.seek(float(p.get("loop_start", 0.0)))
+	else: _music_player.stop()
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"mute"):
 		toggle_mute()
@@ -89,77 +163,112 @@ func _unhandled_input(event: InputEvent) -> void:
 func toggle_mute() -> void:
 	SaveManager.set_setting("muted", not bool(SaveManager.settings.muted))
 
-## 効果音を鳴らす。名前は制作工程の build_audio.gd の一覧。
-func sound(name: StringName) -> AudioStream:
-	return _sounds.get(name)
+## 欄の音。音のない欄は null。
+func sound(id: StringName) -> AudioStream:
+	return _sounds.get(id)
 
-func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
-	if name == &"dash":
-		start_dash(volume_db, pitch)
+## 欄の鳴らし方。音の表にない欄は空。
+func settings(id: StringName) -> Dictionary:
+	if not _params.has(id): _reload_bank()
+	if not _params.has(id) and not _unknown.has(id):
+		_unknown[id] = true
+		push_error("音の表にない欄です: %s" % id)
+	return _params.get(id, {})
+
+## 欄のピッチを最小〜最大から選び、呼び出し側の倍率を掛ける。
+func pitch(id: StringName, scale := 1.0) -> float:
+	var p := settings(id)
+	return randf_range(float(p.get("pitch_min", 1.0)), float(p.get("pitch_max", 1.0))) * scale
+
+## 効果音を1回鳴らす。pitch_scale は欄のピッチに掛ける倍率（段階で音を上げる演出など）。
+func play(id: StringName, pitch_scale := 1.0) -> void:
+	if id == DASH_SOUNDS[0]:
+		start_dash()
 		return
-	if not _sounds.has(name) and not _missing_sounds.has(name):
-		# 開発中に生成済みバンクが更新されても、既存の再生口の音は止めない。
-		_reload_bank()
-		if not _sounds.has(name):
-			_missing_sounds[name] = true
-			push_error("音声バンクに効果音がありません: %s" % name)
-	var stream: AudioStream = _sounds.get(name)
-	if stream == null:
-		return
+	var p := settings(id)
+	var stream: AudioStream = _sounds.get(id)
+	if stream == null: return
 	# 同じ瞬間の音は1つにまとめ、ずれて来た音は必ず鳴らす。重なりは上限までにして、古い音から入れ替える。
 	var now := Time.get_ticks_msec()
 	var same: Array[AudioStreamPlayer] = []
 	for player in _players:
-		if player.playing and player.get_meta(&"sound_name", &"") == name:
+		if player.playing and player.get_meta(&"sound_name", &"") == id:
 			if now - int(player.get_meta(&"started_at", 0)) < SAME_SOUND_MERGE_MS: return
 			same.append(player)
-	var p: AudioStreamPlayer
-	if same.size() >= MAX_SAME_SOUND:
+	var limit: int = p.get("max_voices", 0)
+	if limit <= 0: limit = MAX_SAME_SOUND
+	var player: AudioStreamPlayer
+	if same.size() >= limit:
 		same.sort_custom(func(a: AudioStreamPlayer, b: AudioStreamPlayer): return int(a.get_meta(&"started_at", 0)) < int(b.get_meta(&"started_at", 0)))
-		p = same[0]
-		p.stop()
+		player = same[0]
+		player.stop()
 	else:
-		p = _players[_next]
+		player = _players[_next]
 		_next = (_next + 1) % MAX_VOICES
-	p.set_meta(&"sound_name", name)
-	p.set_meta(&"started_at", now)
-	p.stream = stream
-	p.volume_db = volume_db - HURT_TRIM_DB if name == &"hurt" else volume_db
-	p.pitch_scale = pitch
-	p.play()
+	player.set_meta(&"sound_name", id)
+	player.set_meta(&"started_at", now)
+	player.stream = stream
+	player.volume_db = float(p.get("volume_db", 0.0))
+	player.pitch_scale = pitch(id, pitch_scale)
+	player.play()
+
+## ループする欄を key ごとに鳴らし続ける。同じ key で呼び直しても鳴らし直さない。
+func start_loop(id: StringName, key: Variant = null) -> void:
+	var k: Variant = id if key == null else key
+	if _loops.has(k) and is_instance_valid(_loops[k]): return
+	var stream: AudioStream = _sounds.get(id)
+	var p := settings(id)
+	if stream == null: return
+	var player := AudioStreamPlayer.new()
+	player.bus = &"SFX"
+	player.stream = stream
+	player.volume_db = float(p.get("volume_db", 0.0))
+	player.pitch_scale = pitch(id)
+	add_child(player)
+	player.play()
+	_loops[k] = player
+
+## start_loop で鳴らした音を短くフェードして止める。
+func stop_loop(id: StringName, key: Variant = null, fade_seconds := 0.15) -> void:
+	var k: Variant = id if key == null else key
+	var player: AudioStreamPlayer = _loops.get(k)
+	_loops.erase(k)
+	if not is_instance_valid(player): return
+	var tween := create_tween().set_ignore_time_scale(true)
+	tween.tween_property(player, "volume_db", -60.0, fade_seconds)
+	tween.tween_callback(player.queue_free)
 
 func _reload_bank() -> void:
 	var bank := ResourceLoader.load("res://.content/audio.res", "", ResourceLoader.CACHE_MODE_IGNORE) as AudioBank
 	if bank != null:
 		_sounds = bank.sounds.duplicate()
 		_music = bank.music.duplicate()
+		_params = bank.params.duplicate()
 
-## 単一のBGM再生口。切り替え中の再要求や画面退出は古いTweenを取り消す。
-func play_music(name: StringName, fade_seconds := 1.0, owner: Node = null) -> void:
-	if name == _music_track:
+## 単一のBGM再生口。切り替え中の再要求や画面退出は古いTweenを取り消す。曲のない欄では今の曲を続ける。
+func play_music(id: StringName, fade_seconds := 1.0, owner: Node = null) -> void:
+	if id == _music_track:
 		_music_owner = owner
 		return
-	if not _music.has(name): _reload_bank()
-	var song := _music.get(name) as AudioStream
-	if song == null:
-		push_error("音声バンクにBGMがありません: %s" % name)
-		return
+	var p := settings(id)
+	var song := _music.get(id) as AudioStream
+	if song == null: return
 	var requested_at := Time.get_ticks_msec()
-	var gain := 1.0 / 3.0 if name in [&"battle", &"boss"] else 1.0
+	var gain := db_to_linear(float(p.get("volume_db", 0.0)))
 	_music_request += 1
 	var request := _music_request
-	_music_track = name
+	_music_track = id
 	_music_owner = owner
 	if _music_fade != null: _music_fade.kill()
 	_music_fade = create_tween()
 	# まだ元のメニュー曲のフェードアウト中なら、止めずに音量だけ戻す。
-	if name in MENU_RESUME_TRACKS and name == _playing_music_track and _music_player.playing and _music_player.stream == song:
+	if id in MENU_RESUME_TRACKS and id == _playing_music_track and _music_player.playing and _music_player.stream == song:
 		_music_departed_at = -1
 		_music_fade.tween_property(_music_player, "volume_linear", gain, minf(fade_seconds, 0.6))
 		return
 	if _music_player.playing and _music_departed_at < 0:
 		_music_departed_at = requested_at
-	var start := _music_start_position(name, song, requested_at)
+	var start := _music_start_position(id, song, requested_at)
 	if _music_player.playing and fade_seconds > 0.0:
 		_music_fade.tween_property(_music_player, "volume_linear", 0.0, fade_seconds)
 	_music_fade.tween_callback(func():
@@ -167,11 +276,11 @@ func play_music(name: StringName, fade_seconds := 1.0, owner: Node = null) -> vo
 		_remember_menu_music()
 		_music_player.stop()
 		_music_player.stream = song
-		_playing_music_track = name
+		_playing_music_track = id
 		_music_departed_at = -1
 		_music_player.volume_linear = 0.0 if fade_seconds > 0.0 else gain
 		_music_player.play(start)
-		_menu_music_positions.erase(name))
+		_menu_music_positions.erase(id))
 	_music_fade.tween_property(_music_player, "volume_linear", gain, minf(fade_seconds, 0.6))
 
 ## 離脱要求の実時刻と、フェード後に実際に止めた位置を曲ごとに保持する。
@@ -181,18 +290,22 @@ func _remember_menu_music() -> void:
 		"position": _music_player.get_playback_position(),
 		"left_at": _music_departed_at if _music_departed_at >= 0 else Time.get_ticks_msec()}
 
-func _music_start_position(name: StringName, song: AudioStream, requested_at: int) -> float:
-	var beginning: float = song.loop_offset if song is AudioStreamMP3 else 0.0
-	if name not in MENU_RESUME_TRACKS: return beginning
-	var saved: Dictionary = _menu_music_positions.get(name, {})
+## 曲の始め（欄の trim_start）から鳴らす。メニュー曲は離れてすぐ戻ったら止めた位置から続ける。
+func _music_start_position(id: StringName, song: AudioStream, requested_at: int) -> float:
+	var p := settings(id)
+	var first := float(p.get("trim_start", 0.0))
+	if id not in MENU_RESUME_TRACKS: return first
+	var saved: Dictionary = _menu_music_positions.get(id, {})
 	if saved.is_empty() or saved.stream != song or requested_at - int(saved.left_at) > MENU_RESUME_WINDOW_MS:
-		return beginning
+		return first
 	var position := float(saved.position)
-	var length := song.get_length()
-	if not is_finite(position) or position < beginning or length <= beginning: return beginning
-	if song is AudioStreamMP3 and song.loop:
-		return beginning + fmod(position - beginning, length - beginning)
-	return position if position < length else beginning
+	var end := song.get_length()
+	var trim_end := float(p.get("trim_end", 0.0))
+	if trim_end > 0.0 and trim_end < end: end = trim_end
+	var loop_from := float(p.get("loop_start", first)) if p.get("loop", false) else first
+	if not is_finite(position) or position < first or end <= loop_from: return first
+	if position < end: return position
+	return loop_from + fmod(position - loop_from, end - loop_from) if p.get("loop", false) else first
 
 func stop_music(owner: Node = null) -> void:
 	if owner != null and _music_owner != owner: return
@@ -208,31 +321,48 @@ func stop_music(owner: Node = null) -> void:
 	_music_player.stop()
 	_music_player.stream = null
 
-## 開始・移動中・終了音を専用の再生口へ渡す。
-func start_dash(volume_db := -6.0, pitch := 1.0) -> void:
-	if not _sounds.has(&"dash_loop") or not _sounds.has(&"dash_end"): return
+## 開始・移動中・終了音を専用の再生口へ渡す。ループと終了の音がなければ開始音だけ鳴らす。
+func start_dash() -> void:
+	var start: AudioStream = _sounds.get(DASH_SOUNDS[0])
+	if _sounds.get(DASH_SOUNDS[1]) == null or _sounds.get(DASH_SOUNDS[2]) == null:
+		if start != null:
+			end_dash()
+			_play_stream_once(DASH_SOUNDS[0])
+		return
 	end_dash()
 	_dash_voice = DASH_VOICE.new()
 	add_child(_dash_voice)
-	_dash_voice.start(_sounds, volume_db, pitch)
+	var voices: Array[Dictionary] = []
+	for id: StringName in DASH_SOUNDS:
+		voices.append({"stream": _sounds.get(id), "volume_db": float(settings(id).get("volume_db", 0.0)), "pitch": pitch(id)})
+	_dash_voice.start(voices)
 func end_dash() -> void:
 	if is_instance_valid(_dash_voice): _dash_voice.finish()
 	_dash_voice = null
 
-## ユーザー設定を保ったまま、BGM・効果音をまとめて減衰する。
+func _play_stream_once(id: StringName) -> void:
+	var player := AudioStreamPlayer.new()
+	player.bus = &"Dash"
+	player.stream = _sounds.get(id)
+	player.volume_db = float(settings(id).get("volume_db", 0.0))
+	player.pitch_scale = pitch(id)
+	player.finished.connect(player.queue_free)
+	add_child(player)
+	player.play()
+
 ## HPが少ない間だけ心音をループで鳴らす。止めるときは短くフェードする。
 func set_heartbeat(active: bool) -> void:
 	if active == (_heartbeat_player.playing and _heartbeat_player.has_meta(&"active")): return
 	if _heartbeat_fade != null: _heartbeat_fade.kill()
 	if active:
-		var stream: AudioStream = _sounds.get(&"heartbeat")
+		var stream: AudioStream = _sounds.get(HEARTBEAT)
 		if stream == null:
 			_reload_bank()
-			stream = _sounds.get(&"heartbeat")
+			stream = _sounds.get(HEARTBEAT)
 		if stream == null: return
 		_heartbeat_player.set_meta(&"active", true)
 		_heartbeat_player.stream = stream
-		_heartbeat_player.volume_db = HEARTBEAT_DB
+		_heartbeat_player.volume_db = float(settings(HEARTBEAT).get("volume_db", 0.0))
 		_heartbeat_player.play()
 		return
 	_heartbeat_player.remove_meta(&"active")
@@ -247,6 +377,7 @@ func heartbeat_phase() -> float:
 	var position := _heartbeat_player.get_playback_position() + AudioServer.get_time_since_last_mix() - AudioServer.get_output_latency()
 	return fposmod(position - HEARTBEAT_FIRST_BEAT, HEARTBEAT_PERIOD) / HEARTBEAT_PERIOD
 
+## ユーザー設定を保ったまま、BGM・効果音をまとめて減衰する。
 func set_slow_motion(enabled: bool) -> void:
 	if _slow_motion == enabled: return
 	_slow_motion = enabled
@@ -282,26 +413,41 @@ func _ensure_bus(bus: StringName) -> void:
 	AudioServer.set_bus_name(idx, bus)
 	AudioServer.set_bus_send(idx, &"Master")
 
+## 戦闘の音を鳴らすために購読するイベント。
+func event_types() -> Array:
+	return EVENT_SOUNDS.keys() + EVENT_SPECIAL
+
 ## C++側の通知を読むだけで、戦闘の更新や乱数には触れない。
 func consume_cpp_frame(frame: Dictionary) -> bool:
 	for event: Dictionary in frame.events:
 		var data: Dictionary = event.payload
-		match event.type:
-			&"levelup": play(&"levelup_notice",-6.0)
+		var type := StringName(event.type)
+		if EVENT_SOUNDS.has(type):
+			play(EVENT_SOUNDS[type])
+			continue
+		match type:
 			&"kill":
-				if not data.get("silent",false): play(&"kill",-10.0,randf_range(0.9,1.2))
-			&"hurt": play(&"hurt",-4.0)
+				if not data.get("silent", false): play(&"ship.combat.kill")
 			&"weapon_fire":
-				if data.id in [&"W01",&"W23"]: play(&"blaster",-12.0)
-			&"launch": play(&"dash",-6.0)
+				if data.get("id") in [&"W01", &"W23"]: play(&"weapon.blaster.fire")
+			&"launch": start_dash()
 			&"trace_end": end_dash()
 			&"game_over":
 				end_dash()
-				play_music(&"game_over",1.0,self)
-			&"block_impact": play(&"bounce",-8.0)
-			&"shield_reflect": play(&"block",-10.0,1.8)
-			&"shield_stolen": play(&"pickup",-5.0,0.7)
-			&"shield_block": play(&"block",-10.0,1.3)
-			&"boss_explode": play(&"boom")
-			&"bomber_explode": play(&"bomber_explode",-12.0)
+				play_music(&"music.game_over", 1.0, self)
+			&"pickup":
+				var id: StringName = PICKUP_SOUNDS.get(StringName(data.get("kind", &"")), &"")
+				if id != &"": play(id)
+			&"xp_collect":
+				var rank := -1
+				for gem: Dictionary in data.get("gems", []): rank = maxi(rank, int(XP_RANK.get(String(gem.get("kind", "")), 0)))
+				if rank >= 0: play([&"growth.level.xp_low", &"growth.level.xp_mid", &"growth.level.xp_high"][rank])
+			&"explode":
+				var id: StringName = EXPLODE_SOUNDS.get(String(data.get("cause", "")), &"")
+				if id != &"": play(id)
+			&"shoot":
+				if String(data.get("kind", "")) in ["bullet", "missile", "shell"]: play(&"enemy.bullet.fire")
+			&"hero_power":
+				var id: StringName = HERO_SOUNDS.get(String(data.get("id", "")), &"")
+				if id != &"": play(id)
 	return true

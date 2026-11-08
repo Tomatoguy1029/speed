@@ -1,33 +1,33 @@
-## BGM切替・ダッシュの寿命・スロー音量・自爆音の重複上限を確認する。
+## 音の表どおりの鳴らし方・BGM切替・ダッシュの寿命・スロー音量・自爆音の重複上限を確認する。
 extends Node
 const EXPECTED := {
-	"block": {
+	"elite.shield.block": {
 		"hash": "bffdb464e57077af9d6cd023acd05f347580df13686e5c97adb6d96ceb76d676",
 		"rate": 22050,
 		"size": 3528
 	},
-	"boom": {
+	"boss.common.explode": {
 		"hash": "d9cf7b2f07eeec614744e9ec60fd9b5624b578c20f53fb33a4e2c58b9968b084",
 		"rate": 22050,
 		"size": 22050
 	},
 
-	"hit": {
+	"ship.combat.hit": {
 		"hash": "5da78562aab917b6d0ecb27af43212180bfff246039a670f2a5c7c1a82766863",
 		"rate": 22050,
 		"size": 2646
 	},
-	"levelup": {
+	"growth.level.levelup_step": {
 		"hash": "aa946cb1e3e3066b57f5ea4f40e342bd3de01442590680c9b4261519907ef093",
 		"rate": 22050,
 		"size": 11024
 	},
-	"pickup": {
+	"elite.shield.stolen": {
 		"hash": "3c61ef68b0cba6c26664ddc54d02ebc33ff7f540246ccad76f5c0b78cc151ee4",
 		"rate": 22050,
 		"size": 2204
 	},
-	"shoot": {
+	"weapon.blaster.hit": {
 		"hash": "723723f560cfde53fc2f5a985c38ac94b173795f1db474d27d191ede479903e0",
 		"rate": 22050,
 		"size": 1764
@@ -42,7 +42,7 @@ func check(ok: bool, label: String) -> void:
 func _ready() -> void:
 	if "--audio-shutdown" in OS.get_cmdline_user_args():
 		var voice := AudioManager._next
-		AudioManager.play(&"hurt")
+		AudioManager.play(&"ship.combat.hurt")
 		check(AudioManager._players[voice].stream is AudioStreamMP3 and AudioManager._players[voice].playing, "終了直前にMP3を再生する")
 		await get_tree().process_frame
 		await get_tree().process_frame
@@ -56,49 +56,49 @@ func _ready() -> void:
 		hash.update(wav.data)
 		check(hash.finish().hex_encode() == EXPECTED[name].hash, "波形を維持する: " + name)
 		check(wav.mix_rate == EXPECTED[name].rate and wav.data.size() == EXPECTED[name].size, "長さとサンプル周波数を維持する: " + name)
-	var kill := AudioManager.sound(&"kill") as AudioStreamMP3
+	var kill := AudioManager.sound(&"ship.combat.kill") as AudioStreamMP3
 	var kill_source := load("res://assets/audio/sfx/khoamthanh-punch-sound-effect-7ehhx2evi5k-500092.mp3") as AudioStreamMP3
 	check(kill != null and not kill.loop and kill.data == kill_source.data, "敵の撃破音を指定されたパンチ音へ差し替える")
 	var kill_voice := AudioManager._next
-	AudioManager.play(&"kill", -10.0)
+	AudioManager.play(&"ship.combat.kill")
 	check(AudioManager._players[kill_voice].stream == kill and AudioManager._players[kill_voice].playing, "撃破通知用の再生口で指定音源が鳴る")
-	for song in [&"battle", &"boss", &"menu", &"stage_select"]:
+	for song in [&"music.battle", &"music.boss", &"music.menu", &"music.stage_select"]:
 		var music := AudioManager._music.get(song) as AudioStreamMP3
 		check(music != null and music.loop and music.get_length() > 0.0, "BGMをループ再生できる: " + String(song))
-	AudioManager.play_music(&"battle", 0.0)
+	AudioManager.play_music(&"music.battle", 0.0)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(AudioManager._music_player.playing and AudioManager._music_player.stream == AudioManager._music[&"battle"], "通常戦闘曲を開始する")
-	check(is_equal_approx(AudioManager._music_player.volume_linear, 1.0 / 3.0), "通常戦闘BGMを1/3の音量にする")
-	AudioManager.play_music(&"boss", 0.08)
-	check(AudioManager._music_player.stream == AudioManager._music[&"battle"], "フェードアウト中は前の曲を保持する")
+	check(AudioManager._music_player.playing and AudioManager._music_player.stream == AudioManager._music[&"music.battle"], "通常戦闘曲を開始する")
+	check(is_equal_approx(AudioManager._music_player.volume_linear, db_to_linear(float(AudioManager.settings(&"music.battle").volume_db))), "通常戦闘BGMを音の表の音量にする")
+	AudioManager.play_music(&"music.boss", 0.08)
+	check(AudioManager._music_player.stream == AudioManager._music[&"music.battle"], "フェードアウト中は前の曲を保持する")
 	await get_tree().create_timer(0.25).timeout
-	check(AudioManager._music_player.stream == AudioManager._music[&"boss"] and AudioManager._music_player.playing, "フェード後にボス曲へ切り替える")
-	check(is_equal_approx(AudioManager._music_player.volume_linear, 1.0 / 3.0), "ボスBGMもフェード後に1/3の音量へ到達する")
-	AudioManager.play_music(&"battle", 0.2)
+	check(AudioManager._music_player.stream == AudioManager._music[&"music.boss"] and AudioManager._music_player.playing, "フェード後にボス曲へ切り替える")
+	check(is_equal_approx(AudioManager._music_player.volume_linear, db_to_linear(float(AudioManager.settings(&"music.boss").volume_db))), "ボスBGMもフェード後に音の表の音量へ到達する")
+	AudioManager.play_music(&"music.battle", 0.2)
 	AudioManager.stop_music()
 	await get_tree().create_timer(0.3).timeout
 	check(not AudioManager._music_player.playing and AudioManager._music_player.stream == null, "画面退出時は切り替え中でも再生を再開しない")
 	var old_screen := Node.new()
 	var menu_screen := Node.new()
-	AudioManager.play_music(&"battle", 0.0, old_screen)
+	AudioManager.play_music(&"music.battle", 0.0, old_screen)
 	await get_tree().process_frame
-	AudioManager.play_music(&"menu", 0.0, menu_screen)
+	AudioManager.play_music(&"music.menu", 0.0, menu_screen)
 	await get_tree().process_frame
 	await get_tree().process_frame
 	AudioManager.stop_music(old_screen)
-	check(AudioManager._music_track == &"menu" and AudioManager._music_player.playing, "前の戦闘画面の退出でメニューBGMを停止しない")
+	check(AudioManager._music_track == &"music.menu" and AudioManager._music_player.playing, "前の戦闘画面の退出でメニューBGMを停止しない")
 	AudioManager.stop_music(menu_screen)
 	old_screen.free()
 	menu_screen.free()
-	var select_music := AudioManager._music.get(&"stage_select") as AudioStreamMP3
+	var select_music := AudioManager._music.get(&"music.stage_select") as AudioStreamMP3
 	check(select_music != null and is_equal_approx(select_music.loop_offset, 26.0), "ステージセレクト曲のループを26秒地点から始める")
 	var main := preload("res://scripts/ui/main.gd").new()
 	add_child(main._fade)
 	main._sync_screen_music(GameManager.Screen.STAGE_SELECT)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(AudioManager._music_track == &"stage_select" and AudioManager._music_player.stream == select_music, "ステージセレクト画面に専用BGMを割り当てる")
+	check(AudioManager._music_track == &"music.stage_select" and AudioManager._music_player.stream == select_music, "ステージセレクト画面に専用BGMを割り当てる")
 	check(AudioManager._music_player.get_playback_position() >= 26.0, "初回再生も冒頭を飛ばして26秒から始める")
 	check(AudioManager._music_player.volume_linear < 1.0, "ステージセレクト曲をフェードインする")
 	await get_tree().create_timer(0.7).timeout
@@ -108,19 +108,19 @@ func _ready() -> void:
 	main._sync_screen_music(GameManager.Screen.MAIN_MENU)
 	await get_tree().process_frame
 	await get_tree().process_frame
-	check(AudioManager._music_track == &"menu", "メニューへ戻ると通常のメニュー曲へ切り替える")
-	var game_over := AudioManager._music.get(&"game_over") as AudioStreamMP3
+	check(AudioManager._music_track == &"music.menu", "メニューへ戻ると通常のメニュー曲へ切り替える")
+	var game_over := AudioManager._music.get(&"music.game_over") as AudioStreamMP3
 	check(game_over != null and not game_over.loop and game_over.get_length() > 0.0, "ゲームオーバー曲を一度再生する")
 	var departing_hud := Node.new()
 	var saved_result := GameManager.last_result
-	for track in [&"battle", &"boss"]:
+	for track in [&"music.battle", &"music.boss"]:
 		AudioManager.play_music(track, 0.0, departing_hud)
 		await get_tree().process_frame
 		await get_tree().process_frame
 		AudioManager.consume_cpp_frame({"events":[{"type": &"game_over", "payload":{}}]})
-		check(AudioManager._music_track == &"game_over" and AudioManager._music_player.stream == AudioManager._music[track], "ゲームオーバー表示時に元の曲からフェードする: " + String(track))
+		check(AudioManager._music_track == &"music.game_over" and AudioManager._music_player.stream == AudioManager._music[track], "ゲームオーバー表示時に元の曲からフェードする: " + String(track))
 		await get_tree().create_timer(0.3).timeout
-		check(AudioManager._music_player.volume_linear < 1.0 / 3.0, "戦闘曲の音量を徐々に下げる")
+		check(AudioManager._music_player.volume_linear < db_to_linear(float(AudioManager.settings(track).volume_db)), "戦闘曲の音量を徐々に下げる")
 		var fade := AudioManager._music_fade
 		GameManager.last_result = {"cleared": false}
 		main._sync_screen_music(GameManager.Screen.RESULT)
@@ -135,39 +135,40 @@ func _ready() -> void:
 		check(AudioManager._music_player.get_playback_position() >= playback, "敗北リザルトで曲を最初から再生し直さない")
 	GameManager.last_result = {"cleared": true}
 	main._sync_screen_music(GameManager.Screen.RESULT)
-	check(AudioManager._music_track == &"menu", "クリア結果ではゲームオーバー曲を流さない")
+	check(AudioManager._music_track == &"music.menu", "クリア結果ではゲームオーバー曲を流さない")
 	GameManager.last_result = saved_result
 	departing_hud.free()
 	AudioManager.stop_music()
 	main._fade.free()
 	main.free()
-	for sound in [&"menu_open", &"upgrade_apply", &"ui", &"stage_select_click", &"hurt", &"bounce", &"contact_arc", &"enemy_laser_charge", &"enemy_laser_fire"]:
+	for sound in [&"ui.pause.menu_open", &"ui.menu.upgrade_buy", &"ui.common.confirm", &"ui.map.stage_pick", &"ship.combat.hurt", &"ship.combat.bounce", &"weapon.arc_field.discharge", &"enemy.beamer.charge", &"enemy.beamer.fire"]:
 		var stream := AudioManager._sounds.get(sound) as AudioStreamMP3
 		check(stream != null, "強化用MP3を読み込む: " + String(sound))
 		if stream != null: check(not stream.loop and stream.get_length() > 0.0, "強化音を一回再生できる: " + String(sound))
-	AudioManager._sounds.erase(&"menu_open")
-	AudioManager.play(&"menu_open")
-	check(AudioManager._sounds.has(&"menu_open"), "更新前のバンクを保持していても強化音を再読込する")
+	AudioManager._sounds.erase(&"ui.pause.menu_open")
+	AudioManager._params.erase(&"ui.pause.menu_open")
+	AudioManager.play(&"ui.pause.menu_open")
+	check(AudioManager._sounds.has(&"ui.pause.menu_open"), "更新前のバンクを保持していても強化音を再読込する")
 	var opened: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
 	check(opened.playing and opened.stream is AudioStreamMP3, "強化画面の音を再生口へ渡す")
 	opened.stop()
-	var dash := AudioManager._sounds.get(&"dash") as AudioStreamWAV
-	var loop := AudioManager._sounds.get(&"dash_loop") as AudioStreamWAV
-	var tail := AudioManager._sounds.get(&"dash_end") as AudioStreamWAV
+	var dash := AudioManager._sounds.get(&"ship.boost.dash") as AudioStreamWAV
+	var loop := AudioManager._sounds.get(&"ship.boost.dash_loop") as AudioStreamWAV
+	var tail := AudioManager._sounds.get(&"ship.boost.dash_end") as AudioStreamWAV
 	check(dash != null and tail != null and loop != null, "開始・維持・終了音を用意する")
 	if dash != null and tail != null and loop != null:
 		check(dash.loop_mode == AudioStreamWAV.LOOP_DISABLED and tail.loop_mode == AudioStreamWAV.LOOP_DISABLED, "開始と終了は一回再生")
 		check(loop.loop_mode == AudioStreamWAV.LOOP_FORWARD and loop.loop_end > 0, "移動中だけループする")
-		AudioManager.start_dash(-6.0)
+		AudioManager.start_dash()
 		var first = AudioManager._dash_voice
-		check(is_equal_approx(first.attack.volume_db, -6.0), "新しいダッシュ音は基本音量で再生する")
+		check(is_equal_approx(first.attack.volume_db, float(AudioManager.settings(&"ship.boost.dash").volume_db)), "新しいダッシュ音は音の表の音量で再生する")
 		for player in [first.attack, first.sustain, first.release]:
 			check(player.bus == &"Dash", "ダッシュの開始・ループ・余韻は専用バスで再生する")
 		AudioManager.end_dash()
 		check(first.attack.playing and first.release.playing, "短いダッシュでも開始音を切らず終了音を鳴らす")
-		for i in 40: AudioManager.play(&"hurt")
+		for i in 40: AudioManager.play(&"ship.combat.hurt")
 		check(first.attack.playing and first.release.playing, "ほかの効果音で上書きされない")
-		AudioManager.start_dash(-6.0)
+		AudioManager.start_dash()
 		var second = AudioManager._dash_voice
 		check(first.release.playing, "次のダッシュでも前の余韻を切らない")
 		await second.attack.finished
@@ -182,12 +183,12 @@ func _ready() -> void:
 		await get_tree().process_frame
 		check(not is_instance_valid(first) and not is_instance_valid(second), "終了後は専用の再生口を回収する")
 	for player in AudioManager._players: player.stop()
-	for i in 10: AudioManager.play(&"hurt", -4.0)
-	check(AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"hurt").size() == 1, "同じ瞬間に来た同じ効果音は1つにまとめる")
+	for i in 10: AudioManager.play(&"ship.combat.hurt")
+	check(AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"ship.combat.hurt").size() == 1, "同じ瞬間に来た同じ効果音は1つにまとめる")
 	for player in AudioManager._players: player.stop()
-	AudioManager.play(&"hurt", -4.0)
+	AudioManager.play(&"ship.combat.hurt")
 	var hurt: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
-	check(hurt.stream == AudioManager._sounds[&"hurt"] and is_equal_approx(hurt.volume_db, -10.0), "被弾素材を基本の音量から6dB下げて再生する")
+	check(hurt.stream == AudioManager._sounds[&"ship.combat.hurt"] and is_equal_approx(hurt.volume_db, -10.0), "被弾素材を音の表の音量で再生する")
 	var master := AudioServer.get_bus_index(&"Master")
 	var original_volume := float(SaveManager.settings.master_volume)
 	var original_muted := bool(SaveManager.settings.muted)
@@ -219,16 +220,16 @@ func _ready() -> void:
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(dash_bus)), sfx_volume), "スロー終了でもダッシュ音量は変わらない")
 	check(is_equal_approx(db_to_linear(AudioServer.get_bus_volume_db(master)), original_volume), "スロー終了で全体音量を戻す")
 	check(float(SaveManager.settings.master_volume) == original_volume, "音量設定を保存し直さない")
-	var blaster := AudioManager._sounds.get(&"blaster") as AudioStreamWAV
+	var blaster := AudioManager._sounds.get(&"weapon.blaster.fire") as AudioStreamWAV
 	check(blaster != null and is_equal_approx(blaster.get_length(), 0.12), "連射用の短いブラスター音を読み込む")
 	for player in AudioManager._players: player.stop()
-	var blasts := func(): return AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"bomber_explode")
+	var blasts := func(): return AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"enemy.bomber.explode")
 	var first_blast: AudioStreamPlayer
 	for i in 3:
-		AudioManager.play(&"bomber_explode", -12.0)
+		AudioManager.play(&"enemy.bomber.explode")
 		if i == 0: first_blast = blasts.call()[0]
 		await get_tree().create_timer(0.06).timeout
-	check(blasts.call().size() == AudioManager.MAX_SAME_SOUND, "時間をずらして来た同じ効果音は鳴らし、重なりは上限まで")
+	check(blasts.call().size() == int(AudioManager.settings(&"enemy.bomber.explode").max_voices), "時間をずらして来た同じ効果音は鳴らし、重なりは上限まで")
 	check(int(first_blast.get_meta(&"started_at")) == blasts.call().map(func(player): return int(player.get_meta(&"started_at"))).max(), "上限を超えたら一番古い音を止めて新しい音を鳴らす")
 	for player in AudioManager._players: player.stop()
 	print("[audio_playback] %d failures" % failed)

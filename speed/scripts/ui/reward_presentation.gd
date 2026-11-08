@@ -329,7 +329,7 @@ func _begin_next() -> void:
 		_continuation.picked_rect = _to_bonus(picked_rect) if picked_rect.size.x > 0.0 else Rect2()
 		picked_rect = Rect2()
 	_continuation.begin(step, card, _capture_screen() if step == 3 else null)
-	AudioManager.play(&"levelup", -5.0, 1.0 + 0.12 * (step - 1))
+	AudioManager.play(&"growth.level.levelup_step", 1.0 + 0.12 * (step - 1))
 
 func _begin_ult() -> void:
 	var definition: HeroDef = ContentManager.heroes.get(_current.id)
@@ -338,7 +338,7 @@ func _begin_ult() -> void:
 	_ult_name.text = "%s — %s" % [definition.display_name, tr("hero.%s.power" % definition.id)]
 	_ult_desc.text = tr("hero.%s.desc" % definition.id)
 	_ult_key.text = tr("hud.ult_key").format({key = OS.get_keycode_string(InputActions.key_of(&"hero"))})
-	AudioManager.play(&"levelup", -4.0, 0.65)
+	AudioManager.play(&"growth.level.levelup_step", 0.65)
 
 func _process(delta: float) -> void:
 	if _authoring_surface != null: return

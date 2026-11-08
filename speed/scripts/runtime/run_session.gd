@@ -235,7 +235,7 @@ func _poll_cpp_loading() -> void:
 		else: view.get_node("Hud").free()
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)
-		bridge.subscribe("audio",AudioManager.consume_cpp_frame,[],["levelup","kill","hurt","weapon_fire","launch","trace_end","game_over","block_impact","shield_reflect","shield_stolen","shield_block","boss_explode","bomber_explode"])
+		bridge.subscribe("audio",AudioManager.consume_cpp_frame,[],AudioManager.event_types().map(func(type: StringName) -> String: return String(type)))
 		cpp_laser_audio = preload("res://scripts/ui/enemy_laser_audio.gd").new()
 		add_child(cpp_laser_audio)
 		bridge.subscribe("laser_audio",cpp_laser_audio.consume_cpp_frame,["laser_voices","world_scale"],["enemy_laser_charge","enemy_laser_cancel","enemy_laser_fire"])
