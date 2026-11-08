@@ -214,7 +214,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
                 }
             }
             if (!runtime.state.ship.glide && !runtime.state.draw.tracing) {
-                const double loss = enemy.dead ? (0.004 + enemy.radius * 0.0006) : (0.1 + enemy.radius * 0.002);
+                const double loss = enemy.dead ? (0.08 + enemy.radius * 0.0006) : (0.1 + enemy.radius * 0.002);
                 runtime.state.ship.vel *= 1.0 - std::min(0.6, loss);
             }
             speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position,result.applied);

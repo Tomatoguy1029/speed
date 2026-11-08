@@ -319,7 +319,7 @@ enemies = Array[StringName]([&"biter", &"bomber", &"splitter", &"splitling", &"p
 enemy_tuning = {
 "biter": {
 "params.bite_telegraph": 0.4,
-"params.bullet_dmg": 4.0
+"params.bullet_dmg": 8.0
 },
 "bomber": {
 "params.blast_dmg": 14.0
