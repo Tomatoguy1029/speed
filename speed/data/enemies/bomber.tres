@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://dxa5n78vlsk8j"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/attacks/zone_bomber.tscn" id="2"]
 
 [resource]

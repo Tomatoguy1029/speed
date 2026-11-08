@@ -362,7 +362,7 @@ func _save_stage() -> void:
 		return
 	saved.backgrounds.assign(snapshot().items)
 	saved.background_color = background_color
-	var error := ResourceSaver.save(saved, path)
+	var error := TresSaver.save(saved, path)
 	if error != OK:
 		_status.text = tr("bg.failed") + " " + error_string(error)
 		return
