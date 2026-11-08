@@ -66,7 +66,7 @@ func _show(screen: GameManager.Screen) -> void:
 	if request != _screen_request:
 		return
 	if screen == GameManager.Screen.STAGE_SELECT and _displayed_screen != screen:
-		AudioManager.play(&"menu_open")
+		AudioManager.play(&"ui.pause.menu_open")
 	_displayed_screen = screen
 	_sync_screen_music(screen)
 	# 最後の子で先に入力を受け、GUI やランへ演出中の操作を渡さない。
@@ -85,13 +85,13 @@ func _sync_screen_music(screen: GameManager.Screen) -> void:
 	if screen == GameManager.Screen.RUN:
 		return # 戦闘のHUDが通常曲とボス曲を所有する。
 	if screen == GameManager.Screen.STAGE_SELECT:
-		AudioManager.play_music(&"stage_select", 0.6, self)
+		AudioManager.play_music(&"music.stage_select", 0.6, self)
 	elif screen == GameManager.Screen.RESULT and not GameManager.last_result.get("cleared", false):
-		AudioManager.play_music(&"game_over", 1.0, self)
+		AudioManager.play_music(&"music.game_over", 1.0, self)
 	elif screen == GameManager.Screen.INTRO:
 		AudioManager.stop_music()
 	else:
-		AudioManager.play_music(&"menu", 0.6, self)
+		AudioManager.play_music(&"music.menu", 0.6, self)
 
 func _replace_screen(screen: GameManager.Screen, request: int) -> void:
 	var morph: bool = screen == GameManager.Screen.UPGRADE and is_instance_valid(_current) and _current.has_method("can_morph_to_upgrade") and _current.can_morph_to_upgrade()

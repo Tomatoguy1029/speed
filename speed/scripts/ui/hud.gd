@@ -433,7 +433,7 @@ func _confirm_abort() -> void:
 
 ## ポーズ中に設定を重ねて開く。戻ると閉じてポーズに戻る。
 func _open_settings(from: Button) -> void:
-	AudioManager.play(&"ui")
+	AudioManager.play(&"ui.common.confirm")
 	_settings = SETTINGS_SCENE.instantiate() as UiScreen
 	_settings.close_fn = func():
 		_settings.set_process_unhandled_input(false)
@@ -937,7 +937,7 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 		_music_started = true
 		if not _cpp_ui.get("lab_mode",false):
 			var boss_spawned: bool = _cpp_ui.get("boss_bodies",[]).any(func(body): return body.get("boss_spawned",false))
-			AudioManager.play_music(&"boss" if boss_spawned else &"battle",0.6,self)
+			AudioManager.play_music(&"music.boss" if boss_spawned else &"music.battle",0.6,self)
 	for event: Dictionary in frame.events:
 		if event.type=="hero_discovered": _hero_notice_t = 1.8
 		if event.type=="level_bonus" and int(_cpp_ui.phase) not in [Phase.Finishing,Phase.Ended]:
@@ -946,7 +946,7 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_rewards.enqueue_bonus(reward)
 		if event.type=="boss_spawn":
 			_warning_t = 3.0
-			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(&"boss",1.0,self)
+			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(&"music.boss",1.0,self)
 		if event.type=="full_burst_ready":
 			_ring_flash_t = 0.1
 			_ring_flash_max = 0.1

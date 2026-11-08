@@ -242,7 +242,7 @@ func _set_increments_alpha(value: float) -> void:
 func _close_start_panel() -> void:
 	if _morphing:
 		return
-	AudioManager.play(&"ui")
+	AudioManager.play(&"ui.common.confirm")
 	GameManager.back()
 
 func _input(event: InputEvent) -> void:
@@ -295,7 +295,7 @@ func _process(delta: float) -> void:
 func _go(screen: GameManager.Screen) -> void:
 	if _morphing:
 		return
-	AudioManager.play(&"ui")
+	AudioManager.play(&"ui.common.confirm")
 	GameManager.goto(screen)
 
 func can_morph_to_upgrade() -> bool:

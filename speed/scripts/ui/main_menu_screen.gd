@@ -9,5 +9,5 @@ func _ready() -> void:
 	super()
 
 func _go(screen: GameManager.Screen) -> void:
-	AudioManager.play(&"ui")
+	AudioManager.play(&"ui.common.confirm")
 	GameManager.goto(screen)

@@ -296,7 +296,7 @@ func check_cpp_beamer() -> void:
 				await get_tree().process_frame
 			if step==4 and kind=="normal":
 				beamer_check(bridge.read_frame().value.ui.laser_voices[0].paused,"保持中はその敵のチャージ音を止める")
-				if AudioManager.sound(&"enemy_laser_charge")!=null:
+				if AudioManager.sound(&"enemy.beamer.charge")!=null:
 					beamer_check(session.cpp_laser_audio._voices.has(id) and session.cpp_laser_audio._voices[id].player.stream_paused,"音の再生側も個体の保持に従って一時停止する")
 			if step==3 and kind in ["death","reuse","pull"]:
 				beamer_check(core.hazards_snapshot().is_empty() and (kind=="pull" or session.cpp_laser_audio._voices.is_empty()),"発生元の撃破・行再利用・吸引で付随ビームを回収する: "+kind)
@@ -308,7 +308,7 @@ func check_cpp_beamer() -> void:
 			bridge.restore(warning.value)
 			bridge.collect_frame()
 			beamer_check(bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value.shapes==warning_shapes,"保持点から予告線とビームの形も復元する")
-			if AudioManager.sound(&"enemy_laser_charge")!=null: beamer_check(session.cpp_laser_audio._voices.has(id),"保持点からチャージ音の所有も復元する")
+			if AudioManager.sound(&"enemy.beamer.charge")!=null: beamer_check(session.cpp_laser_audio._voices.has(id),"保持点からチャージ音の所有も復元する")
 			for step in range(3,13):
 				if step in [4,5]: core.set_enemy_motion(id,{"held":step==4})
 				core.advance_attack_budget(core.inspect().world_time+0.125)

@@ -332,7 +332,7 @@ func select_constellation(index: int) -> void:
 	if _selected < DRAGON_INDEX and index == DRAGON_INDEX:
 		_last_orbit_selection = _selected
 	if index != _selected:
-		AudioManager.play(&"stage_select_click", -10.0)
+		AudioManager.play(&"ui.map.stage_pick")
 	if _turn != null:
 		_turn.kill()
 	_hide_details()
@@ -587,5 +587,5 @@ func _start() -> void:
 		return
 	if _selected < _visible_stage_count():
 		_launch_requested = true
-		AudioManager.play(&"ui")
+		AudioManager.play(&"ui.common.confirm")
 		GameManager.start_run(_selected + 1)

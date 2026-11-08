@@ -50,7 +50,7 @@ func _ready() -> void:
 	_layout_art()
 	_refresh_details()
 	super()
-	AudioManager.play(&"menu_open")
+	AudioManager.play(&"ui.pause.menu_open")
 	if get_meta("fade_from_menu", false):
 		_fade_in()
 
@@ -350,7 +350,7 @@ func _select(id: StringName) -> void:
 	if _leaving:
 		return
 	_selected = id
-	AudioManager.play(&"ui")
+	AudioManager.play(&"ui.common.confirm")
 	_refresh_highlights()
 	_refresh_details()
 
@@ -377,7 +377,7 @@ func _buy() -> void:
 		return
 	var def := ContentManager.catalog.find(&"meta_upgrades", _selected)
 	if def != null and SaveManager.buy_upgrade(def):
-		AudioManager.play(&"upgrade_apply", linear_to_db(0.5))
+		AudioManager.play(&"ui.menu.upgrade_buy")
 		_play_upgrade_effect(def.id)
 	_refresh_details()
 
