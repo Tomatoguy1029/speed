@@ -443,7 +443,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const Transform2D transform(angle+godot::Math::PI/2.0,Vector2(config.character_scale,config.character_scale),0,at);
     int32_t visual_state=state.ship.hurt>0?1:0;
     if (boss_contact_white(run)) visual_state|=4;
-    if (state.ship.invuln>0 && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
+    if ((state.ship.invuln>0 || !state.ship.attacker_invuln.empty()) && std::fmod(state.time*20.0,2.0)<1.0) visual_state|=2;
     for (const auto visual:{config.cannon_visual,config.ship_visual}) {
         Dictionary pose;pose["participant_id"]=0;pose["part_key"]=visual;pose["transform"]=transform;
         pose["visible"]=state.phase!=godot::RunState::Phase::Ended && !state.control.cinematic_hide_ship && !(state.phase==godot::RunState::Phase::Dying && state.sequence_t>=state.death_freeze) && (visual!=config.cannon_visual || state.forward.ready || scatter.ready);pose["visual_state"]=visual_state;poses.push_back(pose);

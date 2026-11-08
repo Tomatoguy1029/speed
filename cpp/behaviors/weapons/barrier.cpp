@@ -29,7 +29,7 @@ bool BarrierBehavior::block(RunRuntime &run,const ShipDamageRequest &request,dou
 }
 double BarrierBehavior::segment(const RunRuntime &run,godot::Vector2 from,godot::Vector2 to,double radius,const ShipDamageRequest &request) {
     const auto &state=run.state;const auto &barrier=state.loadout->barrier;
-    if (!barrier.ready || barrier.restore>0 || request.amount<=0 || request.cause==Cause::Debug || request.cause==Cause::FinalStrike || state.phase!=godot::RunState::Phase::Play || state.boss_dead || state.controls_locked || state.encounter_protected || state.ship.shield_t>0 || state.ship.invuln>0 || state.invincible) return -1;
+    if (!barrier.ready || barrier.restore>0 || request.amount<=0 || request.cause==Cause::Debug || request.cause==Cause::FinalStrike || state.phase!=godot::RunState::Phase::Play || state.boss_dead || state.controls_locked || state.encounter_protected || state.ship.shield_t>0 || CombatResolver::invulnerable(run,request) || state.invincible) return -1;
     return CollisionQuery::segment_circle_t(from,to,state.ship.pos,barrier.shell_radius*1.82*run.content->config.character_scale+radius);
 }
 void BarrierBehavior::step(RunRuntime &run,double dt) {

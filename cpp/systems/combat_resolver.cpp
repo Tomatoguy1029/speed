@@ -59,7 +59,7 @@ ShipContactResult CombatResolver::attack_ship_damage(RunRuntime &run,AttackHandl
     ShipDamageRequest request;request.observation_id=spec.observation_id;request.effect_id=attack->id;request.amount=amount;request.slow=slow;request.cause=spec.cause;
     request.source_is_explicit=spec.damage_source!=0;request.source=spec.damage_source?spec.damage_source:spec.owner.source_definition;request.technique=spec.damage_technique?spec.damage_technique:spec.source_technique;
     if (spec.damage_technique && spec.damage_technique!=spec.source_technique) request.borrowed_technique=spec.source_technique;
-    request.scale=policy.scale;request.hit_policy=policy.hit_policy;
+    request.scale=policy.scale;request.hit_policy=policy.hit_policy;request.attacker=attacker_of(run,spec);
     request.origin=contact_origin(shape,run.state.ship.pos);request.has_origin=true;
     result.attempted=true;result.damage=ship_damage(run,request);
     if (policy.hit_policy==HitPolicy::MarkAfter || (policy.hit_policy==HitPolicy::MarkIfAccepted && result.damage.accepted)) AttackSystem::mark_ship_hit(run.state,handle);
@@ -220,6 +220,25 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     }
     return result;
 }
+int64_t CombatResolver::attacker_of(const RunRuntime &run,const AttackSpec &spec) {
+    const auto &state=run.state;
+    if (spec.boss.generation) return 0;
+    if (state.enemy_handles.contains(spec.owner.live_source)) {
+        const auto &enemy=state.enemies[spec.owner.live_source.slot];
+        return enemy.is_boss?0:enemy.id;
+    }
+    if (!spec.owner.source_id) return 0;
+    for (const auto &enemy:state.enemies) if (enemy.alive && enemy.id==spec.owner.source_id && enemy.is_boss) return 0;
+    return spec.owner.source_id;
+}
+bool CombatResolver::invulnerable(const RunRuntime &run,const ShipDamageRequest &request) {
+    const auto &ship=run.state.ship;
+    // 機体全体の無敵（敵を特定しない被弾・バリア・ボスの技の保護）はすべての攻撃を防ぐ。
+    if (ship.invuln>0) return true;
+    if (!request.attacker) return false;
+    for (const auto &entry:ship.attacker_invuln) if (entry.first==request.attacker) return entry.second>0;
+    return false;
+}
 ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageRequest &request) {
     CombatHooks::Dispatch dispatch(run.combat_hooks);auto &state=run.state;
     ShipDamageResult result;result.hp_before=result.hp_after=state.ship.hp;
@@ -232,7 +251,7 @@ ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageReq
     else if (state.ship.shield_t>0) {
         if (state.ship.shield_flash<=0) {CombatEvent event;event.kind=CombatEventKind::ShieldBlock;event.pos=state.ship.pos;state.combat_events.push_back(event);}
         state.ship.shield_flash=0.12;result.reason=CombatReason::Shield;
-    } else if (state.ship.invuln>0 || LeoBehavior::active(run) || state.heroes.twin.acting) result.reason=CombatReason::Invulnerability;
+    } else if (invulnerable(run,request) || LeoBehavior::active(run) || state.heroes.twin.acting) result.reason=CombatReason::Invulnerability;
     else if (state.invincible) result.reason=CombatReason::DebugInvincible;
     else if (result.amount>0 && request.cause!=Cause::FinalStrike && request.cause!=Cause::Debug && run.combat_hooks.barrier(run,request,result.amount)) {
         state.ship.invuln=state.ship_config.invulnerability;result.reason=CombatReason::Barrier;
@@ -242,7 +261,12 @@ ShipDamageResult CombatResolver::ship_damage(RunRuntime &run,const ShipDamageReq
             state.ship.hp=std::max(1.0,state.ship.hp);
         if (request.slow>0) state.ship.glide=false;
         state.ship.vel*=1.0-std::min(0.9,request.slow);
-        state.ship.invuln=state.ship_config.invulnerability;state.ship.hurt=state.ship_config.ship_hurt_time;
+        state.ship.hurt=state.ship_config.ship_hurt_time;
+        if (request.attacker) {
+            auto &list=state.ship.attacker_invuln;
+            auto found=std::find_if(list.begin(),list.end(),[&](const auto &entry){return entry.first==request.attacker;});
+            if (found!=list.end()) found->second=state.ship_config.invulnerability; else list.emplace_back(request.attacker,state.ship_config.invulnerability);
+        } else state.ship.invuln=state.ship_config.invulnerability;
         result.hp_after=state.ship.hp;result.accepted=true;result.reason=CombatReason::Applied;
     }
     if (result.accepted) {state.lifecycle.last_request=request;state.lifecycle.last_damage=result;state.lifecycle.has_damage=true;}
