@@ -181,6 +181,10 @@ func _ready() -> void:
 		await get_tree().process_frame
 		await get_tree().process_frame
 		check(not is_instance_valid(first) and not is_instance_valid(second), "終了後は専用の再生口を回収する")
+	for player in AudioManager._players: player.stop()
+	for i in 10: AudioManager.play(&"hurt", -4.0)
+	check(AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"hurt").size() == AudioManager.MAX_SAME_SOUND, "同じ効果音を一度に何度鳴らしても重ねるのは上限まで")
+	for player in AudioManager._players: player.stop()
 	AudioManager.play(&"hurt", -4.0)
 	var hurt: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
 	check(hurt.stream == AudioManager._sounds[&"hurt"] and is_equal_approx(hurt.volume_db, -10.0), "被弾素材を基本の音量から6dB下げて再生する")

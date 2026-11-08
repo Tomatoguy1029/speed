@@ -6,6 +6,8 @@
 extends Node
 
 const MAX_VOICES := 12
+## 同じ効果音を同時に鳴らす数の上限。重なって大きくなりすぎないよう、超えた分は鳴らさない。
+const MAX_SAME_SOUND := 2
 const MENU_RESUME_TRACKS := [&"menu", &"stage_select"]
 const MENU_RESUME_WINDOW_MS := 10000
 const DASH_VOICE = preload("res://scripts/managers/dash_audio_voice.gd")
@@ -102,12 +104,11 @@ func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream: AudioStream = _sounds.get(name)
 	if stream == null:
 		return
-	if name == &"bomber_explode":
-		var active := 0
-		for player in _players:
-			if player.playing and player.get_meta(&"sound_name", &"") == name:
-				active += 1
-		if active >= 2: return
+	var active := 0
+	for player in _players:
+		if player.playing and player.get_meta(&"sound_name", &"") == name:
+			active += 1
+	if active >= MAX_SAME_SOUND: return
 	var p := _players[_next]
 	p.set_meta(&"sound_name", name)
 	_next = (_next + 1) % MAX_VOICES
