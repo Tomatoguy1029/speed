@@ -10,7 +10,7 @@ import zlib
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-RUSH_PATH = ROOT / 'speed/data/bosses/draco_finale_rush.tres'
+RUSH_PATH = ROOT / 'speed/data/visuals/draco_finale_rush.tres'
 PUFF_PATH = ROOT / 'speed/assets/effects/build/draco_finale_puff.png'
 LIT_PATH = ROOT / 'speed/assets/effects/build/draco_finale_lit.png'
 PARTS_DIR = ROOT / 'speed/assets/pixel/draco'

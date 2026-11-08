@@ -1,7 +1,7 @@
 ## りゅう座の決着の演出。戦闘の状態を読むだけで、承認済みの試作と同じ式を座標系ごと写す。
 ## 座標は決着の中心を原点とする。時間は各段階の開始からの秒数。
 extends Node2D
-const RUSH: DracoFinaleRush = preload("res://data/bosses/draco_finale_rush.tres")
+const RUSH: DracoFinaleRush = preload("res://data/visuals/draco_finale_rush.tres")
 const PUFF := preload("res://assets/effects/build/draco_finale_puff.png")
 const SHIP := preload("res://assets/pixel/airship.png")
 const FLAME := preload("res://assets/pixel/airship_blue_flame.png")
