@@ -8,6 +8,7 @@ rank = 1
 radius = 12.0
 hp = 5.0
 armor = 2.0
+hitstop_multiplier = 0.3
 speed = 120.0
 accel = 2.5
 turn = 4.0

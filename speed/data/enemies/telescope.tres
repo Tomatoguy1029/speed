@@ -54,6 +54,7 @@ radius = 20.0
 toughness = -1
 hp = 30.0
 armor = 6.0
+hitstop_multiplier = 0.5
 speed = 80.0
 accel = 1.5
 turn = 3.0
