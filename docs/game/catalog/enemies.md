@@ -144,6 +144,8 @@
 
 - `ruler`（じょうぎ座）は `assets/pixel/ruler/` の上下の専用画像を重ねて出現し、分離後は各個体が片側の画像を使う。装甲の塗装は上下を選んで編集する。下側の未指定の装甲片は上側の対応する装甲片の色を使い、下側に指定した色を優先する。上下の対応は `data/visuals/looks/ruler_bottom.tres` に持つ。
 
+- `hound`（猟犬）は胴体・発光部・左右の装甲片を個別に塗装する。`assets/pixel/hound/armor.regions.json` で領域を指定し、各領域の明るさを基準に選択色を適用する。
+
 - `lynx`（やまねこ座）は `assets/pixel/lynx/` の専用画像を使う。重ね方は[敵のアート](../art-style.md#42-敵)に従う。
 
 - ステージ4の `biter`（ヘビ）は `assets/pixel/snake/`、`pulser` は `assets/pixel/pulser/` の本体・装甲・法線画像を重ねて描く。星コアは照明に左右されず、装甲は法線付き照明を受ける。表示の基準寸法と接触半径は各種類の設定に従う。
