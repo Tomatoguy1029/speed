@@ -28,6 +28,13 @@ func _ready() -> void:
 	lab._hitstop_details.show()
 	lab._refresh_hitstop()
 	var authored: float = session.run.enemies.def_of(&"biter").hitstop_multiplier
+	# 試遊の更新で未確定の数値入力を消さない。
+	lab._refresh_hitstop()
+	var field: LineEdit = lab._hitstop_value.get_line_edit()
+	field.text = "0.7"
+	for n in 10: lab._refresh_hitstop()
+	check(field.text == "0.7", "同じ状態の更新でヒットストップの入力途中の文字を消さない")
+	field.text = str(authored)
 	var original_scene: RunSession = session.scene
 	var builds: int = session.BUILDER.preparation_build_count
 	await session.back_to_play_start()

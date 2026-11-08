@@ -2209,6 +2209,10 @@
       {
         "name": "BiteCue",
         "value": "biter_cue"
+      },
+      {
+        "name": "DebugRankHitstopChanged",
+        "value": "debug_rank_hitstop_changed"
       }
     ],
     "ResultKind": [
@@ -3290,6 +3294,10 @@
       "radius",
       "sprite_radius",
       "cue"
+    ],
+    "debug_rank_hitstop_changed": [
+      "rank",
+      "multiplier"
     ]
   },
   "includes": [

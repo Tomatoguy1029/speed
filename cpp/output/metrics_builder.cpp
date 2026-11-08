@@ -195,6 +195,7 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         add["max_hp"]=l.hp_profile_add;add["reroll"]=l.reroll_profile_add;reduce["charge_time"]=l.charge_profile_factor;profile["mult"]=mult;profile["add"]=add;profile["reduce"]=reduce;
         conditions["config"]=config_snapshot(c.config);conditions["stats"]=stats;conditions["profile"]=profile;
         conditions["rng_state"]=String::num_uint64(s.control.rng.get_state());conditions["rng_algorithm"]="pcg32";
+        PackedFloat64Array rank_hitstop;for (double multiplier:s.debug_rank_hitstop) rank_hitstop.push_back(multiplier);conditions["debug_rank_hitstop"]=rank_hitstop;
         conditions["hitstop_enabled"]=s.hitstop_enabled;conditions["invincible"]=s.invincible;out["conditions"]=conditions;
         Dictionary tuning;
         for (const auto &v:c.enemy_tuning) {const auto id=c.definitions[v.enemy-1].id;Dictionary values=tuning.get(id,Dictionary());values[String::utf8(v.key.c_str())]=v.value;tuning[id]=values;}
