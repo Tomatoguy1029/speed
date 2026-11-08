@@ -187,6 +187,8 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
         if (!fast) {
             health.hit_cd = c.contact_cooldown;
             damage_enemy(hit.row, attack * c.touch_damage, "touch", false, direction, 160.0, &position);
+            // 普段の接触で倒しても少し減速する。群れの中を回り続けると速さが落ちていく。
+            if (enemy.dead) runtime.state.ship.vel *= 1.0 - std::min(0.6, 0.03 + enemy.radius * 0.0006);
             speed::EquipmentSystem::electric_contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)));
             continue;
         }
