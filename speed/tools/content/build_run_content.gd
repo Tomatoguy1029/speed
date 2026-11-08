@@ -2361,7 +2361,7 @@ static func preparation_signature(stage: RuntimeStage, config: GameConfig, defin
 	bytes.append_array(var_to_bytes(values))
 	return Schema.sha256(bytes).hex_encode()
 
-static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray(), reuse_prepared := true, live_result: Variant = null) -> Error:
+static func build(stage: RuntimeStage, config: GameConfig, output: String, input_sha256: String, definitions := {}, extra_formations: Array = [], boss_definitions: Dictionary = {}, previous_resources: Resource = null, boss_programs: Dictionary = {}, previous_definition_ids := PackedStringArray(), reuse_prepared := true, live_result: Variant = null, record_result: Variant = null) -> Error:
 	# ライブ編集は同じ変換・検証を使い、生成物をディスクへ保存しない。
 	if live_result != null: live_result.clear()
 	if stage == null or stage.resources == null or input_sha256.length()!=64: return ERR_INVALID_DATA
@@ -2889,6 +2889,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 		if appearance_metadata.has(visual.id): visual.merge(appearance_metadata[visual.id])
 	for visual: Dictionary in visuals:
 		if not visual.path.is_empty(): resources.keys[visual.id] = visual.path
+	if record_result != null: record_result.merge(data,true)
 	if live_result != null:
 		live_result.bytes = bytes
 		live_result.resources = resources
