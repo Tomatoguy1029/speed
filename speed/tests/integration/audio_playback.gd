@@ -183,7 +183,7 @@ func _ready() -> void:
 		check(not is_instance_valid(first) and not is_instance_valid(second), "終了後は専用の再生口を回収する")
 	for player in AudioManager._players: player.stop()
 	for i in 10: AudioManager.play(&"hurt", -4.0)
-	check(AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"hurt").size() == AudioManager.MAX_SAME_SOUND, "同じ効果音を一度に何度鳴らしても重ねるのは上限まで")
+	check(AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"hurt").size() == 1, "同じ瞬間に来た同じ効果音は1つにまとめる")
 	for player in AudioManager._players: player.stop()
 	AudioManager.play(&"hurt", -4.0)
 	var hurt: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
@@ -222,15 +222,14 @@ func _ready() -> void:
 	var blaster := AudioManager._sounds.get(&"blaster") as AudioStreamWAV
 	check(blaster != null and is_equal_approx(blaster.get_length(), 0.12), "連射用の短いブラスター音を読み込む")
 	for player in AudioManager._players: player.stop()
-	for i in 10: AudioManager.play(&"bomber_explode", -12.0)
-	var active_blasts := AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"bomber_explode")
-	check(active_blasts.size() == 2, "同時自爆10体でも自爆音は2体分まで")
-	var before := AudioManager._next
-	AudioManager.play(&"bomber_explode", -12.0)
-	check(AudioManager._next == before, "再生中の自爆音が2音なら追加音を抑える")
-	active_blasts[0].stop()
-	AudioManager.play(&"bomber_explode", -12.0)
-	check(AudioManager._next == (before + 1) % AudioManager.MAX_VOICES, "自爆音の終了後は次の自爆を再生できる")
+	var blasts := func(): return AudioManager._players.filter(func(player): return player.playing and player.get_meta(&"sound_name", &"") == &"bomber_explode")
+	var first_blast: AudioStreamPlayer
+	for i in 3:
+		AudioManager.play(&"bomber_explode", -12.0)
+		if i == 0: first_blast = blasts.call()[0]
+		await get_tree().create_timer(0.06).timeout
+	check(blasts.call().size() == AudioManager.MAX_SAME_SOUND, "時間をずらして来た同じ効果音は鳴らし、重なりは上限まで")
+	check(int(first_blast.get_meta(&"started_at")) == blasts.call().map(func(player): return int(player.get_meta(&"started_at"))).max(), "上限を超えたら一番古い音を止めて新しい音を鳴らす")
 	for player in AudioManager._players: player.stop()
 	print("[audio_playback] %d failures" % failed)
 	get_tree().quit(1 if failed else 0)

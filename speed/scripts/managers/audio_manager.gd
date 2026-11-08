@@ -6,8 +6,10 @@
 extends Node
 
 const MAX_VOICES := 12
-## 同じ効果音を同時に鳴らす数の上限。重なって大きくなりすぎないよう、超えた分は鳴らさない。
+## 同じ効果音を同時に鳴らす数の上限。超えたら一番古い音を止めて新しい音に入れ替える。
 const MAX_SAME_SOUND := 2
+## 同じ効果音がこの時間（ミリ秒）より近く続けて来たら、1つの音にまとめる。
+const SAME_SOUND_MERGE_MS := 50
 const MENU_RESUME_TRACKS := [&"menu", &"stage_select"]
 const MENU_RESUME_WINDOW_MS := 10000
 const DASH_VOICE = preload("res://scripts/managers/dash_audio_voice.gd")
@@ -104,14 +106,23 @@ func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
 	var stream: AudioStream = _sounds.get(name)
 	if stream == null:
 		return
-	var active := 0
+	# 同じ瞬間の音は1つにまとめ、ずれて来た音は必ず鳴らす。重なりは上限までにして、古い音から入れ替える。
+	var now := Time.get_ticks_msec()
+	var same: Array[AudioStreamPlayer] = []
 	for player in _players:
 		if player.playing and player.get_meta(&"sound_name", &"") == name:
-			active += 1
-	if active >= MAX_SAME_SOUND: return
-	var p := _players[_next]
+			if now - int(player.get_meta(&"started_at", 0)) < SAME_SOUND_MERGE_MS: return
+			same.append(player)
+	var p: AudioStreamPlayer
+	if same.size() >= MAX_SAME_SOUND:
+		same.sort_custom(func(a: AudioStreamPlayer, b: AudioStreamPlayer): return int(a.get_meta(&"started_at", 0)) < int(b.get_meta(&"started_at", 0)))
+		p = same[0]
+		p.stop()
+	else:
+		p = _players[_next]
+		_next = (_next + 1) % MAX_VOICES
 	p.set_meta(&"sound_name", name)
-	_next = (_next + 1) % MAX_VOICES
+	p.set_meta(&"started_at", now)
 	p.stream = stream
 	p.volume_db = volume_db - HURT_TRIM_DB if name == &"hurt" else volume_db
 	p.pitch_scale = pitch
