@@ -49,7 +49,7 @@ params = {
 "shell_r": 26.0,
 "shell_range": 640.0,
 "shell_speed": 900.0,
-"store_max": 20,
+"store_max": 10,
 "swallow_interval": 0.12,
 "swallow_reach": 30.0,
 "telegraph": 0.25
