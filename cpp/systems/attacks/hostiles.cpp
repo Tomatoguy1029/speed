@@ -105,7 +105,7 @@ bool SpeedRunCore::step_hostiles(double world_dt) {
         const auto wall=speed::WallSystem::block_hit(runtime,from,to,shot.radius);
         if (wall && (!body_hit || wall->t<body_hit->t)) body_hit=speed::BodyHit{UINT32_MAX,wall->t,wall->point};
         speed::ShipDamageRequest blocked;blocked.observation_id=record->spec.observation_id;blocked.effect_id=record->id;blocked.amount=shot.damage;blocked.slow=shot.slow;blocked.cause=record->spec.cause;
-        blocked.source=record->spec.owner.source_definition;blocked.technique=record->spec.source_technique;blocked.scale=record->spec.contact.scale;
+        blocked.source=record->spec.owner.source_definition;blocked.technique=record->spec.source_technique;blocked.scale=record->spec.contact.scale;blocked.attacker=speed::CombatResolver::attacker_of(runtime,record->spec);
         const Vector2 barrier_end=body_hit?body_hit->point:to;
         const double barrier_t=speed::BarrierBehavior::segment(runtime,from,barrier_end,shot.radius,blocked);
         if (barrier_t>=0) {

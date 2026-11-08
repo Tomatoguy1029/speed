@@ -88,6 +88,8 @@ struct RunState {
         double hp = 0, hurt = 0, invuln = 0, shield_flash = 0, shield_t = 0, shield_max = 0;
         double boost_t = 0, fade_t = 0, glide_t = 0, glide_speed = 0, peak_speed = 0;
         bool glide = false;
+        // 敵ごとの被弾後の無敵。攻撃した敵の個体IDと残り時間。
+        std::vector<std::pair<int64_t,double>> attacker_invuln;
     } ship;
     struct ShipConfig {
         double start_radius, base_max_speed, stick_dead_zone, mouse_dead_zone, steer_cruise;

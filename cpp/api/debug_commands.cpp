@@ -74,7 +74,7 @@ Dictionary SpeedRunCore::development_debug_command(const Dictionary &p) {
     else if (action=="heal") s.ship.hp=s.ship_config.max_hp;
     else if (action=="clear_enemies") {speed::EnemySystem::clear_regular(runtime);rebuild_enemy_grid(s.frame_grid_cell);}
     else if (action=="hurt" || action=="die") {
-        const bool keep=s.invincible;const double shield=s.ship.shield_t;s.invincible=false;s.ship.invuln=s.ship.shield_t=0;
+        const bool keep=s.invincible;const double shield=s.ship.shield_t;s.invincible=false;s.ship.invuln=s.ship.shield_t=0;s.ship.attacker_invuln.clear();
         speed::ShipDamageRequest hit;hit.amount=action=="hurt"?1:s.ship.hp+1;hit.cause=speed::Cause::Debug;speed::CombatResolver::ship_damage(runtime,hit);
         if (action=="hurt") {s.invincible=keep;s.ship.shield_t=shield;}
     } else if (action=="reset_loadout") {
