@@ -59,6 +59,8 @@ struct ShipDamageRequest {
     TechniqueId technique=0;
     TechniqueId borrowed_technique=0;
     HitPolicy hit_policy=HitPolicy::EveryTick;
+    // 攻撃した敵の個体ID。0以外なら、被弾後の無敵をその敵ごとに数える（ほかの敵の攻撃は無敵中でも当たる）。
+    int64_t attacker=0;
 };
 struct ShipDamageResult { bool accepted=false;CombatReason reason=CombatReason::Invalid;double hp_before=0,hp_after=0,amount=0; };
 struct ShipContactResult {bool touching=false,attempted=false;ShipDamageResult damage;};

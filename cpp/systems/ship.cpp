@@ -120,6 +120,11 @@ bool SpeedRunCore::step_ship_input(double real_dt, double world_dt, const speed:
     if (!runtime.state.started || runtime.state.closed || !runtime.state.ship_ready || !std::isfinite(real_dt) || !std::isfinite(world_dt) || real_dt < 0 || world_dt < 0) return false;
     if (runtime.state.ship.hurt > 0) runtime.state.ship.hurt=speed::remaining_time(runtime.state.ship.hurt,real_dt);
     if (runtime.state.ship.invuln > 0) runtime.state.ship.invuln=speed::remaining_time(runtime.state.ship.invuln,world_dt);
+    {
+        auto &list=runtime.state.ship.attacker_invuln;
+        for (auto &entry:list) entry.second=speed::remaining_time(entry.second,world_dt);
+        list.erase(std::remove_if(list.begin(),list.end(),[](const auto &entry){return entry.second<=0;}),list.end());
+    }
     runtime.state.ship.shield_flash = std::max(0.0, runtime.state.ship.shield_flash - world_dt);
     if (runtime.state.ship.shield_t > 0) {
         runtime.state.ship.shield_t = std::max(0.0, runtime.state.ship.shield_t - world_dt);
@@ -156,7 +161,7 @@ Dictionary SpeedRunCore::ship_snapshot() const {
     if (!runtime.state.ship_ready || runtime.state.closed) return out;
     out["ship_pos"] = runtime.state.ship.pos; out["ship_vel"] = runtime.state.ship.vel; out["ship_heading"] = runtime.state.ship.heading;
     out["ship_contact_white"] = speed::boss_contact_white(runtime);
-    out["ship_hp"] = runtime.state.ship.hp; out["ship_hurt"] = runtime.state.ship.hurt; out["ship_invuln"] = runtime.state.ship.invuln;
+    out["ship_hp"] = runtime.state.ship.hp; out["ship_hurt"] = runtime.state.ship.hurt; {double invuln=runtime.state.ship.invuln;for (const auto &entry:runtime.state.ship.attacker_invuln) invuln=std::max(invuln,entry.second);out["ship_invuln"] = invuln;}
     out["ship_shield_flash"] = runtime.state.ship.shield_flash; out["ship_shield_t"] = runtime.state.ship.shield_t; out["ship_shield_max"] = runtime.state.ship.shield_max;
     out["ship_boost_t"] = runtime.state.ship.boost_t; out["ship_fade_t"] = runtime.state.ship.fade_t;
     out["glide"] = runtime.state.ship.glide; out["glide_t"] = runtime.state.ship.glide_t; out["glide_speed"] = runtime.state.ship.glide_speed;
