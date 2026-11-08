@@ -127,6 +127,8 @@ struct RunState {
     } combat_config{};
     bool combat_ready = false;
     double hitstop = 0, dash_stop = 0;
+    // 開発ランだけの星別倍率。固定定義を共有する別ランには漏らさない。
+    std::array<double,10> debug_rank_hitstop{{1,1,1,1,1,1,1,1,1,1}};
     int64_t kills = 0;
     Array events;
     std::vector<speed::CombatEvent> combat_events;

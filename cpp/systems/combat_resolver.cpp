@@ -60,8 +60,9 @@ void hit_stop(RunRuntime &run,EnemyHandle target,bool fresh,bool crit) {
     double seconds=0;
     if (fresh && enemy.hp<=0) seconds=config.kill_hitstop*(enemy.radius>25?config.hitstop_big_mult:1.0)*(crit?config.hitstop_crit_mult:1.0);
     if (crit) seconds=std::max(seconds,enemy.hp<=0?0.05:0.035);
-    if (def.hitstop_multiplier<=0) return;
-    const double stop=std::min(seconds*def.hitstop_multiplier,std::max(0.0,config.kill_hitstop_cap-state.dash_stop));
+    const double rank_mult=run.api_development && !enemy.is_boss && def.rank>=1 && def.rank<=10?state.debug_rank_hitstop[def.rank-1]:1.0;
+    if (def.hitstop_multiplier<=0 || rank_mult<=0) return;
+    const double stop=std::min(seconds*def.hitstop_multiplier*rank_mult,std::max(0.0,config.kill_hitstop_cap-state.dash_stop));
     state.hitstop=std::max(state.hitstop,stop);state.dash_stop+=stop;
 }
 }

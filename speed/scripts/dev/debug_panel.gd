@@ -40,6 +40,7 @@ var _sliders: Dictionary = {}
 ## 機体の強化の ID → 段の入力欄
 var _meta_boxes: Dictionary = {}
 var _status: Label
+var _hitstop_tab: VBoxContainer
 
 func _ready() -> void:
 	visible = false
@@ -50,11 +51,31 @@ func _ready() -> void:
 	if cpp_session!=null:
 		_commands = preload("res://scripts/dev/run_commands.gd").new()
 		_commands.setup_cpp(cpp_session)
-	custom_minimum_size = Vector2(420, 0)
+	var background := StyleBoxFlat.new()
+	background.bg_color = Color(0.035, 0.05, 0.08, 0.97)
+	background.content_margin_left = 6
+	background.content_margin_right = 6
+	add_theme_stylebox_override("panel", background)
+	var tabs := TabContainer.new()
+	tabs.name = "DebugTabs"
+	tabs.get_tab_bar().add_theme_font_size_override("font_size", 16)
+	add_child(tabs)
 	var scroll := ScrollContainer.new()
-	scroll.custom_minimum_size = Vector2(420, 560)
+	scroll.name = "通常"
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	add_child(scroll)
+	tabs.add_child(scroll)
+	var hitstop_scroll := ScrollContainer.new()
+	hitstop_scroll.name = "ヒットストップ"
+	hitstop_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	tabs.add_child(hitstop_scroll)
+	_hitstop_tab = preload("res://scripts/dev/debug_hitstop_tab.gd").new()
+	_hitstop_tab.cpp_session = cpp_session
+	_hitstop_tab.resume_requested.connect(_close)
+	hitstop_scroll.add_child(_hitstop_tab)
+	tabs.tab_changed.connect(func(index: int):
+		if index == 1: _hitstop_tab.refresh())
+	get_viewport().size_changed.connect(_fit_viewport)
+	_fit_viewport()
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)
@@ -234,10 +255,15 @@ func _input(event: InputEvent) -> void:
 			# 編集用の写しは全ファイルの署名とステージの再変換を伴うので、スライダーを動かしたときに作る。
 			_refresh_sliders()
 			_refresh_meta_levels()
+			_hitstop_tab.refresh()
 			for button in find_children("*", "Button", true, false):
 				if button.is_visible_in_tree():
 					button.grab_focus()
 					break
+
+func _fit_viewport() -> void:
+	var available := get_viewport_rect().size - position - Vector2(16, 16)
+	size = Vector2(minf(460, available.x), minf(580, available.y))
 
 func _close() -> void:
 	hide()

@@ -171,7 +171,28 @@ func _test_cpp_debug() -> void:
 	while other.bridge==null and other.cpp_error==OK: await get_tree().process_frame
 	check(other.bridge!=null,"別ランを独立して保持する")
 	var panel: Control = session.view.get_node("Hud/DebugPanel")
-	panel.show()
+	var toggle := InputEventAction.new()
+	toggle.action = &"debug_panel"
+	toggle.pressed = true
+	panel._input(toggle)
+	check(panel.visible, "Pでゲーム内の調整メニューを開く")
+	var tabs: TabContainer = panel.get_node("DebugTabs")
+	check(tabs.get_tab_count() == 2 and tabs.get_tab_title(1) == "ヒットストップ", "通常とヒットストップのタブを表示する")
+	tabs.current_tab = 1
+	panel._hitstop_tab._boxes[0].value = 0.25
+	check(session.bridge.read_lab().value.debug_rank_hitstop[0] == 0.25, "実際のデバッグメニューで星別倍率を変更する")
+	panel._input(toggle)
+	check(not panel.visible, "Pで閉じて試遊へ戻る")
+	panel._input(toggle)
+	check(panel.visible and panel._hitstop_tab._boxes[0].value == 0.25, "開き直しても同じランの試遊倍率を保つ")
+	check(not session.has_meta("dev_content_edit") and panel._content_edit == null, "星別編集では制作元の変換を始めない")
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--capture=") and DisplayServer.get_name() != "headless":
+			await get_tree().process_frame
+			await get_tree().process_frame
+			await RenderingServer.frame_post_draw
+			get_viewport().get_texture().get_image().save_png(argument.trim_prefix("--capture="))
+	panel._hitstop_tab._reset()
 	var bridge: RefCounted = session.bridge
 	check((await panel._commands.handle_cpp(&"debug_invincible",{})).ok and bridge.read_frame().value.ui.invincible,"無敵を明示命令で切り替える")
 	check(not other.bridge.read_frame().value.ui.invincible,"別ランの無敵は変えない")

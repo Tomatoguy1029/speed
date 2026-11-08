@@ -12,6 +12,7 @@
 #include "../systems/attacks/wall.h"
 #include "../state/loadout_state.h"
 #include "../content/content_bundle.h"
+#include "../output/frame_builder.h"
 #include <algorithm>
 #include <cmath>
 #include <climits>
@@ -22,6 +23,14 @@ Dictionary SpeedRunCore::development_debug_command(const Dictionary &p) {
     if (!runtime.api_development || (s.phase!=Phase::Play && s.phase!=Phase::Paused && s.phase!=Phase::LevelUp) || p.get("action",Variant()).get_type()!=Variant::STRING || p.get("args",Variant()).get_type()!=Variant::DICTIONARY || p.size()!=2) return reply(false);
     if (s.phase==Phase::Paused && s.control.resume_phase!=int32_t(Phase::Play) && s.control.resume_phase!=int32_t(Phase::LevelUp)) return reply(false);
     const String action=p["action"];const Dictionary args=p["args"];
+    if (action=="rank_hitstop") {
+        if (args.size()!=2 || args.get("rank",Variant()).get_type()!=Variant::INT) return reply(false);
+        const int64_t rank=args["rank"];const Variant value=args.get("multiplier",Variant());
+        if (rank<1 || rank>10 || (value.get_type()!=Variant::INT && value.get_type()!=Variant::FLOAT) || !std::isfinite(double(value)) || double(value)<0 || double(value)>10) return reply(false);
+        s.debug_rank_hitstop[rank-1]=double(value);
+        Dictionary changed;changed["rank"]=rank;changed["multiplier"]=double(value);speed::FrameBuilder::append(runtime,"debug_rank_hitstop_changed",changed);
+        return reply(true);
+    }
     if (action=="random") {
         if (args.size()!=2 || args.get("ids",Variant()).get_type()!=Variant::PACKED_STRING_ARRAY || args.get("count",Variant()).get_type()!=Variant::INT) return reply(false);
         const PackedStringArray ids=args["ids"];const int64_t count=args["count"];if (ids.is_empty() || count<1 || count>10000) return reply(false);
