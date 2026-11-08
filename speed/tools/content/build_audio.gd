@@ -11,6 +11,9 @@ static func build(output: String) -> Error:
 	_sounds[&"block"] = _tone(180.0, 140.0, 0.08, "square")
 	_sounds[&"bounce"] = load("res://assets/audio/sfx/bounce_robot.mp3")
 	_sounds[&"hurt"] = load("res://assets/audio/sfx/hurt_robot.mp3")
+	var heartbeat := load("res://assets/audio/sfx/shidenbeatsmusic-heartbeat-sound-effect-111218.mp3").duplicate() as AudioStreamMP3
+	heartbeat.loop = true
+	_sounds[&"heartbeat"] = heartbeat
 	_sounds[&"levelup"] = _tone(440.0, 880.0, 0.25, "sine")
 	_sounds[&"levelup_notice"] = load("res://assets/audio/sfx/levelup_notice.mp3")
 	_sounds[&"pickup"] = _tone(880.0, 1200.0, 0.05, "sine")

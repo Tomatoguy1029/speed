@@ -9,7 +9,15 @@ const MAX_VOICES := 12
 const MENU_RESUME_TRACKS := [&"menu", &"stage_select"]
 const MENU_RESUME_WINDOW_MS := 10000
 const DASH_VOICE = preload("res://scripts/managers/dash_audio_voice.gd")
+## 被弾音の素材は大きいので、基本の音量から下げて鳴らす。
+const HURT_TRIM_DB := 6.0
+## 心音の素材で、最初の拍が鳴る位置と拍の間隔（秒）。
+const HEARTBEAT_FIRST_BEAT := 0.24
+const HEARTBEAT_PERIOD := 1.125
+const HEARTBEAT_DB := -6.0
 var _dash_voice: Node
+var _heartbeat_player: AudioStreamPlayer
+var _heartbeat_fade: Tween
 
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
@@ -37,6 +45,9 @@ func _ready() -> void:
 	_music_player = AudioStreamPlayer.new()
 	_music_player.bus = &"Music"
 	add_child(_music_player)
+	_heartbeat_player = AudioStreamPlayer.new()
+	_heartbeat_player.bus = &"SFX"
+	add_child(_heartbeat_player)
 	for i in MAX_VOICES:
 		var p := AudioStreamPlayer.new()
 		p.bus = &"SFX"
@@ -101,7 +112,7 @@ func play(name: StringName, volume_db := 0.0, pitch := 1.0) -> void:
 	p.set_meta(&"sound_name", name)
 	_next = (_next + 1) % MAX_VOICES
 	p.stream = stream
-	p.volume_db = volume_db - 20.0 if name == &"hurt" else volume_db
+	p.volume_db = volume_db - HURT_TRIM_DB if name == &"hurt" else volume_db
 	p.pitch_scale = pitch
 	p.play()
 
@@ -197,6 +208,33 @@ func end_dash() -> void:
 	_dash_voice = null
 
 ## ユーザー設定を保ったまま、BGM・効果音をまとめて減衰する。
+## HPが少ない間だけ心音をループで鳴らす。止めるときは短くフェードする。
+func set_heartbeat(active: bool) -> void:
+	if active == (_heartbeat_player.playing and _heartbeat_player.has_meta(&"active")): return
+	if _heartbeat_fade != null: _heartbeat_fade.kill()
+	if active:
+		var stream: AudioStream = _sounds.get(&"heartbeat")
+		if stream == null:
+			_reload_bank()
+			stream = _sounds.get(&"heartbeat")
+		if stream == null: return
+		_heartbeat_player.set_meta(&"active", true)
+		_heartbeat_player.stream = stream
+		_heartbeat_player.volume_db = HEARTBEAT_DB
+		_heartbeat_player.play()
+		return
+	_heartbeat_player.remove_meta(&"active")
+	if not _heartbeat_player.playing: return
+	_heartbeat_fade = create_tween().set_ignore_time_scale(true)
+	_heartbeat_fade.tween_property(_heartbeat_player, "volume_db", -60.0, 0.3)
+	_heartbeat_fade.tween_callback(_heartbeat_player.stop)
+
+## 心音の拍の進み具合（0で拍が鳴った瞬間、1で次の拍）。鳴っていなければ負の値。
+func heartbeat_phase() -> float:
+	if not _heartbeat_player.playing or not _heartbeat_player.has_meta(&"active"): return -1.0
+	var position := _heartbeat_player.get_playback_position() + AudioServer.get_time_since_last_mix() - AudioServer.get_output_latency()
+	return fposmod(position - HEARTBEAT_FIRST_BEAT, HEARTBEAT_PERIOD) / HEARTBEAT_PERIOD
+
 func set_slow_motion(enabled: bool) -> void:
 	if _slow_motion == enabled: return
 	_slow_motion = enabled

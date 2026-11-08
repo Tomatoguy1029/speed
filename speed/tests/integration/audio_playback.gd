@@ -183,7 +183,7 @@ func _ready() -> void:
 		check(not is_instance_valid(first) and not is_instance_valid(second), "終了後は専用の再生口を回収する")
 	AudioManager.play(&"hurt", -4.0)
 	var hurt: AudioStreamPlayer = AudioManager._players[(AudioManager._next - 1 + AudioManager.MAX_VOICES) % AudioManager.MAX_VOICES]
-	check(hurt.stream == AudioManager._sounds[&"hurt"] and is_equal_approx(hurt.volume_db, -24.0), "被弾素材を控えめな音量で再生する")
+	check(hurt.stream == AudioManager._sounds[&"hurt"] and is_equal_approx(hurt.volume_db, -10.0), "被弾素材を基本の音量から6dB下げて再生する")
 	var master := AudioServer.get_bus_index(&"Master")
 	var original_volume := float(SaveManager.settings.master_volume)
 	var original_muted := bool(SaveManager.settings.muted)

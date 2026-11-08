@@ -130,6 +130,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.combat_kill_hitstop_cap < 0) return false;
     if (!input.read_f64(out.combat_kill_hitstop_regen)) return false;
     if (out.combat_kill_hitstop_regen < 0) return false;
+    if (!input.read_f64(out.combat_hurt_hitstop)) return false;
+    if (out.combat_hurt_hitstop < 0) return false;
     if (!input.read_f64(out.combat_hitstop_big_mult)) return false;
     if (out.combat_hitstop_big_mult < 0) return false;
     if (!input.read_f64(out.combat_hitstop_crit_mult)) return false;
@@ -4953,7 +4955,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     switch(kind) {
     case 1: {
         if (version != 16) return false;
-        if (count > input.remaining()/728) return false;
+        if (count > input.remaining()/736) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -7230,6 +7232,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.combat_config.kill_hitstop=config.combat_kill_hitstop;
     state.combat_config.kill_hitstop_cap=config.combat_kill_hitstop_cap;
     state.combat_config.kill_hitstop_regen=config.combat_kill_hitstop_regen;
+    state.combat_config.hurt_hitstop=config.combat_hurt_hitstop;
     state.combat_config.hitstop_big_mult=config.combat_hitstop_big_mult;
     state.combat_config.hitstop_crit_mult=config.combat_hitstop_crit_mult;
     state.combat_config.max_enemy_radius=config.combat_max_enemy_radius;
@@ -7320,6 +7323,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["combat_kill_hitstop"]=config.combat_kill_hitstop;
     out["combat_kill_hitstop_cap"]=config.combat_kill_hitstop_cap;
     out["combat_kill_hitstop_regen"]=config.combat_kill_hitstop_regen;
+    out["combat_hurt_hitstop"]=config.combat_hurt_hitstop;
     out["combat_hitstop_big_mult"]=config.combat_hitstop_big_mult;
     out["combat_hitstop_crit_mult"]=config.combat_hitstop_crit_mult;
     out["combat_max_enemy_radius"]=config.combat_max_enemy_radius;

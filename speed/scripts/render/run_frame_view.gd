@@ -175,6 +175,8 @@ var _shield_transfer_canvas: DrawLayer
 var _shield_layer := 2
 var _ship_white_material: ShaderMaterial
 var _ship_visible := true
+const ShipHurtFx := preload("res://scripts/render/fx/ship_hurt_fx.gd")
+var _hurt_fx: ShipHurtFx
 ## しし座が効いていて、機体の代わりに獅子を描いているか
 var _lion_on := false
 var _ship_transform := Transform2D.IDENTITY
@@ -211,6 +213,9 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	for entry in entries: visuals[int(entry.id)] = entry
 	add_child(_elite_deaths)
 	_elite_deaths.setup(scope,visuals)
+	_hurt_fx = ShipHurtFx.new()
+	add_child(_hurt_fx)
+	_hurt_fx.setup(_layer(16))
 	for entry: Dictionary in entries:
 		if entry.role==6: _shield_layer = maxi(_shield_layer,int(entry.id)-3)
 	var mark_layer := CanvasLayer.new()
@@ -1123,7 +1128,7 @@ func apply_frame(frame: Dictionary) -> bool:
 			_ship_visible = row.visible
 		sprite.transform = row.transform
 		sprite.visible = row.visible
-		_ship_white_material.set_shader_parameter("strength",1.0 if row.visual_state & 4 else 0.0)
+		_ship_white_material.set_shader_parameter("strength",maxf(1.0 if row.visual_state & 4 else 0.0,_hurt_fx.white_strength()))
 		sprite.modulate = Color("#ff6b5a") if row.visual_state & 1 else Color.WHITE
 		if row.visual_state & 2: sprite.modulate.a = 0.5
 	submit_us = Time.get_ticks_usec()-begin
@@ -1138,6 +1143,7 @@ func receive_frame(frame: Dictionary) -> bool:
 		_epoch = frame.epoch
 		boss_hit_feedback.clear()
 		ruler_shake=0.0
+		_hurt_fx.clear()
 		_queued_events.clear()
 		_reference_events.clear()
 		_elite_deaths.clear()
@@ -1510,6 +1516,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_duplicator_world_time = -1.0
 	_zoom = frame.camera.zoom
 	_sniper_world_time = float(frame.ui.world_time)
+	_hurt_fx.update(frame.ui,dt,_ship_visual_position,_ship_visible)
 	if not _sniper.is_empty(): _gunner_marks.queue_redraw()
 	var death_view := Rect2(frame.ui.view_center-frame.ui.view_half,frame.ui.view_half*2.0)
 	var captured := {}
@@ -1517,6 +1524,10 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
 	for event: Dictionary in _queued_events:
 		var stone_kill := _hero_power_visual.frame_event(event)
+		if event.type==&"hurt":
+			_hurt_fx.hurt()
+			var hurt_dir: Vector2 = event.get("dir",Vector2.ZERO)
+			_burst(_ship_visual_position-hurt_dir*float(frame.ui.ship_radius)*0.5,ShipHurtFx.SPARK_COLOR,ShipHurtFx.SPARK_COUNT,ShipHurtFx.SPARK_SPEED,hurt_dir)
 		if event.type==&"kill" and not captured.has(event.id):
 			_elite_deaths.add_event(event,frame.ui.world_time,death_view)
 			var enemy_type := StringName(event.enemy_type)

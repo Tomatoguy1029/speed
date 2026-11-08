@@ -49,6 +49,9 @@ struct ShipDamageRequest {
     int64_t observation_id=0,effect_id=0;
     godot::Vector2 impact;
     bool has_impact=false;
+    // 被弾の向きを出すための、攻撃の出どころ。弾・範囲の形から決める。
+    godot::Vector2 origin;
+    bool has_origin=false;
     double amount=0,slow=0;
     DamageScale scale=DamageScale::None;
     Cause cause=Cause::None;
