@@ -61,7 +61,7 @@ static func layout(texture: Texture2D) -> Dictionary:
 	return result
 
 ## 領域表は画素を描き替えず、クリック・塗装の単位だけを指定する。
-## 濃淡は元の連結領域の値を保ち、旧領域の一括塗装を同じ見た目で引き継ぐ。
+## 濃淡は元の連結領域を基準にし、normalize_shades指定時は分割した領域ごとを基準にする。
 static func _partition(data: Dictionary, path: String, alpha_hash: String) -> void:
 	var partition: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
 	assert(partition is Dictionary and partition.get("alpha_sha256", "") == alpha_hash, "装甲領域表のマスクが一致しない: " + path)
@@ -89,6 +89,11 @@ static func _partition(data: Dictionary, path: String, alpha_hash: String) -> vo
 			regions[region] = pixels
 			parents[region] = parent
 			labels[pixel] = region
+	if partition.get("normalize_shades", false):
+		for pixels: PackedInt32Array in regions.values():
+			var brightest := 0.001
+			for pixel in pixels: brightest = maxf(brightest, data.shades[pixel])
+			for pixel in pixels: data.shades[pixel] = data.shades[pixel] / brightest if brightest > 0.001 else 1.0
 	data.labels = labels
 	data.regions = regions
 	data.parents = parents
