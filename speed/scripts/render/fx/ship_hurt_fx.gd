@@ -10,9 +10,9 @@ const EDGE_SHADER := preload("res://shaders/ship_hurt_edge.gdshader")
 const WHITE_TIME := 0.06
 ## 被弾で画面の縁を赤く光らせる時間（実秒）と、その最大の濃さ。
 const FLASH_TIME := 0.28
-const FLASH_STRENGTH := 0.35
+const FLASH_STRENGTH := 0.2
 const FLASH_COLOR := Color(1.0, 0.16, 0.2)
-const FLASH_INNER := 0.4
+const FLASH_INNER := 0.6
 ## 被弾の火花。
 const SPARK_COUNT := 14
 const SPARK_SPEED := 400.0
@@ -20,12 +20,12 @@ const SPARK_COLOR := Color(1.0, 0.9, 0.6)
 ## HPが最大HPのこの割合以下になると、HPが少ない状態の演出を出す。
 const LOW_RATIO := 0.3
 ## HPが少ない間の縁の濃さ。拍のない間の濃さと、拍で足す濃さ。
-const LOW_BASE := 0.12
-const LOW_BEAT := 0.2
+const LOW_BASE := 0.07
+const LOW_BEAT := 0.12
 const LOW_COLOR := Color(0.78, 0.0, 0.12)
-const LOW_INNER := 0.4
+const LOW_INNER := 0.6
 ## 縁がいちばん濃くなる位置（中心から角までを1とする）。
-const EDGE_OUTER := 0.78
+const EDGE_OUTER := 0.85
 ## 心音の2つ目の拍（ドクンの「クン」）が、拍の間隔のどこで鳴るか。
 const LOW_SECOND_BEAT := 0.32
 ## 心音が鳴らないときに縁を脈打たせる間隔（実秒）。
