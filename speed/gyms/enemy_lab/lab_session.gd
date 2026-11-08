@@ -71,6 +71,7 @@ var _support_memo := {}
 var _support_signature := ""
 var _support_dirty := false
 var _program_memo := {}
+var _content_records := {}
 var _last_input := {}
 ## 描いたルートを本番の描画で描いている途中（点の列・描き終えるまでの回数・進んだ回数）。空なら描いていない
 var _route_play := {}
@@ -79,9 +80,15 @@ var pinned: Variant = null
 ## 最後に再生を始めた時刻（リセットで戻る所）
 var play_start := 0
 var _was_playing := false
+var _playback_changed := false
+var _play_checkpoint := preload("res://gyms/enemy_lab/lab_play_checkpoint.gd").new()
 
 func reset(settings := {}) -> void:
 	playing = false
+	_was_playing = false
+	_playback_changed = false
+	play_start = 0
+	_play_checkpoint.clear()
 	_seek_serial += 1
 	seeking = false
 	for checkpoint in checkpoints:
@@ -152,6 +159,7 @@ func _save_support_memo() -> void:
 	if file!=null: file.store_string(JSON.stringify({"signature":_support_signature,"results":_support_memo}))
 
 func _rebuild() -> void:
+	_play_checkpoint.clear()
 	revision += 1
 	_epoch += 1
 	if is_instance_valid(scene):
@@ -210,7 +218,8 @@ func _rebuild() -> void:
 	_formation_sources = []
 	_output = "res://.content/dev/lab_%d_%d" % [OS.get_process_id(),get_instance_id()]
 	RESOURCES.use_file_memo(HASH_MEMO)
-	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions,null,_boss_programs)
+	_content_records = {}
+	var built: Error = BUILDER.build(_source,_config,_output,"実験場".sha256_text(),_definitions,[],_boss_definitions,null,_boss_programs,PackedStringArray(),true,null,_content_records)
 	RESOURCES.save_file_memo()
 	BUILDER.end_package_memo()
 	RESOURCES.end_batch()
@@ -254,7 +263,7 @@ func _rebuild() -> void:
 	tick = 0
 	selected = -1
 	_cursor = 0
-	_state_key = ""
+	_state_key = str(hash(var_to_bytes(spec)))
 	_intent = Intent.new()
 	_last_input = {}
 	_route_play = {}
@@ -293,8 +302,9 @@ func vector(value) -> Vector2:
 	return Vector2(float(value[0]), float(value[1])) if value is Array and value.size() == 2 else Vector2.ZERO
 
 func _physics_process(delta: float) -> void:
-	if playing and not _was_playing and not seeking:
+	if playing and not _was_playing and not seeking and is_instance_valid(run):
 		play_start = tick
+		_play_checkpoint.capture(self)
 	_was_playing = playing
 	if not playing or seeking or not is_instance_valid(run):
 		return
@@ -305,6 +315,12 @@ func _physics_process(delta: float) -> void:
 		step()
 		_accumulator -= DT
 		budget += 1
+	_playback_changed = true
+
+## 同じ描画フレームに進んだ複数tickのUI更新をまとめる。
+func _process(_delta: float) -> void:
+	if not _playback_changed: return
+	_playback_changed = false
 	changed.emit()
 
 ## 試遊中は、本番の入力をその回の操作として記録してから進める。
@@ -382,12 +398,10 @@ func step() -> void:
 	_apply_recorded()
 
 func _apply_recorded() -> void:
-	var old_cursor := _cursor
 	while _cursor < history.size() and int(history[_cursor].tick) <= tick:
 		_apply(String(history[_cursor].kind), history[_cursor].args)
+		_state_key = _next_checkpoint_key(_state_key,history[_cursor])
 		_cursor += 1
-	if _state_key.is_empty() or old_cursor != _cursor:
-		_state_key = _checkpoint_key(tick)
 
 func perform(kind: String, args := {}) -> bool:
 	if seeking or not is_instance_valid(run): return false
@@ -407,13 +421,14 @@ func perform(kind: String, args := {}) -> bool:
 	revision += 1
 	history.append({"tick":tick,"kind":kind,"args":args.duplicate(true)})
 	_cursor = history.size()
-	_state_key = _checkpoint_key(tick)
-	changed.emit()
+	_state_key = _next_checkpoint_key(_state_key,history.back())
+	if kind!="input": changed.emit()
 	return true
 
 func _apply(kind: String, args: Dictionary) -> bool:
 	last_error = _apply_command(kind,args)
-	if last_error.get("ok",false): _refresh_projection()
+	if last_error.get("ok",false):
+		if kind!="input": _refresh_projection()
 	else: push_warning(last_error.get("message","実験の編集に失敗しました"))
 	return last_error.get("ok",false)
 
@@ -451,7 +466,9 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			var built: Error = _build_live_bundle(_source,_config,_definitions,next_sources,_boss_definitions,bundle)
 			if built!=OK: return {"ok":false,"message":"配置の定義を生成できません"}
 			var result: Dictionary = bridge.replace_scenario("formation",{"layout":int(args.get("layout",0)),"entry":int(args.get("entry",0))},bundle.bytes)
-			if result.ok: _formation_sources = next_sources
+			if result.ok:
+				_content_records = bundle.records
+				_formation_sources = next_sources
 			return result
 		"meta":
 			var levels: Dictionary = run.state.meta_override.duplicate(true)
@@ -545,6 +562,7 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			var result: Dictionary = bridge.replace_scenario("phase_set",{},bundle.bytes)
 			if result.ok:
 				_source = next
+				_content_records = bundle.records
 				run.state.data.stage = next
 			return result
 	return {"ok":false,"message":"この実験命令はまだ移行していません: "+kind}
@@ -618,6 +636,19 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		var edited: Resource = config if kind=="config" else bosses[type] if kind in ["boss_parameter","boss_appearance"] else next[type]
 		if preload("res://tools/content/build_boss_program.gd").fingerprint(original)==preload("res://tools/content/build_boss_program.gd").fingerprint(edited):
 			return {"ok":true,"unchanged":true}
+	# 停止倍率は戦闘の1列だけを変える。固定の画像・技・装備の変換を再実行しない。
+	if key=="hitstop_multiplier" and kind in ["parameter","boss_parameter"]:
+		var edited: Resource = bosses[type] if kind=="boss_parameter" else next[type]
+		var replacement := preload("res://gyms/enemy_lab/lab_hitstop_edit.gd").build(_content_records,String(type),edited.hitstop_multiplier)
+		if replacement.is_empty(): return {"ok":false,"message":"ヒットストップの定義を生成できません"}
+		var result: Dictionary = bridge.replace_definition(String(type),replacement.bytes,kind)
+		if result.ok:
+			_content_records = replacement.records
+			_definitions = next
+			_boss_definitions = bosses
+			run.enemies.data.definitions = next
+			run.bosses.definitions = bosses
+		return result
 	var lighting_edit := kind=="parameter" and key.begins_with("visual.") and key not in ["visual.scale","visual.collision_scale"]
 	if kind in ["armor_paint","boss_appearance"] or lighting_edit:
 		# 表示だけの編集は戦闘定義を作り直さない。停止中の別Sessionへ変更を漏らさない。
@@ -655,6 +686,7 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 		_boss_definitions = bosses
 		run.bosses.definitions = bosses
 		_config = config
+		_content_records = bundle.records
 		run.cfg = config
 		run.enemies.data.definitions = next
 		_replace_visuals(bundle.resources)
@@ -664,7 +696,9 @@ func _edit_definition(args: Dictionary, kind := "parameter") -> Dictionary:
 func _build_live_bundle(stage: RuntimeStage, config: GameConfig, definitions: Dictionary, formations: Array, bosses: Dictionary, bundle: Dictionary) -> Error:
 	RESOURCES.begin_batch()
 	BUILDER.begin_package_memo(_program_memo)
-	var result: Error = BUILDER.build(stage,config,_output,"実験場".sha256_text(),definitions,formations,bosses,scene.cpp_resources,_boss_programs,PackedStringArray(),false,bundle)
+	var records := {}
+	var result: Error = BUILDER.build(stage,config,_output,"実験場".sha256_text(),definitions,formations,bosses,scene.cpp_resources,_boss_programs,PackedStringArray(),false,bundle,records)
+	if result==OK: bundle.records = records
 	BUILDER.end_package_memo()
 	RESOURCES.end_batch()
 	return result
@@ -768,6 +802,7 @@ func seek(target: int, instant := false) -> void:
 		_boss_definitions = run.bosses.definitions
 		_config = run.cfg
 		_source = item.source
+		_content_records = item.records
 		_formation_sources = item.get("formation_sources",[]).duplicate(true)
 		scene.process_mode = Node.PROCESS_MODE_INHERIT
 		if viewport != null and scene.get_parent() == null:
@@ -816,20 +851,32 @@ func back_to_play_start() -> void:
 	playing = false
 	_was_playing = false
 	var at := mini(play_start, furthest)
-	if furthest > at or history.any(func(e): return int(e.tick) == at and String(e.kind) in ["input", "route"]):
+	var discard := furthest > at or history.any(func(e): return int(e.tick) == at and String(e.kind) in ["input", "route"])
+	if tick==at and not discard:
+		edit_undo.clear()
+		edit_redo.clear()
+		changed.emit()
+		return
+	if discard:
 		branches.append({"name": current_branch, "history": history.duplicate(true), "end": furthest})
 		branch_serial += 1
 		current_branch = TranslationServer.translate("lab.message_549e9c3c03") % branch_serial
 		history = history.filter(func(e): return int(e.tick) < at or (int(e.tick) == at and String(e.kind) not in ["input", "route"]))
 		furthest = at
 		_cursor = 0
-		# 今の場面は消した記録を含むので、保存せずに作り直す
-		if is_instance_valid(scene):
-			if scene.get_parent() != null:
-				scene.get_parent().remove_child(scene)
-			scene.queue_free()
-		scene = null
-		run = null
+	# 同じSessionなら戦闘の保持点と表示資源を戻し、生成・読み込みを繰り返さない。
+	if _play_checkpoint.restore(self):
+		edit_undo.clear()
+		edit_redo.clear()
+		changed.emit()
+		return
+	# 保持点のない記録や、再生開始時刻の配置を編集した場合は履歴から復元する。
+	if is_instance_valid(scene):
+		if scene.get_parent() != null:
+			scene.get_parent().remove_child(scene)
+		scene.queue_free()
+	scene = null
+	run = null
 	await seek(at, true)
 	edit_undo.clear()
 	edit_redo.clear()
@@ -855,16 +902,25 @@ func digest() -> String:
 	return str(hash(var_to_bytes([tick,baseline,spec,history.filter(func(entry): return int(entry.tick)<=tick),schedule,pending,_route_play,record.value if record.ok else {},snapshot.value if snapshot.ok else {}])))
 
 func _checkpoint_key(at: int) -> String:
-	return str(hash(var_to_bytes([spec, history.filter(func(e): return int(e.tick) <= at)])))
+	var key := str(hash(var_to_bytes(spec)))
+	for entry: Dictionary in history:
+		if int(entry.tick)>at: break
+		key = _next_checkpoint_key(key,entry)
+	return key
+
+## 入力1件ごとに過去の履歴を全件直列化しない。照合側も同じ順序で積む。
+func _next_checkpoint_key(previous: String, entry: Dictionary) -> String:
+	return str(hash(var_to_bytes([previous,entry])))
 
 ## 状態をコピーせず、停止したシーン全体を保持する。HSM とタイムラインも同じ実体で復元する。
 func _cache_current() -> void:
+	_play_checkpoint.clear()
 	if not is_instance_valid(scene) or not is_instance_valid(run): return
 	var held: Dictionary = bridge.checkpoint()
 	if not held.ok:
 		last_error = held
 		return
-	checkpoints.append({"checkpoint":held.value,"formation_sources":_formation_sources.duplicate(true),"source":_source,"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
+	checkpoints.append({"checkpoint":held.value,"records":_content_records,"formation_sources":_formation_sources.duplicate(true),"source":_source,"scene": scene, "run": run, "tick": tick, "cursor": _cursor, "intent": _intent, "route_play": _route_play.duplicate(true), "pinned": pinned,
 		"schedule": schedule.duplicate(true), "events": events.duplicate(true), "selected": selected, "key": _state_key})
 	scene.process_mode = Node.PROCESS_MODE_DISABLED
 	# 表示枠に残すと、保存した過去の場面も重なって描かれる
@@ -976,6 +1032,7 @@ func _restore_edit(source: Array[Dictionary], target: Array[Dictionary]) -> void
 	furthest = maxi(end, furthest)
 
 func _exit_tree() -> void:
+	_play_checkpoint.clear()
 	_seek_serial += 1
 	for checkpoint in checkpoints:
 		_free_checkpoint(checkpoint)
