@@ -4,6 +4,16 @@
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"scale": 1.25
+}
+armor_colors = {
+"res://assets/pixel/defender/armor.png|36x20|bb236b92c98701cae3224c738c92e29e0c4af1cd41cb7016cbca2a13601e757b": {
+"109": "6b829b",
+"141": "6b829b",
+"339": "6b829b"
+}
+}
 rank = 1
 radius = 13.0
 hp = 6.0
@@ -12,6 +22,7 @@ speed = 140.0
 accel = 2.5
 turn = 4.0
 xp = 1.0
+xp_reward_counts = PackedInt32Array()
 color = Color(0.9, 0.65, 0.35, 1)
 shape = &"box"
 behavior = &"defender"

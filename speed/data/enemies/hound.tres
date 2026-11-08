@@ -4,6 +4,22 @@
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"collision_scale": 1.25,
+"height": 0.4,
+"key_energy": 1.5,
+"scale": 1.25
+}
+armor_colors = {
+"res://assets/pixel/hound/armor.png|20x38|0181dbee5e01b885de6611d3a1597b4eecb4ea6126a51bc214b9dcdd8f353656": {
+"825": "3c7292",
+"826": "cb6e6e",
+"827": "3c7292",
+"828": "3c7292",
+"829": "3c7292",
+"830": "3c7292"
+}
+}
 rank = 1
 radius = 13.0
 hp = 6.0
@@ -12,6 +28,7 @@ speed = 160.0
 accel = 4.0
 turn = 4.0
 xp = 1.0
+xp_reward_counts = PackedInt32Array()
 color = Color(0.75, 0.65, 0.95, 1)
 shape = &"dart"
 behavior = &"hound"
