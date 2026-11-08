@@ -239,6 +239,7 @@ public:
     int64_t random_state() const;
     int64_t progression_revision() const;
     bool avoid_strong(double dt);
+    bool separate_crowd(double dt);
     Array enemies_snapshot() const;
     bool rebuild_enemy_grid(double cell_size);
     PackedInt64Array query_enemy_ids(Vector2 lo, Vector2 hi) const;

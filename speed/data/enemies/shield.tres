@@ -1,6 +1,6 @@
-[gd_resource type="Resource" script_class="EnemyDef" format=3]
+[gd_resource type="Resource" script_class="EnemyDef" format=3 uid="uid://mw0dydcbhq02"]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -13,25 +13,25 @@ visual_settings = {
 armor_colors = {
 "res://assets/pixel/shield/scutum_armor.png|47x42|ea901f636c0344c05eb5f437d7d647c7306bfc21d121b264a898f518567db42c": {
 "1035": "84878d",
-"1050": "42628c",
-"1064": "42628c",
+"1050": "304460",
+"1064": "304460",
 "1076": "84878d",
-"1194": "42628c",
-"1200": "42628c",
-"1473": "42628c",
-"1485": "42628c",
+"1194": "4d6792",
+"1200": "4d6792",
+"1473": "4d6792",
+"1485": "4d6792",
 "157": "84878d",
 "170": "84878d",
 "22": "84878d",
-"626": "42628c",
-"640": "42628c",
-"762": "42628c",
-"787": "42628c",
-"820": "42628c",
-"907": "42628c",
-"911": "42628c",
-"920": "42628c",
-"923": "42628c"
+"626": "ba912e",
+"640": "ba912e",
+"762": "ba912e",
+"787": "ba912e",
+"820": "ba912e",
+"907": "4d6792",
+"911": "4d6792",
+"920": "4d6792",
+"923": "4d6792"
 }
 }
 rank = 4
@@ -42,6 +42,7 @@ speed = 70.0
 accel = 1.2
 turn = 0.8
 xp = 12.0
+xp_reward_counts = PackedInt32Array()
 color = Color(0.62, 0.68, 0.8, 1)
 shape = &"hex"
 behavior = &"shield"

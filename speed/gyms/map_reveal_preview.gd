@@ -180,7 +180,7 @@ func _save() -> void:
 	if FileAccess.get_md5(settings_path) != _source_hash:
 		_status.text = "保存を止めました。別の場所で設定が変わっています。再読込して確認してください。"
 		return
-	var error := ResourceSaver.save(_settings, settings_path)
+	var error := TresSaver.save(_settings, settings_path)
 	if error != OK:
 		_status.text = "設定を保存できませんでした（%d）。" % error
 		return

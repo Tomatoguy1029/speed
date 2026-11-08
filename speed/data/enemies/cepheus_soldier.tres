@@ -4,6 +4,19 @@
 
 [resource]
 script = ExtResource("1")
+visual_settings = {
+"key_energy": 1.4
+}
+armor_colors = {
+"res://assets/pixel/cepheus_soldier/kepheus_servant_armor.png|21x42|91df30ff0fb2a4265a19b4ea4dfb7826236ddcdfd559b54115dc80e4ed09e915": {
+"10": "d8aa2e",
+"173": "4d6792",
+"182": "4d6792",
+"421": "4d6792",
+"436": "4d6792",
+"619": "d8aa2e"
+}
+}
 radius = 16.0
 hp = 10.0
 armor = 2.0

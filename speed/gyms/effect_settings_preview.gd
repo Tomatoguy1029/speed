@@ -1096,7 +1096,7 @@ func save_current() -> void:
 	if FileAccess.get_md5(SETTINGS_PATH) != _source_hash:
 		_message = "保存先が外部で変更されました。再読込してください。"
 		return
-	var error := ResourceSaver.save(_working.duplicate(true), SETTINGS_PATH)
+	var error := TresSaver.save(_working.duplicate(true), SETTINGS_PATH)
 	if error != OK:
 		_message = "保存失敗: " + error_string(error)
 		return

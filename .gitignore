@@ -26,3 +26,6 @@ demo/docs/keporusu.md
 /cpp/**/*.os
 /cpp/.sconsign.dblite
 /speed/extensions/run/bin/
+
+# Pythonのキャッシュ
+__pycache__/

@@ -44,19 +44,23 @@ func setup(scope: ContentResourceScope, entry: Dictionary, death_masks: Dictiona
 	_biting = entry.get("biting",false)
 	if entry.get("pump",false):
 		_pump = preload("res://scripts/render/enemies/pump.gd").new()
-		_pump.setup_frame(_canvas,look,paint,settings,_death_map)
+		_pump.setup_frame(_canvas,look,paint,settings,_death_map,entry.paint)
 	elif _biter:
 		var assets: Resource = scope.resources[parts_path]
-		for part: Dictionary in assets.get_meta("parts",[]):
-			_add_part(part.name,part.base,part.armor,part.normal,part.pivot-Vector2(10,17),paint,settings)
+		if not look.outlined_parts.is_empty() and look.outlined_armors.has(entry.paint):
+			for part: Dictionary in look.outlined_parts:
+				_add_outlined_part(part.name,part.base,part.armor,part.normal,look.outlined_armors[entry.paint],part.pivot-Vector2(10,17),settings)
+		else:
+			for part: Dictionary in assets.get_meta("parts",[]):
+				_add_part(part.name,part.base,part.armor,part.normal,part.pivot-Vector2(10,17),paint,settings)
 	else:
-		_add_part("body",look.base_texture(),paint,look.normal,Vector2.ZERO,paint,settings)
+		_add_part("body",look.base_texture(),paint,look.normal,Vector2.ZERO,paint,settings,look,entry.paint)
 		_ruler=entry.get("ruler",false) and look.split_other!=null
 		if _ruler:
 			var lower: EnemyLook=look.split_other
 			var lower_paint: Texture2D=lower.painted_armors[entry.lower_paint]
 			_death_map = death_masks.get(lower.source_path)
-			_add_part("lower",lower.base_texture(),lower_paint,lower.normal,Vector2.ZERO,lower_paint,settings)
+			_add_part("lower",lower.base_texture(),lower_paint,lower.normal,Vector2.ZERO,lower_paint,settings,lower,entry.lower_paint)
 			_parts.back().angle=lower.angle-look.angle
 	if _biting:
 		_sparks = InstanceBatch.new()
@@ -66,7 +70,11 @@ func setup(scope: ContentResourceScope, entry: Dictionary, death_masks: Dictiona
 		_sparks.material = material
 		_canvas.add_child(_sparks)
 
-func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, normal: Texture2D, pivot: Vector2, paint: Texture2D, settings: Dictionary) -> void:
+## look があり縁を焼き込んだ絵を持つときは、下地と装甲を1つの束で1体ずつ描く。
+func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, normal: Texture2D, pivot: Vector2, paint: Texture2D, settings: Dictionary, look: EnemyLook = null, paint_key := "") -> void:
+	if look!=null and look.outlined_base!=null and look.outlined_normal!=null and look.outlined_armors.has(paint_key):
+		_add_outlined_part(name,look.outlined_base,look.outlined_armors[paint_key],look.outlined_normal,null,pivot,settings)
+		return
 	var base := InstanceBatch.new()
 	base.setup_texture(base_texture)
 	var base_material := ShaderMaterial.new()
@@ -95,6 +103,31 @@ func _add_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, 
 	armor.material = material
 	_canvas.add_child(armor)
 	_parts.append({"name":name,"base":base,"armor":armor,"pivot":pivot})
+
+## paint があるときは、装甲の色を共通の確定塗装から取る（部位に分けた絵）。
+func _add_outlined_part(name: String, base_texture: Texture2D, armor_texture: Texture2D, normal: Texture2D, paint: Texture2D, pivot: Vector2, settings: Dictionary) -> void:
+	var batch := InstanceBatch.new()
+	var texture := CanvasTexture.new()
+	texture.diffuse_texture = armor_texture
+	texture.normal_texture = normal
+	batch.setup_texture(texture,Rect2(),EnemyLook.OUTLINE_PAD)
+	var material := ShaderMaterial.new()
+	material.shader = load("res://shaders/pixel_enemy.gdshader")
+	material.set_shader_parameter("base_tex",base_texture)
+	if paint!=null:
+		material.set_shader_parameter("use_paint",true)
+		material.set_shader_parameter("paint_tex",paint)
+	material.set_shader_parameter("outline_pad",float(EnemyLook.OUTLINE_PAD))
+	material.set_shader_parameter("ambient",settings.ambient)
+	material.set_shader_parameter("normal_strength",settings.normal_strength)
+	# ペルセウス座の石の色は、HDR の画面（Compatibility 以外）ではリニアで出す
+	material.set_shader_parameter("stone_linear",RenderingServer.get_current_rendering_method() != "gl_compatibility")
+	if _death_map != null:
+		material.set_shader_parameter("death_enabled",true)
+		material.set_shader_parameter("death_map",_death_map)
+	batch.material = material
+	_canvas.add_child(batch)
+	_parts.append({"name":name,"base":batch,"armor":null,"pivot":pivot})
 
 func begin() -> void:
 	_seen = false
@@ -170,6 +203,7 @@ func end() -> void:
 		var began := Time.get_ticks_usec() if perf.active else 0
 		part.base.end()
 		perf.since(&"enemies.body",began)
+		if part.armor==null: continue
 		began = Time.get_ticks_usec() if perf.active else 0
 		part.armor.apply_shared_frame(part.base)
 		perf.since(&"enemies.armor",began)
@@ -189,7 +223,7 @@ func set_death_brightness(value: float) -> void:
 	if _pump!=null: _pump.frame_brightness(value)
 	for part: Dictionary in _parts:
 		part.base.material.set_shader_parameter("brightness",value)
-		part.armor.material.set_shader_parameter("brightness",value)
+		if part.armor!=null: part.armor.material.set_shader_parameter("brightness",value)
 
 func frame_event(event: Dictionary, texture: Texture2D) -> void:
 	if _pump!=null: _pump.frame_event(event,texture)

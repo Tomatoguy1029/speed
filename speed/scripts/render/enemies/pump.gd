@@ -14,6 +14,7 @@ var _wind_mesh: QuadMesh
 var _frame_parent: Node
 var _frame_look: EnemyLook
 var _frame_paint: Texture2D
+var _frame_outlined := false
 var _frame_settings: Dictionary
 var _frame_targets := {}
 var _frame_swallow: DrawLayer
@@ -21,11 +22,13 @@ var _frame_clock := -1.0
 var _frame_brightness_value := 1.0
 var _death_map: Texture2D
 
-func setup_frame(parent: Node, look: EnemyLook, paint: Texture2D, settings: Dictionary, death_map: Texture2D = null) -> void:
+func setup_frame(parent: Node, look: EnemyLook, paint: Texture2D, settings: Dictionary, death_map: Texture2D = null, paint_key := "") -> void:
 	_death_map = death_map
 	_frame_parent = parent
 	_frame_look = look
 	_frame_paint = paint
+	_frame_outlined = look.outlined_base!=null and look.outlined_normal!=null and look.outlined_armors.has(paint_key)
+	if _frame_outlined: _frame_paint = look.outlined_armors[paint_key]
 	_frame_settings = settings
 	_body_mesh = QuadMesh.new()
 	_body_mesh.size = Vector2(44,54)
@@ -45,9 +48,13 @@ func _frame_nodes() -> void:
 		material.set_shader_parameter("death_enabled",true)
 		material.set_shader_parameter("death_map",_death_map)
 	material.set_shader_parameter("brightness",_frame_brightness_value)
-	material.set_shader_parameter("base_tex",_frame_look.base)
+	material.set_shader_parameter("base_tex",_frame_look.outlined_base if _frame_outlined else _frame_look.base)
 	material.set_shader_parameter("armor_tex",_frame_paint)
-	material.set_shader_parameter("normal_tex",_frame_look.normal)
+	material.set_shader_parameter("normal_tex",_frame_look.outlined_normal if _frame_outlined else _frame_look.normal)
+	if _frame_outlined:
+		material.set_shader_parameter("pad",float(EnemyLook.OUTLINE_PAD))
+		var outline := EnemyLook.OUTLINE_COLOR
+		material.set_shader_parameter("outline_color",Vector3(outline.r,outline.g,outline.b))
 	for k in 3: material.set_shader_parameter("enemy%d" % k,ENEMIES[k])
 	for key in ["normal_strength","ambient"]: material.set_shader_parameter(key,_frame_settings[key])
 	body.material = material

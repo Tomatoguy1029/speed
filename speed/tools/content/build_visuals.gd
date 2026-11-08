@@ -33,6 +33,7 @@ static func build(output: String) -> Error:
 		if not file.ends_with(".tres"): continue
 		var definition := load("res://data/enemies/" + file) as EnemyDef
 		if not definition.armor_colors.is_empty(): palettes.append(definition.armor_colors)
+	var biter_parts := ResourceLoader.load("res://data/visuals/biter_parts.tres", "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as Resource
 	var index := StageResources.new()
 	for file in DirAccess.get_files_at("res://data/visuals/looks"):
 		if not file.ends_with(".tres"): continue
@@ -40,6 +41,7 @@ static func build(output: String) -> Error:
 		var name := file.get_basename()
 		var result: EnemyLook = TRANSFORM.prepare_look(source, palettes)
 		if result == null or not result.prepared or result.previews.is_empty(): return ERR_INVALID_DATA
+		if biter_parts.get_meta("source_look", "") == source.resource_path: result.outlined_parts = TRANSFORM.outlined_parts(biter_parts.get_meta("parts", []))
 		var path := output.path_join("look_" + name + ".res")
 		var error := ResourceSaver.save(result, path)
 		if error != OK: return error

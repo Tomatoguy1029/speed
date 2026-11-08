@@ -1,6 +1,6 @@
 [gd_resource type="Resource" script_class="EnemyDef" format=3]
 
-[ext_resource type="Script" path="res://scripts/data_types/enemy_def.gd" id="1"]
+[ext_resource type="Script" uid="uid://dffudlvu1bf8v" path="res://scripts/data_types/enemy_def.gd" id="1"]
 
 [resource]
 script = ExtResource("1")
@@ -9,9 +9,14 @@ visual_settings = {
 }
 armor_colors = {
 "res://assets/pixel/defender/armor.png|36x20|bb236b92c98701cae3224c738c92e29e0c4af1cd41cb7016cbca2a13601e757b": {
-"109": "6b829b",
-"141": "6b829b",
-"339": "6b829b"
+"109": "7c9dae",
+"11": "7c9dae",
+"141": "7c9dae",
+"228": "7c9dae",
+"23": "7c9dae",
+"238": "7c9dae",
+"339": "7c9dae",
+"87": "7c9dae"
 }
 }
 rank = 1

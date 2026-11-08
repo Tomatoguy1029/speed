@@ -287,7 +287,7 @@ func _save_appearance_target(target: Dictionary) -> String:
 	var values := _appearance_values(definition, target.boss)
 	for key in values: saved.set(key, values[key].duplicate(true))
 	if FileAccess.get_sha256(path) != expected: return tr("lab.appearance.file_changed")
-	var error := ResourceSaver.save(saved, path)
+	var error := TresSaver.save(saved, path)
 	if error != OK: return tr("lab.appearance.save_failed") + " " + error_string(error)
 	var saved_hash := FileAccess.get_sha256(path)
 	if saved_hash.is_empty(): return tr("lab.appearance.save_failed")
