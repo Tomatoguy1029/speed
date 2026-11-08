@@ -7,6 +7,9 @@ shader_type canvas_item;
 varying float death_age;
 uniform sampler2D base_tex : filter_nearest;
 uniform float outline_pad = 1.0;
+// 部位に分けた絵（噛みつく雑魚）は、装甲の色を共通の確定塗装から、アルファと法線を部位から取る
+uniform bool use_paint = false;
+uniform sampler2D paint_tex : filter_nearest;
 uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
@@ -41,6 +44,7 @@ void fragment() {
 	vec2 sprite_uv = mapped.xy;
 	vec2 size = vec2(textureSize(base_tex, 0));
 	vec4 armor = texture(TEXTURE, sprite_uv);
+	if (use_paint) armor.rgb = texture(paint_tex, sprite_uv).rgb;
 	if (armor.a > 0.0) {
 		armor.rgb = hero_stone(armor.rgb, sprite_uv, size, stone_since, TIME, stone_linear);
 		vec3 lit = mix(armor.rgb, vec3(1.0), hit_flash * 0.8) * ambient;
@@ -61,6 +65,7 @@ void fragment() {
 void light() {
 	vec2 sprite_uv = padded_sample(UV, death_age).xy;
 	vec4 armor = texture(TEXTURE, sprite_uv);
+	if (use_paint) armor.rgb = texture(paint_tex, sprite_uv).rgb;
 	// 下地と縁は照明を受けない
 	if (armor.a <= 0.0) {
 		LIGHT = vec4(0.0);

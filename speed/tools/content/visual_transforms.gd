@@ -171,6 +171,51 @@ static func _outlined_base(base: Image, shapes: Array[Image]) -> Image:
 				result.set_pixel(x, y, EnemyLook.OUTLINE_COLOR)
 	return result
 
+## 噛みつく雑魚の部位（共通キャンバス）へ縁を焼き込む。縁は全部位を合わせた外形の外側に置き、
+## 隣り合う画素の多い部位に持たせて、顎の回転と一緒に動かす。
+static func outlined_parts(parts: Array) -> Array[Dictionary]:
+	var bases: Array[Image] = []
+	var owners: Array[PackedByteArray] = []
+	var width := 0
+	var height := 0
+	for part: Dictionary in parts:
+		var base := _padded((part.base as Texture2D).get_image())
+		var armor := _padded((part.armor as Texture2D).get_image())
+		width = base.get_width()
+		height = base.get_height()
+		var filled := PackedByteArray()
+		filled.resize(width * height)
+		for y in height:
+			for x in width:
+				if base.get_pixel(x, y).a > 0.0 or armor.get_pixel(x, y).a > 0.0: filled[y * width + x] = 1
+		bases.append(base)
+		owners.append(filled)
+	for y in height:
+		for x in width:
+			var pixel := y * width + x
+			var empty := true
+			for filled in owners:
+				if filled[pixel] == 1: empty = false
+			if not empty: continue
+			var best := -1
+			var best_count := 0
+			for i in owners.size():
+				var count := 0
+				for offset: Vector2i in [Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, -1), Vector2i(0, 1)]:
+					var at := Vector2i(x, y) + offset
+					if at.x >= 0 and at.y >= 0 and at.x < width and at.y < height and owners[i][at.y * width + at.x] == 1: count += 1
+				if count > best_count:
+					best = i
+					best_count = count
+			if best >= 0: bases[best].set_pixel(x, y, EnemyLook.OUTLINE_COLOR)
+	var result: Array[Dictionary] = []
+	for i in parts.size():
+		var part: Dictionary = parts[i]
+		result.append({"name": part.name, "pivot": part.pivot, "base": ImageTexture.create_from_image(bases[i]),
+			"armor": ImageTexture.create_from_image(_padded((part.armor as Texture2D).get_image())),
+			"normal": ImageTexture.create_from_image(_padded((part.normal as Texture2D).get_image()))})
+	return result
+
 static func prepare_look(source: EnemyLook, palettes: Array[Dictionary], pair: EnemyLook = null) -> EnemyLook:
 	var result := source.duplicate() as EnemyLook
 	result.prepared = true

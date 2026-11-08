@@ -36,6 +36,8 @@ extends Resource
 @export_storage var outlined_base: Texture2D
 @export_storage var outlined_normal: Texture2D
 @export_storage var outlined_armors: Dictionary = {}
+## 部位に分けて描く外観（噛みつく雑魚）の、縁を焼き込んだ部位。name・pivot・base・armor・normal を持つ
+@export_storage var outlined_parts: Array[Dictionary] = []
 
 const OUTLINE_PAD := 1
 const OUTLINE_COLOR := Color8(2, 4, 10)

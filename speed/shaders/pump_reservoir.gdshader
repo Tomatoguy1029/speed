@@ -14,6 +14,9 @@ uniform float flash = 0.0;
 uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
+// 縁を焼き込み外周を広げた絵のときの余白ドット数（0 なら元の絵）
+uniform float pad = 0.0;
+uniform vec3 outline_color = vec3(0.008, 0.016, 0.039);
 varying vec2 local_pixel;
 varying vec4 albedo;
 #include "res://shaders/pump_outline.gdshaderinc"
@@ -23,19 +26,21 @@ void vertex() {
 void fragment() {
 	vec2 p = floor(local_pixel);
 	vec2 source = p;
-	bool front = p.y < 18.0 && p.x >= 0.0 && p.x < 24.0 && p.y >= 0.0;
-	if (front) front = max(texture(base_tex,(p+0.5)/vec2(24,37)).a,texture(armor_tex,(p+0.5)/vec2(24,37)).a)>0.0;
+	vec2 padded = vec2(24.0, 37.0) + 2.0 * pad;
+	bool front = p.y < 18.0 && p.x >= -pad && p.x < 24.0 + pad && p.y >= -pad;
+	if (front) front = max(texture(base_tex,(p+pad+0.5)/padded).a,texture(armor_tex,(p+pad+0.5)/padded).a)>0.0;
 	vec2 delta = p - vec2(12.0, 27.0);
 	vec2 radii = pump_radii(p, full);
 	float target = radii.y;
 	bool rear = full <= 0.001 || length(delta) <= target;
 	if (!front && full > 0.001) source = pump_source(p, radii);
-	bool valid = source.x >= 0.0 && source.x < 24.0 && source.y >= (front ? 0.0 : 18.0) && source.y < 37.0;
-	vec2 sample_uv = (source + 0.5) / vec2(24.0, 37.0);
-	vec3 mapped = death_sample(sample_uv, death_age);
+	// 膨らんだ後部は形が変わるため、膨らんだ外周の1ドット外側へ縁を置く
+	bool rim = !front && full > 0.001 && pad > 0.0 && p.y >= 18.0 && length(delta) > target && length(delta) <= target + pad;
+	bool valid = source.x >= -pad && source.x < 24.0 + pad && source.y >= (front ? -pad : 18.0) && source.y < 37.0 + pad;
+	vec3 mapped = death_sample((source + 0.5) / vec2(24.0, 37.0), death_age);
 	if (mapped.z < 0.5) discard;
-	sample_uv = mapped.xy;
-	if (death_enabled) source = sample_uv * vec2(24.0, 37.0) - 0.5;
+	if (death_enabled) source = mapped.xy * vec2(24.0, 37.0) - 0.5;
+	vec2 sample_uv = (source + pad + 0.5) / padded;
 	vec4 base = valid && (front || rear) ? texture(base_tex, sample_uv) : vec4(0.0);
 	vec4 armor = valid && (front || rear) ? texture(armor_tex, sample_uv) : vec4(0.0);
 	vec4 contents = vec4(0.0);
@@ -56,6 +61,10 @@ void fragment() {
 	albedo.rgb = mix(armor.rgb, vec3(1.0), flash * 0.8);
 	vec3 color = mix(inside.rgb, albedo.rgb * ambient, armor.a);
 	COLOR = vec4(color * brightness, max(max(base.a, armor.a), contents_alpha));
+	if (rim) {
+		albedo = vec4(0.0);
+		COLOR = vec4(outline_color * brightness, 1.0);
+	}
 	vec3 n = texture(normal_tex, sample_uv).rgb * 2.0 - 1.0;
 	n.y *= -1.0;
 	n = normalize(vec3(n.xy * normal_strength, max(n.z, 0.001)));
