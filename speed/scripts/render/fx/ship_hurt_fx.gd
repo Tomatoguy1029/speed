@@ -10,9 +10,9 @@ const EDGE_SHADER := preload("res://shaders/ship_hurt_edge.gdshader")
 const WHITE_TIME := 0.06
 ## 被弾で画面の縁を赤く光らせる時間（実秒）と、その最大の濃さ。
 const FLASH_TIME := 0.28
-const FLASH_STRENGTH := 0.75
+const FLASH_STRENGTH := 0.35
 const FLASH_COLOR := Color(1.0, 0.16, 0.2)
-const FLASH_INNER := 0.55
+const FLASH_INNER := 0.4
 ## 被弾の火花。
 const SPARK_COUNT := 14
 const SPARK_SPEED := 400.0
@@ -20,10 +20,12 @@ const SPARK_COLOR := Color(1.0, 0.9, 0.6)
 ## HPが最大HPのこの割合以下になると、HPが少ない状態の演出を出す。
 const LOW_RATIO := 0.3
 ## HPが少ない間の縁の濃さ。拍のない間の濃さと、拍で足す濃さ。
-const LOW_BASE := 0.18
-const LOW_BEAT := 0.32
+const LOW_BASE := 0.12
+const LOW_BEAT := 0.2
 const LOW_COLOR := Color(0.78, 0.0, 0.12)
-const LOW_INNER := 0.6
+const LOW_INNER := 0.4
+## 縁がいちばん濃くなる位置（中心から角までを1とする）。
+const EDGE_OUTER := 0.78
 ## 心音の2つ目の拍（ドクンの「クン」）が、拍の間隔のどこで鳴るか。
 const LOW_SECOND_BEAT := 0.32
 ## 心音が鳴らないときに縁を脈打たせる間隔（実秒）。
@@ -57,6 +59,7 @@ func _edge_rect(color: Color, inner: float) -> ColorRect:
 	material.shader = EDGE_SHADER
 	material.set_shader_parameter(&"tint", color)
 	material.set_shader_parameter(&"inner", inner)
+	material.set_shader_parameter(&"outer", EDGE_OUTER)
 	material.set_shader_parameter(&"strength", 0.0)
 	rect.material = material
 	rect.visible = false
@@ -103,6 +106,11 @@ func _particles(parent: Node2D, amount: int, lifetime: float, color: Color, soft
 	particles.color_ramp = fade
 	parent.add_child(particles)
 	return particles
+
+## 縁の層を画面効果の層へ移し、外観の追加で増える敵の層より手前に保つ。
+func move_overlay(pipeline: RenderPipeline) -> void:
+	remove_child(_overlay)
+	pipeline.add_screen_layer(_overlay, 2)
 
 ## 被弾したときに呼ぶ。火花は呼び出し側の火花の仕組みで出す。
 func hurt() -> void:

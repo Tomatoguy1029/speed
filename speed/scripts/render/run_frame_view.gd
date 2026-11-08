@@ -200,6 +200,10 @@ var landmark_aura: Node2D
 var elite_crackle: Node2D
 var _mark_clock := 0.0
 
+## 画面全体に重ねる演出の層を画面効果の層へ置く。pipeline を作ったあとに呼ぶ。
+func place_screen_effects(screen_pipeline: RenderPipeline) -> void:
+	_hurt_fx.move_overlay(screen_pipeline)
+
 func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_scale: float) -> void:
 	_ship_white_material = ShaderMaterial.new()
 	_ship_white_material.shader = preload("res://shaders/ship_contact_white.gdshader")
