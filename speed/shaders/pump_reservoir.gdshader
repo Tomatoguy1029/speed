@@ -16,7 +16,7 @@ uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
 // 縁を焼き込み外周を広げた絵のときの余白ドット数（0 なら元の絵）
 uniform float pad = 0.0;
-uniform vec3 outline_color = vec3(0.008, 0.016, 0.039);
+uniform vec3 outline_color : source_color = vec3(0.008, 0.016, 0.039);
 varying vec2 local_pixel;
 varying vec4 albedo;
 #include "res://shaders/pump_outline.gdshaderinc"

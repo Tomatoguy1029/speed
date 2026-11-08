@@ -5,11 +5,11 @@ shader_type canvas_item;
 #include "res://shaders/elite_death.gdshaderinc"
 #include "res://shaders/hero_stone.gdshaderinc"
 varying float death_age;
-uniform sampler2D base_tex : filter_nearest;
+uniform sampler2D base_tex : source_color, filter_nearest;
 uniform float outline_pad = 1.0;
 // 部位に分けた絵（噛みつく雑魚）は、装甲の色を共通の確定塗装から、アルファと法線を部位から取る
 uniform bool use_paint = false;
-uniform sampler2D paint_tex : filter_nearest;
+uniform sampler2D paint_tex : source_color, filter_nearest;
 uniform float brightness = 1.0;
 uniform float ambient = 0.08;
 uniform float normal_strength = 1.0;
