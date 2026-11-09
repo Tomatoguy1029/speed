@@ -180,7 +180,7 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             const double vn=runtime.state.ship.vel.dot(normal);
             if (vn<0) {runtime.state.ship.vel-=normal*2.0*vn;runtime.state.ship.vel*=c.bounce_keep;}
             if (health.hit_cd<=0) {
-                health.hit_cd=0.25;speed::EventBuilder::audio(runtime,runtime.state.field.rocks[enemy.rock.slot].kind==speed::RockKind::Iron?"field.iron.block":"field.meteor.hit",position);Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
+                health.hit_cd=0.25;speed::EventBuilder::audio(runtime,runtime.state.field.rocks[enemy.rock.slot].kind==speed::RockKind::Iron?"field.iron.block":"field.meteor.impact",position);Dictionary impact;impact["pos"]=position;impact["normal"]=normal;impact["enemy_pos"]=enemy.pos;impact["r"]=enemy.radius;emit_event("block_impact",impact);
                 damage_enemy(hit.row,attack*0.25,"bump",false,-normal);
             }
             continue;

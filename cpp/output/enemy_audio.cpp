@@ -23,8 +23,7 @@ constexpr ModeSound MODE_SOUNDS[]={
 };
 /// 現れた時に鳴らす欄。loop の欄は、いる間ずっと鳴らす。
 struct LifeSound {Kind kind;const char *cue;bool loop;};
-constexpr LifeSound LIFE_SOUNDS[]={{Kind::TriangleStar,"elite.triangle.spin",true},{Kind::Auriga,"elite.auriga.drive",true},
-    {Kind::Hound,"enemy.hound.rush",false},{Kind::Defender,"enemy.defender.line",false}};
+constexpr LifeSound LIFE_SOUNDS[]={{Kind::TriangleStar,"elite.triangle.spin",true},{Kind::Auriga,"elite.auriga.drive",true}};
 }
 void EnemyAudio::mode_changed(RunRuntime &run,uint32_t row,EnemyMode before) {
     const auto &e=run.state.enemies[row];if (e.mode==before) return;const auto kind=run.content->definitions[e.definition].kind;

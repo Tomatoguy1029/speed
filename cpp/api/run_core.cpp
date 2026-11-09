@@ -291,7 +291,7 @@ bool SpeedRunCore::advance_enemies(double delta) {
         if (enemy.shove_time > 0 || enemy.knock_t > 0) { update_pushed(enemy, delta);speed::FieldSystem::collide_enemy(runtime,uint32_t(row),from,delta);continue; }
         const Vector2 relative = enemy.pos - runtime.state.view_center;
         const bool far = def.kind!=speed::EnemyDefinition::Kind::Aquila && def.kind!=speed::EnemyDefinition::Kind::Marlin && def.kind!=speed::EnemyDefinition::Kind::Pulser && (std::abs(relative.x) > limit.x || std::abs(relative.y) > limit.y);
-        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) { if (!far && first_update) speed::EnemyAudio::spawned(runtime,uint32_t(row)); advance_biter(row, delta, far); continue; }
+        if (def.kind == speed::EnemyDefinition::Kind::Biter || def.kind == speed::EnemyDefinition::Kind::Hound || def.kind==speed::EnemyDefinition::Kind::Defender) { advance_biter(row, delta, far); continue; }
         if (!far || (enemy.id + runtime.state.ticks) % 3 == 0) {
             if (def.kind==speed::EnemyDefinition::Kind::Crow) {
                 speed::CrowBehavior::step(runtime,uint32_t(row));
