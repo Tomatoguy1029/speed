@@ -62,7 +62,7 @@ func _ready() -> void:
 func _check_debug_spawns(session: RunSession, amount: int) -> void:
 	var bridge = session.bridge
 	var before: int = bridge.read_metrics().value.enemies
-	var reply: Dictionary = bridge.command("dev_edit", {"kind":"debug_action","payload":{"action":"random","args":{"count":amount,"ids":PackedStringArray(["drifter"])}}})
+	var reply: Dictionary = bridge.command("dev_edit", {"kind":"debug_action","payload":{"action":"random","args":{"count":amount,"ids":PackedStringArray(["splitling"])}}})
 	check(reply.ok and bridge.read_metrics().value.enemies >= before + amount, "デバッグ命令で指定数を生成: %d" % amount)
 	for path in session.cpp_resources.paths:
 		check(session.resources.resources.has(path), "生成済みの依存資源をランのScopeに保持: " + path)

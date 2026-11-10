@@ -10,7 +10,7 @@ func _ready() -> void:
 	_grid = GridContainer.new()
 	_grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(_grid)
-	for id in ["drifter","swarm","darter","armored","splitter","splitling","gunner","missile","battleship","titan"]:
+	for id in ["splitter","splitling","missile"]:
 		_add_asset(load("res://data/enemies/%s.tres" % id).display_name,load("res://assets/pixel/%s.png" % id))
 	for item in [["機体","airship"],["月","moon"],["惑星","planet"]]:
 		_add_asset(item[0],load("res://assets/pixel/%s.png" % item[1]))

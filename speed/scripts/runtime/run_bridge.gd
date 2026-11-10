@@ -188,7 +188,7 @@ func replace_definition(definition_id: String, replacement: PackedByteArray, edi
 		if result.ok and not resumed.ok: return resumed
 	return result
 
-## 制作中の配置・時間帯も、生成と現在版を照合して一度で適用する。
+## 制作中の配置も、生成と現在版を照合して一度で適用する。
 func replace_scenario(kind: String, params: Dictionary, replacement: PackedByteArray) -> Dictionary:
 	var frame := read_frame()
 	if not frame.ok: return frame

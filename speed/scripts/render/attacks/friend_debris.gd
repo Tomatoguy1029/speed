@@ -2,7 +2,7 @@
 extends Node2D
 const STYLE = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.DebrisStyle
 const PUMP_SHADER := preload("res://shaders/pump_debris.gdshader")
-const PUMP_ENEMIES := [preload("res://assets/pixel/drifter.png"),preload("res://assets/pixel/swarm.png"),preload("res://assets/pixel/splitling.png")]
+const PUMP_ENEMIES := [preload("res://assets/pixel/bomber.png"),preload("res://assets/pixel/splitter.png"),preload("res://assets/pixel/splitling.png")]
 var _row: Dictionary = {}
 var _pixel := 1.0
 var _zoom := 1.0

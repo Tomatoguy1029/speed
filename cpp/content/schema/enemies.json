@@ -101,53 +101,6 @@
       ]
     },
     {
-      "name": "GunnerDefinition",
-      "section": 28,
-      "fields": [
-        {
-          "name": "id",
-          "type": "u32",
-          "min": 1,
-          "ref": "EnemyRecord"
-        },
-        {
-          "name": "accel",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "keep",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "telegraph",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "bullet_speed",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "bullet_damage",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "slow",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "admission_duration",
-          "type": "f64",
-          "min": 0
-        }
-      ]
-    },
-    {
       "name": "BeamerDefinition",
       "section": 29,
       "fields": [
@@ -340,49 +293,6 @@
           "type": "u32",
           "min": 1,
           "ref": "EnemyRecord"
-        }
-      ]
-    },
-    {
-      "name": "DashDefinition",
-      "section": 50,
-      "fields": [
-        {
-          "name": "id",
-          "type": "u32",
-          "min": 1,
-          "ref": "EnemyRecord"
-        },
-        {
-          "name": "range",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "warn",
-          "type": "f64",
-          "min": 0,
-          "source": "windup"
-        },
-        {
-          "name": "dash_time",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "dash_speed",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "recover",
-          "type": "f64",
-          "min": 0
-        },
-        {
-          "name": "admission_duration",
-          "type": "f64",
-          "min": 0
         }
       ]
     },

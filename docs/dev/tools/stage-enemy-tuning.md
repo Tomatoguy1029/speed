@@ -178,25 +178,17 @@
 | 吸い込む間隔 (`params.swallow_interval`) | 敵を1体吸い込んでから次を吸い込めるまでの時間。 | 世界秒 |
 | 吸い込む距離 (`params.swallow_reach`) | 胴体の縁からこの距離まで来た敵を吸い込む。 | 単位（距離） |
 | 予告の時間 (`params.telegraph`) | 撃つ前に光って知らせる時間。 | 世界秒 |
-| 投擲の威力：装甲型 (`params.throw_damage_armored`) | この種類を投げたときの固定ダメージ。 | HP |
 | 投擲の威力：噛みつく雑魚 (`params.throw_damage_biter`) | この種類を投げたときの固定ダメージ。 | HP |
-| 投擲の威力：ダーター (`params.throw_damage_darter`) | この種類を投げたときの固定ダメージ。 | HP |
-| 投擲の威力：ドリフター (`params.throw_damage_drifter`) | この種類を投げたときの固定ダメージ。 | HP |
 | 投擲の威力：猟犬 (`params.throw_damage_hound`) | この種類を投げたときの固定ダメージ。 | HP |
 | 投擲の威力：分裂体 (`params.throw_damage_splitling`) | この種類を投げたときの固定ダメージ。 | HP |
 | 投擲の威力：分裂する雑魚 (`params.throw_damage_splitter`) | この種類を投げたときの固定ダメージ。 | HP |
-| 投擲の威力：スウォーム (`params.throw_damage_swarm`) | この種類を投げたときの固定ダメージ。 | HP |
 | 投擲の頭の大きさ (`params.throw_effect_scale`) | 敵本体の半径に掛ける攻撃エフェクトと当たり判定の倍率。尾は飾り。 | 倍 |
 | 投擲の持続時間 (`params.throw_life`) | 投擲の終了後は同じ個体が通常行動へ戻る。 | 世界秒 |
 | 投げる速さ (`params.throw_speed`) | 旋回の進行方向を保って投げる速さ。 | 単位/秒 |
-| 投擲の重み：装甲型 (`params.throw_weight_armored`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
 | 投擲の重み：噛みつく雑魚 (`params.throw_weight_biter`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
-| 投擲の重み：ダーター (`params.throw_weight_darter`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
-| 投擲の重み：ドリフター (`params.throw_weight_drifter`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
 | 投擲の重み：猟犬 (`params.throw_weight_hound`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
 | 投擲の重み：分裂体 (`params.throw_weight_splitling`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
 | 投擲の重み：分裂する雑魚 (`params.throw_weight_splitter`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
-| 投擲の重み：スウォーム (`params.throw_weight_swarm`) | 旋回している種類だけで抽選する重み。0 で対象外。 | 重み |
 | サーチライトの追う速さ (`params.track_turn`) | 帯の中にいる機体を追って向きを変える速さ。これより速く横へ動けば振り切れる。 | ラジアン/秒 |
 | trail_dmg (`params.trail_dmg`) | 三角が通った炎の跡が与えるダメージ。 | HP |
 | 炎の跡の間隔 (`params.trail_step`) | 飛んだ跡に炎を残す時間の間隔。 | 世界秒 |

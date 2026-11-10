@@ -65,7 +65,7 @@ func check_cpp_planet() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 83
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_planet"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder!=null and builder.can_instantiate(),"地形の生成入口を読み込める")
@@ -135,7 +135,7 @@ func check_cpp_moons() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 84
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_moons"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder!=null and builder.can_instantiate(),"月の生成入口を読み込める")
@@ -165,7 +165,7 @@ func check_cpp_moons() -> void:
 	var moon: Dictionary = initial.bodies[1]
 	var start: Vector2 = moon.position-Vector2(moon.radius+80.0,0.0)
 	check(bridge.command("dev_ship_motion",{"position":moon.position+Vector2(500,-500),"velocity":Vector2.ZERO}).ok,"月の近くを通常の表示範囲にする")
-	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":start})
+	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":start})
 	check(spawned.ok,"月へ向かう敵を出す")
 	if not spawned.ok:
 		session.free()
@@ -262,7 +262,7 @@ func check_cpp_rocks() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 85
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_rocks"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder!=null and builder.can_instantiate(),"岩の生成入口を読み込める")
@@ -382,7 +382,7 @@ func check_cpp_gravity() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 57
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","hydra_bite"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling","hydra_bite"])
 	var output := "res://.content/dev/run_gravity"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"重力の吸引と世界時計".sha256_text())
 	check(built==OK,"重力の編集値を生成する")
@@ -404,8 +404,8 @@ func check_cpp_gravity() -> void:
 	core.set_motion_context(target,target,Vector2(640,360))
 	var center := target+Vector2(100,0)
 	var point := target+Vector2(0,80)
-	var id: int = core.spawn_enemy(&"drifter",point,{"guard":100.0})
-	var boss: int = core.spawn_enemy(&"drifter",point,{"is_boss":true})
+	var id: int = core.spawn_enemy(&"splitling",point,{"guard":100.0})
+	var boss: int = core.spawn_enemy(&"splitling",point,{"is_boss":true})
 	var part: int = bridge.command("dev_spawn_part",{"parent_id":boss,"definition_id":"hydra_bite","position":point}).value
 	for enemy_id in [id,boss,part]: core.set_enemy_motion(enemy_id,{"held":true})
 	bridge.command("dev_add_rock",{"position":point,"kind":0,"manual":true})
@@ -497,7 +497,7 @@ func check_cpp_warp() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 83
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","pulser","lynx","hydra_bite"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling","pulser","lynx","hydra_bite"])
 	stage.enemy_tuning = {"pulser":{"speed":0.0}}
 	var phase := PhaseDef.new()
 	phase.id = &"warp_test"
@@ -506,9 +506,9 @@ func check_cpp_warp() -> void:
 	phase.rate = 120.0
 	phase.xp_bonus = 1.0
 	phase.attack_budget = 0
-	phase.mix = {&"drifter":2.0,&"pulser":1.0,&"lynx":1.0}
+	phase.mix = {&"splitling":2.0,&"pulser":1.0,&"lynx":1.0}
 	stage.phases = [phase]
-	for pair in [[&"drifter",2.0],[&"pulser",1.0],[&"lynx",1.0]]:
+	for pair in [[&"splitling",2.0],[&"pulser",1.0],[&"lynx",1.0]]:
 		var curve := SpawnCurve.new()
 		curve.type = pair[0]
 		curve.points = PackedVector2Array([Vector2(0,pair[1]),Vector2(10,pair[1])])
@@ -533,8 +533,8 @@ func check_cpp_warp() -> void:
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
 	core.set_motion_context(target,target,Vector2(640,360))
 	var position := target-Vector2(300,0)
-	var ordinary: int = core.spawn_enemy(&"drifter",position,{})
-	var boss: int = core.spawn_enemy(&"drifter",position,{"is_boss":true})
+	var ordinary: int = core.spawn_enemy(&"splitling",position,{})
+	var boss: int = core.spawn_enemy(&"splitling",position,{"is_boss":true})
 	var child: int = bridge.command("dev_spawn_part",{"parent_id":boss,"definition_id":"hydra_bite","position":position+Vector2(10,0)}).value
 	for entity in [ordinary,boss,child]: core.set_enemy_motion(entity,{"held":true})
 	bridge.command("dev_add_rock",{"position":position+Vector2(0,200),"kind":0,"manual":true})
@@ -563,11 +563,11 @@ func check_cpp_warp() -> void:
 	check(core.attack_snapshot().any(func(item): return item.id==friend_id and item.pool==0) and bridge.read_frame().value.ui.draw.gauge==1.0,"味方弾を保ちゲージを回復する")
 	var bonus: Dictionary = core.spawn_target(clock,true)
 	var normal: Dictionary = core.spawn_target(clock,false)
-	check(bonus.pop==6.0 and bonus.per_type.get(&"drifter")==4.0 and bonus.per_type.get(&"pulser")==2.0 and not bonus.per_type.has(&"lynx") and normal.per_type.has(&"lynx"),"既存曲線の比率を保ち雑魚と硬めだけのボーナス配分へ切り替える")
+	check(bonus.pop==6.0 and bonus.per_type.get(&"splitling")==4.0 and bonus.per_type.get(&"pulser")==2.0 and not bonus.per_type.has(&"lynx") and normal.per_type.has(&"lynx"),"既存曲線の比率を保ち雑魚と硬めだけのボーナス配分へ切り替える")
 	core.set_population_mode(true,false,false)
 	fixed_step(bridge)
 	var fresh: Array = core.enemies_snapshot().filter(func(enemy): return enemy.id not in [boss,child,rock] and not enemy.dead)
-	check(not fresh.is_empty() and fresh.all(func(enemy): return enemy.type in ["drifter","pulser"]),"通常Runnerが生成済みの配分でボーナスを補充する")
+	check(not fresh.is_empty() and fresh.all(func(enemy): return enemy.type in ["splitling","pulser"]),"通常Runnerが生成済みの配分でボーナスを補充する")
 	check(core.inspect().time==clock and core.inspect().bonus_remaining<0.05,"ボーナス中はラン時計を止め残り秒だけを進める")
 	var pending: Dictionary = bridge.checkpoint()
 	mute_checks = phase_only
@@ -644,7 +644,7 @@ func check_cpp_comets() -> void:
 	stage.index = 86
 	stage.boss_enabled = false
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_comets"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"彗星の軌道と同時破壊の予約".sha256_text())
 	check(built==OK,"彗星の編集値と限定武器のメタ情報を生成する")

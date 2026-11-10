@@ -13,8 +13,7 @@ func _ready() -> void:
 		["config_ship", func(m): return m.kind == "group" and m.group.name == "機体"],
 		["weapons_table", func(m): return m.kind == "table" and m.cat.folder == "weapons"],
 		["weapon_item", func(m): return m.kind == "item" and m.cat.folder == "weapons"],
-		["enemy_item", func(m): return m.kind == "item" and str(m.res.get("id")) == "darter"],
-		["phase_item", func(m): return m.kind == "item" and m.cat.folder == "phases"],
+		["enemy_item", func(m): return m.kind == "item" and str(m.res.get("id")) == "beamer"],
 		["stage_item", func(m): return m.kind == "item" and m.cat.folder == "stages"],
 		["trait_item", func(m): return m.kind == "item" and str(m.res.get("id")) == "T07"],
 	]

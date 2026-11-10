@@ -141,7 +141,6 @@ bool EnemySystem::attack_due(const RunRuntime &run,EnemyHandle handle,double dt)
     if (definition.kind==EnemyDefinition::Kind::Corona) return enemy.fire_t<=dt;
     if (definition.kind==EnemyDefinition::Kind::Pump) return std::get<PumpState>(enemy.behavior_state).contents.size()>=run.content->pumps[definition.pump_definition-1].store_max;
     if (definition.kind==EnemyDefinition::Kind::Bomber) return enemy.pos.distance_to(run.state.ship_pos)<=run.content->bombers[definition.bomber_definition-1].trigger;
-    if (definition.kind==EnemyDefinition::Kind::Dash) return enemy.pos.distance_to(run.state.enemy_aim)<=run.content->dashes[definition.dash_definition-1].range;
     return enemy.fire_t<=definition.attack_telegraph+dt;
 }
 bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 position) {

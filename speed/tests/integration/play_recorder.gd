@@ -163,7 +163,7 @@ func verify_cpp_perf() -> bool:
 	stage.index = 89
 	stage.boss_enabled = false
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_perf"
 	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"F3と同時録画の累積差分".sha256_text())!=OK: return false
 	var path := output.path_join("stage_89.json")
@@ -198,7 +198,7 @@ func verify_cpp_perf() -> bool:
 	var recording := rec._file.get_path()
 	var bridge = session.bridge
 	var before: Dictionary = bridge.read_metrics().value
-	bridge.command("dev_spawn",{"definition_id":"drifter","position":bridge.read_frame().value.ui.ship.ship_pos+Vector2(50,0)})
+	bridge.command("dev_spawn",{"definition_id":"splitling","position":bridge.read_frame().value.ui.ship.ship_pos+Vector2(50,0)})
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	for frame in 4:
 		check(bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)}).ok,"通常窓口から固定更新する")
@@ -290,7 +290,7 @@ func verify_cpp_metadata_detail() -> bool:
 	if not await begin_cpp_play(session): session.free();return false
 	bridge._core.set_run_guards({"invincible":true,"hitstop_enabled":false})
 	var position: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
-	bridge.command("dev_spawn",{"definition_id":"drifter","position":position+Vector2(100,0)})
+	bridge.command("dev_spawn",{"definition_id":"splitling","position":position+Vector2(100,0)})
 	bridge.command("dev_drop_crystal",{"position":position+Vector2(500,0),"kind":1})
 	var rec := TempRecorder.new()
 	add_child(rec)
@@ -356,7 +356,7 @@ func verify_cpp_perf_bytes(session: RunSession, overlay: PerfOverlay) -> bool:
 	var recording := rec._file.get_path()
 	var bridge = session.bridge
 	var at: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
-	if not bridge.command("dev_spawn",{"definition_id":"drifter","position":at+Vector2(100,0)}).ok: return false
+	if not bridge.command("dev_spawn",{"definition_id":"splitling","position":at+Vector2(100,0)}).ok: return false
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	for frame in 4:
 		bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
@@ -397,7 +397,7 @@ func verify_cpp_initial_recording() -> bool:
 	stage.index = 90
 	stage.boss_enabled = false
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_recording_initial"
 	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"開始前待機の通知".sha256_text())!=OK: return false
 	var path := output.path_join("stage_90.json")
@@ -433,7 +433,7 @@ func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recordi
 	stage.index = 88
 	stage.boss_enabled = false
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_recording"
 	if load("res://tools/content/build_run_content.gd").build(stage,config,output,"録画と経験値の対応".sha256_text())!=OK: return {}
 	var path := output.path_join("stage_88.json")
@@ -451,7 +451,7 @@ func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recordi
 		return {}
 	bridge.command("dev_remove_weapon",{"id":"W01"})
 	var origin: Vector2 = core.ship_snapshot().ship_pos
-	var owner: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(500,0)}).value
+	var owner: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(500,0)}).value
 	core.set_enemy_motion(owner,{"held":true})
 	var carried: int = bridge.command("dev_drop_crystal",{"position":origin+Vector2(500,0),"kind":1}).value
 	var carry_ok: bool = bridge.command("dev_carry_crystal",{"entity_id":owner,"crystal_id":carried}).ok
@@ -521,8 +521,8 @@ func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recordi
 				var samples: Array = rows.filter(func(row):return row.type=="sample")
 				check(not samples.is_empty() and samples[0].has("effective_damage") and samples[0].has("enemy_life") and samples[0].has("enemy_contacts") and samples[0].has("attack_budget_max"),"通常の命中・生存・接触計測を診断ログとは別の区間集計へ残す")
 				if not samples.is_empty() and samples[0].has("effective_damage"):
-					check(samples[0].effective_damage.any(func(hit):return hit.enemy=="drifter" and hit.weapon_id=="W01" and hit.applied>0.0),"武器IDと敵種付きの実ダメージを保存する")
-					check(samples[0].enemy_life.any(func(life):return life.enemy=="drifter" and life.killed==1 and life.unknown_spawn==1 and life.life_world_count==0),"途中録画の既存敵を出現から撃破の時間へ混ぜない")
+					check(samples[0].effective_damage.any(func(hit):return hit.enemy=="splitling" and hit.weapon_id=="W01" and hit.applied>0.0),"武器IDと敵種付きの実ダメージを保存する")
+					check(samples[0].enemy_life.any(func(life):return life.enemy=="splitling" and life.killed==1 and life.unknown_spawn==1 and life.life_world_count==0),"途中録画の既存敵を出現から撃破の時間へ混ぜない")
 				check(start.event_sequence_at_start==before_sequence,"開始前の通知番号を区間の欠落として数えない")
 				check(rows.any(func(row):return row.type=="hurt" and row.pos is Array and row.pos.size()==2),"C++通知の座標を既存と同じ数値配列で記録する")
 				check(existing[0].ground.size()==2 and existing[0].carried.size()==1 and existing[0].cap.absorber_id>0,"途中開始の地面・運搬・集約先の基準XPを保存する")

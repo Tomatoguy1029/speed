@@ -435,7 +435,7 @@ func _apply(kind: String, args: Dictionary) -> bool:
 func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 	match kind:
 		"spawn":
-			var id := String(args.get("type","drifter"))
+			var id := String(args.get("type","splitling"))
 			if not _definitions.has(StringName(id)): return {"ok":false,"message":"この敵はまだ移行していません: "+id}
 			var result: Dictionary = bridge.command("dev_edit",{"kind":"spawn","payload":{"definition_id":id,"position":vector(args.get("pos",[0,0])),"facing":float(args.get("angle",0)),"elite":bool(args.get("elite",false)),"count":clampi(int(args.get("count",1)),1,10000),"spacing":float(args.get("spacing",60))}})
 			if not result.ok: return result
@@ -549,22 +549,6 @@ func _apply_command(kind: String, args: Dictionary) -> Dictionary:
 			if name in ["debug_gauge_full","debug_heal","debug_invincible"]: return bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":name.trim_prefix("debug_"),"args":{}}})
 			return bridge.command(name,payload)
 		"field": return _add_field(String(args.get("kind","")),vector(args.get("pos",[0,0])),float(args.get("radius",0)))
-		"phase_set":
-			if args.get("ids",[]).is_empty(): return {"ok":true}
-			var next := _source.duplicate(true) as RuntimeStage
-			next.phases.clear()
-			for id in args.ids:
-				if not ContentManager.phases.has(StringName(id)): return {"ok":false,"message":"時間帯の定義がありません"}
-				next.phases.append(ContentManager.phases[StringName(id)].duplicate(true))
-			var bundle := {}
-			var built: Error = _build_live_bundle(next,_config,_definitions,_formation_sources,_boss_definitions,bundle)
-			if built!=OK: return {"ok":false,"message":"時間帯の定義を生成できません"}
-			var result: Dictionary = bridge.replace_scenario("phase_set",{},bundle.bytes)
-			if result.ok:
-				_source = next
-				_content_records = bundle.records
-				run.state.data.stage = next
-			return result
 	return {"ok":false,"message":"この実験命令はまだ移行していません: "+kind}
 
 func _apply_meta(levels: Dictionary) -> Dictionary:

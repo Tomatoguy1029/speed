@@ -738,10 +738,11 @@ static func centaurus_set_records(definition: BossDef, moves: Array) -> Dictiona
 static func boss_body_package(definition: BossDef, config: GameConfig) -> Dictionary:
 	if definition==null or definition.id not in [&"monoceros",&"centaurus",&"canis_major",&"hydra",&"draco"]: return {}
 	# 機体・装備・接触など共通セクションの生成を既存の入口へそろえる。
-	var package := chase_package(load("res://data/enemies/defender.tres" if definition.id==&"centaurus" else "res://data/enemies/hound.tres" if definition.id==&"canis_major" else "res://data/enemies/drifter.tres"),config)
+	var package := chase_package(load("res://data/enemies/defender.tres" if definition.id==&"centaurus" else "res://data/enemies/hound.tres" if definition.id==&"canis_major" else "res://data/enemies/splitling.tres"),config)
 	if package.is_empty(): return {}
 	var data: Dictionary = package.records
 	var row: Dictionary = data.EnemyRecord[0]
+	if definition.id not in [&"centaurus",&"canis_major"]: row.hitstop_multiplier = definition.hitstop_multiplier
 	if definition.id in [&"centaurus",&"canis_major"]:
 		row = row.duplicate(true)
 		row.id = 2
@@ -1401,11 +1402,11 @@ static func chase_package(definition: EnemyDef, config: GameConfig, stage: Runti
 	return _memoized("chase",[definition,config,stage],func(): return _chase_package(definition,config,stage))
 
 static func _chase_package(definition: EnemyDef, config: GameConfig, stage: RuntimeStage = null) -> Dictionary:
-	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"gunner",&"beamer",&"missile",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
+	if definition == null or definition.behavior not in [&"chase",&"shield",&"biter",&"hound",&"meteor",&"obstacle",&"saw",&"beamer",&"missile",&"rocket",&"drift",&"part",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 	var resolved := Legacy.compile_enemy(definition,config,stage)
 	if resolved.is_empty(): return {}
 	var source: Dictionary = resolved.enemies[0]
-	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"gunner":7,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"dash":13,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18,&"lynx":19,&"soldier":20,&"auriga":21,&"clock":22,&"reticle":23,&"aquarius":24,&"cross":25,&"bomber":28,&"phoenix":29,&"aquila":30,&"split":26,&"defender":27,&"crab":34,&"crow":37,&"cepheus":31,&"pump":35,&"triangle_star":32,&"corona":36,&"ruler":33,&"triangle":38}[definition.behavior],"turn":source.turn}
+	var row := {"id":1,"kind":{&"chase":0,&"shield":1,&"biter":2,&"hound":3,&"meteor":4,&"obstacle":5,&"saw":6,&"beamer":8,&"missile":9,&"rocket":10,&"drift":11,&"part":12,&"battleship":14,&"sniper":15,&"marlin":16,&"pulser":17,&"dolphin":18,&"lynx":19,&"soldier":20,&"auriga":21,&"clock":22,&"reticle":23,&"aquarius":24,&"cross":25,&"bomber":28,&"phoenix":29,&"aquila":30,&"split":26,&"defender":27,&"crab":34,&"crow":37,&"cepheus":31,&"pump":35,&"triangle_star":32,&"corona":36,&"ruler":33,&"triangle":38}[definition.behavior],"turn":source.turn}
 	for key in ["hp","armor","radius","speed","fire_interval","xp","knockback","hitstop_multiplier","gate","gate_arc"]:
 		row[key] = source[key]
 	for pair in [["attack_value","value"],["attack_priority","priority"],["attack_weight","weight"],["telegraph","telegraph"],["attack_managed","managed"]]:
@@ -1611,10 +1612,6 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 		var battleship: Dictionary = source.battleship.duplicate()
 		battleship.id = 1
 		data.BattleshipDefinition = [battleship]
-	if definition.behavior==&"dash":
-		var dash: Dictionary = source.dash.duplicate()
-		dash.id = 1
-		data.DashDefinition = [dash]
 	if definition.behavior==&"triangle_star": data.TriangleStarDefinition = [{"id":1}]
 	if definition.behavior==&"part": data.PartDefinition = [{"id":1}]
 	if definition.behavior==&"drift":
@@ -1634,10 +1631,6 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 		var beamer: Dictionary = source.beamer.duplicate()
 		beamer.id = 1
 		data.BeamerDefinition = [beamer]
-	if definition.behavior==&"gunner":
-		var gunner: Dictionary = source.gunner.duplicate()
-		gunner.id = 1
-		data.GunnerDefinition = [gunner]
 	if definition.behavior==&"hound":
 		var pack: Dictionary = source.pack.duplicate()
 		pack.id = 1
@@ -1662,7 +1655,7 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 	for point in saw_points: data.FriendSawPoint.append({"id":data.FriendSawPoint.size()+1,"x":point.x,"y":point.y})
 	var polygon := PackedVector2Array()
 	if not ResourceLoader.exists(sprite):
-		if definition.behavior not in [&"chase",&"rocket",&"drift",&"part",&"dash",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
+		if definition.behavior not in [&"chase",&"rocket",&"drift",&"part",&"battleship",&"sniper",&"marlin",&"pulser",&"dolphin",&"lynx",&"soldier",&"auriga",&"clock",&"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]: return {}
 		polygon = RunPresentation._placeholder_points(definition.shape)
 		sprite = ""
 		row.sprite_angle = 0.0
@@ -2520,9 +2513,6 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			for battleship: Dictionary in resolved.BattleshipDefinition:
 				battleship.id = row.id
 				data.BattleshipDefinition.append(battleship)
-			for dash: Dictionary in resolved.DashDefinition:
-				dash.id = row.id
-				data.DashDefinition.append(dash)
 			for star: Dictionary in resolved.TriangleStarDefinition:
 				star.id = row.id
 				data.TriangleStarDefinition.append(star)
@@ -2541,9 +2531,6 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			for beamer: Dictionary in resolved.BeamerDefinition:
 				beamer.id = row.id
 				data.BeamerDefinition.append(beamer)
-			for gunner: Dictionary in resolved.GunnerDefinition:
-				gunner.id = row.id
-				data.GunnerDefinition.append(gunner)
 			for hound: Dictionary in resolved.HoundDefinition:
 				hound.id = row.id
 				data.HoundDefinition.append(hound)

@@ -97,7 +97,7 @@ func check_restore_outputs() -> void:
 		count += 1
 	for tick in 24: restore_step(bridge,tick)
 	check(bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"hazards","args":{}}}).ok,"複数形状の残留攻撃を保持場面へ加える")
-	var carrier: int = bridge._core.spawn_enemy(&"drifter",Vector2(-1500,300))
+	var carrier: int = bridge._core.spawn_enemy(&"splitling",Vector2(-1500,300))
 	for kind in [0,1,2]:
 		var crystal: Dictionary = bridge.command("dev_drop_crystal",{"position":Vector2(-1500,300),"kind":kind})
 		if kind==1: bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal.value})
@@ -267,7 +267,7 @@ func check_restore_heroes() -> void:
 		var bridge=fixture._cpp_fixture(true,100000.0,100000.0)
 		behavior._cpp_rescue(bridge,id)
 		bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
-		var enemy: int=bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
+		var enemy: int=bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(120,0)}).value
 		if id=="perseus":bridge.command("dev_fire_enemy",{"source_id":enemy,"angle":0.0,"speed":100.0})
 		var input:=Intent.new()
 		input.hero_press=true;behavior._cpp_step(bridge,input)

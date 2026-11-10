@@ -6,7 +6,7 @@ const AttackDefaults = preload("res://scripts/data_types/attack_defaults.gd")
 const PROBE_CONFIG_FIELDS := ["start_radius", "base_max_speed", "stick_dead_zone", "mouse_dead_zone", "steer_cruise", "glide_hold", "glide_fade", "cruise_floor", "energy_cut", "cruise_drag", "overcap_decay", "field_radius", "boundary_push", "ship_radius", "crash_restitution", "ship_hurt_time", "draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "base_attack", "atk_scale", "ram_speed_ratio", "crit_armor", "touch_damage", "contact_cooldown", "bounce_keep", "bounce_min_speed", "kill_hitstop", "kill_hitstop_cap", "kill_hitstop_regen", "hitstop_big_mult", "hitstop_crit_mult", "max_enemy_radius", "gem_max", "drop_base", "drop_max", "drop_power_exp", "big_crystal_shift_time", "big_crystal_xp", "big_crystal_weights_start", "big_crystal_weights_end", "world_tick_div", "grid_cell", "trace_radius", "character_scale"]
 
 static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: StageDef = null) -> Dictionary:
-	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"gunner", &"beamer", &"missile", &"rocket", &"drift", &"part", &"dash", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]:
+	if definition == null or config == null or definition.behavior not in [&"chase", &"shield", &"biter", &"hound", &"meteor", &"obstacle", &"saw", &"beamer", &"missile", &"rocket", &"drift", &"part", &"battleship", &"sniper", &"marlin", &"pulser", &"dolphin", &"lynx", &"soldier", &"auriga", &"clock", &"reticle",&"aquarius",&"cross",&"bomber",&"phoenix",&"aquila",&"split",&"defender",&"crab",&"crow",&"cepheus",&"pump",&"triangle_star",&"corona",&"ruler",&"triangle"]:
 		return {}
 	var radius := definition.radius * config.character_scale
 	radius *= definition.visual_value("scale", 1.0) * definition.visual_value("collision_scale", 1.0)
@@ -49,14 +49,6 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 			row.pack[pair[0]] = float(definition.params[pair[1]])
 		for value in row.pack.values():
 			if not is_finite(value): return {}
-	if definition.behavior == &"gunner":
-		row.gunner = {"accel":definition.accel,"admission_duration":float(definition.params.get("telegraph",0.0))+float(definition.params.get("dash_time",definition.params.get("beam_time",definition.params.get("blast_delay",0.2))))+0.1}
-		for pair in [["keep","keep"],["telegraph","telegraph"],["bullet_speed","bullet_speed"],["bullet_damage","bullet_dmg"],["slow","slow"]]:
-			if not definition.params.has(pair[1]): return {}
-			row.gunner[pair[0]] = float(definition.params[pair[1]])
-		for value in row.gunner.values():
-			if not is_finite(value) or value<0.0: return {}
-		if row.gunner.telegraph<=0.0 or row.fire_interval<=0.0: return {}
 	if definition.behavior == &"lynx":
 		row.lynx = {"accel":definition.accel if definition.accel>0.0 else 2.0}
 		for pair in [["keep","keep"],["warn","telegraph"],["slash_speed","slash_speed"],["slash_size","slash_size"],["slash_range","slash_range"],["damage","bullet_dmg"]]:
@@ -261,14 +253,6 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 		for value in row.battleship.values():
 			if not is_finite(value) or value<0.0: return {}
 		if row.battleship.telegraph<=0.0 or row.fire_interval<=0.0: return {}
-	if definition.behavior == &"dash":
-		row.dash = {}
-		for key in ["range","windup","dash_time","dash_speed","recover"]:
-			if not definition.params.has(key): return {}
-			row.dash[key] = float(definition.params[key])
-		row.dash.admission_duration = row.dash.windup+row.dash.dash_time+0.1
-		for value in row.dash.values():
-			if not is_finite(value) or value<0.0: return {}
 	if definition.behavior == &"drift":
 		row.drift = {"has_life":definition.params.has("life"),"life":float(definition.params.get("life",0.0)),"ram_guard":definition.gate==&"guard"}
 		if not is_finite(row.drift.life) or row.drift.life<0.0: return {}
@@ -310,7 +294,7 @@ static func compile_enemy(definition: EnemyDef, config: GameConfig, stage: Stage
 
 ## 共通生成から使う比較条件。未移行の通常ゲーム用データと混同しない。
 static func build_probe(path: String) -> Error:
-	var definition := load("res://data/enemies/drifter.tres") as EnemyDef
+	var definition := load("res://data/enemies/splitling.tres") as EnemyDef
 	var config := load("res://data/config.tres") as GameConfig
 	var data := compile_enemy(definition, config)
 	if data.is_empty(): return ERR_INVALID_DATA

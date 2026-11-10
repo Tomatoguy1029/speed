@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b2f4prp38y3h2"
-path="res://.godot/imported/darter.png-75ca9941135173435c98bdb63417433c.ctex"
+uid="uid://ch8fpktrqjwum"
+path="res://.godot/imported/bomber_normal.png-492eca8c8cff2fd75dd98840adbd9585.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/pixel/darter.png"
-dest_files=["res://.godot/imported/darter.png-75ca9941135173435c98bdb63417433c.ctex"]
+source_file="res://assets/pixel/bomber/bomber_normal.png"
+dest_files=["res://.godot/imported/bomber_normal.png-492eca8c8cff2fd75dd98840adbd9585.ctex"]
 
 [params]
 

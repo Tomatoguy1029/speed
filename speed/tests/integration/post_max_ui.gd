@@ -15,7 +15,7 @@ func _cpp_ui_ready() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 88
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/post_max_ui"
 	_check(load("res://tools/content/build_run_content.gd").build(stage,config,output,"最大後強化の正式UI".sha256_text())==OK,"同じ生成入口で表示と装備の資源を準備する")
 	var path := output.path_join("stage_88.json")

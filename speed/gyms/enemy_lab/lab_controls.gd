@@ -397,19 +397,6 @@ func _conditions(page: Node) -> void:
 	box = UI.fold(page, tr("lab.ui.stage_time"))
 	var time = _number(box, TranslationServer.translate("lab.message_c66777f550"), 0, 0, 10000, 1)
 	_button(box, TranslationServer.translate("lab.message_54036730a6"), func(): lab.session.perform("time", {"value": time.value}))
-	var phase_set := OptionButton.new()
-	phase_set.add_item(TranslationServer.translate("lab.message_568b393d89"))
-	phase_set.add_item(TranslationServer.translate("lab.message_df7c5eeb44"))
-	box.add_child(phase_set)
-	_button(box, TranslationServer.translate("lab.message_ace6599b1c"), func():
-		var ids := []
-		if phase_set.selected == 0:
-			ids = ["build1", "pressure", "build2", "rampage", "tension", "escape"]
-		else:
-			for suffix in ["early", "mid", "late"]:
-				var id = "s%d_%s" % [int(lab.session.spec.stage), suffix]
-				if ContentManager.phases.has(StringName(id)): ids.append(id)
-		lab.session.perform("phase_set", {"ids": ids}))
 	box = UI.fold(page, tr("lab.ui.player_stats"))
 	for entry in [["base_attack", TranslationServer.translate("lab.message_0c0e2d79f0"), 10.2], ["base_max_speed", TranslationServer.translate("lab.message_0aee0183fd"), 400.0], ["draw_length", TranslationServer.translate("lab.message_017dfdb22a"), 1020.0], ["trace_radius", TranslationServer.translate("lab.message_ec7bdd3fb0"), 28.0], ["draw_time_scale", TranslationServer.translate("lab.message_355273af8a"), 0.03], ["draw_confirm_delay", TranslationServer.translate("lab.message_ab276f5393"), 0.1], ["boss_hp", TranslationServer.translate("lab.message_6384a9a6f0"), 1000], ["boss_armor", TranslationServer.translate("lab.message_391c98f217"), 30]]:
 		_condition_fields[entry[0]] = _number(box, entry[1], float(ContentManager.base.get(entry[0])), 0.01, 100000, 1, func(value): lab.session.perform("config", {"key": entry[0], "value": value}))
@@ -633,9 +620,15 @@ func _files(box: Node) -> void:
 	export_phase = OptionButton.new()
 	export_phase.add_item(TranslationServer.translate("lab.message_82b885c33d"))
 	export_phase.set_item_metadata(0, "")
-	for def in ContentManager.sorted(ContentManager.phases):
-		export_phase.add_item(String(def.id))
-		export_phase.set_item_metadata(export_phase.item_count - 1, String(def.id))
+	var phase_ids := {}
+	var stages: Array = ContentManager.stages.values()
+	stages.sort_custom(func(a, b): return a.index < b.index)
+	for stage: StageDef in stages:
+		for phase: PhaseDef in stage.phases:
+			if phase_ids.has(phase.id): continue
+			phase_ids[phase.id] = true
+			export_phase.add_item(String(phase.id))
+			export_phase.set_item_metadata(export_phase.item_count - 1, String(phase.id))
 	box.add_child(export_phase)
 	export_targets = ItemList.new()
 	export_targets.select_mode = ItemList.SELECT_MULTI

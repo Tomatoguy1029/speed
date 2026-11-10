@@ -9,7 +9,7 @@ func _ready() -> void:
 		var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 		add_child(lab)
 		await lab.reset({"empty": true})
-		lab.perform("spawn", {"type": "drifter", "pos": [0, 0]})
+		lab.perform("spawn", {"type": "splitling", "pos": [0, 0]})
 		lab.perform("input", {"cursor": [1000, 1000]})
 		var before: String = lab.digest()
 		if not FileAccess.file_exists("res://gyms/enemy_lab/route_trial.gd"):
@@ -31,9 +31,9 @@ func _ready() -> void:
 	var ui_lab = load("res://gyms/enemy_lab/enemy_lab.tscn").instantiate()
 	add_child(ui_lab)
 	await get_tree().create_timer(0.4).timeout
-	ui_lab.session.perform("spawn", {"type": "drifter", "pos": [-250, -80], "count": 18, "spacing": 70})
+	ui_lab.session.perform("spawn", {"type": "splitling", "pos": [-250, -80], "count": 18, "spacing": 70})
 	ui_lab.session.perform("spawn", {"type": "beamer", "pos": [300, -140], "count": 3})
-	ui_lab.session.perform("spawn", {"type": "armored", "pos": [150, 200], "count": 4})
+	ui_lab.session.perform("spawn", {"type": "shield", "pos": [150, 200], "count": 4})
 	ui_lab.canvas.route = PackedVector2Array([Vector2(-450,-100), Vector2(-100,0), Vector2(300,150)])
 	ui_lab._refresh()
 	ui_lab.inspector.refresh(true)

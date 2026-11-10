@@ -37,7 +37,7 @@ bool FriendDebrisSystem::burst(RunRuntime &run,const DebrisBurstParams &p) {
         godot::RunState::Friendly s;s.cause="hullDebris";s.pos=p.position+u*10.0;s.vel=u*p.speed*(0.8+0.3*run.state.control.rng.randf());
         s.radius=12;s.life=d.life;s.damage=p.damage;s.knock=d.knock;s.no_crit=true;s.color=p.color;
         s.angle=run.state.control.rng.randf()*godot::Math::TAU;s.spin=k%2==0?10:-10;if (p.source_id!=-1) s.hit_ids.insert(p.source_id);
-        if (p.armor_count>=0) {s.visual="enemy/pump_burst";s.type=k<p.armor_count?"pump":((k-p.armor_count)%3==0?"drifter":(k-p.armor_count)%3==1?"swarm":"splitling");}
+        if (p.armor_count>=0) {s.visual="enemy/pump_burst";s.type=k<p.armor_count?"pump":((k-p.armor_count)%3==0?"bomber":(k-p.armor_count)%3==1?"splitter":"splitling");}
         if (!AttackSystem::get(run.state,emit(run,std::move(s),p.source_id))) return false;
     }
     godot::Dictionary event;event["pos"]=p.position;event["count"]=p.count;FrameBuilder::append(run,"hull_scatter",event);return true;
@@ -87,6 +87,6 @@ void FriendDebrisSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::FriendDebris);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
     PackedVector2Array p;p.push_back(position);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(s.radius);PackedColorArray colors;colors.push_back(Color(d.tint_r,d.tint_g,d.tint_b,d.tint_a));
     shape["points"]=p;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;shape["angle"]=angle;shape["age"]=double(s.age);shape["life"]=double(s.life);shape["clock"]=run.state.world_time;
-    shape["velocity"]=s.vel;shape["trail"]=s.trail;shape["debris_style"]=int32_t(s.debris.style);shape["trail_width"]=d.trail_width;shape["pump_kind"]=s.type==StringName("pump")?-1:s.type==StringName("swarm")?1:s.type==StringName("splitling")?2:0;out.push_back(shape);
+    shape["velocity"]=s.vel;shape["trail"]=s.trail;shape["debris_style"]=int32_t(s.debris.style);shape["trail_width"]=d.trail_width;shape["pump_kind"]=s.type==StringName("pump")?-1:s.type==StringName("splitter")?1:s.type==StringName("splitling")?2:0;out.push_back(shape);
 }
 }

@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ueekv52wncw3"
-path="res://.godot/imported/titan.png-63dc5b13f89c349b57a16e3e36dd0b5b.ctex"
+uid="uid://ct0vk5d4xrirp"
+path="res://.godot/imported/bomber_armor.png-027b89346bc69f839788f8c1d78a0ef0.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/pixel/titan.png"
-dest_files=["res://.godot/imported/titan.png-63dc5b13f89c349b57a16e3e36dd0b5b.ctex"]
+source_file="res://assets/pixel/bomber/bomber_armor.png"
+dest_files=["res://.godot/imported/bomber_armor.png-027b89346bc69f839788f8c1d78a0ef0.ctex"]
 
 [params]
 

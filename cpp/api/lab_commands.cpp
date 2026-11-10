@@ -54,25 +54,19 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         if (!bool(p.get("rocks",true))) {s.field.rocks.clear();s.field.rock_handles={};}
         return reply(true);
     }
-    if (command=="dev_set_scenario" && (kind=="formation" || kind=="phase_set")) {
-        if (!keys(p,{"replacement","expected_revision","layout","entry"}) || p.get("replacement",Variant()).get_type()!=Variant::PACKED_BYTE_ARRAY || p.get("expected_revision",Variant()).get_type()!=Variant::INT || (kind=="phase_set" && p.size()!=2) || (kind=="formation" && (p.size()!=4 || p["layout"].get_type()!=Variant::INT || p["entry"].get_type()!=Variant::INT))) return reply(false);
+    if (command=="dev_set_scenario" && kind=="formation") {
+        if (!keys(p,{"replacement","expected_revision","layout","entry"}) || p.get("replacement",Variant()).get_type()!=Variant::PACKED_BYTE_ARRAY || p.get("expected_revision",Variant()).get_type()!=Variant::INT || p.size()!=4 || p["layout"].get_type()!=Variant::INT || p["entry"].get_type()!=Variant::INT) return reply(false);
         Ref<SpeedRunCore> candidate;candidate.instantiate();candidate->runtime=runtime;candidate->runtime.state=speed::clone_state(s);
         Dictionary replacement;replacement["definition_id"]="config";replacement["replacement"]=p["replacement"];replacement["expected_revision"]=p["expected_revision"];
         const Dictionary edited=speed::DevCommands::replace_definition(candidate->runtime,replacement);if (!bool(edited["ok"])) return edited;
         auto &target=candidate->runtime.state;Variant value;
-        if (kind=="formation") {
-            if (candidate->runtime.content->formations.empty()) return reply(false);
-            const auto &f=candidate->runtime.content->formations.back();const int64_t layout=p["layout"],entry=p["entry"];
-            if (layout<0 || uint64_t(layout)>=f.layouts.size() || entry<0 || uint64_t(entry)>=f.entries.size()) return reply(false);
-            target.formations=candidate->runtime.content->formations;target.formation_base_view=candidate->runtime.content->formation_base_view;target.motion_ready=true;
-            const auto ids=candidate->spawn_formation(target.formations.size()-1,layout,entry,PackedStringArray(),-1.0,Variant(),Variant());
-            if (ids.size()!=int64_t(f.layouts[layout].types.size())) return reply(false);value=ids;
-            Dictionary event;event["pos"]=target.ship_pos;event["enemy_type"]="formation";speed::FrameBuilder::append(candidate->runtime,"lab_spawn",event);
-        } else {
-            const bool enabled=target.population.frame_enabled;
-            if (!target.population.ready) speed::PopulationSystem::prepare(candidate->runtime);
-            target.population.frame_enabled=enabled;target.spawn_timeline=candidate->runtime.content->population_timeline;target.spawn_timeline_ready=true;
-        }
+        if (candidate->runtime.content->formations.empty()) return reply(false);
+        const auto &f=candidate->runtime.content->formations.back();const int64_t layout=p["layout"],entry=p["entry"];
+        if (layout<0 || uint64_t(layout)>=f.layouts.size() || entry<0 || uint64_t(entry)>=f.entries.size()) return reply(false);
+        target.formations=candidate->runtime.content->formations;target.formation_base_view=candidate->runtime.content->formation_base_view;target.motion_ready=true;
+        const auto ids=candidate->spawn_formation(target.formations.size()-1,layout,entry,PackedStringArray(),-1.0,Variant(),Variant());
+        if (ids.size()!=int64_t(f.layouts[layout].types.size())) return reply(false);value=ids;
+        Dictionary event;event["pos"]=target.ship_pos;event["enemy_type"]="formation";speed::FrameBuilder::append(candidate->runtime,"lab_spawn",event);
         runtime=std::move(candidate->runtime);return reply(true,value);
     }
     if (command!="dev_edit") return reply(false);

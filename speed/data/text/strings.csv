@@ -347,9 +347,6 @@ lab.message_d79714f205,充填率,Charge
 lab.message_cdff100dfe,自機を表示中心へ移動・充填,Move ship to view center and charge
 lab.message_c66777f550,ステージ経過（実秒）,Stage time (real seconds)
 lab.message_54036730a6,ステージ時計へ適用,Set stage clock
-lab.message_568b393d89,復元した通常の出現,Original stage roster
-lab.message_df7c5eeb44,追加版の出現（実験のみ）,Added roster (lab only)
-lab.message_ace6599b1c,出現の時間帯を切替,Switch phase roster
 lab.message_0c0e2d79f0,基礎攻撃力,Base attack
 lab.message_0aee0183fd,最高速度,Maximum speed
 lab.message_017dfdb22a,線の長さ,Drawing length
@@ -593,8 +590,6 @@ lab.status_wait,待機,Waiting
 lab.exit_clearance,抜けた先に残す余裕の半径,Exit clearance radius
 lab.min_spacing,敵中心どうしの最小距離,Minimum distance between enemy centers
 lab.attack_legend,■ 予告・発動　／ 残留　数値は 発動＋残留,■ Telegraph / active  / Lingering; active + lingering
-lab.error_b03790ec83,時間帯一覧の形式が違います,Invalid phase list
-lab.error_1ba7e23ea5,未知の時間帯です,Unknown phase ID
 lab.error_ea2fd16cf8,攻撃量の上限が不正です,Invalid attack budget
 lab.error_76545bdd1e,攻撃管理の形式が違います,Invalid attack settings
 lab.error_141fdea6d8,攻撃分類の値が不正です,Invalid attack category value
@@ -713,26 +708,12 @@ lab.ui.reset,リセット,Reset
 lab.ui.reset_help,再生を始めた時の状態に戻す（配置は残す。それ以降の記録は分岐として残す）,Back to when playback started (keeps placements; later records stay as a branch)
 lab.ui.how_moves,動き,Behavior
 lab.ui.how_to_kill,倒し方,How to defeat
-lab.enemy.drifter.move,追ってくる。ときどき画面の中を広く回る,Chases you and sometimes roams widely across the screen
-lab.enemy.drifter.kill,HP を削る（体当たり・武器）,Wear down its HP (ram or weapons)
-lab.enemy.swarm.move,小さな体で群れになって追ってくる,Small bodies that chase you in packs
-lab.enemy.swarm.kill,HP を削る,Wear down its HP
-lab.enemy.darter.move,近づくと構えてから突進し、突進のあとしばらく止まる,Winds up when close then dashes and stops for a while
-lab.enemy.darter.kill,HP を削る。止まっている間が狙いどき,Wear down its HP. Strike while it is stopped
-lab.enemy.armored.move,硬い装甲で追ってくる,Chases you behind heavy armor
-lab.enemy.armored.kill,攻撃力が装甲以上なら貫ける。背面に当てると必ずクリティカル,Pierce it when your attack meets its armor. Hits on its back always crit
 lab.enemy.splitter.move,経験値が詰まった体で機体を追う。生きている間は増えない,Chases the ship with a body full of experience. It does not multiply while alive
 lab.enemy.splitter.kill,倒すと経験値をその場に全部落とし、小さく速い分裂体2体に分かれる,Defeating it drops all its experience on the spot and splits it into two small fast splitlings
 lab.enemy.splitling.move,小さく速い体で追ってくる。それ以上は分かれない,A small fast body that chases you. It does not split further
 lab.enemy.splitling.kill,HP を削る,Wear down its HP
-lab.enemy.gunner.move,距離を保って回り込み、光ってから弾を撃つ,Keeps its distance and circles then fires after a flash
-lab.enemy.gunner.kill,HP を削る,Wear down its HP
 lab.enemy.missile.move,遠い距離を保ち、予告のあとホーミングミサイルを撃つ,Keeps far away and fires homing missiles after a warning
 lab.enemy.missile.kill,HP を削る,Wear down its HP
-lab.enemy.titan.move,大きな体で追ってくる。大きさは毎回変わる,A large chaser whose size varies each time
-lab.enemy.titan.kill,HP が多い。何度も貫く,High HP. Pierce it many times
-lab.enemy.battleship.move,追ってきて、予告のあと扇状に弾を撃つ,Chases you and fires a fan of bullets after a warning
-lab.enemy.battleship.kill,HP を削る。背面が弱点,Wear down its HP. Its back is the weak point
 lab.enemy.rocket.move,出た向きのまま一直線に飛び、機体に近づくと爆発する。少しすると消える,Flies straight in its spawn direction and explodes near you then fades
 lab.enemy.rocket.kill,HP を削る,Wear down its HP
 lab.enemy.bomber.move,追ってきて、近づくとカウントダウンに入り、止まらずに詰め寄る。2回明滅し終わると爆発する,Chases you and starts a countdown when close then keeps closing in. It explodes after blinking twice

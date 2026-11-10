@@ -32,7 +32,7 @@ func configure(d,core,enabled: bool,budget: float) -> void:
 	var settings := {"enabled":enabled,"budget":budget,"jitter":0.3}
 	d.configure(settings)
 	check(core.configure_attack_budget(settings),"攻撃予算の設定を受け付ける")
-func director_fixture(phases: Array = [], enemy: StringName = &"drifter"):
+func director_fixture(phases: Array = [], enemy: StringName = &"splitling"):
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -47,7 +47,7 @@ func director_fixture(phases: Array = [], enemy: StringName = &"drifter"):
 	return bridge
 
 func spawn_owner(bridge, offset: float) -> int:
-	var response: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(3000+offset,3000)})
+	var response: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(3000+offset,3000)})
 	check(response.ok,"攻撃元を通常の生成経路で登録する")
 	return int(response.value) if response.ok else 0
 

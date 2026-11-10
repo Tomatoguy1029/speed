@@ -8,7 +8,7 @@ func check(ok: bool, label: String) -> void:
 func _ready() -> void:
 	var content := get_node_or_null("/root/ContentManager")
 	check(content != null, "ContentManagerを起動する")
-	for path in ["res://data/stages/stage_1.tres", "res://data/weapons/W01_forward.tres", "res://data/enemies/drifter.tres"]:
+	for path in ["res://data/stages/stage_1.tres", "res://data/weapons/W01_forward.tres", "res://data/enemies/splitling.tres"]:
 		check(not ResourceLoader.has_cached(path), "要求前の定義を読まない: " + path)
 	if content != null:
 		var entry: Resource = content.catalog.find(&"weapons", &"W01")

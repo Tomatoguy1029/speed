@@ -58,12 +58,10 @@ struct ContentBundle {
     BarrierPostDefinition barrier_post;
     std::vector<BiteDefinition> bites;
     std::vector<HoundDefinition> hounds;
-    std::vector<GunnerDefinition> gunners;
     std::vector<BeamerDefinition> beamers;
     std::vector<MissileEnemyDefinition> missile_enemies;
     std::vector<RocketDefinition> rockets;
     std::vector<DriftDefinition> drifts;
-    std::vector<DashDefinition> dashes;
     std::vector<BattleshipDefinition> battleships;
     std::vector<SniperDefinition> snipers;
     std::vector<MarlinDefinition> marlins;

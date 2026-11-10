@@ -111,7 +111,7 @@ func cpp_perseus_display() -> void:
 	var bridge = guide._cpp_fixture(true)
 	behavior._cpp_rescue(bridge,"perseus")
 	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
-	var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
+	var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(120,0)}).value
 	bridge.command("dev_fire_enemy",{"source_id":enemy,"angle":0.0,"speed":100.0})
 	var intent := Intent.new()
 	intent.hero_press = true

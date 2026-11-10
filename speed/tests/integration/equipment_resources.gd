@@ -20,7 +20,7 @@ func _cpp_ready() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 88
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/comet_resources"
 	check(load("res://tools/content/build_run_content.gd").build(stage,config,output,"交換資源の所有".sha256_text())==OK,"正規生成を使う")
 	var path := output.path_join("stage_88.json")

@@ -21,9 +21,6 @@ var _definitions: Dictionary = {}
 var enemies: Dictionary:
 	get: return _table(&"enemies")
 	set(value): _tables[&"enemies"] = value
-var phases: Dictionary:
-	get: return _table(&"phases")
-	set(value): _tables[&"phases"] = value
 var stages: Dictionary:
 	get: return _table(&"stages")
 	set(value): _tables[&"stages"] = value
@@ -112,7 +109,7 @@ func _load_dir(dir_path: String, into: Dictionary, key: String, mode := Resource
 func reload_experiment_data() -> bool:
 	var fresh := ResourceLoader.load(CONFIG_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as GameConfig
 	if fresh == null: return false
-	var registries := {"enemies": "id", "phases": "id", "stages": "index", "bosses": "id"}
+	var registries := {"enemies": "id", "stages": "index", "bosses": "id"}
 	var loaded := {}
 	var old_hashes := source_hashes.duplicate()
 	for name in registries:
@@ -122,18 +119,6 @@ func reload_experiment_data() -> bool:
 			source_hashes = old_hashes
 			return false
 		loaded[name] = table
-	for stage: StageDef in loaded.stages.values():
-		var phase_list := []
-		for phase: PhaseDef in stage.phases:
-			# タイムラインで追加した時間帯はステージ内に保存し、その値を直接使う。
-			if phase.resource_path.contains("::"):
-				phase_list.append(phase)
-				continue
-			if not loaded.phases.has(phase.id):
-				source_hashes = old_hashes
-				return false
-			phase_list.append(loaded.phases[phase.id])
-		stage.phases = phase_list
 	for name in registries: set(name, loaded[name])
 	base = fresh
 	reset_runtime()

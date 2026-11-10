@@ -51,5 +51,5 @@ static func _seed_trait_conditions(reference: WeakRef, id: String, seeded: Dicti
 	session.perform("command",{"name":"dev_edit","args":{"kind":"equipment_seed","payload":{"id":id}}})
 
 static func spawn(session, pos: Vector2) -> int:
-	if not session.perform("spawn",{"type":"drifter","pos":[pos.x,pos.y]}): return -1
+	if not session.perform("spawn",{"type":"splitling","pos":[pos.x,pos.y]}): return -1
 	return session.selected

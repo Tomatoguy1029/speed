@@ -51,7 +51,7 @@ func check_cpp_mix() -> bool:
 				if not clip.prepared.is_empty(): chosen_clip = clip.duplicate(true); break
 		bridge.dispose()
 	if chosen_clip==null or not all_types.has("triangle"): return false
-	if not all_types.has("drifter"): all_types.append("drifter")
+	if not all_types.has("splitling"): all_types.append("splitling")
 	var spawn_types := PackedStringArray()
 	for type in all_types:
 		var definition: EnemyDef = ContentManager.enemies[StringName(type)]
@@ -113,7 +113,7 @@ func check_cpp_mix() -> bool:
 	var count := 0
 	var type_index := 0
 	while count<1300:
-		var type: String = spawn_types[type_index%spawn_types.size()] if count<1280 else "drifter"
+		var type: String = spawn_types[type_index%spawn_types.size()] if count<1280 else "splitling"
 		type_index += 1
 		if type in ["meteor","iron","saw","triangle_star","cepheus_soldier"]: continue
 		var at := Vector2(-900,0)+Vector2((count%50-25)*20.0,(count/50-13)*20.0)
@@ -136,7 +136,7 @@ func check_cpp_mix() -> bool:
 	for id in [parent_id]+child_ids:
 		if core.enemies_snapshot().any(func(row): return row.id==id): core.remove_enemy(id)
 	check(core.enemies_snapshot().all(func(row): return row.id!=parent_id and not child_ids.has(row.id)),"親と部位を同時に解放しても二重解放や別個体への参照を残さない")
-	var refill_ids: Array = core.enemies_snapshot().filter(func(row): return row.type=="drifter").slice(0,16).map(func(row): return row.id)
+	var refill_ids: Array = core.enemies_snapshot().filter(func(row): return row.type=="splitling").slice(0,16).map(func(row): return row.id)
 	for id in refill_ids: core.remove_enemy(id)
 	check(mix_ticks(bridge,8) and core.enemy_motion_snapshot().any(func(row): return row.spawn_origin==MIX_SCHEMA.ENUMS.SpawnOrigin.Refill),"不足分を通常の補充元として新しい個体IDで補う")
 	var generated: Dictionary = bridge.read_recording().value.population

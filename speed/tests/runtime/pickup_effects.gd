@@ -80,7 +80,7 @@ func check_cpp_reward() -> void:
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	config.strong_gold_chance = 1.0
-	var base: EnemyDef = ContentManager.enemies[&"drifter"]
+	var base: EnemyDef = ContentManager.enemies[&"splitling"]
 	var cases: Array[Dictionary] = []
 	for rank in [0,1,2,3,5,10,11]: cases.append({"rank":rank})
 	cases.append({"rank":3,"override":PackedInt32Array([2,3,4])})
@@ -133,7 +133,7 @@ func check_cpp_reward() -> void:
 		bridge.command("dev_remove",{"entity_id":retired})
 		check(before==bridge._core.pickups_snapshot(),"ボス本体の専用決着と非撃破の退場では通常報酬を出さない")
 		bridge.dispose()
-	for id in [&"splitter",&"drifter"]:
+	for id in [&"splitter",&"splitling"]:
 		var actual: EnemyDef = load("res://data/enemies/splitter.tres")
 		# AIの移植前も同じ報酬経路を使い、実データの散乱・輪の有無を固定場面で確認する。
 		var probe: EnemyDef = base.duplicate(true)
@@ -176,9 +176,9 @@ func check_cpp_reward_view() -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.planet_radius = 0.0
 	config.moon_count = 0
-	for id in [&"splitter",&"drifter"]:
+	for id in [&"splitter",&"splitling"]:
 		var actual: EnemyDef = load("res://data/enemies/splitter.tres")
-		var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+		var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 		definition.id = id
 		definition.rank = actual.rank
 		definition.params = actual.params.duplicate(true)
@@ -227,7 +227,7 @@ func check_cpp_cap() -> bool:
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	config.gem_max = 8
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.rank = 1
 	definition.xp_reward_counts = PackedInt32Array([6,0,0])
 	var bridge = reward_bridge(definition,config)
@@ -326,7 +326,7 @@ func check_cpp_cargo() -> bool:
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	config.gem_max = 2
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.rank = 0
 	definition.xp_reward_counts = PackedInt32Array([1,0,0])
 	var bridge = reward_bridge(definition,config)
@@ -407,7 +407,7 @@ func check_cpp_cargo_record() -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.planet_radius = 0.0
 	config.moon_count = 0
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.rank = 0
 	definition.xp_reward_counts = PackedInt32Array([0,0,0])
 	var bridge = reward_bridge(definition,config)
@@ -433,7 +433,7 @@ func check_cpp_cargo_record() -> bool:
 func pickups_bridge(config: GameConfig):
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var data: Dictionary = builder.chase_records(ContentManager.enemies[&"drifter"],config)
+	var data: Dictionary = builder.chase_records(ContentManager.enemies[&"splitling"],config)
 	var bytes: PackedByteArray = schema.write_content(data,schema.sha256("固定色の取得入口".to_utf8_buffer()))
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	if not bridge.configure(bytes,{"api_version":1,"run_id":92,"mode":1,"stage_id":"pickups","profile":{},"settings":{}}).ok:
@@ -467,7 +467,7 @@ func check_cpp_pickups() -> bool:
 	check(first.xp_statistics.collected_actual_xp==0.234375 and records.any(func(event): return event.type==&"levelup"),"取得でレベルが変わっても基準量と実取得量を分ける")
 	# 画面外・吸引待ちの結晶もビーコンの開始時に一括確定する。
 	var carried_id: int = supply_crystal(bridge,Vector2(-2000,500),1)
-	var carrier: int = bridge._core.spawn_enemy(&"drifter",Vector2(-2000,500))
+	var carrier: int = bridge._core.spawn_enemy(&"splitling",Vector2(-2000,500))
 	bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":carried_id})
 	for kind: int in [0,1,2,0]: supply_crystal(bridge,Vector2(-1000+kind*100,500),kind)
 	var before: Dictionary = bridge._core.pickups_snapshot()
@@ -588,7 +588,7 @@ func visible_crystal_ids(bridge,area: Rect2) -> Array:
 func check_cpp_visible() -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.planet_radius=0;config.moon_count=0;config.gem_draw_max=2
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	var bridge = reward_bridge(definition,config)
 	if bridge==null: return false
 	bridge.subscribe("visible",func(_frame): return true,[],[])

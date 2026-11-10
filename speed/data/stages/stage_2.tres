@@ -2,17 +2,11 @@
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_aepvt"]
-[ext_resource type="Resource" uid="uid://7qtvadbveuyx" path="res://data/phases/build1.tres" id="2"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="2_5plhc"]
-[ext_resource type="Resource" uid="uid://b0b8k2n625rst" path="res://data/phases/pressure.tres" id="3"]
 [ext_resource type="PackedScene" uid="uid://c7lv3gs5b6ybn" path="res://data/formations/s2_beamer.tscn" id="3_hhbsv"]
-[ext_resource type="Resource" uid="uid://bbsggxpveod53" path="res://data/phases/build2.tres" id="4"]
 [ext_resource type="PackedScene" uid="uid://c2bfyhrynkq2f" path="res://data/formations/s2_ruler.tscn" id="4_ttetq"]
-[ext_resource type="Resource" uid="uid://bwo0b0exhykxt" path="res://data/phases/rampage.tres" id="5"]
 [ext_resource type="PackedScene" uid="uid://cur5vh0jpoy0c" path="res://data/formations/s2_shield.tscn" id="5_3y6x8"]
-[ext_resource type="Resource" uid="uid://hm5frkto2fwd" path="res://data/phases/tension.tres" id="6"]
 [ext_resource type="PackedScene" uid="uid://cagn3eqtiqrgr" path="res://data/formations/s2_telescope.tscn" id="6_fv8bx"]
-[ext_resource type="Resource" uid="uid://cfgspvain2mak" path="res://data/phases/escape.tres" id="7"]
 [ext_resource type="PackedScene" uid="uid://dix03w6vstef7" path="res://data/formations/s2_crab.tscn" id="7_esfk7"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_5plhc"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_hhbsv"]
@@ -275,14 +269,8 @@ pop_from = 90.0
 pop_to = 120.0
 rate = 12.0
 mix = {
-"armored": 3.0,
-"battleship": 0.6,
-"darter": 3.0,
-"gunner": 2.0,
 "missile": 1.6,
-"splitter": 1.5,
-"swarm": 3.0,
-"titan": 2.0
+"splitter": 1.5
 }
 id = &"phase_347783990498013494"
 display_name = "4回目の育成"
@@ -295,14 +283,8 @@ pop_to = 120.0
 rate = 12.0
 attack_budget = 5
 mix = {
-"armored": 3.0,
-"battleship": 0.6,
-"darter": 3.0,
-"gunner": 2.0,
 "missile": 1.6,
-"splitter": 1.5,
-"swarm": 3.0,
-"titan": 2.0
+"splitter": 1.5
 }
 id = &"phase_6374603078355179547"
 display_name = "ボス前ラッシュ"
@@ -315,14 +297,8 @@ pop_to = 120.0
 rate = 12.0
 attack_budget = 4
 mix = {
-"armored": 3.0,
-"battleship": 0.6,
-"darter": 3.0,
-"gunner": 2.0,
 "missile": 1.6,
-"splitter": 1.5,
-"swarm": 3.0,
-"titan": 2.0
+"splitter": 1.5
 }
 id = &"phase_6315931189886180248"
 display_name = "ボス戦"
@@ -335,14 +311,8 @@ pop_to = 120.0
 rate = 12.0
 attack_budget = 4
 mix = {
-"armored": 3.0,
-"battleship": 0.6,
-"darter": 3.0,
-"gunner": 2.0,
 "missile": 1.6,
-"splitter": 1.5,
-"swarm": 3.0,
-"titan": 2.0
+"splitter": 1.5
 }
 id = &"phase_9125328042912577426"
 display_name = "ボス後強化"
@@ -357,11 +327,91 @@ script = ExtResource("10_hhbsv")
 type = &"defender"
 points = PackedVector2Array(0, 0, 10, 198, 39, 179, 55, 53, 57, 304, 97, 170, 134, 288, 136, 45, 152, 103, 169, 51, 171, 336, 259, 329, 261, 57, 267, 174, 277, 48, 285, 178, 290, 65, 291, 367, 311, 202, 332, 412, 360, 254, 386, 378, 386.1, 0, 393, 143, 407, 143, 415, 0, 418, 214, 430, 170, 441, 527, 454, 325, 464, 519, 476, 444, 485, 0, 654, 12, 662, 361)
 
+[sub_resource type="Resource" id="Phase_stage2_build1"]
+script = ExtResource("9_5plhc")
+pop_from = 14.0
+pop_to = 45.0
+rate = 6.0
+attack_budget = 1
+mix = {
+"splitter": 0.8
+}
+id = &"build1"
+display_name = "1回目の育成"
+
+[sub_resource type="Resource" id="Phase_stage2_pressure"]
+script = ExtResource("9_5plhc")
+start = 55.0
+pop_from = 45.0
+pop_to = 70.0
+rate = 8.0
+attack_budget = 3
+mix = {
+"splitter": 1.5
+}
+id = &"pressure"
+display_name = "1回目の山"
+
+[sub_resource type="Resource" id="Phase_stage2_build2"]
+script = ExtResource("9_5plhc")
+start = 135.0
+pop_from = 38.0
+pop_to = 45.0
+rate = 6.0
+xp_bonus = 1.4
+attack_budget = 1
+mix = {
+"splitter": 2.0
+}
+id = &"build2"
+display_name = "2回目の育成"
+
+[sub_resource type="Resource" id="Phase_stage2_rampage"]
+script = ExtResource("9_5plhc")
+start = 170.0
+pop_from = 140.0
+pop_to = 260.0
+rate = 60.0
+attack_budget = 2
+mix = {
+"splitling": 2.0
+}
+id = &"rampage"
+display_name = "2回目の山"
+
+[sub_resource type="Resource" id="Phase_stage2_tension"]
+script = ExtResource("9_5plhc")
+start = 260.0
+pop_from = 70.0
+pop_to = 110.0
+rate = 10.0
+attack_budget = 1
+mix = {
+"missile": 1.3,
+"splitter": 2.0
+}
+id = &"tension"
+display_name = "3回目の育成"
+
+[sub_resource type="Resource" id="Phase_stage2_escape"]
+script = ExtResource("9_5plhc")
+start = 290.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+attack_budget = 3
+mix = {
+"missile": 1.6,
+"splitter": 1.5
+}
+id = &"escape"
+display_name = "3回目の山"
+
 [resource]
 script = ExtResource("1")
 index = 2
 scene_path = "res://scenes/stages/stage_2.tscn"
-phases = [ExtResource("2"), ExtResource("3"), ExtResource("4"), ExtResource("5"), ExtResource("6"), ExtResource("7"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq"), SubResource("Resource_vp438")]
+phases = [SubResource("Phase_stage2_build1"), SubResource("Phase_stage2_pressure"), SubResource("Phase_stage2_build2"), SubResource("Phase_stage2_rampage"), SubResource("Phase_stage2_tension"), SubResource("Phase_stage2_escape"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq"), SubResource("Resource_vp438")]
 enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])
 enemy_tuning = {
 "crab": {
