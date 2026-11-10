@@ -271,7 +271,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
     const double pixel=1.82*config.character_scale;
     for (auto row:state.pickups.nearest_gems(view.grow(128),state.ship.pos,size_t(state.pickup_config.gem_draw_max))) {
         const auto &gem=state.pickups.gems[row];
-        batch(config.crystal_visual,6,0).add(int64_t(gem.id),gem.pos,0,std::max(5.0,pixel*4.0)*1.4,crystal_colors[gem.kind]);
+        batch(config.crystal_visual,6,0).add(int64_t(gem.id),gem.pos,0,std::max(5.0,pixel*4.0)*0.7,crystal_colors[gem.kind]);
     }
     for (size_t i=0;i<state.pickups.coins.size();++i) {
         const auto &coin=state.pickups.coins[i];if (coin.alive && view.grow(60).has_point(coin.pos))
