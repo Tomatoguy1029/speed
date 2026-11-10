@@ -470,7 +470,8 @@ func _draw() -> void:
 
 func _update_fuel_meter() -> void:
 	if _fuel_meter==null or _cpp_ui.is_empty(): return
-	_fuel_meter.fuel = float(_cpp_ui.fuel)
+	var draw: Dictionary = _cpp_ui.get("draw",{})
+	_fuel_meter.fuel = float(draw.get("fuel_preview",_cpp_ui.fuel))
 	_fuel_meter.maximum = float(_cpp_ui.fuel_max)
 	_fuel_meter.minimum = float(_cpp_ui.boost_min_cost)
 	_fuel_meter.queue_redraw()

@@ -120,7 +120,7 @@ func _cpp_route_input(frame: Dictionary, driver: Dictionary, owner: RunSession) 
 		if heading.length_squared()<0.1: heading = (intent.cursor-at).normalized()
 		driver.stroke.clear()
 		if driver.smart:
-			var length: float = frame.ui.base_draw_length*maxf(draw.fuel/ContentManager.cfg.fuel_capacity,ContentManager.cfg.boost_min_q)*(frame.ui.max_speed/ContentManager.cfg.base_max_speed)*frame.ui.length_mult/ContentManager.cfg.boost_cost_ratio*0.9
+			var length: float = frame.ui.base_draw_length*(draw.fuel/ContentManager.cfg.fuel_capacity)*(frame.ui.max_speed/ContentManager.cfg.base_max_speed)*frame.ui.length_mult/ContentManager.cfg.boost_cost_ratio*0.9
 			driver.stroke = Array(_cpp_safer_path(owner,frame,(intent.cursor-at).normalized(),length,driver))
 		else:
 			for k in 7: driver.stroke.append(at+heading*(60.0+220.0*k)+heading.orthogonal()*(80.0 if k%2 else -80.0))

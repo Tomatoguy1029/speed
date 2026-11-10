@@ -724,6 +724,11 @@ func check_cpp_t08() -> bool:
 	bridge.collect_frame()
 	for _frame in range(3): await get_tree().process_frame
 	check(hud._cpp_ui.capacity==capacity and is_equal_approx(hud._fuel_meter.fuel,fuel),"HUDは容量が増えても同じ燃料の量を示す")
+	var low_position: Vector2 = core.ship_snapshot().ship_pos
+	bridge.command("dev_edit",{"kind":"ship","payload":{"position":low_position,"fuel":7.0}})
+	core.handle_draw({"press":true,"pen":low_position},300,1.0)
+	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*7.0/config.fuel_capacity/config.boost_cost_ratio),"燃料7の描線上限に突進速度の最低量を足さない")
+	core.handle_draw({"touch":true,"pen_release":true},310,1.0)
 	hud.free()
 	bridge.dispose()
 	await get_tree().process_frame
@@ -1074,7 +1079,7 @@ func check_cpp_t14() -> bool:
 	add_child(hud)
 	bridge.collect_frame()
 	for _frame in range(3): await get_tree().process_frame
-	check(is_equal_approx(hud._cpp_ui.length_mult,expected) and is_equal_approx(hud._cpp_ui.draw.draw_limit,limit) and is_equal_approx(hud._cpp_ui.draw.draw_length/limit,0.25),"HUDへ同じ延長倍率と描き途中のゲージ消費率を渡す")
+	check(is_equal_approx(hud._cpp_ui.length_mult,expected) and is_equal_approx(hud._cpp_ui.draw.draw_limit,limit) and is_equal_approx(hud._cpp_ui.draw.draw_length/limit,0.25) and is_equal_approx(hud._fuel_meter.fuel,config.fuel_capacity*0.75),"HUDへ描き途中の長さと消費後の残量を渡す")
 	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*2.0,0)},20,1.0),"上限を越える入力も実際の描線へ通す")
 	var committed: Dictionary = core.draw_snapshot()
 	check(committed.tracing and not committed.drawing and is_equal_approx(committed.trace_total,limit) and is_equal_approx(committed.fuel,0.0),"上限で線を止めて発進し、上限相当のゲージを消費する")

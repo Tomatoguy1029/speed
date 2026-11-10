@@ -43,7 +43,7 @@ double RouteConstraints::distance(godot::Vector2 p,const std::vector<godot::Vect
 }
 RouteResult RouteConstraints::validate(const RouteContext &c,const std::vector<godot::Vector2> &path,const RouteOptions &o) {
     RouteResult r;r.radius=c.ship_radius+std::max(0.0,o.margin)+c.point_step+2.5/std::max(c.zoom,0.01);
-    r.budget=c.draw_length*std::max(c.fuel/c.fuel_capacity,c.boost_min_q)*(c.max_speed/c.base_speed)*c.length_mult/c.boost_cost_ratio;
+    r.budget=c.draw_length*(c.fuel/c.fuel_capacity)*(c.max_speed/c.base_speed)*c.length_mult/c.boost_cost_ratio;
     r.horizon=(std::max(0.0,o.window)+std::max(o.draw_seconds,c.confirm_delay)+c.run_time+c.hitstop_cap)*std::max(1.0,std::max(c.time_scale,c.scale_min))+c.pending_world;
     if (path.size()<2) return r;
     for (size_t n=1;n<path.size();++n) r.length+=path[n-1].distance_to(path[n]);

@@ -45,6 +45,7 @@ func apply_snapshot(ui: Dictionary) -> void:
 		_cpp_ui.fuel_max = config.fuel_capacity*float(_cpp_ui.capacity)
 		_cpp_ui.fuel = _cpp_ui.fuel_max
 		_cpp_ui.draw.fuel = _cpp_ui.fuel
+		_cpp_ui.draw.fuel_preview = _cpp_ui.fuel
 
 func _process(delta: float) -> void:
 	_layout_cpp_art()

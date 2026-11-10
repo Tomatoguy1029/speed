@@ -265,7 +265,7 @@ extends Resource
 @export var boost_cost_ratio: float
 ## ブーストの最低消費量
 @export var boost_min_cost: float
-## ブーストの充填量の下限
+## 突進の速さを求める充填量の下限。描ける長さは残燃料に比例する。
 @export var boost_min_q: float
 ## 標準の体当たり1回分の給油量
 @export var fuel_per_hit: float
@@ -276,7 +276,7 @@ extends Resource
 ## 満タン通知を再び出せる燃料の割合
 @export var fuel_notify_reset: float
 ## 描線の基準距離
-## 充填量1・基本の最高速度での基準。実効基準距離に q・最高速度・軌跡延長を掛け、ブースト消費率で割って描ける上限を求める。
+## 充填量1・基本の最高速度での基準。実効基準距離に燃料÷基本容量・最高速度・軌跡延長を掛け、ブースト消費率で割って描ける上限を求める。
 ## 単位：単位（距離）
 @export var draw_length: float
 ## 描画中の世界の速さ

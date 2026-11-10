@@ -106,11 +106,7 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 
 void SpeedRunCore::commit_draw() {
     if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
-    const auto &c=runtime.state.draw_config;
-    const double used=runtime.state.draw.connection+runtime.state.draw.length;
-    const bool at_limit=!runtime.state.draw.blocked && runtime.state.draw.limit-used<c.point_step;
-    const double fraction=at_limit?1.0:std::min(1.0,used/runtime.state.draw.limit);
-    const double cost=std::max(c.boost_min_cost,runtime.state.draw.start_fuel*fraction);
+    const double cost=speed::FuelSystem::draw_cost(runtime.state);
     speed::FuelSystem::set(runtime,runtime.state.draw.fuel-cost);
     auto points = runtime.state.draw.points;
     if (runtime.state.ship.pos.distance_to(points[0]) > 1) points.insert(0, runtime.state.ship.pos);
@@ -290,6 +286,7 @@ Dictionary SpeedRunCore::draw_snapshot() const {
     Dictionary out;
     if (!runtime.state.draw_ready || runtime.state.closed) return out;
     out["fuel"] = runtime.state.draw.fuel;out["fuel_max"]=speed::FuelSystem::maximum(runtime.state);out["boost_min_cost"]=runtime.state.draw_config.boost_min_cost;
+    out["fuel_preview"]=runtime.state.draw.drawing?std::max(0.0,runtime.state.draw.fuel-speed::FuelSystem::draw_cost(runtime.state)):runtime.state.draw.fuel;
     out["gauge"] = runtime.state.draw.fuel/speed::FuelSystem::maximum(runtime.state); out["drawing"] = runtime.state.draw.drawing; out["draw_started"] = runtime.state.draw.started;
     out["draw_blocked"] = runtime.state.draw.blocked;
     out["draw_start_fuel"] = runtime.state.draw.start_fuel;out["draw_connection"] = runtime.state.draw.connection; out["draw_gauge"] = runtime.state.draw.amount;
