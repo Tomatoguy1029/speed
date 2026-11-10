@@ -338,6 +338,9 @@ enemy_tuning = {
 "shield": {
 "hp": 45.0
 },
+"splitling": {
+"params.bite_telegraph": 0.4
+},
 "triangle": {
 "params.trail_dmg": 14.0
 },
