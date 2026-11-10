@@ -27,6 +27,13 @@ func _ready() -> void:
 		elif "--cpp-operation-runtime" in OS.get_cmdline_user_args() or "--cpp-operation-input" in OS.get_cmdline_user_args(): await _operation_runtime()
 		elif "--cpp-operation-debug" in OS.get_cmdline_user_args(): await _operation_debug()
 		elif "--cpp-operation-settings" in OS.get_cmdline_user_args(): await _operation_settings()
+		elif "--cpp-operation-codex" in OS.get_cmdline_user_args():
+			await _codex_round_trip()
+			hud._rewards.enqueue_bonus({"type": &"level_bonus", "kind": &"weapon", "id": &"W01", "level": 2, "count": 1})
+			await _codex_round_trip()
+			hud._rewards.cancel()
+			_clear_choice()
+			await _codex_round_trip()
 		elif "--cpp-operation-spawn" in OS.get_cmdline_user_args():
 			_clear_choice()
 			_tap(KEY_P)
@@ -53,6 +60,7 @@ func _ready() -> void:
 		_tap(KEY_ESCAPE)
 		_check(_state().phase == MenuIds.Phase.Levelup and hud._cards_box.visible, "Esc restores initial choice")
 	_check(_state().start_pick and _state().cards == cards and _state().weapons.is_empty(), "pause preserves initial candidates and choice state")
+	await _codex_round_trip()
 	await _ready_cards()
 	for i in 3:
 		_tap(KEY_P)
@@ -100,6 +108,7 @@ func _ready() -> void:
 	_check(hud._pause_box.visible, "pause opens during reward presentation")
 	_tap(KEY_ESCAPE)
 	_check(hud._rewards.visible and _state().phase == MenuIds.Phase.Levelup, "pause restores reward and selection phase")
+	await _codex_round_trip()
 	hud._rewards.cancel()
 	await _ready_cards()
 	# 資源待ちで既に選んだカードは、メニュー中に準備が終わっても確定を保留する。
@@ -145,6 +154,7 @@ func _ready() -> void:
 	_tap(KEY_P)
 	# ゲーム中のデバッグ表示も閉じるまで時計を停止し、背後の入力を残さない。
 	_clear_choice()
+	await _codex_round_trip()
 	for equipment in ["W01", "W02", "W03", "W04"]:
 		_check(bridge.command("dev_grant_equipment", {"kind":"weapon","id":equipment,"levels":1}).ok, "交換前に通常の装備枠を埋める")
 	_check(bridge.command("dev_edit", {"kind":"comet_weapon","payload":{"id":"W22"}}).ok, "交換候補を開く")
@@ -165,6 +175,43 @@ func _ready() -> void:
 	await _close()
 	print("[selection_menus] passed=%d failed=%d" % [passed, failed])
 	get_tree().quit(1 if failed else 0)
+
+func _codex_round_trip() -> void:
+	var phase: int = _state().phase
+	var cards: Array = _state().cards.duplicate(true)
+	var before: float = _state().time
+	var elapsed: float = hud._rewards._elapsed
+	var screen: int = GameManager.screen
+	_tap(KEY_ESCAPE)
+	var button: Button = hud._pause_box.get_node("CodexButton")
+	for use_back in [false, true]:
+		await get_tree().process_frame
+		button.grab_focus()
+		_tap(KEY_ENTER)
+		var page: Control = hud._menu_overlay
+		_check(page != null and not hud._pause_box.visible, "pause opens codex above the run")
+		if page == null: break
+		await _shot("pause_codex")
+		_tap(KEY_1)
+		_tap(KEY_R)
+		_tap(KEY_Q)
+		_tap(KEY_P)
+		_step(1.0)
+		_check(_state().phase == MenuIds.Phase.Paused and _state().time == before and _state().cards == cards and hud._rewards._elapsed == elapsed and not panel.visible, "codex preserves clock, choices and rewards and blocks shortcuts")
+		_check(not bridge.read_frame().value.ui.input_enabled, "codex blocks gameplay input at the run boundary")
+		if use_back:
+			_click(page.get_node("%BackButton").get_global_rect().get_center())
+		else:
+			_tap(KEY_ESCAPE)
+		_check(hud._menu_overlay == null and hud._pause_box.visible and _state().phase == MenuIds.Phase.Paused, "codex returns to pause without resuming")
+		_check(get_viewport().gui_get_focus_owner() == button and GameManager.screen == screen, "codex restores focus and keeps the run screen")
+		var intent := router.poll()
+		_check(not intent.press and not intent.alt_press and not intent.hero_press, "closing codex discards pending gameplay input")
+		_key(KEY_ESCAPE, true, true)
+		_key(KEY_ESCAPE, false)
+		_check(_state().phase == MenuIds.Phase.Paused, "codex close key echo cannot resume the run")
+	_tap(KEY_ESCAPE)
+	_check(_state().phase == phase and _state().cards == cards, "resume after codex restores the previous phase and choices")
 
 func _ready_cards() -> void:
 	var deadline := Time.get_ticks_usec() + 350_000
