@@ -33,7 +33,6 @@ struct RunConfig {
     double ship_config_acceleration{};
     double ship_config_glide_duration_mult{};
     double ship_config_invulnerability{};
-    double draw_config_min_charge{};
     double draw_config_length{};
     double draw_config_point_step{};
     double draw_config_confirm_delay{};
@@ -46,7 +45,6 @@ struct RunConfig {
     double draw_config_launch_ratio{};
     double draw_config_glide_ratio{};
     double draw_config_capacity{};
-    double draw_config_charge_time{};
     double draw_config_length_mult{};
     double camera_base_view{};
     double camera_zoom_ref_speed{};
@@ -104,6 +102,19 @@ struct RunConfig {
     double fx_monoceros_kick_life{};
     double fx_monoceros_lance_timing{};
     double fx_boss_touch_damage{};
+    double draw_config_fuel_capacity{};
+    double draw_config_cruise_drain{};
+    double draw_config_regen_rate{};
+    double draw_config_fuel_low{};
+    double draw_config_fuel_speed_min{};
+    double draw_config_fuel_slow_time{};
+    double draw_config_boost_cost_ratio{};
+    double draw_config_boost_min_cost{};
+    double draw_config_boost_min_q{};
+    double draw_config_fuel_per_hit{};
+    double draw_config_fuel_hole_ratio{};
+    double draw_config_fuel_gain_max{};
+    double draw_config_fuel_notify_reset{};
 };
 struct StringEntry {
     uint32_t id{};
@@ -157,6 +168,7 @@ struct EnemyRecord {
     uint32_t gate{};
     double gate_arc{};
     double weak_arc{};
+    double fuel_hits{};
 };
 struct LoadoutDefinition {
     uint32_t id{};
@@ -1101,12 +1113,11 @@ struct NumericTraitLevel {
     double pickup_bonus{};
     double length_bonus{};
     double glide_bonus{};
+    double cruise_drain_ratio{};
 };
 struct PostMaxChargeDefinition {
     uint32_t id{};
     double increment{};
-    double minimum_ratio{};
-    double minimum_time{};
 };
 struct PostMaxCritDefinition {
     uint32_t id{};

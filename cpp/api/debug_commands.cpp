@@ -1,4 +1,5 @@
 #include "run_core.h"
+#include "../systems/fuel.h"
 #include "../systems/equipment.h"
 #include "../systems/progression.h"
 #include "../systems/enemy_system.h"
@@ -70,7 +71,7 @@ Dictionary SpeedRunCore::development_debug_command(const Dictionary &p) {
         return reply(false);
     }
     else if (action=="level_up") return reply(speed::ProgressionSystem::add_experience(*this,speed::ProgressionSystem::next_xp(runtime)-s.loadout->xp+0.01));
-    else if (action=="gauge_full") s.draw.gauge=1;
+    else if (action=="gauge_full") speed::FuelSystem::set(runtime,speed::FuelSystem::maximum(s));
     else if (action=="heal") s.ship.hp=s.ship_config.max_hp;
     else if (action=="clear_enemies") {speed::EnemySystem::clear_regular(runtime);rebuild_enemy_grid(s.frame_grid_cell);}
     else if (action=="hurt" || action=="die") {

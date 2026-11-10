@@ -1821,7 +1821,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		_end_blast_visual.sync_frame(ui.end_blast.visuals)
 	var full_burst_dt: float = 0.0 if _full_burst_world_time<0.0 else maxf(0.0,ui.world_time-_full_burst_world_time)
 	_full_burst_world_time = ui.world_time if equipped_full_burst else -1.0
-	if _full_burst_visual!=null: _full_burst_visual.frame_tick(full_burst_dt,ui.ship.ship_pos+ui.ship.ship_heading*16.0*1.82*ui.character_scale,ui.full_burst_active,ui.world_time,_ship_visible)
+	if _full_burst_visual!=null: _full_burst_visual.frame_tick(full_burst_dt,ui.ship.ship_pos+ui.ship.ship_heading*16.0*1.82*ui.character_scale,float(ui.full_burst_strength),ui.world_time,_ship_visible)
 	var duplicator_dt: float = 0.0 if _duplicator_world_time<0.0 else maxf(0.0,ui.world_time-_duplicator_world_time)
 	_duplicator_world_time = ui.world_time if equipped_duplicator else -1.0
 	if _duplicator_visual!=null: _duplicator_visual.frame_tick(duplicator_dt)

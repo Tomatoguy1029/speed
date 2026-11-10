@@ -1,3 +1,4 @@
+#include "../traits/fullBurst.h"
 #include "interceptor.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/collision_query.h"
@@ -30,7 +31,7 @@ void InterceptorBehavior::step(RunRuntime &r,double dt) {
         if (s.enemy_handles.contains(target)) {const auto &e=s.enemies[target.slot];d.target=target;d.target_id=e.id;d.angle=(e.pos-d.pos).angle();w.target_after[e.id]=w.clock+w.target_interval;d.kick=1.5*1.82*r.content->config.character_scale;d.flash=0.06;const auto direction=godot::Vector2::from_angle(d.angle);const auto origin=d.pos+direction*15*r.content->config.character_scale;const auto count=EquipmentSystem::shot_count(r,1);const double damage=CombatResolver::attack_power(r)*EquipmentSystem::weapon_damage_factor(r,w.definition)*w.damage;
             for (int64_t j=0;j<count;++j) {godot::RunState::Friendly shot;shot.pos=origin;shot.vel=godot::Vector2::from_angle(d.angle+(j-(count-1)/2.0)*0.08)*(w.shot_speed*(1+w.projectile_increment*double(s.loadout->post_projectile_speed_stacks)));shot.damage=damage;shot.radius=w.shot_radius*s.loadout->effects.area;shot.life=w.life*(1+w.duration_increment*double(s.loadout->post_duration_stacks));shot.color=godot::Color::hex(w.color);shot.cause="interceptor";shot.weapon_id="W25";shot.visual="weapon/interceptor";shot.callback.kind=FriendHitKind::Interceptor;FriendShotSystem::emit(r,std::move(shot));}
         }
-        --d.left;const double rate=s.draw.gauge<1?1:1+s.loadout->effects.full_gauge_rate*s.draw.gauge;d.next=w.clock+interval(d.left?w.burst_interval:w.interval)/rate;
+        --d.left;const double rate=FullBurstBehavior::rate(r);d.next=w.clock+interval(d.left?w.burst_interval:w.interval)/rate;
     }
 }
 }

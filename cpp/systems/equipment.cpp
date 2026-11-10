@@ -1,4 +1,5 @@
 #include "equipment.h"
+#include "fuel.h"
 #include "progression.h"
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/forward.h"
@@ -33,7 +34,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     bool kill_sonic_owned=false;
     bool rampage_owned=false,run_up_owned=false,vortex_owned=false,crit_beam_owned=false;
     run.state.loadout->duplicator={};
-    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0,pickup_bonus=0,length_bonus=0,glide_bonus=0;
+    effects.area=effects.shot_amount=1;effects.full_gauge_rate=0;double drain_ratio=1,charge_bonus=0,capacity_bonus=0,crit_bonus=0,speed_bonus=0,attack_bonus=0,pickup_bonus=0,length_bonus=0,glide_bonus=0;
     for (const auto &owned:run.state.loadout->traits) {
         if (run.content->equipment[owned.definition-1].external_id=="T36") run.state.loadout->full_burst_owned=true;
         for (const auto &level:run.content->duplicator_levels) if (level.equipment==owned.definition && level.level==owned.level) {
@@ -56,7 +57,7 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
         }
         for (const auto &level:run.content->full_charge_levels) if (level.equipment==owned.definition && level.level==owned.level) run.state.loadout->full_charge_maximum=level.multiplier;
         for (const auto &level:run.content->numeric_traits) if (level.equipment==owned.definition && level.level==owned.level) {
-            effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;crit_bonus+=level.crit_bonus;speed_bonus+=level.speed_bonus;attack_bonus+=level.attack_bonus;pickup_bonus+=level.pickup_bonus;length_bonus+=level.length_bonus;glide_bonus+=level.glide_bonus;
+            drain_ratio*=level.cruise_drain_ratio;effects.area+=level.area_bonus;effects.shot_amount+=level.shot_bonus;effects.full_gauge_rate+=level.full_gauge_rate;charge_bonus+=level.charge_bonus;capacity_bonus+=level.capacity_bonus;crit_bonus+=level.crit_bonus;speed_bonus+=level.speed_bonus;attack_bonus+=level.attack_bonus;pickup_bonus+=level.pickup_bonus;length_bonus+=level.length_bonus;glide_bonus+=level.glide_bonus;
         }
     }
     if (!run.state.loadout->full_burst_owned) run.state.loadout->full_burst_active=false;
@@ -85,10 +86,11 @@ void EquipmentSystem::refresh_effects(RunRuntime &run) {
     run.state.pickup_config.repair_fraction=run.content->config.pickup_repair_fraction+ProgressionSystem::post_effect(run,"repair");
     run.state.pickup_config.speed_mult=run.content->config.pickup_speed_mult*(1+ProgressionSystem::post_amount(run,"pickup_speed"));
     run.state.loadout->xp_gain_mult=1+ProgressionSystem::post_amount(run,"xp_gain");
-    const auto &post=run.content->post_charge;
-    const double base=run.content->config.draw_config_charge_time*p.charge_profile_factor/(1.0+charge_bonus);
-    const double floor=std::min(base,std::max(post.minimum_time,base*post.minimum_ratio));
-    run.state.draw_config.charge_time=std::max(floor,base*(1.0-post.increment*double(p.post_charge_stacks)));
+    run.state.draw_config.regen_mult=1.0+charge_bonus;
+    run.state.draw_config.drain_mult=drain_ratio;
+    run.state.draw_config.fuel_gain_mult=1.0+std::min(run.state.draw_config.fuel_gain_max,
+        std::max(0.0,p.fuel_gain_profile_factor-1.0)+ProgressionSystem::post_amount(run,"charge_time"));
+    FuelSystem::set(run,run.state.draw.fuel);
     run.state.draw_config.length_mult=p.length_profile_factor*(1.0+length_bonus)*(1.0+run.content->post_draw.line_length_increment*double(p.post_line_length_stacks));
     run.state.pickup_config.coin_radius=run.content->config.coin_radius*p.pickup_profile_factor*(1.0+pickup_bonus);
     run.state.pickup_config.xp_radius=run.state.pickup_config.coin_radius*(1.0+run.content->post_pickup.xp_radius_increment*double(p.post_xp_pickup_stacks));

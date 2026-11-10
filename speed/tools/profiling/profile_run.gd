@@ -3,7 +3,7 @@ extends Node
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 const DRIVE_RADIUS := 900.0
 const REFILL_TICKS := 30
-const OBSERVED_UI_FIELDS := ["ship", "draw", "capacity", "min_charge", "full_burst", "full_burst_active", "phase", "input_enabled", "cards", "mines", "afterimage", "end_blast", "barrier", "knockback", "interceptor", "full_charge", "bonus_remaining", "run_time", "world_time", "hitstop", "boss_bodies"]
+const OBSERVED_UI_FIELDS := ["ship", "draw", "capacity", "boost_min_cost", "full_burst", "full_burst_active", "phase", "input_enabled", "cards", "mines", "afterimage", "end_blast", "barrier", "knockback", "interceptor", "full_charge", "bonus_remaining", "run_time", "world_time", "hitstop", "boss_bodies"]
 const FLAGS := ["gpu", "hitstop", "levels", "bonus", "keep", "normal-drops", "rewards"]
 const NUMBERS := ["stage", "time", "seconds", "warmup", "seed", "hz", "fps", "draw", "stroke", "mixed_target", "boss_hp"]
 const TEXT := ["size", "drive", "weapons", "meta", "mix", "revision", "out", "vsync", "condition", "require", "mode"]
@@ -260,7 +260,7 @@ func _drive_intent() -> Intent:
 		if draw.drawing: drawing_ticks+=1
 		if draw.tracing: traced_ticks+=1
 	# 満タンの通常入力でギアアップも発動させる。充填時間や容量は変更しない。
-	var charge_ready: bool = draw.gauge>=1.0 if expected_equipment.has("T04") or packet.ui.get("full_burst",false) else draw.gauge*packet.ui.capacity>=packet.ui.min_charge
+	var charge_ready: bool = draw.gauge>=1.0 if expected_equipment.has("T04") or packet.ui.get("full_burst",false) else draw.fuel>=packet.ui.boost_min_cost
 	if not seek_warp and stroke_time<0 and clock>=next_draw and not draw.drawing and not draw.tracing and charge_ready:
 		stroke.clear()
 		var heading: Vector2 = ship.ship_heading

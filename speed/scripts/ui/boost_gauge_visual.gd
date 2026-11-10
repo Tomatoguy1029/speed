@@ -66,31 +66,9 @@ static func style_for(values: Dictionary, radius := 14.0, gap := 7.0) -> BoostGa
 	style.tick_end = maxf(style.tick_start, sqrt(maxf(0.0, style.bounds.y * style.bounds.y - half_stroke * half_stroke)) - half_stroke)
 	return style
 
-static func draw(c: CanvasItem, at: Vector2, amount: float, capacity: float, min_charge: float,
-		drawing: bool, usable: bool, flash: float, pulse: float, style: BoostGaugeStyle, gap: float) -> void:
-	var col: Color = style.unavailable_color if amount < 0.25 else style.normal_color
-	if drawing: col = style.path_color
-	var bounds := style.bounds
-	if flash > 0.0:
-		col = col.lerp(style.full_flash_color, flash)
-	var laps := ceili(capacity - 1e-6)
-	if laps <= 0: return
-	for lap in laps:
-		var inside := bounds.x if lap == 0 else bounds.z + gap * (lap - 1)
-		var outside := bounds.y if lap == 0 else bounds.w + gap * (lap - 1)
-		var r := (inside + outside) * 0.5
-		var lap_cap := minf(1.0, capacity - lap)
-		var fill := clampf(amount - lap, 0.0, lap_cap)
-		var width := outside - inside
-		c.draw_arc(at, r, -PI / 2.0, -PI / 2.0 + TAU * lap_cap, 32, style.background_color, width)
-		if fill > 0.0: c.draw_arc(at, r, -PI / 2.0, -PI / 2.0 + TAU * fill, 32, col, minf(r * 2.0, width + 2.0 * flash))
-	if not drawing:
-		var tick := Vector2.from_angle(-PI / 2.0 + TAU * min_charge)
-		var tick_color: Color = style.ready_tick_color if usable else style.unavailable_tick_color
-		# 線の角と端まで第一周の外縁へ収めた制作済みの位置を使う。
-		c.draw_line(at + tick * style.tick_start, at + tick * style.tick_end, tick_color, style.tick_width)
-	if pulse >= 0.0:
-		var pulse_color: Color = style.ready_pulse_color
-		pulse_color.a *= 1.0 - pulse
-		var outermost := (bounds.x + bounds.y) * 0.5 if laps == 1 else (bounds.z + bounds.w) * 0.5 + gap * (laps - 2)
-		c.draw_arc(at, outermost + 12.0 * pulse, 0, TAU, 32, pulse_color, 3.0)
+static func draw(c: CanvasItem, at: Vector2, remaining: float, style: BoostGaugeStyle) -> void:
+	var radius := (style.bounds.x+style.bounds.y)*0.5
+	var width := style.bounds.y-style.bounds.x
+	c.draw_arc(at,radius,-PI/2.0,-PI/2.0+TAU,48,style.background_color,width)
+	if remaining>0.0:
+		c.draw_arc(at,radius,-PI/2.0,-PI/2.0+TAU*clampf(remaining,0.0,1.0),48,style.path_color,width)

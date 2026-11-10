@@ -115,12 +115,12 @@ func _cpp_route_input(frame: Dictionary, driver: Dictionary, owner: RunSession) 
 		intent.hero_press = not str(frame.ui.hero.power).is_empty() and frame.ui.hero.cooldown<=0 and (frame.ui.hp<frame.ui.max_hp*0.7 or int(driver.blockers)>0)
 
 	var clock := float(frame.tick)/120.0
-	if driver.start<0.0 and clock>=driver.next and not draw.drawing and not draw.tracing and draw.gauge>=1.0:
+	if driver.start<0.0 and clock>=driver.next and not draw.drawing and not draw.tracing and draw.fuel>=frame.ui.boost_min_cost:
 		var heading: Vector2 = ship.ship_heading
 		if heading.length_squared()<0.1: heading = (intent.cursor-at).normalized()
 		driver.stroke.clear()
 		if driver.smart:
-			var length: float = frame.ui.base_draw_length*frame.ui.capacity*draw.gauge*(frame.ui.max_speed/ContentManager.cfg.base_max_speed)*frame.ui.length_mult*0.9
+			var length: float = frame.ui.base_draw_length*maxf(draw.fuel/ContentManager.cfg.fuel_capacity,ContentManager.cfg.boost_min_q)*(frame.ui.max_speed/ContentManager.cfg.base_max_speed)*frame.ui.length_mult*0.9
 			driver.stroke = Array(_cpp_safer_path(owner,frame,(intent.cursor-at).normalized(),length,driver))
 		else:
 			for k in 7: driver.stroke.append(at+heading*(60.0+220.0*k)+heading.orthogonal()*(80.0 if k%2 else -80.0))

@@ -4,17 +4,12 @@
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
-const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "world_scale", "xp"]
+const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "fuel", "fuel_max", "boost_min_cost", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "world_scale", "xp"]
 
-## 描けるようになったときに広がる輪の時間（実秒）
 const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
 const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
-const RING_PULSE_TIME := 0.35
-## リングが1周溜まりきったときに白く光る時間（実秒）
-const RING_FLASH_TIME := 0.3
-## 制作済みの色・円帯・目盛りと、3周目以降の間隔
+## 制作済みの描画中のリングの色と円帯
 const BOOST_STYLE := preload("res://data/visuals/boost_gauge_runtime.tres")
-const RING_GAP := 7.0
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（素材のpx）
 const LOADOUT_SLOT := 16.0
@@ -39,7 +34,19 @@ const SLOTS := preload(ART + "combat_ui_components.png")
 const COMET_SLOT_FRAME := preload(ART + "comet_slot_frame.gdshader")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
-const SPEED_INDICATOR := preload("res://scripts/ui/speed_indicator.gd")
+class FuelMeter extends Control:
+	const METER_SIZE := Vector2(116, 28)
+	var fuel := 0.0
+	var maximum := 100.0
+	var minimum := 4.0
+	var font: Font
+	var normal_color := Color("#5dffa0")
+	func _draw() -> void:
+		var col: Color = normal_color if fuel>=minimum else normal_color.darkened(0.75)
+		draw_rect(Rect2(0, 14, METER_SIZE.x, 10), Color(0.03, 0.06, 0.08, 0.9))
+		draw_rect(Rect2(1, 15, (METER_SIZE.x-2)*clampf(fuel/maxf(maximum,0.001),0.0,1.0), 8), col)
+		draw_string(font, Vector2(0, 10), TranslationServer.translate("hud.fuel"), HORIZONTAL_ALIGNMENT_LEFT, -1, 9, col)
+		draw_string(font, Vector2(60, 10), str(floori(fuel)), HORIZONTAL_ALIGNMENT_RIGHT, 56, 10, col)
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
 
@@ -110,18 +117,13 @@ var _banner_cleared := false
 var _banner_t := 0.0
 var _warning_t := 0.0
 var _hero_notice_t := 0.0
-var _ring_usable := true
+var _draw_reject_t := 0.0
 ## ポーズ中に開いている設定（なければ null）
 var _settings: UiScreen
-var _ring_pulse_t := 0.0
-var _ring_flash_t := 0.0
-var _ring_flash_max := RING_FLASH_TIME
-## 前のフレームの溜まっている量（1周溜まりきった瞬間を見つける）
-var _ring_amount := 1.0
 var _pause_after_reward := false
 var _menu_overlay: Control
 var _overlay_focus: WeakRef
-var _speed_indicator: SPEED_INDICATOR
+var _fuel_meter: FuelMeter
 
 func _ready() -> void:
 	_ready_cpp()
@@ -218,12 +220,10 @@ func _process(delta: float) -> void:
 		_banner_t += delta
 	_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
 	_warning_t = maxf(0.0,_warning_t-delta)
-	_update_speed_indicator(delta)
+	_update_fuel_meter()
+	_draw_reject_t = maxf(0.0,_draw_reject_t-delta)
 	_update_cpp_finish()
 	_update_cpp_cinematic()
-	if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
-		_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
-		_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
 	queue_redraw()
 
 func _can_show_draw_button(touchscreen: bool) -> bool:
@@ -468,13 +468,12 @@ func _open_settings(from: Button) -> void:
 func _draw() -> void:
 	_draw_cpp()
 
-func _speed_indicator_mode() -> int:
-	if _cpp_ui.get("tracing",false) or float(_cpp_ui.get("ship_boost_t",0.0))>0.0: return SPEED_INDICATOR.BOOST
-	if _cpp_ui.get("glide",false) or Vector2(_cpp_ui.get("ship_vel",Vector2.ZERO)).length()>float(_cpp_ui.get("max_speed",0.0))*float(_cpp_ui.get("steer_cruise",0.0))+1.0: return SPEED_INDICATOR.FAST
-	return SPEED_INDICATOR.NORMAL
-
-func _update_speed_indicator(delta: float) -> void:
-	if _cpp_ui.get("phase",-1)==0 and _cpp_ui.get("input_enabled",false): _speed_indicator.advance(_speed_indicator_mode(),delta)
+func _update_fuel_meter() -> void:
+	if _fuel_meter==null or _cpp_ui.is_empty(): return
+	_fuel_meter.fuel = float(_cpp_ui.fuel)
+	_fuel_meter.maximum = float(_cpp_ui.fuel_max)
+	_fuel_meter.minimum = float(_cpp_ui.boost_min_cost)
+	_fuel_meter.queue_redraw()
 
 static func _minimap_segment(a: Vector2, b: Vector2) -> PackedVector2Array:
 	var length := a.distance_to(b)
@@ -576,38 +575,13 @@ func _draw_edge_arrow_values(p: Vector2, col: Color, view_center: Vector2, view_
 	var side := Vector2(-dir.y, dir.x) * 12.0
 	draw_colored_polygon(PackedVector2Array([tip, tip - dir * 24.0 + side, tip - dir * 24.0 - side]), col)
 
-## カーソル付近のリング：描画前は溜まっている量、描画中は残りの長さ（仕様書 6.2）。
-## 内側の1周が容量1、大容量チャージで増えた容量は外側の弧。内側から順に埋まる。
-## 描けるまでは専用の不足色を使い、描ける量に目盛りを置く。描けるようになった瞬間に広がる輪、1周溜まりきった瞬間に白い光を出す。
+## 描画中だけ、接続区間を含む予算に対する残りの長さを表示する。
 func _draw_cpp_gauge_ring() -> void:
 	var draw: Dictionary = _cpp_ui.draw
-	var capacity := float(_cpp_ui.capacity)
-	var amount := float(draw.gauge)*capacity
-	var displayed := float(draw.draw_gauge)*(1.0-float(draw.draw_length)/maxf(1.0,float(draw.draw_limit))) if draw.drawing else amount
-	_draw_gauge_values(float(_cpp_ui.min_charge),capacity,amount,draw.drawing,not draw.drawing and not draw.tracing,displayed,_cpp_ui.full_burst)
-
-func _draw_gauge_values(min_charge: float,capacity: float,amount: float,drawing: bool,charging: bool,displayed: float,full_burst: bool) -> void:
-	var c := get_viewport().get_mouse_position()+Vector2(26,26)
-	var usable := amount >= min_charge
-	if usable and not _ring_usable and charging:
-		_ring_pulse_t = RING_PULSE_TIME
-	_ring_usable = usable
-	if charging and _lap_filled(_ring_amount, amount, capacity):
-		_ring_flash_t = 0.1 if full_burst else RING_FLASH_TIME
-		_ring_flash_max = 0.1 if full_burst else RING_FLASH_TIME
-	_ring_amount = amount
-	amount = displayed
-	var flash := _ring_flash_t / _ring_flash_max if _ring_flash_t > 0.0 else 0.0
-	var pulse := 1.0 - _ring_pulse_t / RING_PULSE_TIME if _ring_pulse_t > 0.0 else -1.0
-	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, drawing, usable, flash, pulse, BOOST_STYLE, RING_GAP)
-
-## 内側・外側のどれかのリングが、before から after の間に溜まりきったか
-func _lap_filled(before: float, after: float, capacity: float) -> bool:
-	for lap in ceili(capacity - 1e-6):
-		var end := minf(lap + 1.0, capacity) - 1e-6
-		if before < end and after >= end:
-			return true
-	return false
+	if not draw.drawing: return
+	var remaining := float(draw.draw_limit)-float(draw.draw_connection)-float(draw.draw_length)
+	var ratio := clampf(remaining/maxf(0.001,float(draw.draw_limit)),0.0,1.0)
+	BOOST_GAUGE.draw(self, get_viewport().get_mouse_position()+Vector2(26,26), ratio, BOOST_STYLE)
 
 func _draw_banner() -> void:
 	if _banner == "":
@@ -678,15 +652,18 @@ func _ready_cpp() -> void:
 			_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
-	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
+	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","draw_rejected","game_over","clear_banner"])
 	_font = get_theme_default_font()
 	_bold_font = FontVariation.new()
 	_bold_font.base_font = _font
 	_bold_font.variation_embolden = 0.6
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_speed_indicator = SPEED_INDICATOR.new()
-	add_child(_speed_indicator)
+	_fuel_meter = FuelMeter.new()
+	_fuel_meter.font = _font
+	_fuel_meter.normal_color = BOOST_STYLE.normal_color
+	_fuel_meter.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_fuel_meter)
 	_health_fill = _make_bar_fill(HEALTH)
 	_experience_fill = _make_bar_fill(EXPERIENCE)
 	_build_pause()
@@ -745,7 +722,7 @@ func _update_cpp_finish() -> void:
 	if active: slow = value.elapsed<value.slow_time
 	AudioManager.set_slow_motion(slow and not _cpp_ui.get("presentation_frozen",false) and _menu_overlay==null and not _rewards.is_active())
 	_finish_skip.visible = active and value.elapsed>=0.35 and value.elapsed<value.reveal_start+value.reveal_duration
-	if _speed_indicator!=null: _speed_indicator.visible = not active
+	if _fuel_meter!=null: _fuel_meter.visible = not active
 	if _legendary_reveal==null: return
 	_legendary_reveal.visible = active and value.reveal_duration>0.0 and value.elapsed>=value.reveal_start and value.elapsed<value.reveal_start+value.reveal_duration
 	if not _legendary_reveal.visible: return
@@ -756,8 +733,8 @@ func _update_cpp_finish() -> void:
 
 func _layout_cpp_art() -> void:
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
-	_speed_indicator.position = (size-(SPEED_INDICATOR.METER.get_size()+Vector2.ONE*8.0)*factor).round()
-	_speed_indicator.scale = Vector2.ONE*factor
+	_fuel_meter.position = (size-(FuelMeter.METER_SIZE+Vector2.ONE*8.0)*factor).round()
+	_fuel_meter.scale = Vector2.ONE*factor
 	_cards_box.position = ((size-ART_SIZE*factor)*0.5).round()
 	_cards_box.scale = Vector2.ONE*factor
 
@@ -816,6 +793,7 @@ func _draw_cpp() -> void:
 		break
 	for comet in _cpp_ui.get("rare_comets",PackedVector2Array()): _draw_edge_arrow_values(comet,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	_draw_cpp_gauge_ring()
+	if _draw_reject_t>0.0: draw_string(_font,get_viewport().get_mouse_position()+Vector2(20,-20),tr("lab.link_too_far"),HORIZONTAL_ALIGNMENT_LEFT,-1,16,Color("#ffb35c"))
 	if _warning_t>0.0 and fmod(_warning_t,0.5)<0.3:
 		draw_string(_font,Vector2(size.x*0.5-160,120),tr("hud.warning"),HORIZONTAL_ALIGNMENT_CENTER,320,48,Color("#ff526e"))
 	_draw_banner()
@@ -966,10 +944,8 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 		if event.type=="boss_spawn":
 			_warning_t = 3.0
 			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(&"music.boss",1.0,self)
-		if event.type=="full_burst_ready":
-			_ring_flash_t = 0.1
-			_ring_flash_max = 0.1
-			_ring_pulse_t = 0.3
+		if event.type=="draw_rejected":
+			_draw_reject_t = 1.5
 		if event.type=="hero_freed" and int(_cpp_ui.phase) not in [Phase.Finishing,Phase.Ended]:
 			var reward: Dictionary = event.payload.duplicate()
 			reward.type = &"hero_freed"
@@ -1104,7 +1080,7 @@ func _update_cpp_cinematic() -> void:
 	var bars: float=_cpp_ui.get("cinematic_bars",0.0)
 	var modules: Array=_cpp_ui.get("final_modules",[])
 	var active: bool=int(_cpp_ui.phase)==Phase.Play
-	_speed_indicator.visible=active and bars<=0.0
+	_fuel_meter.visible=show_status and active and bars<=0.0 and not _cpp_ui.get("boss_finish",{}).get("active",false)
 	var combat_visible := show_status and bars<=0.0 and int(_cpp_ui.phase) not in [Phase.Dying,Phase.Finishing,Phase.Ended]
 	var finale_shown:=false
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):

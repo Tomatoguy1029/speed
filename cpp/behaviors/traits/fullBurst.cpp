@@ -1,13 +1,16 @@
 #include "fullBurst.h"
 #include "../../runtime/run_runtime.h"
-#include "../../output/frame_builder.h"
 #include "../../state/loadout_state.h"
+#include <algorithm>
 namespace speed {
+double FullBurstBehavior::rate(const RunRuntime &run) {
+    if (!run.state.draw_ready) return 1.0;
+    return 1.0+run.state.loadout->effects.full_gauge_rate*run.state.draw.fuel/run.state.draw_config.fuel_capacity;
+}
+double FullBurstBehavior::strength(const RunRuntime &run) {
+    return run.state.loadout->full_burst_owned?std::min(1.0,run.state.draw.fuel/run.state.draw_config.fuel_capacity):0.0;
+}
 void FullBurstBehavior::step(RunRuntime &run) {
-    auto &loadout=*run.state.loadout;
-    if (!loadout.full_burst_owned) return;
-    const bool ready=run.state.draw.gauge>=1.0;
-    if (ready && !loadout.full_burst_active) {godot::Dictionary event;event["pos"]=run.state.ship.pos;FrameBuilder::append(run,"full_burst_ready",event);}
-    loadout.full_burst_active=ready;
+    run.state.loadout->full_burst_active=run.state.loadout->full_burst_owned && run.state.draw.fuel>=run.state.draw_config.fuel_capacity;
 }
 }

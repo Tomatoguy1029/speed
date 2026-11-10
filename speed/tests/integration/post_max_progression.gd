@@ -60,7 +60,7 @@ func _cpp_ready() -> void:
 	_check(is_equal_approx(bridge._ui.max_speed,config.base_max_speed*1.15),"最大速度は基準+15%で累乗しない")
 	_check(is_equal_approx(bridge.read_lab().value.max_hp,105.0) and is_equal_approx(bridge._core.ship_snapshot().ship_hp,40.0),"最大HP+5は現在HPを回復しない")
 	_check(is_equal_approx(bridge._ui.crit_mult,config.crit_mult+0.5),"倍率の加算を反映する")
-	_check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*0.85),"充填の短縮を基準から適用する")
+	_check(is_equal_approx(bridge._ui.fuel_gain_mult,1.15),"追加強化の給油倍率を加算する")
 	_check(is_equal_approx(bridge._ui.xp_pickup_radius,bridge._ui.pickup_radius*1.25),"吸引範囲はXP結晶だけへ反映する")
 	var baseline_attack: float = bridge._ui.attack_power
 	var input: Dictionary = bridge.pack_intent(Intent.new())
@@ -82,7 +82,7 @@ func _cpp_ready() -> void:
 	var capped: Array = bridge._ui.post_max_candidates.map(func(c): return c.id)
 	for id in ["charge_time","weapon_interval","invulnerability","repair","crit_chance"]:
 		_check(not capped.has(id),"上限到達の候補を外す: "+id)
-	_check(is_equal_approx(bridge._ui.charge_time,1.2),"充填は基準6秒の20%で止まる")
+	_check(is_equal_approx(bridge._ui.fuel_gain_mult,1.0+config.fuel_gain_max),"給油倍率は設定の上限で止まる")
 	_cpp_edit(bridge,"post_max",{"stacks":{}})
 	var expectations := {"W01":["weapon_interval","projectile_speed","duration","knockback","followup"],"W03":["projectile_speed","duration","knockback","area"],"W04":["knockback","area"],"W05":["weapon_interval","knockback","followup"],"W07":["duration","knockback","followup"],"W08":["duration","knockback","area"],"W17":["knockback","area"],"W21":["projectile_speed","duration","knockback","area","followup"],"W22":["knockback","area","followup"],"W23":["weapon_interval","projectile_speed","duration","knockback","followup"],"W25":["weapon_interval","projectile_speed","duration","followup"],"W26":["area"],"W27":[]}
 	var previous := "W01"

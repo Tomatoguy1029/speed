@@ -59,11 +59,8 @@ const NUMBER_LIMITS := {
 }
 const DIRECT_FIELDS := {
 	BOOST_GAUGE.KEY: [
-		["1周目：内側の半径（px）", "first_inner_radius", 0.0, 127.5, 0.25, BOOST_GAUGE.DEFAULT_RADII.first_inner_radius],
-		["1周目：外側の半径（px）", "first_outer_radius", 0.5, 128.0, 0.25, BOOST_GAUGE.DEFAULT_RADII.first_outer_radius],
-		["2周目：内側の半径（px）", "second_inner_radius", 0.0, 127.5, 0.25, BOOST_GAUGE.DEFAULT_RADII.second_inner_radius],
-		["2周目：外側の半径（px）", "second_outer_radius", 0.5, 128.0, 0.25, BOOST_GAUGE.DEFAULT_RADII.second_outer_radius],
-		["目盛り線の太さ（1周目の幅の半分が上限）", "tick_width", 0.5, 6.0, 0.25, BOOST_GAUGE.DEFAULT_WIDTHS.tick_width],
+		["内側の半径（px）", "first_inner_radius", 0.0, 127.5, 0.25, BOOST_GAUGE.DEFAULT_RADII.first_inner_radius],
+		["外側の半径（px）", "first_outer_radius", 0.5, 128.0, 0.25, BOOST_GAUGE.DEFAULT_RADII.first_outer_radius],
 	],
 	BOMBER_PREVIEW: [
 		["ドット幅（倍）", "pixel_scale", 0.5, 4.0, 0.05, 1.0],
@@ -137,14 +134,9 @@ const DIRECT_FIELDS := {
 }
 const DIRECT_COLOR_FIELDS := {
 	BOOST_GAUGE.KEY: [
-		["通常（25%以上）", "normal_color", BOOST_GAUGE.DEFAULT_COLORS.normal_color],
-		["不足（25%未満）", "unavailable_color", BOOST_GAUGE.DEFAULT_COLORS.unavailable_color],
+		["燃料メーターの通常色", "normal_color", BOOST_GAUGE.DEFAULT_COLORS.normal_color],
 		["経路描画中", "path_color", BOOST_GAUGE.DEFAULT_COLORS.path_color],
-		["使用可能時の波紋（通常色と独立）", "ready_pulse_color", BOOST_GAUGE.DEFAULT_COLORS.ready_pulse_color],
 		["下地", "background_color", BOOST_GAUGE.DEFAULT_COLORS.background_color],
-		["目盛り：使用可能", "ready_tick_color", BOOST_GAUGE.DEFAULT_COLORS.ready_tick_color],
-		["目盛り：不足", "unavailable_tick_color", BOOST_GAUGE.DEFAULT_COLORS.unavailable_tick_color],
-		["満タン時のフラッシュ", "full_flash_color", BOOST_GAUGE.DEFAULT_COLORS.full_flash_color],
 	],
 	"boss/body/hydra": [["予告色", "warning_color", Color("#ffd16c")], ["攻撃色", "attack_color", Color("#ff765c")]],
 	"boss/body/draco": [["胸の光色", "core_glow_color", Color(0.38, 0.59, 1.0)], ["裂け目の色", "rift_color", Color("#5a4d91")]],

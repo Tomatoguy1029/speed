@@ -1,4 +1,5 @@
 #include "vortex.h"
+#include "../../systems/fuel.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/combat_resolver.h"
 #include "../../output/event_builder.h"
@@ -43,8 +44,8 @@ void VortexBehavior::step(RunRuntime &run,double dt) {
             }
         }
         if (instance.age>=instance.duration) {
-            const double amount=std::min(1.0,double(instance.kills)/v.kills);
-            run.state.draw.gauge=std::min(run.state.draw_config.capacity,run.state.draw.gauge+amount);
+            const double amount=run.state.draw_config.fuel_hole_ratio*std::min(1.0,double(instance.kills)/std::max(1.0,double(v.kills)));
+            FuelSystem::add(run,run.state.draw_config.fuel_capacity*amount,false);
             VortexVisual visual;visual.id=++v.serial;visual.kind=2;visual.pos=instance.pos;visual.amount=amount;visual.life=0.78;visual.twin=instance.twin;v.visuals.push_back(visual);
             godot::Dictionary event;event["pos"]=visual.pos;event["amount"]=amount;FrameBuilder::append(run,"hole_recover",event);
         }

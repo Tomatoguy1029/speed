@@ -42,13 +42,16 @@ func apply_snapshot(ui: Dictionary) -> void:
 			var definition: TraitDef = ContentManager.definition(&"traits",&"T08")
 			_cpp_ui.capacity += definition.stack_bonus(capacity_level)
 		_cpp_ui.draw.gauge = 1.0
+		_cpp_ui.fuel_max = config.fuel_capacity*float(_cpp_ui.capacity)
+		_cpp_ui.fuel = _cpp_ui.fuel_max
+		_cpp_ui.draw.fuel = _cpp_ui.fuel
 
 func _process(delta: float) -> void:
 	_layout_cpp_art()
 	if not preview_paused:
-		_update_speed_indicator(delta)
-		_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
-		_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
+		_update_fuel_meter()
+		_fuel_meter.normal_color = preview_values.get("normal_color",BOOST_STYLE.normal_color)
+		if preview_mode==1: _fuel_meter.fuel = 0.0
 	queue_redraw()
 
 func _draw_cpp() -> void:
@@ -69,28 +72,9 @@ func _draw_cpp() -> void:
 func _draw_cpp_gauge_ring() -> void:
 	if _cpp_ui.is_empty(): return
 	var state: Dictionary = _cpp_ui.draw
+	var drawing: bool = state.drawing if preview_mode==3 or reward_preview else preview_mode==2
+	if not drawing: return
 	var cursor := get_viewport().get_mouse_position() if follow_cursor else preview_cursor
-	var at := cursor+Vector2(26,26)
-	var capacity := float(_cpp_ui.capacity) if preview_mode==5 or reward_preview else 1.5
-	var amount := float(state.gauge)*capacity
-	var drawing: bool = state.drawing
-	if preview_mode!=5 and not reward_preview:
-		amount = 0.1 if preview_mode==1 else 1.5 if preview_mode==4 else 1.1
-		drawing = preview_mode==2
-	var usable := amount >= float(_cpp_ui.min_charge)
-	if preview_mode==5:
-		var charging: bool = not bool(state.drawing) and not bool(state.tracing)
-		if usable and not _ring_usable and charging: _ring_pulse_t = RING_PULSE_TIME
-		if charging and _lap_filled(_ring_amount,amount,capacity):
-			_ring_flash_t = RING_FLASH_TIME
-			_ring_flash_max = RING_FLASH_TIME
-		_ring_usable = usable
-		_ring_amount = amount
-	if drawing:
-		amount = float(state.draw_gauge)*(1.0-float(state.draw_length)/maxf(1.0,float(state.draw_limit))) if preview_mode==5 else 1.1*(1.0-120.0/300.0)
-	var pulse := fmod(preview_clock,RING_PULSE_TIME)/RING_PULSE_TIME if preview_mode==3 else -1.0
-	var flash := 1.0-fmod(preview_clock,RING_FLASH_TIME)/RING_FLASH_TIME if preview_mode==4 else 0.0
-	if preview_mode==5:
-		pulse = 1.0-_ring_pulse_t/RING_PULSE_TIME if _ring_pulse_t>0.0 else -1.0
-		flash = _ring_flash_t/_ring_flash_max if _ring_flash_t>0.0 else 0.0
-	BOOST_GAUGE.draw(self,at,amount,capacity,float(_cpp_ui.min_charge),drawing,usable,flash,pulse,BOOST_GAUGE.style_for(preview_values),RING_GAP)
+	var remaining := float(state.draw_limit)-float(state.draw_connection)-float(state.draw_length)
+	var ratio := clampf(remaining/maxf(0.001,float(state.draw_limit)),0.0,1.0) if preview_mode==3 else 0.6
+	BOOST_GAUGE.draw(self,cursor+Vector2(26,26),ratio,BOOST_GAUGE.style_for(preview_values))

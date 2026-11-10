@@ -275,7 +275,7 @@ func verify_cpp_metadata_detail() -> bool:
 	var path := "res://.content/run/stage_2.json"
 	if not FileAccess.file_exists(path): return false
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	var profile := {"mult":{"max_speed":1.25,"xp":1.5},"add":{"max_hp":7.0},"reduce":{"charge_time":0.75}}
+	var profile := {"mult":{"max_speed":1.25,"xp":1.5,"fuel_gain":1.25},"add":{"max_hp":7.0},"reduce":{}}
 	var session := RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"cpp_profile":profile,"cpp_source":"stage_launcher","seed":9688},true)
 	session.auto_step = false
 	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
@@ -283,7 +283,7 @@ func verify_cpp_metadata_detail() -> bool:
 	var bridge = session.bridge
 	var initial: Dictionary = bridge.recording_origin.conditions
 	check(initial.config.size()>80 and initial.stats.size()==18,"開始時のC++設定全列と旧機体能力18列を保存する")
-	check(initial.profile.mult.max_speed==1.25 and initial.profile.mult.xp==1.5 and initial.profile.add.max_hp==7.0 and initial.profile.reduce.charge_time==0.75,"開始時に適用した永続強化の係数を保存する")
+	check(initial.profile.mult.max_speed==1.25 and initial.profile.mult.xp==1.5 and initial.profile.add.max_hp==7.0 and initial.profile.mult.fuel_gain==1.25,"開始時に適用した永続強化の係数を保存する")
 	check(initial.rng_seed=="9688" and not String(initial.rng_state).is_empty() and initial.rng_algorithm=="pcg32","乱数のseed・状態・方式を別々に保存する")
 	check(initial.physics_ticks_per_second==Engine.physics_ticks_per_second and initial.simulation_ticks_per_second==120 and initial.meta_levels.size()>0,"物理更新数と機体強化の段を開始条件に残す")
 	check(initial.identity.implementation_sha256.length()==64 and initial.identity.input_sha256==index.input_sha256 and initial.identity.payload_sha256==index.payload_sha256,"ロード済みC++実装と入力・戦闘データの署名を保存する")

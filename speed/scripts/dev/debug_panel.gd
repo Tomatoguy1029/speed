@@ -9,8 +9,9 @@ const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Ph
 ## 調整できる値：項目名、表示名、最小、最大、刻み
 const SLIDERS := [
 	["draw_time_scale", "描画中の世界の速さ", 0.0, 1.0, 0.05],
-	["dash_charge_time", "ゲージ1単位の充填（秒）", 1.0, 20.0, 0.5],
-	["draw_min_charge", "描き始められる量", 0.05, 1.0, 0.05],
+	["regen_rate", "燃料の時間回復（毎秒）", 0.0, 20.0, 0.1],
+	["cruise_drain", "巡航の燃料消費（毎秒）", 0.1, 20.0, 0.1],
+	["boost_min_cost", "ブーストの最低消費", 0.0, 100.0, 1.0],
 	["density_mult", "敵の密度の倍率", 0.0, 10.0, 0.5],
 	["boss_time", "ボスの出現時刻（秒）", 0.0, 900.0, 10.0],
 	["boss_hp", "ボスの HP", 100.0, 10000.0, 100.0],

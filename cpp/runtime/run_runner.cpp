@@ -6,6 +6,7 @@
 #include "../behaviors/weapons/dashRangeDrone.h"
 #include "../behaviors/weapons/massTow.h"
 #include "run_runner.h"
+#include "../systems/fuel.h"
 #include "dev_commands.h"
 #include "../output/frame_builder.h"
 #include "../bosses/draco/finale.h"
@@ -101,10 +102,12 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.hitstop>0) {state.hitstop=std::max(0.0,state.hitstop-dt);BossRamSystem::advance(core.runtime,dt);return true;}
     if (state.control.boss_ram.pending) BossRamSystem::advance(core.runtime,dt);
     if (!state.draw.tracing && state.dash_stop>0) state.dash_stop=std::max(0.0,state.dash_stop-dt*state.combat_config.kill_hitstop_regen);
+    const bool fuel_frozen=state.draw.drawing || state.draw.tracing;
     if (!timed("draw",[&]{return core.step_draw(dt);})) return false;
     if (core.check_run_end()) return true;
     control.world_scale=core.world_scale();
     const double world_dt=dt*control.world_scale;
+    if (!fuel_frozen) FuelSystem::step(core.runtime,world_dt,!state.controls_locked && !state.encounter_protected && !LeoBehavior::active(core.runtime));
     if (control.bonus_remaining>0) {
         control.bonus_remaining-=dt;
         if (control.bonus_remaining<=0) leave_bonus(core);
@@ -218,7 +221,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     return true;
 }
 void RunRunner::enter_bonus(godot::SpeedRunCore &core) {
-    auto &s=core.runtime.state;s.control.bonus_remaining=core.runtime.content->warp.bonus_time;s.draw.gauge=1;
+    auto &s=core.runtime.state;s.control.bonus_remaining=core.runtime.content->warp.bonus_time;FuelSystem::set(core.runtime,FuelSystem::maximum(s),true);
     EnemySystem::clear_regular(core.runtime);AttackSystem::clear_hostile(s,AttackEndReason::BonusClear);
     godot::Dictionary event;event["enter"]=true;event["pos"]=s.ship.pos;core.emit_event("bonus",event);
 }

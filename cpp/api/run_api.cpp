@@ -1,3 +1,5 @@
+#include "../systems/fuel.h"
+#include "../behaviors/traits/fullBurst.h"
 #include "../behaviors/heroes/gemini.h"
 #include "../systems/heroes.h"
 #include "run_core.h"
@@ -108,7 +110,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     if (!candidate->configure_content(bytes)) return failure(1,"bundle","生成物の版・参照・署名を確認してください");
     speed::apply_config(candidate->runtime.content->config,candidate->runtime.state);
     auto &state=candidate->runtime.state;const auto &s=state.ship_config;const auto &d=state.draw_config;const auto &c=state.control;
-    if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || d.charge_time<=0 || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0 || candidate->runtime.content->config.character_scale<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
+    if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || !speed::FuelSystem::valid(state) || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0 || candidate->runtime.content->config.character_scale<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
     candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])==1;
     candidate->runtime.state.control.stage_id=String(options["stage_id"]);candidate->runtime.api_configured=true;
     const auto &forward=candidate->runtime.content->forward_levels.front();
@@ -501,7 +503,7 @@ Dictionary SpeedRunCore::read_frame_value(bool full_snapshot) {
     Dictionary end_blast;const auto &blast=runtime.state.loadout->end_blast;end_blast["ready"]=blast.ready;end_blast["radius"]=blast.radius*runtime.state.loadout->effects.area;end_blast["secondary"]=blast.secondary;
     Array pending_blasts,blast_visuals;for (const auto &p:blast.pending) {Dictionary item;item["pos"]=p.pos;item["radius"]=p.radius;item["damage"]=p.damage;item["delay"]=p.delay;pending_blasts.push_back(item);}
     for (const auto &v:blast.visuals) {Dictionary item;item["id"]=int64_t(v.id);item["pos"]=v.pos;item["radius"]=v.radius;item["age"]=v.age;blast_visuals.push_back(item);}end_blast["pending"]=pending_blasts;end_blast["visuals"]=blast_visuals;ui["end_blast"]=end_blast;
-    ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout->full_burst_owned;ui["full_burst_active"]=runtime.state.loadout->full_burst_active;ui["shooting_rate"]=runtime.state.draw.gauge<1.0?1.0:1.0+runtime.state.loadout->effects.full_gauge_rate*runtime.state.draw.gauge;
+    ui["capacity"]=runtime.state.draw_config.capacity;ui["fuel"]=runtime.state.draw.fuel;ui["fuel_max"]=speed::FuelSystem::maximum(runtime.state);ui["boost_min_cost"]=runtime.state.draw_config.boost_min_cost;ui["regen_rate"]=runtime.state.draw_config.regen_rate*runtime.state.draw_config.regen_mult;ui["fuel_gain_mult"]=runtime.state.draw_config.fuel_gain_mult;ui["full_burst"]=runtime.state.loadout->full_burst_owned;ui["full_burst_active"]=runtime.state.loadout->full_burst_owned && runtime.state.draw.fuel>=runtime.state.draw_config.fuel_capacity;ui["full_burst_strength"]=speed::FullBurstBehavior::strength(runtime);ui["shooting_rate"]=speed::FullBurstBehavior::rate(runtime);
     ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);
     value["ui"]=full_snapshot?ui.duplicate(true):speed::FrameBuilder::ui_delta(runtime,ui);
     value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=speed::Lifecycle::result(runtime);return success(value);

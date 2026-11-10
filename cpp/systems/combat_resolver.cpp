@@ -1,6 +1,7 @@
 #include "heroes.h"
 #include "../behaviors/heroes/leo.h"
 #include "combat_resolver.h"
+#include "fuel.h"
 #include "../behaviors/enemies/defender.h"
 #include "combat_hooks.h"
 #include "../behaviors/enemies/shield.h"
@@ -21,6 +22,18 @@
 #include <variant>
 namespace speed {
 namespace {
+bool boss_fuel_target(const RunRuntime &run,EnemyHandle target) {
+    const auto &s=run.state;const auto &e=s.enemies[target.slot];
+    const auto &def=run.content->definitions[e.definition];
+    if (def.source_id()==godot::StringName("meteor") || def.id==godot::StringName("cepheus_soldier") || def.id==godot::StringName("triangle_star") || def.id==godot::StringName("hydra_rubble") || def.id==godot::StringName("iron") || def.id==godot::StringName("saw") || def.id==godot::StringName("rocket")) return false;
+    if (e.is_boss) return def.kind!=EnemyDefinition::Kind::Hydra;
+    if (e.boss_clone) return true;
+    auto parent=e.parent;
+    for (size_t n=0;n<s.enemies.size() && s.enemy_handles.contains(parent);++n) {
+        const auto &p=s.enemies[parent.slot];if (p.is_boss || p.boss_clone) return true;parent=p.parent;
+    }
+    return false;
+}
 // 機体に最も近い線上の点。機体が線に重なるときは、弾の来た側（線の始点）を出どころにする。
 godot::Vector2 segment_origin(godot::Vector2 ship,godot::Vector2 from,godot::Vector2 to) {
     const auto delta=to-from;const double length=delta.length_squared();
@@ -159,6 +172,16 @@ DamageResult CombatResolver::damage_enemy(RunRuntime &run,const DamageRequest &r
     result.applied=std::max(0.0,result.hp_before-std::max(0.0,result.hp_after));
     result.overkill=result.hp_after<=0?std::max(0.0,result.resolved-std::max(0.0,result.hp_before)):0;
     result.reason=result.hp_after>result.hp_before-result.resolved?CombatReason::PhaseFloor:CombatReason::Applied;
+    if (request.cause!=Cause::Debug && result.applied>0) {
+        auto &enemy=state.enemies[result.target.slot];const auto &def=run.content->definitions[enemy.definition];
+        if (boss_fuel_target(run,result.target)) {
+            if (state.combat_config.base_attack>0) FuelSystem::add(run,result.applied/state.combat_config.base_attack*state.draw_config.fuel_per_hit);
+        } else if (!enemy.is_boss && def.rank>=3 && def.rank<=10 && def.fuel_hits>0 && enemy.max_hp>0) {
+            const double total=state.draw_config.fuel_per_hit*def.fuel_hits;
+            const double amount=std::min(std::max(0.0,total-enemy.fuel_paid),result.applied/enemy.max_hp*total);
+            enemy.fuel_paid+=amount;FuelSystem::add(run,amount);
+        }
+    }
     // ダメージの観測は、撃破hookが再び攻撃を生成するより前に確定する。
     EventBuilder::enemy_damage(run,request,result);
     run.combat_hooks.damage_applied(run,request,result);
@@ -197,6 +220,11 @@ KillResult CombatResolver::kill_enemy(RunRuntime &run,const DamageRequest &reque
     // 形態移行を撃破に数えない。死亡印は再入するhookより先に立てる。
     if (!state.enemy_handles.contains(result.target) || state.enemies[result.target.slot].dead) {result.reason=CombatReason::Dead;return result;}
     DefenderBehavior::gone(run,result.target);state.enemies[result.target.slot].dead=true;state.dead_rows.push_back(result.target.slot);
+    if (request.cause!=Cause::Debug && !enemy.is_boss && !boss_fuel_target(run,result.target)) {
+        const auto &def=run.content->definitions[enemy.definition];
+        const double remaining=std::max(0.0,state.draw_config.fuel_per_hit*def.fuel_hits-enemy.fuel_paid);
+        state.enemies[result.target.slot].fuel_paid+=remaining;FuelSystem::add(run,remaining);
+    }
     if (!enemy.is_boss) ++state.kills;
     AttackSystem::source_ended(state,result.target,AttackEndReason::ParticipantEnd);
     EnemySystem::leave_hound(state,result.target.slot);

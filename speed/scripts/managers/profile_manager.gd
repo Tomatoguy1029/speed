@@ -33,7 +33,7 @@ func compute(levels: Dictionary) -> Dictionary:
 func for_cpp(lab: bool, overrides: Dictionary = {}) -> Dictionary:
 	var source := for_run(lab,overrides)
 	var result := {"mult":{},"add":{},"reduce":{}}
-	var fields := {"mult":["max_speed","attack","pickup","length","xp"],"add":["max_hp","reroll"],"reduce":["charge_time"]}
+	var fields := {"mult":["max_speed","attack","pickup","length","xp","fuel_gain"],"add":["max_hp","reroll"],"reduce":[]}
 	for group in fields:
 		for stat in fields[group]: result[group][stat] = source[group].get(stat,0.0 if group=="add" else 1.0)
 	return result

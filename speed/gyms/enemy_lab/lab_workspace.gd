@@ -585,7 +585,8 @@ func sync() -> void:
 		_mode_hint.tooltip_text = _mode_hint.text
 	_route_actions.visible = lab.canvas.route.size() >= 2
 	var length: float = lab.CHECK.length(lab.canvas.route)
-	var limit: float = lab.session.run.draw.budget(lab.session.run.state.stats.capacity * lab.session.run.state.gauge)
+	if not lab.canvas.route.is_empty(): length += lab.session.run.state.ship_pos.distance_to(lab.canvas.route[0])
+	var limit: float = lab.session.run.draw.budget(lab.session.run.state.fuel)
 	var cost := 100 * length / maxf(0.01, limit)
 	_budget.value = cost
 	_budget.modulate = Color("#ff9c83") if cost > 100 else Color.WHITE

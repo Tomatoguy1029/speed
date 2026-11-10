@@ -126,6 +126,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | stage&#95;select.launch | 出撃 | Launch |
 | stage&#95;select.available | 出撃可能 | Ready to launch |
 |  | ■ ラン中（HUD・3択・ポーズ） |  |
+| hud.fuel | 燃料 | Fuel |
 | hud.draw | 描く | Draw |
 | hud.kills | 撃破 {n} | Kills {n} |
 | hud.bonus | ボーナスステージ　残り {n} 秒 | Bonus Stage  {n}s Left |
@@ -175,7 +176,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.current | 実効値 {a} → {b} | Effective: {a} → {b} |
 | postmax.points | ポイント |  points |
 | postmax.summary.interval | 攻撃間隔 −{n}% | Interval −{n}% |
-| postmax.summary.charge | 充填 −{n}秒 | Charge −{n}s |
+| postmax.summary.charge | 給油量 +{n}% | Fuel gain +{n}% |
 | postmax.summary.invulnerability | 無敵 +{n}秒 | Invulnerability +{n}s |
 | postmax.summary.multiplier | 倍率 +{n} | Multiplier +{n} |
 | postmax.heal_desc | 最大HPの{percent}%を即時回復<br>HP {a} → {b} | Heal {percent}% of max HP now<br>HP {a} → {b} |
@@ -192,7 +193,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | postmax.acceleration | 加速 | Acceleration |
 | postmax.turn_rate | 旋回速度 | Turn rate |
 | postmax.line_length | 描ける線の長さ | Drawable line length |
-| postmax.charge_time | ゲージ充填時間短縮 | Charge time reduction |
+| postmax.charge_time | 給油量 | Fuel gain |
 | postmax.max_hp | 最大HP | Maximum HP |
 | postmax.invulnerability | 被弾後の無敵時間 | Post-hit invulnerability |
 | postmax.repair | 修理キット回復量 | Repair kit healing |
@@ -309,9 +310,9 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T06.name | クリティカルランス | Critical Lance |
 | trait.T06.desc | クリティカルのたびに、光の槍が前へ貫く。 | Critical hits launch a piercing lance of light forward. |
 | trait.T07.name | 急速充填 | Quick Charge |
-| trait.T07.desc | ゲージがたまるのが速くなる。 | Charges the gauge faster. |
+| trait.T07.desc | 燃料の時間回復が速くなる。最大Lvでは巡航の消費も減る。 | Recovers fuel faster. At max level, also reduces cruise fuel use. |
 | trait.T08.name | 大容量チャージ | High-Capacity Charge |
-| trait.T08.desc | ゲージの容量が増え、1回で描ける長さと勢いが伸びる。 | Increases gauge capacity, line length and momentum. |
+| trait.T08.desc | 燃料の最大量が増え、溜めた燃料に応じて描ける長さと勢いが伸びる。 | Increases fuel capacity, allowing longer paths and more momentum with stored fuel. |
 | trait.T09.name | 急所見切り | Weak-Point Insight |
 | trait.T09.desc | クリティカルが出やすくなる。 | Makes critical hits more likely. |
 | trait.T10.name | 最高速度 | Top Speed |
@@ -333,7 +334,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | trait.T35.name | マルチショット | Multishot |
 | trait.T35.desc | すべての射撃の弾数が増える。 | Increases the shot count of all shooting weapons. |
 | trait.T36.name | フルバースト | Full Burst |
-| trait.T36.desc | ゲージが満タンの間、射撃の連射が上がる。 | Increases shooting fire rate while the gauge is full. |
+| trait.T36.desc | 燃料が多いほど、射撃の連射が上がる。 | More fuel increases shooting fire rate. |
 | trait.T37.name | デュプリケーター | Duplicator |
 | trait.T37.desc | 投擲武器(弾・破片・クリティカルランス)を放つと、一定の確率で攻撃を複製する。 | Projectile weapons (shots, debris and Critical Lances) have a chance to duplicate their attacks when launched. |
 | trait.T37.codex&#95;desc | 一筋の攻撃が、三筋の軌跡になる。弾や星屑、光の槍が生まれる瞬間、左右へ複製を放つことがある。複製の一撃は元より弱いが、攻撃を広く届ける。 | One trail of fire becomes three. Shots, stardust and light lances may send copies to either side as they appear. Each copy strikes with less force, spreading the attack farther across the battlefield. |
@@ -350,7 +351,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | meta.atk.name | 衝角素材 | Ram Plating |
 | meta.atk.desc | 攻撃力 +6% | Attack +6% |
 | meta.charge.name | 充電効率 | Charge Efficiency |
-| meta.charge.desc | ゲージの充填時間 -5% | Gauge charge time -5% |
+| meta.charge.desc | 給油量 +5% | Fuel gain +5% |
 | meta.hp.name | 機体フレーム | Hull Frame |
 | meta.hp.desc | 最大 HP +20 | Max HP +20 |
 | meta.pickup.name | 回収装置 | Collector |
@@ -369,6 +370,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | stage.3.name | おおいぬ座の星系 | Canis Major System |
 | stage.4.name | うみへび座の星系 | Hydra System |
 | stage.5.name | 元凶の待つ星系 | Where the Source Awaits |
+| lab.link&#95;too&#95;far | 遠すぎる | Too far |
 | lab.message&#95;7474db4292 | 線には2点以上必要です | A route needs at least two points |
 | lab.message&#95;26fa279ba2 | 出現 | Spawns |
 | lab.message&#95;63d8f43c5b | 攻撃 | Attacks |
@@ -379,7 +381,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.message&#95;fadf24dbc5 | 保存 | Files |
 | lab.message&#95;fc23b9c287 | 変更はこの実験に適用されます。初期条件へ戻る操作は新しい実験です。 | Changes apply to this experiment. New experiment resets the initial conditions. |
 | lab.message&#95;9e4c412d75 | 試遊中の無敵 | Invincible while playing |
-| lab.message&#95;d79714f205 | 充填率 | Charge |
+| lab.message&#95;d79714f205 | 燃料の割合 | Fuel ratio |
 | lab.message&#95;cdff100dfe | 自機を表示中心へ移動・充填 | Move ship to view center and charge |
 | lab.message&#95;c66777f550 | ステージ経過（実秒） | Stage time (real seconds) |
 | lab.message&#95;54036730a6 | ステージ時計へ適用 | Set stage clock |

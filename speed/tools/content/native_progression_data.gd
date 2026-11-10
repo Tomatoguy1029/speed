@@ -1,6 +1,6 @@
 ## 比較用の固定成長データ。編集値とカタログ順を更新前に確定する。
 extends RefCounted
-const FIELDS := ["xp_base","xp_growth","xp_curve","level_heal","weapon_slots","trait_slots","weapon_max_level","trait_max_stacks","start_weapon_choices","owned_card_bias","reroll_count","levelup_bonus_chance","levelup_bonus_more","levelup_bonus_last","fallback_heal","base_max_speed","base_hp","dash_charge_time","base_crit_chance","crit_mult","pickup_radius","steer_accel","steer_rate","invuln_time","meteor_heal_frac"]
+const FIELDS := ["xp_base","xp_growth","xp_curve","level_heal","weapon_slots","trait_slots","weapon_max_level","trait_max_stacks","start_weapon_choices","owned_card_bias","reroll_count","levelup_bonus_chance","levelup_bonus_more","levelup_bonus_last","fallback_heal","base_max_speed","base_hp","base_crit_chance","crit_mult","pickup_radius","steer_accel","steer_rate","invuln_time","meteor_heal_frac"]
 static func compile(cfg: GameConfig, profile: Dictionary) -> Dictionary:
 	var data := {"version":1,"config":{},"profile":profile.duplicate(true),"weapons":[],"traits":[],"bonuses":{},"crit_max":1.0}
 	for key in FIELDS: data.config[key] = cfg.get(key)

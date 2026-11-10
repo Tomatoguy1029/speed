@@ -1,3 +1,4 @@
+#include "../traits/fullBurst.h"
 #include "rear.h"
 #include "forward.h"
 #include "../../runtime/run_runtime.h"
@@ -13,7 +14,7 @@ void RearBehavior::step(RunRuntime &run,double dt) {
     auto &state=run.state;auto &weapon=state.loadout->rear;
     if (!weapon.ready || dt<=0 || state.controls_locked || state.phase!=godot::RunState::Phase::Play) return;
     const auto &loadout=*state.loadout;const auto &effects=loadout.effects;const auto &post=run.content->rear_post;
-    const double rate=state.draw.gauge<1?1:1+effects.full_gauge_rate*state.draw.gauge;
+    const double rate=FullBurstBehavior::rate(run);
     const double floor=std::min(weapon.base_interval,std::max(post.minimum_interval,weapon.base_interval*post.minimum_ratio));
     const double interval=std::max(floor,weapon.base_interval*(1-post.interval_increment*double(loadout.post_weapon_interval_stacks)))/rate;
     weapon.fire.remaining+=interval-weapon.interval;weapon.interval=interval;

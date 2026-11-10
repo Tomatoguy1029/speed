@@ -1,3 +1,4 @@
+#include "../systems/fuel.h"
 #include "run_core.h"
 #include "../behaviors/weapons/forward.h"
 #include <algorithm>
@@ -25,9 +26,9 @@ bool SpeedRunCore::configure_progression(const Dictionary &data) {
         }
     }
     const Dictionary c=data["config"];
-    const char *keys[]={"xp_base","xp_growth","xp_curve","level_heal","weapon_slots","trait_slots","weapon_max_level","trait_max_stacks","start_weapon_choices","owned_card_bias","reroll_count","levelup_bonus_chance","levelup_bonus_more","levelup_bonus_last","fallback_heal","base_max_speed","base_hp","dash_charge_time","base_crit_chance","crit_mult","pickup_radius","steer_accel","steer_rate","invuln_time","meteor_heal_frac"};
+    const char *keys[]={"xp_base","xp_growth","xp_curve","level_heal","weapon_slots","trait_slots","weapon_max_level","trait_max_stacks","start_weapon_choices","owned_card_bias","reroll_count","levelup_bonus_chance","levelup_bonus_more","levelup_bonus_last","fallback_heal","base_max_speed","base_hp","base_crit_chance","crit_mult","pickup_radius","steer_accel","steer_rate","invuln_time","meteor_heal_frac"};
     for (const char *key:keys) if (!numeric(c.get(key,Variant())) || number(c,key)<0) return false;
-    if (number(c,"xp_base")<=0 || number(c,"base_hp")<=0 || number(c,"dash_charge_time")<=0) return false;
+    if (number(c,"xp_base")<=0 || number(c,"base_hp")<=0) return false;
     for (const char *key:{"weapon_slots","trait_slots","weapon_max_level","trait_max_stacks","start_weapon_choices","reroll_count"}) if (std::floor(number(c,key))!=number(c,key)) return false;
     const Dictionary profile=data["profile"];
     for (const char *key:{"mult","add","reduce"}) {
@@ -55,7 +56,7 @@ void SpeedRunCore::refresh_progression_stats() {
     const double old_max=number(p.stats,"max_hp"); Dictionary s;
     s["max_speed"]=number(c,"base_max_speed")*number(mult,"max_speed",1)*(1+bonus("T10"));
     s["attack_mult"]=number(mult,"attack",1)*(1+bonus("T11")); s["max_hp"]=number(c,"base_hp")+number(add,"max_hp");
-    s["capacity"]=1+bonus("T08"); s["charge_time"]=number(c,"dash_charge_time")*number(reduce,"charge_time",1)/(1+bonus("T07"));
+    s["capacity"]=1+bonus("T08"); s["regen_mult"]=1+bonus("T07"); s["fuel_gain_mult"]=1+std::min(runtime.state.draw_config.fuel_gain_max,std::max(0.0,number(mult,"fuel_gain",1)-1));
     s["crit_chance"]=std::min(double(p.data["crit_max"]),number(c,"base_crit_chance")+bonus("T09")); s["crit_mult"]=number(c,"crit_mult");
     s["pickup_radius"]=number(c,"pickup_radius")*number(mult,"pickup",1)*(1+bonus("T12")); s["xp_pickup_radius"]=s["pickup_radius"];
     s["length_mult"]=number(mult,"length",1)*(1+bonus("T14")); s["glide_duration_mult"]=1+bonus("T31");
@@ -67,7 +68,7 @@ void SpeedRunCore::refresh_progression_stats() {
 }
 void SpeedRunCore::apply_stat_values(const Dictionary &s) {
     runtime.state.ship_config.max_hp=s["max_hp"]; runtime.state.ship_config.max_speed=s["max_speed"]; runtime.state.ship_config.acceleration=s["acceleration"]; runtime.state.ship_config.turn_rate=s["turn_rate"]; runtime.state.ship_config.glide_duration_mult=s["glide_duration_mult"]; runtime.state.ship_config.invulnerability=s["invulnerability"];
-    runtime.state.draw_config.capacity=s["capacity"]; runtime.state.draw_config.charge_time=s["charge_time"]; runtime.state.draw_config.length_mult=s["length_mult"];
+    runtime.state.draw_config.capacity=s["capacity"]; runtime.state.draw_config.regen_mult=s["regen_mult"]; runtime.state.draw_config.fuel_gain_mult=s["fuel_gain_mult"]; speed::FuelSystem::set(runtime,runtime.state.draw.fuel); runtime.state.draw_config.length_mult=s["length_mult"];
     runtime.state.combat_config.attack_mult=s["attack_mult"]; runtime.state.combat_config.crit_chance=s["crit_chance"]; runtime.state.combat_config.crit_mult=s["crit_mult"];
     runtime.state.pickup_config.xp_mult=s["xp_mult"]; runtime.state.pickup_config.xp_radius=s["xp_pickup_radius"]; runtime.state.pickup_config.coin_radius=s["pickup_radius"]; runtime.state.pickup_config.speed_mult=s["pickup_speed_mult"];
 }
@@ -198,9 +199,9 @@ Dictionary SpeedRunCore::progression_snapshot() const {
 int64_t SpeedRunCore::random_state() const { return (runtime.state.started && !runtime.state.closed)?int64_t(runtime.state.control.rng.get_state()):0; }
 bool SpeedRunCore::apply_external_progression(const Dictionary &stats, double hp, bool waiting, int64_t random_state) {
     if (!runtime.state.started || runtime.state.closed || runtime.state.legacy_progression.ready || !runtime.state.ship_ready || (runtime.state.phase!=Phase::Play && runtime.state.phase!=Phase::LevelUp) || !std::isfinite(hp) || hp<0) return false;
-    for (const char *key:{"max_hp","max_speed","acceleration","turn_rate","glide_duration_mult","invulnerability","capacity","charge_time","length_mult","attack_mult","crit_chance","crit_mult","xp_mult","xp_pickup_radius","pickup_radius","pickup_speed_mult"})
+    for (const char *key:{"max_hp","max_speed","acceleration","turn_rate","glide_duration_mult","invulnerability","capacity","regen_mult","fuel_gain_mult","length_mult","attack_mult","crit_chance","crit_mult","xp_mult","xp_pickup_radius","pickup_radius","pickup_speed_mult"})
         if (!numeric(stats.get(key,Variant())) || double(stats[key])<0) return false;
-    if (double(stats["max_hp"])<=0 || double(stats["capacity"])<=0 || double(stats["charge_time"])<=0 || hp>double(stats["max_hp"])) return false;
+    if (double(stats["max_hp"])<=0 || double(stats["capacity"])<=0 || hp>double(stats["max_hp"])) return false;
     apply_stat_values(stats); runtime.state.ship.hp=hp; runtime.state.phase=waiting?Phase::LevelUp:Phase::Play; runtime.state.control.rng.set_state(uint64_t(random_state)); return true;
 }
 
