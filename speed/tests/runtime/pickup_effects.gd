@@ -639,6 +639,8 @@ func check_cpp_coins() -> bool:
 	config.moon_count = 0
 	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.xp_reward_counts = PackedInt32Array([0,0,0])
+	definition.behavior = &"chase"
+	definition.params = {}
 	var bridge = reward_bridge(definition,config)
 	if bridge==null: return false
 	bridge.collect_frame()

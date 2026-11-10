@@ -261,6 +261,7 @@ func check_cpp_rocks() -> void:
 	config.meteor_magnet_chance = 1.0
 	var stage := RuntimeStage.new()
 	stage.index = 85
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_rocks"
