@@ -27,8 +27,12 @@ void CollisionQuery::enemy_rows_into(const godot::RunState &state,Point lo,Point
 }
 
 double CollisionQuery::segment_circle_t(Point from,Point to,Point center,double radius) {
-    const Point f=from-center,d=to-from;
-    const double cc=double(f.length_squared())-radius*radius,a=d.length_squared();
+    return segment_circle_t(PreparedSegment(from,to),center,radius);
+}
+double CollisionQuery::segment_circle_t(const PreparedSegment &segment,Point center,double radius) {
+    const Point f=segment.from-center;
+    const auto &d=segment.delta;
+    const double cc=double(f.length_squared())-radius*radius,a=segment.length_squared;
     if (cc<=0) return 0;if (a==0) return -1;
     const double b=2.0*f.dot(d),disc=b*b-4.0*a*cc;
     if (disc<0) return -1;

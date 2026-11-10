@@ -2,6 +2,7 @@
 #include "../content/content_bundle.h"
 #include <godot_cpp/core/math.hpp>
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <limits>
 using namespace godot;
@@ -124,19 +125,41 @@ bool SpeedRunCore::separate_crowd(double dt) {
     auto cell_key = [cell_size](Vector2 p, int64_t dx, int64_t dy) {
         return ((int64_t(std::floor(p.x / cell_size)) + dx) << 32) ^ ((int64_t(std::floor(p.y / cell_size)) + dy) & 0xffffffffLL);
     };
-    for (auto &entry : cells) entry.first = cell_key(state.enemies[entry.second].pos, 0, 0);
+    // 押し出す位置は最後に反映するので、この計算中の移動可否は変わらない。
+    auto &movable = runtime.workspace.crowd_movable;
+    movable.assign(state.enemies.size(),0);
+    for (auto &entry : cells) {
+        entry.first = cell_key(state.enemies[entry.second].pos, 0, 0);
+        movable[entry.second] = can_avoid_strong(entry.second);
+    }
     std::sort(cells.begin(), cells.end());
     shift.assign(state.enemies.size(), Vector2());
     // 基準の1/60秒あたり CROWD_STRENGTH の割合で戻す。更新間隔が変わっても同じ速さで離れる。
     const double rate = 1.0 - std::pow(1.0 - CROWD_STRENGTH, dt / CROWD_REFERENCE_DT);
+    // 同じセルの個体は、同じ順序の近傍9セルを調べる。開始位置だけを共有する。
+    std::array<decltype(cells.cbegin()),9> neighbor_begins;
+    std::array<int64_t,9> neighbor_keys;
+    bool neighbors_ready = false;
+    int64_t neighbor_cell = 0;
     for (const auto &entry : cells) {
         const size_t row = entry.second;
-        if (!can_avoid_strong(row)) continue;
+        if (!movable[row]) continue;
         const auto &e = state.enemies[row]; const double weight = e.radius * e.radius;
+        if (!neighbors_ready || neighbor_cell!=entry.first) {
+            neighbor_cell = entry.first;
+            neighbors_ready = true;
+            int neighbor = 0;
+            for (int64_t dy = -1; dy <= 1; ++dy) for (int64_t dx = -1; dx <= 1; ++dx) {
+                const int64_t key = cell_key(e.pos, dx, dy);
+                neighbor_keys[neighbor] = key;
+                neighbor_begins[neighbor] = std::lower_bound(cells.cbegin(),cells.cend(),std::make_pair(key,uint32_t(0)));
+                ++neighbor;
+            }
+        }
         int seen = 0;
-        for (int64_t dy = -1; dy <= 1 && seen < CROWD_NEIGHBORS; ++dy) for (int64_t dx = -1; dx <= 1 && seen < CROWD_NEIGHBORS; ++dx) {
-            const int64_t key = cell_key(e.pos, dx, dy);
-            for (auto it = std::lower_bound(cells.begin(), cells.end(), std::make_pair(key, uint32_t(0))); it != cells.end() && it->first == key && seen < CROWD_NEIGHBORS; ++it) {
+        for (int neighbor = 0; neighbor < 9 && seen < CROWD_NEIGHBORS; ++neighbor) {
+            const int64_t key = neighbor_keys[neighbor];
+            for (auto it = neighbor_begins[neighbor]; it != cells.cend() && it->first == key && seen < CROWD_NEIGHBORS; ++it) {
                 if (it->second == row) continue;
                 const auto &other = state.enemies[it->second];
                 const double reach = (e.radius + other.radius) * CROWD_ALLOW;
@@ -144,7 +167,7 @@ bool SpeedRunCore::separate_crowd(double dt) {
                 if (distance >= reach) continue;
                 ++seen;
                 if (distance < 0.001) { offset = Vector2::from_angle(double((e.id * 17 + other.id * 31) % 360) * godot::Math::PI / 180.0); distance = 1.0; }
-                const double share = can_avoid_strong(it->second) ? other.radius * other.radius / (weight + other.radius * other.radius) : 1.0;
+                const double share = movable[it->second] ? other.radius * other.radius / (weight + other.radius * other.radius) : 1.0;
                 shift[row] += offset / distance * ((reach - distance) * share * rate);
             }
         }

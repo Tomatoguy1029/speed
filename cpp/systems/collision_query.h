@@ -5,6 +5,12 @@
 namespace godot {struct RunState;}
 namespace speed {
 using Point=godot::Vector2;
+// 同じ移動区間を多数の円と照合する間、区間だけの演算を再利用する。
+struct PreparedSegment {
+    Point from,delta;
+    double length_squared;
+    PreparedSegment(Point p_from,Point to):from(p_from),delta(to-p_from),length_squared(delta.length_squared()) {}
+};
 struct PointCircle {Point center;double radius=0;};
 struct SegmentCircle {Point from,to;double half_width=0;};
 struct SweptSegment {Point before_from,before_to,from,to;double half_width=0;};
@@ -21,6 +27,7 @@ public:
     static std::vector<size_t> enemy_rows(const godot::RunState &,Point lo,Point hi,bool include_dead=false);
     static void enemy_rows_into(const godot::RunState &,Point lo,Point hi,std::vector<size_t> &out,bool include_dead=false);
     static double segment_circle_t(Point from,Point to,Point center,double radius);
+    static double segment_circle_t(const PreparedSegment &,Point center,double radius);
     static double point_segment_squared(Point point,Point from,Point to);
     static bool point_in_polygon(Point,const std::vector<Point> &);
     static bool sweep_segment(Point ship_before,Point ship_now,Point from,Point to,double radius);
