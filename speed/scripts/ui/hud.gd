@@ -591,7 +591,7 @@ func _draw_cpp_gauge_ring() -> void:
 	var capacity := float(_cpp_ui.capacity)
 	var amount := float(draw.gauge)*capacity
 	var displayed := float(draw.draw_gauge)*(1.0-(float(draw.draw_length)+float(draw.get("draw_connection",0.0)))/maxf(1.0,float(draw.draw_limit))) if draw.drawing else amount
-	var placing_start := not draw.tracing and (not draw.drawing or not draw.draw_started)
+	var placing_start: bool = not draw.tracing and (not draw.drawing or not draw.draw_started)
 	var too_far := false
 	var reach := float(draw.get("draw_reach",INF))
 	if placing_start and _cpp_ui.input_enabled and amount>=float(_cpp_ui.min_charge) and is_finite(reach):
