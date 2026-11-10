@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ct0vk5d4xrirp"
-path="res://.godot/imported/bomber_armor.png-027b89346bc69f839788f8c1d78a0ef0.ctex"
+path="res://.godot/imported/bomber_armor.png-e409d52624b0932eeea1f74361f2abf3.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/pixel/bomber/bomber_armor.png"
-dest_files=["res://.godot/imported/bomber_armor.png-027b89346bc69f839788f8c1d78a0ef0.ctex"]
+dest_files=["res://.godot/imported/bomber_armor.png-e409d52624b0932eeea1f74361f2abf3.ctex"]
 
 [params]
 
