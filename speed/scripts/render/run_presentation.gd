@@ -131,7 +131,7 @@ func _ready_cpp() -> void:
 	cpp_background.z_index = -10
 	frame_view.add_child(cpp_background)
 	cpp_background.setup(cpp_scope,cpp_resources,snapshot.value.ui.ship.ship_pos)
-	bridge.subscribe("presentation",frame_view.receive_owned_frame,["world_time","boss_bodies"],frame_view.presentation_event_types())
+	bridge.subscribe_presentation("presentation",frame_view.receive_owned_frame,["world_time","boss_bodies"],frame_view.presentation_event_types())
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	var layer_count: int = cpp_resources.visuals.size()-3

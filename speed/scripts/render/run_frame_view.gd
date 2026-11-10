@@ -513,16 +513,13 @@ func _batch(id: int, layer: int) -> InstanceBatch:
 func _valid(frame: Dictionary) -> bool:
 	if frame.has("enemy_weak"):
 		if not frame.enemy_weak is PackedFloat32Array or frame.enemy_weak.size()%5: return false
-		for value: float in frame.enemy_weak:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.enemy_weak): return false
 	if frame.has("enemy_health"):
 		if not frame.enemy_health is PackedFloat32Array or frame.enemy_health.size()%4: return false
-		for value: float in frame.enemy_health:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.enemy_health): return false
 	if frame.has("petrified_enemies"):
 		if not frame.petrified_enemies is PackedFloat32Array or frame.petrified_enemies.size()%3: return false
-		for value: float in frame.petrified_enemies:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.petrified_enemies): return false
 	if frame.get("schema_version")!=1 or not frame.get("batches") is Array or not frame.get("shapes") is Array or not frame.get("poses") is Array: return false
 	if frame.has("boss_bodies"):
 		if not frame.boss_bodies is Array: return false
@@ -548,8 +545,7 @@ func _valid(frame: Dictionary) -> bool:
 			var stride := 7 if key == "comets" else (3 if key == "capsules" else 6)
 			if not data is Dictionary or not data.get("values") is PackedFloat32Array or data.values.size() % stride != 0: return false
 			if key != "comets" and (not (data.get("time") is float or data.get("time") is int) or not is_finite(data.time)): return false
-			for value: float in data.values:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(data.values): return false
 	if frame.has("warp"):
 		var warp = frame.warp
 		if not warp is Dictionary or not warp.get("position") is Vector2 or not warp.position.is_finite(): return false
@@ -559,51 +555,42 @@ func _valid(frame: Dictionary) -> bool:
 	if frame.has("gravity"):
 		var wells = frame.gravity
 		if not wells is Dictionary or not wells.get("wells") is PackedFloat64Array or wells.wells.size()%5!=0 or not (wells.get("time") is float or wells.get("time") is int) or not is_finite(wells.time): return false
-		for value: float in wells.wells:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(wells.wells): return false
 		for n in range(0,wells.wells.size(),5):
 			if wells.wells[n+3]<=0.0 or wells.wells[n+4]<0.0: return false
 	if frame.has("pulser"):
 		if not frame.pulser is PackedFloat64Array or frame.pulser.size()%6!=0: return false
-		for value in frame.pulser:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.pulser): return false
 	if frame.has("ruler"):
 		if not frame.ruler is PackedFloat64Array or frame.ruler.size()%12!=0: return false
-		for value: float in frame.ruler:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.ruler): return false
 	if frame.has("triangle_star"):
 		if not frame.triangle_star is PackedFloat64Array or frame.triangle_star.size()%5!=0: return false
-		for value: float in frame.triangle_star:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.triangle_star): return false
 	if frame.has("cepheus"):
 		if not frame.cepheus is Dictionary: return false
 		for pair in [["values",5],["marks",10]]:
 			var values = frame.cepheus.get(pair[0])
 			if not values is PackedFloat64Array or values.size()%int(pair[1])!=0: return false
-			for value: float in values:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(values): return false
 	for pair in [["corona",7],["corona_members",10]]:
 		if not frame.has(pair[0]): continue
 		var values = frame[pair[0]]
 		if not values is PackedFloat64Array or values.size()%int(pair[1])!=0: return false
-		for value: float in values:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(values): return false
 	if frame.has("aquila"):
 		var data = frame.aquila
 		if not data is Dictionary or not data.get("values") is PackedFloat64Array or not data.get("view") is Rect2 or data.values.size()%9!=0: return false
-		for value: float in data.values:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(data.values): return false
 		for i in range(0,data.values.size(),9):
 			if data.values[i+6]<=0.0: return false
 	if frame.has("phoenix"):
 		if not frame.phoenix is PackedFloat64Array or frame.phoenix.size()%7!=0: return false
-		for value: float in frame.phoenix:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(frame.phoenix): return false
 	if frame.has("marlin"):
 		var data = frame.marlin
 		if not data is Dictionary or not data.get("ids") is PackedInt64Array or not data.get("values") is PackedFloat64Array or not data.get("view") is Rect2 or data.values.size()!=data.ids.size()*14: return false
-		for value: float in data.values:
-			if not is_finite(value): return false
+		if not SpeedRunCore.packed_floats_finite(data.values): return false
 	for row in frame.batches:
 		if not row is Dictionary or not visuals.has(row.get("visual_id")) or not row.get("ids") is PackedInt64Array or not row.get("transforms") is PackedFloat32Array or not row.get("colors") is PackedColorArray or not row.get("flags") is PackedInt32Array: return false
 		var count: int = row.ids.size()
@@ -622,64 +609,49 @@ func _valid(frame: Dictionary) -> bool:
 				if not row.biter.has(key) or row.biter[key].size()!=count: return false
 		if row.has("beamer"):
 			if not row.beamer is PackedFloat32Array or row.beamer.size()%10!=0: return false
-			for value: float in row.beamer:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.beamer): return false
 		if row.has("reticle"):
 			if not row.reticle is PackedFloat32Array or row.reticle.size()%12!=0: return false
-			for value: float in row.reticle:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.reticle): return false
 		if row.has("soldier"):
 			if not row.soldier is PackedFloat32Array or row.soldier.size()%7!=0: return false
-			for value: float in row.soldier:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.soldier): return false
 		if row.has("lynx"):
 			if not row.lynx is PackedFloat32Array or row.lynx.size()%6!=0: return false
-			for value: float in row.lynx:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.lynx): return false
 		if row.has("dolphin"):
 			if not row.dolphin is PackedFloat32Array or row.dolphin.size()%6!=0: return false
-			for value: float in row.dolphin:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.dolphin): return false
 		if row.has("sniper"):
 			if not row.sniper is PackedFloat32Array or row.sniper.size()%59!=0: return false
-			for value: float in row.sniper:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.sniper): return false
 		if row.has("battleship"):
 			if not row.battleship is PackedFloat32Array or row.battleship.size()%6!=0: return false
-			for value: float in row.battleship:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.battleship): return false
 		if row.has("missile"):
 			if not row.missile is PackedFloat32Array or row.missile.size()%5!=0: return false
-			for value: float in row.missile:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.missile): return false
 		if row.has("gunner"):
 			if not row.gunner is PackedFloat32Array or row.gunner.size()%5!=0: return false
-			for value: float in row.gunner:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.gunner): return false
 		if row.has("pump"):
 			if not row.pump is PackedFloat32Array or row.pump.size()!=count*9: return false
-			for value: float in row.pump:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.pump): return false
 		if row.has("crab"):
 			if not row.crab is PackedFloat32Array or row.crab.size()%14!=0: return false
-			for value: float in row.crab:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.crab): return false
 		if row.has("bomber"):
 			if not row.bomber is PackedFloat32Array or row.bomber.size()%5!=0: return false
-			for value: float in row.bomber:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.bomber): return false
 		if row.has("cross"):
 			if not row.cross is PackedFloat32Array or row.cross.size()%9!=0: return false
-			for value: float in row.cross:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.cross): return false
 		if row.has("aquarius"):
 			if not row.aquarius is PackedFloat32Array or row.aquarius.size()%5!=0: return false
-			for value: float in row.aquarius:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.aquarius): return false
 		if row.has("glows"):
 			if not row.glows is PackedFloat32Array or row.glows.size()%3!=0: return false
-			for value: float in row.glows:
-				if not is_finite(value): return false
+			if not SpeedRunCore.packed_floats_finite(row.glows): return false
 		for flag: int in row.flags:
 			var maximum := 3 if visuals[row.visual_id].role==2 else 2 if visuals[row.visual_id].get("iron",false) else 1
 			if flag<0 or flag>maximum: return false
