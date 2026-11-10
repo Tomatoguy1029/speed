@@ -15,6 +15,10 @@ bool FuelSystem::valid(const godot::RunState &s) {
 }
 double FuelSystem::maximum(const godot::RunState &s) {return s.draw_config.fuel_capacity*s.draw_config.capacity;}
 double FuelSystem::amount(const godot::RunState &s) {return std::max(s.draw.fuel/s.draw_config.fuel_capacity,s.draw_config.boost_min_q);}
+double FuelSystem::draw_limit(const godot::RunState &s) {
+    const auto &c=s.draw_config;
+    return c.length*amount(s)*(s.ship_config.max_speed/s.ship_config.base_max_speed)*c.length_mult/c.boost_cost_ratio;
+}
 double FuelSystem::speed_ratio(const godot::RunState &s) {
     if (!s.draw_ready) return 1.0;
     const auto &c=s.draw_config;

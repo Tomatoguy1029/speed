@@ -261,7 +261,7 @@ extends Resource
 @export var fuel_speed_min: float
 ## 燃料による減速の時定数（世界秒）
 @export var fuel_slow_time: float
-## 上限まで描いたときに使う開始時燃料の割合
+## 基準距離を描いたときに使う開始時燃料の割合。描ける上限は基準距離をこの割合で割った長さ。
 @export var boost_cost_ratio: float
 ## ブーストの最低消費量
 @export var boost_min_cost: float
@@ -275,8 +275,8 @@ extends Resource
 @export var fuel_gain_max: float
 ## 満タン通知を再び出せる燃料の割合
 @export var fuel_notify_reset: float
-## 描ける長さ
-## 満タン・容量1・基本の最高速度のときに描ける線の長さ。開始時の燃料から求める量 q と最高速度に比例して変わる。
+## 描線の基準距離
+## 充填量1・基本の最高速度での基準。実効基準距離に q・最高速度・軌跡延長を掛け、ブースト消費率で割って描ける上限を求める。
 ## 単位：単位（距離）
 @export var draw_length: float
 ## 描画中の世界の速さ

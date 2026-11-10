@@ -706,7 +706,7 @@ func check_cpp_t08() -> bool:
 	var position: Vector2 = core.ship_snapshot().ship_pos
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":position},200,1.0)
 	var draw: Dictionary = core.draw_snapshot()
-	check(is_equal_approx(draw.draw_gauge,fuel/config.fuel_capacity) and is_equal_approx(draw.draw_limit,config.draw_length*fuel/config.fuel_capacity),"利用側は容量を含む実充填量から描ける長さを求める")
+	check(is_equal_approx(draw.draw_gauge,fuel/config.fuel_capacity) and is_equal_approx(draw.draw_limit,config.draw_length*fuel/config.fuel_capacity/config.boost_cost_ratio),"利用側は容量を含む実充填量から描ける長さを求める")
 	core.handle_draw({"touch":true,"pen_release":true},210,1.0)
 	var before: float = core.draw_snapshot().fuel
 	core.step_draw(0.01)
@@ -846,7 +846,7 @@ func check_cpp_t10() -> bool:
 	check(absf(core.ship_snapshot().ship_vel.length()-result)<0.0001,"操舵と減速は同じ実効最高速度を使う")
 	var position: Vector2 = core.ship_snapshot().ship_pos
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":position},0,1.0)
-	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*expected/config.base_max_speed),"描線の距離にも実効最高速度の比率が効く")
+	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*expected/config.base_max_speed/config.boost_cost_ratio),"描線の距離にも実効最高速度の比率が効く")
 	core.handle_draw({"touch":true,"pen_release":true},100,1.0)
 	velocity = core.ship_snapshot().ship_vel
 	bridge.command("dev_remove_trait",{"id":"T10"})
@@ -1061,7 +1061,7 @@ func check_cpp_t14() -> bool:
 	check(is_equal_approx(bridge._ui.length_mult,expected),"最大段後の延長は通常の育成後へ掛ける")
 	var start := Vector2(-3000,0)
 	check(core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0),"実際の描線入力を開始する")
-	var limit := config.draw_length*expected*speed_factor
+	var limit := config.draw_length*expected*speed_factor/config.boost_cost_ratio
 	check(is_equal_approx(core.draw_snapshot().draw_limit,limit),"速度の倍率・充填量・延長倍率を含む距離上限を開始時に決める")
 	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*0.25,0)},10,1.0),"延長された距離の途中まで描く")
 	var partial: Dictionary = core.draw_snapshot()
@@ -1077,7 +1077,7 @@ func check_cpp_t14() -> bool:
 	check(is_equal_approx(hud._cpp_ui.length_mult,expected) and is_equal_approx(hud._cpp_ui.draw.draw_limit,limit) and is_equal_approx(hud._cpp_ui.draw.draw_length/limit,0.25),"HUDへ同じ延長倍率と描き途中のゲージ消費率を渡す")
 	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*2.0,0)},20,1.0),"上限を越える入力も実際の描線へ通す")
 	var committed: Dictionary = core.draw_snapshot()
-	check(committed.tracing and not committed.drawing and is_equal_approx(committed.trace_total,limit) and is_equal_approx(committed.fuel,config.fuel_capacity*(1.0-config.boost_cost_ratio)),"上限で線を止めて発進し、上限相当のゲージを消費する")
+	check(committed.tracing and not committed.drawing and is_equal_approx(committed.trace_total,limit) and is_equal_approx(committed.fuel,0.0),"上限で線を止めて発進し、上限相当のゲージを消費する")
 	bridge.command("dev_remove_trait",{"id":"T14"})
 	check(is_equal_approx(bridge._ui.length_mult,factor*config.post_max.factor(&"line_length",{&"line_length":3})) and core.draw_snapshot().trace_total==committed.trace_total,"解除で特性分だけを外し、開始済みの線を縮めない")
 	bridge.command("dev_post_length",{"stacks":0})
@@ -1087,7 +1087,7 @@ func check_cpp_t14() -> bool:
 	check(core.draw_snapshot()==partial and is_equal_approx(bridge._ui.length_mult,expected),"復帰後も同じ点列と実効距離へ戻る")
 	bridge.release_checkpoint(saved.value)
 	core.handle_draw({"touch":true,"pen_release":true},30,1.0)
-	check(core.draw_snapshot().tracing and is_equal_approx(core.draw_snapshot().fuel,config.fuel_capacity*(1.0-config.boost_cost_ratio*0.25)),"復帰した途中の線を発進すると実際に描いた分だけ消費する")
+	check(core.draw_snapshot().tracing and is_equal_approx(core.draw_snapshot().fuel,config.fuel_capacity*0.75),"復帰した途中の線を発進すると実際に描いた分だけ消費する")
 	hud.free()
 	bridge.dispose()
 	await get_tree().process_frame

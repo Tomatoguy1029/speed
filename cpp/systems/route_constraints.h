@@ -15,7 +15,7 @@ struct RouteContext {
     struct Bullet {godot::Vector2 position,velocity;double radius=0;bool homing=false;int64_t id=0;};
     struct Hazard {godot::Vector2 position,end;double radius=0;bool circle=true,attached=false;int64_t id=0;};
     godot::Vector2 ship_position;
-    double ship_radius=0,field_radius=0,point_step=0,zoom=1,fuel=0,fuel_max=0,fuel_capacity=1,boost_min_cost=0,boost_min_q=0;
+    double ship_radius=0,field_radius=0,point_step=0,zoom=1,fuel=0,fuel_max=0,fuel_capacity=1,boost_min_cost=0,boost_min_q=0,boost_cost_ratio=1;
     double draw_length=1,max_speed=1,base_speed=1,length_mult=1,confirm_delay=0,run_time=0,hitstop_cap=0,time_scale=1,scale_min=1,pending_world=0;
     double attack=0,window_attack=0,body_speed=0,comet_time=std::numeric_limits<double>::infinity(),gravity_time=std::numeric_limits<double>::infinity();
     int64_t tick=0,history_hz=120,equipment_count=0,well_count=0,rock_count=0;

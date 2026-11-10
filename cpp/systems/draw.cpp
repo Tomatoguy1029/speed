@@ -69,7 +69,7 @@ void SpeedRunCore::begin_draw(bool press, Vector2 pen, int64_t clock_msec) {
     runtime.state.draw.start_fuel = runtime.state.draw.fuel;
     runtime.state.draw.amount = speed::FuelSystem::amount(runtime.state);
     runtime.state.draw.connection = 0;
-    runtime.state.draw.limit = runtime.state.draw_config.length * runtime.state.draw.amount * (runtime.state.ship_config.max_speed / runtime.state.ship_config.base_max_speed) * runtime.state.draw_config.length_mult;
+    runtime.state.draw.limit = speed::FuelSystem::draw_limit(runtime.state);
     runtime.state.draw.length = 0;
     runtime.state.draw.points.clear();
     if (press) { runtime.state.draw.connection=runtime.state.ship.pos.distance_to(pen);runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
@@ -107,8 +107,10 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 void SpeedRunCore::commit_draw() {
     if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
     const auto &c=runtime.state.draw_config;
-    const double cost=std::max(c.boost_min_cost,runtime.state.draw.start_fuel*c.boost_cost_ratio*
-        std::min(1.0,(runtime.state.draw.connection+runtime.state.draw.length)/runtime.state.draw.limit));
+    const double used=runtime.state.draw.connection+runtime.state.draw.length;
+    const bool at_limit=!runtime.state.draw.blocked && runtime.state.draw.limit-used<c.point_step;
+    const double fraction=at_limit?1.0:std::min(1.0,used/runtime.state.draw.limit);
+    const double cost=std::max(c.boost_min_cost,runtime.state.draw.start_fuel*fraction);
     speed::FuelSystem::set(runtime,runtime.state.draw.fuel-cost);
     auto points = runtime.state.draw.points;
     if (runtime.state.ship.pos.distance_to(points[0]) > 1) points.insert(0, runtime.state.ship.pos);
@@ -173,7 +175,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
         // しし座の獅子の間は、なぞり（ブースト）を始められない
         if (speed::LeoBehavior::active(runtime)) return true;
         if ((press || alt) && runtime.state.draw.fuel >= runtime.state.draw_config.boost_min_cost) {
-            const double limit=runtime.state.draw_config.length*speed::FuelSystem::amount(runtime.state)*(runtime.state.ship_config.max_speed/runtime.state.ship_config.base_max_speed)*runtime.state.draw_config.length_mult;
+            const double limit=speed::FuelSystem::draw_limit(runtime.state);
             if (press && runtime.state.ship.pos.distance_to(pen)>=limit) {Dictionary event;event["reason_key"]="lab.link_too_far";emit_event("draw_rejected",event);}
             else begin_draw(press,pen,clock_msec);
         }
