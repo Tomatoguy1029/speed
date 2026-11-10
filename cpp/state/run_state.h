@@ -100,7 +100,7 @@ struct RunState {
     struct DrawConfig {
         double length, point_step, confirm_delay, run_time, time_scale, slow_ref, scale_min;
         double boost_duration, carry, launch_ratio, glide_ratio, capacity, length_mult;
-        double fuel_capacity, cruise_drain, regen_rate, fuel_low, fuel_speed_min, fuel_slow_time, boost_cost_ratio, boost_min_cost, boost_min_q, fuel_per_hit, fuel_hole_ratio, fuel_gain_max, fuel_notify_reset;
+        double fuel_capacity, cruise_drain, regen_rate, fuel_low, fuel_speed_min, fuel_slow_time, boost_cost_ratio, boost_min_cost, boost_min_q, fuel_hole_ratio, fuel_gain_max, fuel_notify_reset;
         double regen_mult=1, drain_mult=1, fuel_gain_mult=1;
     } draw_config{};
     struct Draw {
@@ -144,6 +144,9 @@ struct RunState {
         int64_t gem_draw_max = 0;
         bool fixed_rewards=false;
         double strong_gold_chance=0;
+        double fuel_crystal_low=0, fuel_crystal_mid=0, fuel_crystal_high=0;
+        double boss_crystal_damage=2.5;
+        uint32_t boss_crystal_kind=0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
         double xp_radius = 0, coin_radius = 0, speed_mult = 1;
         double repair_fraction=0,pickup_life=0;

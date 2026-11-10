@@ -105,8 +105,9 @@
 | 巡航消費 (`cruise_drain`)・時間回復 (`regen_rate`) | 6.1の消費と時間回復の基準。 | 燃料／世界秒 |
 | 減速開始量 (`fuel_low`)・最低速度比 (`fuel_speed_min`)・減速時定数 (`fuel_slow_time`) | 燃料が少ないときの通常移動。 | 燃料・割合・世界秒 |
 | ブースト消費率 (`boost_cost_ratio`)・最低消費 (`boost_min_cost`)・突進量の下限 (`boost_min_q`) | 消費率は実効基準距離を描くときに使う開始時燃料の割合。描ける上限は実効基準距離÷消費率で求める。 | 割合・燃料・割合 |
-| 給油 (`fuel_per_hit`)・エンドホール (`fuel_hole_ratio`)・給油上限 (`fuel_gain_max`)・通知復帰 (`fuel_notify_reset`) | 給油と通知の基準。 | 燃料・割合 |
-| 雑魚の給油倍率 (`fuel_regular_mult`)・強敵の給油倍率 (`fuel_strong_mult`) | 星1・2と星3〜10の敵の給油量にそれぞれ掛ける倍率。 | 倍 |
+| 結晶の給油量 (`fuel_crystal_low`・`fuel_crystal_mid`・`fuel_crystal_high`) | 水色・紫・黄色の結晶1個を拾うときの給油量。 | 燃料 |
+| ボスの結晶供給 (`boss_crystal_damage`・`boss_crystal_kind`) | 結晶1個を落とす実ダメージと種類。端数は個体ごとに持ち越す。 | ダメージは正の数。種類は水色0・紫1・黄色2 |
+| エンドホール (`fuel_hole_ratio`)・給油上限 (`fuel_gain_max`)・通知復帰 (`fuel_notify_reset`) | 給油と通知の基準。 | 割合 |
 | 描線の基準距離 (`draw_length`) | 充填量1・基本の最高速度での基準。燃料÷基本容量・最高速度・軌跡延長を掛けて実効基準距離を求める。武器と勢いもこの基準を使う。 | 単位（距離） |
 | 描画中の世界の速さ (`draw_time_scale`) | 線を描いている間、世界をこの倍率で遅くする。0 で止まる、1 で通常どおり。 | 倍（0〜1） |
 | なぞり中の遅さの基準 (`draw_run_slow_ref`) | なぞり中の世界の速さ ＝ この値 ÷ 突進の速さ。大きいほど、なぞり中の世界が速く動く。 | 単位/秒 |

@@ -717,11 +717,39 @@
           "config": "boost_min_q"
         },
         {
-          "name": "draw_config_fuel_per_hit",
+          "name": "fuel_crystal_low",
           "type": "f64",
           "min": 0,
-          "runtime": "draw_config.fuel_per_hit",
-          "config": "fuel_per_hit"
+          "runtime": "pickup_config.fuel_crystal_low",
+          "config": "fuel_crystal_low"
+        },
+        {
+          "name": "fuel_crystal_mid",
+          "type": "f64",
+          "min": 0,
+          "runtime": "pickup_config.fuel_crystal_mid",
+          "config": "fuel_crystal_mid"
+        },
+        {
+          "name": "fuel_crystal_high",
+          "type": "f64",
+          "min": 0,
+          "runtime": "pickup_config.fuel_crystal_high",
+          "config": "fuel_crystal_high"
+        },
+        {
+          "name": "boss_crystal_damage",
+          "type": "f64",
+          "min": 1e-06,
+          "runtime": "pickup_config.boss_crystal_damage",
+          "config": "boss_crystal_damage"
+        },
+        {
+          "name": "boss_crystal_kind",
+          "type": "u32",
+          "max": 2,
+          "runtime": "pickup_config.boss_crystal_kind",
+          "config": "boss_crystal_kind"
         },
         {
           "name": "draw_config_fuel_hole_ratio",
@@ -745,7 +773,7 @@
           "config": "fuel_notify_reset"
         }
       ],
-      "version": 17
+      "version": 18
     },
     {
       "name": "StringEntry",
@@ -1026,15 +1054,9 @@
           "native": "weak_arc",
           "min": 0,
           "value": 0.0
-        },
-        {
-          "name": "fuel_hits",
-          "type": "f64",
-          "min": 0,
-          "native": "fuel_hits"
         }
       ],
-      "version": 3
+      "version": 4
     },
     {
       "name": "LoadoutDefinition",

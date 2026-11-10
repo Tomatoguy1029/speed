@@ -111,7 +111,11 @@ struct RunConfig {
     double draw_config_boost_cost_ratio{};
     double draw_config_boost_min_cost{};
     double draw_config_boost_min_q{};
-    double draw_config_fuel_per_hit{};
+    double fuel_crystal_low{};
+    double fuel_crystal_mid{};
+    double fuel_crystal_high{};
+    double boss_crystal_damage{};
+    uint32_t boss_crystal_kind{};
     double draw_config_fuel_hole_ratio{};
     double draw_config_fuel_gain_max{};
     double draw_config_fuel_notify_reset{};
@@ -168,7 +172,6 @@ struct EnemyRecord {
     uint32_t gate{};
     double gate_arc{};
     double weak_arc{};
-    double fuel_hits{};
 };
 struct LoadoutDefinition {
     uint32_t id{};

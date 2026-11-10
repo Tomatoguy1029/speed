@@ -1,5 +1,6 @@
 #include "pickup_system.h"
 #include "progression.h"
+#include "fuel.h"
 #include "../api/run_core.h"
 #include "../runtime/run_runtime.h"
 #include "../output/event_builder.h"
@@ -106,16 +107,19 @@ bool PickupSystem::release_crystal(RunRuntime &run,size_t row,CrystalRemoval rea
 double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<size_t> &rows,CrystalCollectMethod method) {
     auto &run=core.runtime;auto &p=run.state.pickups;
     const double multiplier=run.state.pickup_config.xp_mult*run.state.loadout->xp_profile_factor*run.state.loadout->xp_gain_mult;
-    std::vector<CrystalCollection> details;double base=0;
+    std::vector<CrystalCollection> details;double base=0,fuel=0;
     for (size_t row:rows) {
         if (row>=p.gems.size() || !p.gems[row].alive) continue;
         const auto gem=p.gems[row];const double actual=gem.value*multiplier;
         details.push_back({gem,actual,p.gem_absorber_id==gem.id});base+=gem.value;
+        const auto &config=run.state.pickup_config;
+        fuel+=gem.kind==0?config.fuel_crystal_low:gem.kind==1?config.fuel_crystal_mid:config.fuel_crystal_high;
         p.collected[gem.kind].actual_xp+=actual;
         release_crystal(run,row,CrystalRemoval::Collected);
     }
     if (details.empty()) return 0;
     const double actual=base*multiplier;
+    FuelSystem::add(run,fuel);
     ProgressionSystem::add_experience(core,actual);p.collected_actual_xp+=actual;
     EventBuilder::crystals_collected(run,details,base,actual,multiplier,method);return actual;
 }
@@ -179,6 +183,18 @@ void PickupSystem::prune(RunRuntime &run) {
         if (!state.enemy_handles.contains(owner) || state.enemy_handles.entity_id(owner)!=cargo.enemy_id || !state.enemies[owner.slot].alive || state.enemies[owner.slot].dead) lose(run,cargo.enemy_id,CargoLoss::OwnerRemoved);
         else ++i;
     }
+}
+void PickupSystem::drop_boss_damage(RunRuntime &run,EnemyHandle target,double applied) {
+    auto &state=run.state;
+    if (!state.enemy_handles.contains(target) || applied<=0) return;
+    auto &enemy=state.enemies[target.slot];const auto &config=state.pickup_config;
+    enemy.boss_crystal_damage+=applied;
+    const auto count=size_t(std::floor(enemy.boss_crystal_damage/config.boss_crystal_damage));
+    if (!count) return;
+    if (!reserve(run,count)) return;
+    enemy.boss_crystal_damage-=double(count)*config.boss_crystal_damage;
+    const CrystalOrigin origin{CrystalSource::Enemy,uint32_t(enemy.definition+1),enemy.id,state.time,state.world_time};
+    for (size_t i=0;i<count;++i) drop_crystal(run,enemy.pos,uint8_t(config.boss_crystal_kind),origin);
 }
 void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     auto &state=run.state;const auto &definition=run.content->definitions[enemy.definition-1];

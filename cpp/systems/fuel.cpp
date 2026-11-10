@@ -7,7 +7,7 @@
 namespace speed {
 bool FuelSystem::valid(const godot::RunState &s) {
     const auto &c=s.draw_config;
-    for (double v:{c.fuel_capacity,c.cruise_drain,c.regen_rate,c.fuel_low,c.fuel_speed_min,c.fuel_slow_time,c.boost_cost_ratio,c.boost_min_cost,c.boost_min_q,c.fuel_per_hit,c.fuel_hole_ratio,c.fuel_gain_max,c.fuel_notify_reset})
+    for (double v:{c.fuel_capacity,c.cruise_drain,c.regen_rate,c.fuel_low,c.fuel_speed_min,c.fuel_slow_time,c.boost_cost_ratio,c.boost_min_cost,c.boost_min_q,c.fuel_hole_ratio,c.fuel_gain_max,c.fuel_notify_reset})
         if (!std::isfinite(v) || v<0) return false;
     return c.fuel_capacity>0 && c.fuel_low>0 && c.fuel_slow_time>0 && c.cruise_drain>0 && c.fuel_speed_min<1 &&
         c.boost_cost_ratio>0 && c.boost_cost_ratio<=1 && c.boost_min_q>0 && c.boost_min_q<=1 &&

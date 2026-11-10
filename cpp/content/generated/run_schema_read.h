@@ -210,8 +210,16 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.draw_config_boost_min_cost < 0) return false;
     if (!input.read_f64(out.draw_config_boost_min_q)) return false;
     if (out.draw_config_boost_min_q < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_per_hit)) return false;
-    if (out.draw_config_fuel_per_hit < 0) return false;
+    if (!input.read_f64(out.fuel_crystal_low)) return false;
+    if (out.fuel_crystal_low < 0) return false;
+    if (!input.read_f64(out.fuel_crystal_mid)) return false;
+    if (out.fuel_crystal_mid < 0) return false;
+    if (!input.read_f64(out.fuel_crystal_high)) return false;
+    if (out.fuel_crystal_high < 0) return false;
+    if (!input.read_f64(out.boss_crystal_damage)) return false;
+    if (out.boss_crystal_damage < 1e-06) return false;
+    if (!input.read_u32(out.boss_crystal_kind)) return false;
+    if (out.boss_crystal_kind > 2) return false;
     if (!input.read_f64(out.draw_config_fuel_hole_ratio)) return false;
     if (out.draw_config_fuel_hole_ratio < 0) return false;
     if (!input.read_f64(out.draw_config_fuel_gain_max)) return false;
@@ -304,8 +312,6 @@ inline bool read(BinaryReader &input, EnemyRecord &out) {
     if (out.gate_arc < 0) return false;
     if (!input.read_f64(out.weak_arc)) return false;
     if (out.weak_arc < 0) return false;
-    if (!input.read_f64(out.fuel_hits)) return false;
-    if (out.fuel_hits < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, LoadoutDefinition &out) {
@@ -4939,8 +4945,8 @@ inline bool read(BinaryReader &input, DracoFlowGateDefinition &out) {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 17) return false;
-        if (count > input.remaining()/824) return false;
+        if (version != 18) return false;
+        if (count > input.remaining()/852) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -4957,8 +4963,8 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 3) return false;
-        if (count > input.remaining()/266) return false;
+        if (version != 4) return false;
+        if (count > input.remaining()/258) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -7232,7 +7238,11 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.draw_config.boost_cost_ratio=config.draw_config_boost_cost_ratio;
     state.draw_config.boost_min_cost=config.draw_config_boost_min_cost;
     state.draw_config.boost_min_q=config.draw_config_boost_min_q;
-    state.draw_config.fuel_per_hit=config.draw_config_fuel_per_hit;
+    state.pickup_config.fuel_crystal_low=config.fuel_crystal_low;
+    state.pickup_config.fuel_crystal_mid=config.fuel_crystal_mid;
+    state.pickup_config.fuel_crystal_high=config.fuel_crystal_high;
+    state.pickup_config.boss_crystal_damage=config.boss_crystal_damage;
+    state.pickup_config.boss_crystal_kind=config.boss_crystal_kind;
     state.draw_config.fuel_hole_ratio=config.draw_config_fuel_hole_ratio;
     state.draw_config.fuel_gain_max=config.draw_config_fuel_gain_max;
     state.draw_config.fuel_notify_reset=config.draw_config_fuel_notify_reset;
@@ -7345,7 +7355,11 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["draw_config_boost_cost_ratio"]=config.draw_config_boost_cost_ratio;
     out["draw_config_boost_min_cost"]=config.draw_config_boost_min_cost;
     out["draw_config_boost_min_q"]=config.draw_config_boost_min_q;
-    out["draw_config_fuel_per_hit"]=config.draw_config_fuel_per_hit;
+    out["fuel_crystal_low"]=config.fuel_crystal_low;
+    out["fuel_crystal_mid"]=config.fuel_crystal_mid;
+    out["fuel_crystal_high"]=config.fuel_crystal_high;
+    out["boss_crystal_damage"]=config.boss_crystal_damage;
+    out["boss_crystal_kind"]=config.boss_crystal_kind;
     out["draw_config_fuel_hole_ratio"]=config.draw_config_fuel_hole_ratio;
     out["draw_config_fuel_gain_max"]=config.draw_config_fuel_gain_max;
     out["draw_config_fuel_notify_reset"]=config.draw_config_fuel_notify_reset;
@@ -7393,7 +7407,6 @@ inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName 
     out.reward_burst=row.reward_burst;
     out.gate_arc=row.gate_arc;
     out.weak_arc=row.weak_arc;
-    out.fuel_hits=row.fuel_hits;
     out.kind=static_cast<EnemyDefinition::Kind>(row.kind);
     return out;
 }

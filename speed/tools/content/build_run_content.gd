@@ -1413,8 +1413,6 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 		row[pair[0]] = source.attack[pair[1]]
 	row.weak_arc = definition.weak_arc
 	row.rank = source.spawn.rank
-	row.fuel_hits = float(config.rank_hits[row.rank-1]) if row.rank>=1 and row.rank<=config.rank_hits.size() and definition.id not in [&"meteor",&"cepheus_soldier",&"triangle_star",&"hydra_rubble",&"iron",&"saw",&"rocket",&"swarm",&"drifter",&"darter",&"armored",&"gunner",&"titan",&"battleship"] else 0.0
-	row.fuel_hits *= config.fuel_regular_mult if row.rank<=2 else config.fuel_strong_mult
 	row.size_var = source.spawn.size_var
 	for pair in [["r",0],["g",1],["b",2],["a",3]]:
 		row["color_"+pair[0]] = source.color[pair[1]]

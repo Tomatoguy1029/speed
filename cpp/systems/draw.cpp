@@ -39,9 +39,9 @@ bool SpeedRunCore::configure_draw(const Dictionary &config, const Dictionary &st
         if (!std::isfinite(*fields[i]) || *fields[i] < 0) return false;
     }
     if (c.length <= 0 || c.run_time <= 0 || c.capacity <= 0 || c.length_mult <= 0 || c.scale_min > 1) return false;
-    const char *fuel_keys[]={"fuel_capacity","cruise_drain","regen_rate","fuel_low","fuel_speed_min","fuel_slow_time","boost_cost_ratio","boost_min_cost","boost_min_q","fuel_per_hit","fuel_hole_ratio","fuel_gain_max","fuel_notify_reset"};
-    double *fuel_fields[]={&c.fuel_capacity,&c.cruise_drain,&c.regen_rate,&c.fuel_low,&c.fuel_speed_min,&c.fuel_slow_time,&c.boost_cost_ratio,&c.boost_min_cost,&c.boost_min_q,&c.fuel_per_hit,&c.fuel_hole_ratio,&c.fuel_gain_max,&c.fuel_notify_reset};
-    for (int i=0;i<13;++i) {
+    const char *fuel_keys[]={"fuel_capacity","cruise_drain","regen_rate","fuel_low","fuel_speed_min","fuel_slow_time","boost_cost_ratio","boost_min_cost","boost_min_q","fuel_hole_ratio","fuel_gain_max","fuel_notify_reset"};
+    double *fuel_fields[]={&c.fuel_capacity,&c.cruise_drain,&c.regen_rate,&c.fuel_low,&c.fuel_speed_min,&c.fuel_slow_time,&c.boost_cost_ratio,&c.boost_min_cost,&c.boost_min_q,&c.fuel_hole_ratio,&c.fuel_gain_max,&c.fuel_notify_reset};
+    for (int i=0;i<12;++i) {
         const auto value=config.get(fuel_keys[i],Variant());
         if (value.get_type()!=Variant::INT && value.get_type()!=Variant::FLOAT) return false;
         *fuel_fields[i]=double(value);
