@@ -2220,6 +2220,10 @@
       {
         "name": "DebugRankHitstopChanged",
         "value": "debug_rank_hitstop_changed"
+      },
+      {
+        "name": "DracoShake",
+        "value": "draco_shake"
       }
     ],
     "ResultKind": [
@@ -3306,6 +3310,9 @@
     "debug_rank_hitstop_changed": [
       "rank",
       "multiplier"
+    ],
+    "draco_shake": [
+      "amount"
     ]
   },
   "includes": [
