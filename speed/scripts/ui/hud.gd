@@ -407,12 +407,31 @@ func _build_pause() -> void:
 	settings.custom_minimum_size = Vector2(320, 52)
 	settings.pressed.connect(_open_settings.bind(settings))
 	_pause_box.add_child(settings)
+	var codex := Button.new()
+	codex.name = "CodexButton"
+	codex.text = "menu.encyclopedia"
+	codex.custom_minimum_size = Vector2(320, 52)
+	codex.pressed.connect(_open_codex.bind(codex))
+	_pause_box.add_child(codex)
 	var quit := Button.new()
+	quit.name = "QuitButton"
 	quit.text = "hud.quit_run"
 	quit.custom_minimum_size = Vector2(320, 52)
 	quit.pressed.connect(_confirm_abort)
 	_pause_box.add_child(quit)
 	add_child(_pause_box)
+
+func _open_codex(from: Button) -> void:
+	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
+	var page := (load("res://scenes/app/encyclopedia.tscn") as PackedScene).instantiate() as UiScreen
+	from.grab_focus()
+	show_menu_overlay(page)
+	page.close_fn = func():
+		page.set_process_unhandled_input(false)
+		close_menu_overlay(page)
+		page.queue_free()
+	add_child(page)
+	AudioManager.play(&"ui.common.confirm")
 
 func _confirm_abort() -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return

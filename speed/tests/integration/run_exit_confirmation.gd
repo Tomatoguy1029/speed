@@ -19,7 +19,7 @@ func _ready() -> void:
 		if result.kind == "Abort": aborts += 1)
 	var cards: Array = _state().cards.duplicate(true)
 	_tap(KEY_ESCAPE)
-	var quit: Button = hud._pause_box.get_child(3)
+	var quit: Button = hud._pause_box.get_node("QuitButton")
 	quit.grab_focus()
 	_tap(KEY_SPACE)
 	_check(aborts == 0 and _state().phase == ExitIds.Phase.Paused, "quit button requests confirmation without aborting")
@@ -117,7 +117,7 @@ func _ready() -> void:
 	hud = scene.view.get_node("Hud/HudRoot")
 	await get_tree().process_frame
 	_tap(KEY_ESCAPE)
-	hud._pause_box.get_child(3).pressed.emit()
+	hud._pause_box.get_node("QuitButton").pressed.emit()
 	await _ready_cards()
 	dialog = hud._menu_overlay
 	confirm = dialog.find_child("Confirm", true, false) as Button
