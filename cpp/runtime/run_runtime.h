@@ -28,7 +28,7 @@ public:
     CombatHooks combat_hooks;
     int64_t epoch=1;
     int64_t api_run_id=0, last_command_id=0;
-    bool api_configured=false, api_development=false, busy=false;
+    bool api_configured=false, api_development=false, api_review=false, busy=false;
     godot::Dictionary last_command_response;
     bool full_output_dirty=false, pending_resource_rebuild=false;
     // 開発計測のHP保持。通常ランと保存状態には含めず、明示命令のときだけ有効にする。

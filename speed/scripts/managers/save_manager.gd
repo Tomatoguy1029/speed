@@ -12,6 +12,16 @@ const SAVE_PATH := "user://save.json"
 const SETTINGS_PATH := "user://settings.cfg"
 const SAVE_VERSION := 1
 
+## 配布の custom feature。開発時だけ -- --review-mode で同じ経路を試す。
+func is_review_build() -> bool:
+	return OS.has_feature("review") or (OS.is_debug_build() and "--review-mode" in OS.get_cmdline_user_args())
+
+func save_path() -> String:
+	return SAVE_PATH.get_base_dir().path_join("review_save.json") if is_review_build() else SAVE_PATH
+
+func settings_path() -> String:
+	return SETTINGS_PATH.get_base_dir().path_join("review_settings.cfg") if is_review_build() else SETTINGS_PATH
+
 var data: Dictionary = {}
 ## ResultIdは実行中に再利用しない。保存の互換形式には追加しない。
 var _recorded_cpp_results: Dictionary = {}
@@ -45,7 +55,7 @@ func default_data() -> Dictionary:
 	}
 
 func save() -> void:
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(save_path(), FileAccess.WRITE)
 	if f == null:
 		push_warning("SaveManager: セーブを書けない")
 		return
@@ -159,9 +169,9 @@ func record_run(result: Dictionary) -> bool:
 
 func _load_save() -> Dictionary:
 	var d := default_data()
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not FileAccess.file_exists(save_path()):
 		return d
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(save_path(), FileAccess.READ)
 	if f == null:
 		return d
 	var parsed = JSON.parse_string(f.get_as_text())
@@ -260,7 +270,7 @@ func _fit_window_to_screen() -> void:
 func _load_settings() -> Dictionary:
 	var s := default_settings()
 	var cf := ConfigFile.new()
-	if cf.load(SETTINGS_PATH) != OK:
+	if cf.load(settings_path()) != OK:
 		return s
 	for k in s:
 		s[k] = cf.get_value("settings", k, s[k])
@@ -270,4 +280,4 @@ func _save_settings() -> void:
 	var cf := ConfigFile.new()
 	for k in settings:
 		cf.set_value("settings", k, settings[k])
-	cf.save(SETTINGS_PATH)
+	cf.save(settings_path())

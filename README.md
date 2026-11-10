@@ -100,6 +100,8 @@ gh workflow run cpp-runtime.yml --repo Tomatoguy1029/speed --ref main -f ref=mai
 python3 tools/build/build_run.py --sdk ~/.cache/speed-build/sdk/godot-cpp-e103d348c4b2 --scons ~/.cache/speed-build/scons-4.11.1/bin/scons --platform macos --package-dir <ソース外の新しい作業先> --godot godot --templates /path/to/4.7.2.stable
 ```
 
+審査版はActions「C++配布確認」の `edition` に `review` を選ぶか、上の配布コマンドへ `--review` を付けます。専用セーブとカスタム設定を使い、通常版の配布は従来のコマンドを使います。開発中はGodotへ `-- --review-mode` を渡すと審査版の経路を試せます。
+
 この入口はMacのarm64・x86_64拡張をuniversalへまとめ、独立コピーでimport・共通生成・export・配布構成の確認まで行います。Windowsは `--platform windows` を使います。`--verify` を付けると`verification/` 内の保存先を隔離した確認用パッケージで最小ランと拡張欠落時の拒否を確認し、Macでは `--rendered` を併用すると描画付きの確認を行います。`--verify-final` は隔離した保存先で通常出撃から自然な終了・結果保存・戻るを確認します。Macの出撃準備・初期装備・交換・取消の計測は `--verify-loading --verify-final --rendered` を使います。配布するのは `export/` の成果物です。`package.json` はソースのコミット・成果物のSHA-256・確認範囲を持ちます。CIは配布物と確認ログを別々に保存します。配布構成と署名・公証の範囲は[設計書](docs/architecture.md#15-ビルドと配布)を参照してください。
 
 検査は一時作業場所で、変更に関係する既存の入口だけ使います。C++の人数・出現の確認は `res://tests/runtime/run_population.tscn`、制作・生成・UI・配布は `speed/tests/` の各対象を参照します。検査を行う範囲は [AGENTS.md](AGENTS.md#検証) に従います。
