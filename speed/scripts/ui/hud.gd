@@ -402,6 +402,13 @@ func _build_pause() -> void:
 	resume.custom_minimum_size = Vector2(320, 52)
 	resume.pressed.connect(func(): bridge.command("pause",{"paused":false}))
 	_pause_box.add_child(resume)
+	if SaveManager.is_review_build():
+		var custom := Button.new()
+		custom.name = "ReviewSettingsButton"
+		custom.custom_minimum_size = Vector2(320, 52)
+		custom.text = tr("review.title")
+		custom.pressed.connect(_open_review_settings)
+		_pause_box.add_child(custom)
 	var settings := Button.new()
 	settings.text = "menu.settings"
 	settings.custom_minimum_size = Vector2(320, 52)
@@ -1138,3 +1145,15 @@ func _update_cpp_cinematic() -> void:
 		icon.size=Vector2(12,10)
 		icon.module_id=StringName(modules[j])
 		_loadout_icons.add_child(icon)
+
+func _open_review_settings() -> void:
+	if not SaveManager.is_review_build() or int(_cpp_ui.get("phase", -1)) != Phase.Paused: return
+	var panel := preload("res://scripts/ui/review_settings.gd").new()
+	panel.session = RunManager.current()
+	if panel.session == null or not show_menu_overlay(panel):
+		panel.free()
+		return
+	add_child(panel)
+	panel.finished.connect(func():
+		close_menu_overlay(panel)
+		panel.queue_free())

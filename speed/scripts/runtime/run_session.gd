@@ -4,6 +4,8 @@
 class_name RunSession
 extends Node
 
+var review_meta_levels: Dictionary = {}
+
 const VIEW_PATH := "res://scenes/run/run.tscn"
 
 ## RunManager が振る番号。破棄したあとの命令を見分ける
@@ -135,7 +137,7 @@ func start_cpp_content(index_path: String, input_sha256: String, seed_value: int
 	if not RunManager.ensure_registered(self): return ERR_OUT_OF_MEMORY
 	var configure_started := Time.get_ticks_usec()
 	var next_bridge = preload("res://scripts/runtime/run_bridge.gd").new()
-	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":1 if OS.is_debug_build() or options.get("cpp_start",{}).get("lab_mode",false) else 0,
+	var configured: Dictionary = next_bridge.configure(prepared.bytes,{"api_version":1,"run_id":id,"mode":2 if SaveManager.is_review_build() else 1 if OS.is_debug_build() or options.get("cpp_start",{}).get("lab_mode",false) else 0,
 		"stage_id":prepared.index.get("stage_id",""),"profile":options.get("cpp_profile",{}),"settings":{"hitstop":bool(SaveManager.settings.get("hitstop",true))}})
 	loading_timings["core_configure_ms"] = (Time.get_ticks_usec()-configure_started)/1000.0
 	if not configured.ok:

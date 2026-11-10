@@ -10,6 +10,12 @@ on:
         description: '確認する作業ブランチまたは完全コミット'
         required: true
         type: string
+      edition:
+        description: '配布する版'
+        required: true
+        type: choice
+        default: normal
+        options: [normal, review]
       platform:
         description: '確認する配布対象'
         required: true
@@ -78,14 +84,18 @@ jobs:
               output.write(f'SPEED_GODOT={engine}\nSPEED_TEMPLATES={templates}\n')
           PY
       - name: 対象CPUをビルド・共通生成・export・配布エンジンで最小ランを確認
+        env:
+          SPEED_EDITION: ${{ inputs.edition || 'normal' }}
         run: |
+          edition_args=()
+          if [ "$SPEED_EDITION" = review ]; then edition_args+=(--review); fi
           python tools/build/build_run.py --sdk "$RUNNER_TEMP/godot-cpp" \
             --platform '${{ matrix.platform }}' --godot "$SPEED_GODOT" --templates "$SPEED_TEMPLATES" \
-            --build-dir "$RUNNER_TEMP/run-objects" --package-dir "$RUNNER_TEMP/speed-package" --verify --verify-final
+            --build-dir "$RUNNER_TEMP/run-objects" --package-dir "$RUNNER_TEMP/speed-package" --verify --verify-final "${edition_args[@]}"
       - name: 配布物を保存
         uses: actions/upload-artifact@v4
         with:
-          name: 'speed-${{ matrix.platform }}-${{ github.run_id }}'
+          name: "speed-${{ inputs.edition || 'normal' }}-${{ matrix.platform }}-${{ github.run_id }}"
           path: |
             ${{ matrix.platform == 'macos' && format('{0}/speed-package/export/Speed.zip', runner.temp) || format('{0}/speed-package/export/', runner.temp) }}
             ${{ runner.temp }}/speed-package/package.json

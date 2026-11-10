@@ -1052,6 +1052,26 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.armor.lower | 下半分 | Lower half |
 | lab.armor.color | 塗る色 | Paint color |
 | lab.armor.help | 左クリックで装甲片を塗り、右クリックで元の色に戻します。上下左右につながるピクセルだけを同じ片として扱い、斜めの接触は分けます。画像は元の向きで表示します。外観の保存ボタンでステージにも反映できます。 | Left-click to paint a piece; right-click to restore its original color. Only horizontal and vertical neighbors connect. Diagonal contacts stay separate. The image uses its original orientation. Save appearance to use the paint in stages. |
+| review.badge | 審査版 | Review build |
+| review.title | カスタム設定（審査版のみ） | Custom settings (review build) |
+| review.run_only | 変更はこのプレイだけに適用します。次のプレイは通常の設定で始まります。 | Changes apply to this run only. The next run uses normal settings. |
+| review.unlock_all | 全ステージ解放 | Unlock all stages |
+| review.weapon | 武器 | Weapons |
+| review.trait | 特性 | Traits |
+| review.hero | 英雄の力 | Hero power |
+| review.meta | 機体強化 | Ship upgrades |
+| review.slots | 所持枠 {used} / {max} | Slots {used} / {max} |
+| review.add | 追加（空き枠を使用） | Add (use an empty slot) |
+| review.level | 適用するレベル | Target level |
+| review.apply_equipment | 選択した装備・レベルを適用 | Apply equipment and level |
+| review.remove | 選択した所持装備を削除 | Remove selected owned equipment |
+| review.none | なし | None |
+| review.apply | 適用 | Apply |
+| review.invincible | 無敵 | Invincible |
+| review.boss | ボス戦へ移動（敵と弾を消去） | Jump to boss (clear enemies and projectiles) |
+| review.preparing | 準備しています… | Preparing… |
+| review.applied | 適用しました。 | Applied. |
+| review.unavailable | 操作できません。準備完了後、通常プレイを一時停止して試してください。 | Unavailable. Pause normal play after preparation and try again. |
 <!-- csv:end -->
 
 ### 互換行

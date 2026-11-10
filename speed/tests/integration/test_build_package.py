@@ -16,8 +16,8 @@ spec.loader.exec_module(build_run)
 
 class PackageTest(unittest.TestCase):
     def test_verification_never_changes_release(self):
-        for platform in ('macos', 'windows'):
-            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as temporary:
+        for platform, review in [('macos', False), ('windows', False), ('macos', True), ('windows', True)]:
+            with self.subTest(platform=platform, review=review), tempfile.TemporaryDirectory() as temporary:
                 base = Path(temporary).resolve()
                 root, destination = base / 'source', base / 'package'
                 project = root / 'speed'
@@ -26,10 +26,11 @@ class PackageTest(unittest.TestCase):
                 save.parent.mkdir(parents=True)
                 main.parent.mkdir(parents=True)
                 original_save = 'const SAVE_PATH := "user://save.json"\nconst SETTINGS_PATH := "user://settings.cfg"\n'
+                (project / 'project.godot').write_text('config/name="Speed"\n')
                 original_main = 'extends Node\nfunc _ready() -> void:\n\tpass\n'
                 save.write_text(original_save)
                 main.write_text(original_main)
-                (project / 'export_presets.cfg').write_text('[preset.0.options]\napplication/min_macos_version_arm64="13.0"\napplication/min_macos_version_x86_64="13.0"\n[preset.1.options]\n')
+                (project / 'export_presets.cfg').write_text('[preset.0]\ncustom_features=""\n[preset.0.options]\napplication/min_macos_version_arm64="13.0"\napplication/min_macos_version_x86_64="13.0"\n[preset.1]\ncustom_features=""\n[preset.1.options]\n')
                 (project / 'extensions/run').mkdir(parents=True)
                 (project / 'extensions/run/run_core.gdextension').write_text('')
                 checks = project / 'tests/content/check_rules.gd'
@@ -47,7 +48,7 @@ class PackageTest(unittest.TestCase):
                 (templates / ('macos.zip' if platform == 'macos' else 'windows_release_x86_64.exe')).touch()
                 args = SimpleNamespace(package_dir=destination, godot='godot', templates=templates,
                                        platform=platform, sdk=sdk, verify=True, verify_final=True,
-                                       rendered=False, verify_loading=False)
+                                       rendered=False, verify_loading=False, review=review)
                 exports = []
 
                 def export(root, project, target, args, verification=False):
@@ -71,6 +72,9 @@ class PackageTest(unittest.TestCase):
                 self.assertEqual(exports[1][:2], (destination / 'verification', True))
                 self.assertIn(json.dumps(str(destination / 'verification' / 'save.json')), exports[1][2])
                 self.assertIn('func _package_runtime(', exports[1][3])
+                self.assertEqual('custom_features="review"' in (destination / 'project/export_presets.cfg').read_text(), review)
+                self.assertEqual('審査版' in (destination / 'project/project.godot').read_text(), review)
+                self.assertEqual(json.loads((destination / 'package.json').read_text())['edition'], 'review' if review else 'normal')
                 self.assertEqual(save.read_text(), original_save)
                 self.assertEqual(main.read_text(), original_main)
                 self.assertEqual(json.loads((destination / 'package.json').read_text())['source_commit'], 'revision')

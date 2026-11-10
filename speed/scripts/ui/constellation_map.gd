@@ -180,8 +180,9 @@ func _ready() -> void:
 	for content: Control in [_heading, _status, _launch]:
 		content.reparent(_details)
 	_launch.pressed.connect(_start)
-	if OS.is_debug_build():
+	if OS.is_debug_build() or SaveManager.is_review_build():
 		_debug_unlock = _button(tr("stage_select.unlock_all"), Vector2(444, 260), Vector2(150, 26))
+		if SaveManager.is_review_build(): _debug_unlock.text = tr("review.unlock_all")
 		_debug_unlock.toggle_mode = true
 		_debug_unlock.add_theme_font_size_override("font_size", 10)
 		_debug_unlock.reparent(_details)
