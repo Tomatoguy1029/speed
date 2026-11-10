@@ -10,7 +10,7 @@ func cpp_fixture(program: Dictionary, section_options := {}, second_actor := fal
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	var actor = load("res://data/enemies/drifter.tres").duplicate(true)
+	var actor = load("res://data/enemies/splitling.tres").duplicate(true)
 	actor.speed = 0.0
 	actor.radius = 96.0
 	var boss = load("res://data/bosses/monoceros.tres")
@@ -47,7 +47,7 @@ func cpp_fixture(program: Dictionary, section_options := {}, second_actor := fal
 	bridge._core.set_motion_context(Vector2(200,0),Vector2(200,0),Vector2(640,360))
 	var ids := PackedInt64Array()
 	for i in (2 if second_actor else 1):
-		var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(0,i*10)}).value
+		var id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(0,i*10)}).value
 		bridge._core.set_enemy_motion(id,{"facing":0.0})
 		ids.append(id)
 	if not bridge.command("dev_boss_flow",{"entity_id":ids[0],"definition":1,"participants":ids}).ok: return {}

@@ -249,7 +249,7 @@ var cpp_bridge
 var cpp_core
 var cpp_config: GameConfig
 var cpp_origin := Vector2(-900,0)
-func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStringArray(["drifter"]), tuning: Dictionary = {}, definitions: Dictionary = {}) -> bool:
+func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStringArray(["splitling"]), tuning: Dictionary = {}, definitions: Dictionary = {}) -> bool:
 	cpp_config = ContentManager.base.duplicate(true)
 	cpp_config.start_radius = 900.0
 	cpp_config.planet_radius = 100.0
@@ -283,7 +283,7 @@ func prepare_cpp_attack(index_number: int, name: String, enemy_ids := PackedStri
 	return true
 func check_cpp_light_arrow() -> void:
 	if not await prepare_cpp_attack(90,"light_arrow"): return
-	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(-300,300)}).value
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(-300,300)}).value
 	var empty: Dictionary = cpp_bridge.checkpoint()
 	var params := {"position":cpp_origin,"angle":0.0,"speed":100.0,"radius":12.0,"travel":400.0,"damage":8.0,"owner_id":owner}
 	check(cpp_core.hostiles_snapshot().is_empty(),"光の矢は発射元が発射するまで生成しない")
@@ -364,7 +364,7 @@ func check_cpp_render_kinds() -> bool:
 
 func check_cpp_star_bolt() -> void:
 	if not await prepare_cpp_attack(91,"star_bolt"): return
-	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(-300,300)}).value
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(-300,300)}).value
 	var empty: Dictionary = cpp_bridge.checkpoint()
 	var params := {"position":cpp_origin,"angle":PI*0.5,"speed":100.0,"damage":8.0,"owner_id":owner}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_star_bolt",params)
@@ -408,7 +408,7 @@ func check_cpp_star_bolt() -> void:
 
 func check_cpp_ring_hold() -> void:
 	if not await prepare_cpp_attack(92,"ring_hold"): return
-	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin}).value
 	var empty: Dictionary = cpp_bridge.checkpoint()
 	var params := {"source_id":owner,"count":4,"radius":100.0,"wait":0.25,"speed":100.0,"damage":8.0}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_ring_hold",params)
@@ -452,7 +452,7 @@ func check_cpp_ring_hold() -> void:
 
 func check_cpp_lump() -> void:
 	if not await prepare_cpp_attack(93,"lump"): return
-	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin}).value
 	var source: Dictionary = cpp_core.enemies_snapshot()[0]
 	var empty: Dictionary = cpp_bridge.checkpoint()
 	var params := {"source_id":owner,"angle":PI*0.5,"speed":100.0,"radius":18.0,"damage":10.0}
@@ -491,7 +491,7 @@ func check_cpp_lump() -> void:
 	cpp_core.step_hostiles(4.0)
 	check(cpp_core.hostiles_snapshot().is_empty(),"塊の弾が寿命で消える")
 	cpp_bridge.restore(empty.value)
-	var terrain_source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-300,0)}).value
+	var terrain_source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-300,0)}).value
 	params.source_id = terrain_source
 	params.angle = 0.0
 	params.speed = 1000.0
@@ -525,7 +525,7 @@ func check_cpp_star_role() -> bool:
 
 func check_cpp_friend_debris() -> void:
 	if not await prepare_cpp_attack(94,"friend_debris"): return
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(100,0)}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(100,0)}).value
 	var empty: Dictionary = cpp_bridge.checkpoint()
 	var fixture: Dictionary = cpp_bridge.command("dev_debris_on_death",{"source_id":source,"count":1,"speed":100.0,"damage":2.0})
 	check(fixture.ok,"開発用の撃破元へ破片生成を予約する")
@@ -578,9 +578,9 @@ func check_cpp_friend_debris() -> void:
 
 func check_cpp_friend_hull() -> void:
 	if not await prepare_cpp_attack(95,"friend_hull"): return
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(200,0)}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin-Vector2(200,0)}).value
 	var empty: Dictionary = cpp_bridge.checkpoint()
-	var params := {"position":cpp_origin,"velocity":Vector2(1000,0),"radius":10.0,"damage":10.0,"life":1.0,"knock":300.0,"angle":0.7,"definition_id":"drifter","source_id":source}
+	var params := {"position":cpp_origin,"velocity":Vector2(1000,0),"radius":10.0,"damage":10.0,"life":1.0,"knock":300.0,"angle":0.7,"definition_id":"splitling","source_id":source}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_hull",params)
 	check(fired.ok,"元の敵の外観とIDを持つ船体弾を生成する")
 	if not fired.ok: cpp_session.free(); return
@@ -596,8 +596,8 @@ func check_cpp_friend_hull() -> void:
 	cpp_bridge.command("dev_remove",{"entity_id":source})
 	var held: Dictionary = cpp_bridge.checkpoint()
 	check(held.ok,"元の敵が退場した後も船体弾を保持する")
-	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(120,0)}).value
-	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(220,0)}).value
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(120,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(220,0)}).value
 	cpp_core.step_projectiles(0.2)
 	var events: Array = cpp_bridge.read_frame().value.events
 	var hits: Array = events.filter(func(e): return e.type==&"combat_damage" and e.payload.cause==&"towShot")
@@ -638,8 +638,8 @@ func check_cpp_zone() -> void:
 		library.set_meta("looks",original)
 		return
 	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(300,0)}).value
-	var target: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(60,0)}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin-Vector2(300,0)}).value
+	var target: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(60,0)}).value
 	var token: int = cpp_core.passive_attack("zone_owner",source)
 	var params := {"position":cpp_origin,"radius":80.0,"delay":0.2,"damage":8.0,"enemy_damage":2.0,"style":1,"owner_id":source,"budget":token}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_zone",params)
@@ -697,7 +697,7 @@ func check_cpp_zone() -> void:
 
 func check_cpp_cross() -> void:
 	if not await prepare_cpp_attack(98,"cross"): return
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(300,0)}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin-Vector2(300,0)}).value
 	var token: int = cpp_core.passive_attack("cross_owner",source)
 	var params := {"position":cpp_origin,"angle":0.23,"length":280.0,"width":12.0,"delay":0.2,"active":0.4,"damage":8.0,"owner_id":source,"budget":token}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_cross",params)
@@ -737,7 +737,7 @@ func check_cpp_cross() -> void:
 
 func check_cpp_flood() -> void:
 	if not await prepare_cpp_attack(99,"flood"): return
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(300,0)}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin-Vector2(300,0)}).value
 	var token: int = cpp_core.passive_attack("flood_owner",source)
 	var params := {"position":cpp_origin,"angle":0.0,"length":280.0,"width":20.0,"spread":0.25,"delay":0.2,"active":0.4,"damage":8.0,"owner_id":source,"budget":token}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_flood",params)
@@ -806,8 +806,8 @@ func check_cpp_light_lances() -> void:
 	if not ready: return
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5})
-	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(200,0)}).value
-	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin-Vector2(100,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin-Vector2(200,0)}).value
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin-Vector2(100,0)}).value
 	var empty: Dictionary = cpp_bridge.checkpoint()
 	var params := {"position":cpp_origin,"direction":Vector2.LEFT,"length":300.0,"width":120.0,"damage":1.0,"knock":0.0}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_light_lances",params)
@@ -872,13 +872,13 @@ func prepare_cpp_duplicator_attack(index_number: int,name: String) -> bool:
 
 func check_cpp_burst_debris() -> bool:
 	if not await prepare_cpp_duplicator_attack(101,"burst_debris"): return false
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin}).value
 	var emitted: Dictionary = cpp_bridge.command("dev_burst_debris",{"position":cpp_origin,"source_id":source,"count":2,"speed":100.0,"damage":2.0,"armor_count":1})
 	check(emitted.ok,"破砕片の元をまとめて完成してから複製する")
 	var state: Array = cpp_core.projectiles_snapshot()
 	check(state.size()==6,"元の破砕片2件のあとで複製4件を生成する")
 	if state.size()!=6: cpp_session.free(); return false
-	check(state.map(func(p): return String(p.type))==["pump","drifter","pump","pump","drifter","drifter"],"完成した装甲と敵の種別を出生順に複製へ引き継ぐ")
+	check(state.map(func(p): return String(p.type))==["pump","bomber","pump","pump","bomber","bomber"],"完成した装甲と敵の種別を出生順に複製へ引き継ぐ")
 	check(state.all(func(p): return p.hit_ids==[source]) and state[2].pos==state[0].pos and state[4].pos==state[1].pos and is_equal_approx(state[2].damage,1.6),"複製へ元ID・位置・T37の威力を引き継ぐ")
 	var events: Array = cpp_bridge.latest_frame().value.events
 	check(events.size()==3 and events[0].type==&"hull_scatter" and events[1].type==&"duplicate" and events[1].payload.pos==state[0].pos and events[2].payload.pos==state[1].pos,"全生成後の破砕通知から元ごとの分裂通知へ順に進む")
@@ -902,11 +902,11 @@ func check_cpp_scatter_hull() -> bool:
 
 func check_cpp_fling_corpse() -> bool:
 	if not await prepare_cpp_duplicator_attack(103,"fling_corpse"): return false
-	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var source: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin}).value
 	var corpse: Dictionary = cpp_core.enemies_snapshot().filter(func(e): return e.id==source)[0]
 	cpp_bridge.command("dev_kill",{"entity_id":source,"cause":"debug"})
-	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(100,0)}).value
-	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(200,0)}).value
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(100,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(200,0)}).value
 	var fired: Dictionary = cpp_bridge.command("dev_fling_corpse",{"source_id":source,"velocity":Vector2(1000,0),"damage":2.0,"radius_mult":1.5,"knock_mult":0.0,"life_mult":0.5})
 	check(fired.ok,"開発用の登録入口から死体を投射する")
 	if not fired.ok: cpp_session.free(); return false
@@ -948,8 +948,8 @@ func check_cpp_saw() -> bool:
 	cpp_bridge.command("dev_stream_rocks",{"center":cpp_origin,"half":Vector2(640,480),"dt":0.1})
 	rocks = cpp_bridge.command("dev_field_query",{"action":"rocks"}).value
 	check(rocks[0].destroyed and rocks[0].enemy_id==0,"投射元のフィールド丸鋸を再出現させない")
-	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(250,0)}).value
-	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(350,0)}).value
+	var near: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(250,0)}).value
+	var far: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(350,0)}).value
 	cpp_core.step_projectiles(0.1)
 	var moving: Array = cpp_core.projectiles_snapshot()
 	check(moving.all(func(p): return is_equal_approx(p.angle,1.4)) and moving[0].pos.distance_to(shots[0].pos+shots[0].vel*0.1)<0.001,"丸鋸の元と複製は14rad毎秒で回り連続した軌道を進む")
@@ -1010,10 +1010,10 @@ func check_cpp_rings() -> bool:
 func check_cpp_shell() -> bool:
 	if not await prepare_cpp_attack(107,"shell"): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
-	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin}).value
 	var token: int = cpp_core.passive_attack("shell_owner",owner)
 	var empty: Dictionary = cpp_bridge.checkpoint()
-	var params := {"source_id":owner,"angle":0.0,"speed":100.0,"radius":12.0,"range":100.0,"burst":90.0,"damage":8.0,"budget":token,"contents":PackedStringArray(["drifter","meteor","drifter"])}
+	var params := {"source_id":owner,"angle":0.0,"speed":100.0,"radius":12.0,"range":100.0,"burst":90.0,"damage":8.0,"budget":token,"contents":PackedStringArray(["splitling","meteor","splitling"])}
 	var fired: Dictionary = cpp_bridge.command("dev_fire_shell",params)
 	check(fired.ok,"発生元から収納内容を持つ圧縮弾を生成する")
 	if not fired.ok: cpp_session.free(); return false
@@ -1040,7 +1040,7 @@ func check_cpp_shell() -> bool:
 	cpp_core.step_hazards(0.01)
 	check(is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp-8.0),"破裂した円だけが機体へダメージを与える")
 	var events: Array = cpp_bridge.read_frame().value.events
-	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.source=="drifter" and e.payload.cause==&"blast"),"発射元の退場後も破裂の発生元と原因名を記録する")
+	check(events.any(func(e): return e.type==&"combat_player_damage" and e.payload.source=="splitling" and e.payload.cause==&"blast"),"発射元の退場後も破裂の発生元と原因名を記録する")
 	cpp_bridge.collect_frame()
 	presentation._present_cpp(0.0)
 	check(presentation.frame_view._zone_bursts.has(ENUMS.ZoneStyle.Pump),"破裂を独立したポンプの爆発として通常画面で描く")
@@ -1080,7 +1080,7 @@ func cpp_motion_for(id: int) -> Dictionary:
 
 func check_cpp_aquarius() -> bool:
 	var tuning := {"aquarius":{"speed":0.0,"params.beams":4,"params.telegraph":0.3,"params.beam_time":0.4,"params.beam_len":500.0,"params.beam_width":10.0,"params.beam_spread":0.2,"params.bullet_dmg":5.0,"params.rest":0.2,"params.fire_interval":0.6,"params.approach":300.0}}
-	if not await prepare_cpp_attack(108,"aquarius",PackedStringArray(["aquarius","drifter"]),tuning): return false
+	if not await prepare_cpp_attack(108,"aquarius",PackedStringArray(["aquarius","splitling"]),tuning): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(220,0),"velocity":Vector2.ZERO})
 	cpp_core.set_attack_formation_mode(true)
@@ -1149,7 +1149,7 @@ func check_cpp_aquarius() -> bool:
 
 func check_cpp_cross_enemy() -> bool:
 	var tuning := {"cross":{"speed":0.0,"params.telegraph":0.2,"params.beam_time":0.3,"params.beam_len":500.0,"params.beam_width":20.0,"params.bullet_dmg":6.0,"params.rest":0.1,"params.fire_interval":0.5,"params.stand_off":180.0,"params.align_tol":8.0}}
-	if not await prepare_cpp_attack(109,"cross_enemy",PackedStringArray(["cross","drifter"]),tuning): return false
+	if not await prepare_cpp_attack(109,"cross_enemy",PackedStringArray(["cross","splitling"]),tuning): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(160,160),"velocity":Vector2.ZERO})
 	cpp_core.set_attack_formation_mode(true)
@@ -1211,7 +1211,7 @@ func check_cpp_cross_enemy() -> bool:
 
 func check_cpp_bomber() -> bool:
 	var tuning := {"bomber":{"speed":80.0,"params.blast_delay":0.3,"params.blast_dmg":7.0,"params.blast_radius":150.0,"params.rush":2.0,"params.trigger":200.0}}
-	if not await prepare_cpp_attack(110,"bomber",PackedStringArray(["bomber","drifter"]),tuning): return false
+	if not await prepare_cpp_attack(110,"bomber",PackedStringArray(["bomber","splitling"]),tuning): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(400,0),"velocity":Vector2.ZERO})
 	cpp_core.set_attack_formation_mode(true)
@@ -1275,7 +1275,7 @@ func check_cpp_phoenix() -> bool:
 	var retry := retry2 or "--cpp-phoenix-fix" in OS.get_cmdline_user_args()
 	mute_checks = retry
 	var tuning := {"phoenix":{"params.retreat_distance":1000.0,"params.retreat_time":0.2,"params.telegraph":0.3,"params.dive_time":0.2,"params.impact_radius":150.0,"params.impact_time":0.5,"params.impact_dmg":9.0,"params.recover_time":0.2}}
-	if not await prepare_cpp_attack(111,"phoenix",PackedStringArray(["phoenix","drifter"]),tuning): return false
+	if not await prepare_cpp_attack(111,"phoenix",PackedStringArray(["phoenix","splitling"]),tuning): return false
 	mute_checks = retry3
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	var aim := cpp_origin+Vector2(200,0)
@@ -1344,7 +1344,7 @@ func check_cpp_phoenix() -> bool:
 
 func check_cpp_aquila() -> bool:
 	var tuning := {"aquila":{"speed":80.0,"turn":0.8,"params.fire_interval":0.3,"params.aim_time":0.2,"params.lock_time":0.2,"params.dash_speed":500.0,"params.dash_time":0.4,"params.drop_step":0.1,"params.blast_delay":0.2,"params.blast_radius":80.0,"params.bullet_dmg":6.0,"params.recover":0.2,"params.keep":300.0}}
-	if not await prepare_cpp_attack(112,"aquila",PackedStringArray(["aquila","drifter"]),tuning): return false
+	if not await prepare_cpp_attack(112,"aquila",PackedStringArray(["aquila","splitling"]),tuning): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	var target := cpp_origin+Vector2(500,0)
 	cpp_bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
@@ -1423,7 +1423,7 @@ func check_cpp_aquila() -> bool:
 
 func check_cpp_crab() -> bool:
 	var tuning := {"crab":{"speed":40.0,"params.reach":300.0,"params.approach":400.0,"params.telegraph":0.2,"params.open_time":0.15,"params.bullet_dmg":5.0,"params.turn_angle":20.0}}
-	if not await prepare_cpp_attack(113,"crab",PackedStringArray(["crab","drifter"]),tuning): return false
+	if not await prepare_cpp_attack(113,"crab",PackedStringArray(["crab","splitling"]),tuning): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(600,0),"velocity":Vector2.ZERO})
 	cpp_core.set_attack_formation_mode(true)
@@ -1475,7 +1475,7 @@ func check_cpp_crab() -> bool:
 	return true
 
 func check_cpp_gates() -> bool:
-	var cases := {"drifter":"none","bomber":"solid","crab":"membrane","aquila":"ghost","phoenix":"immortal","cross":"claw","aquarius":"back","reticle":"guard"}
+	var cases := {"splitling":"none","bomber":"solid","crab":"membrane","aquila":"ghost","phoenix":"immortal","cross":"claw","aquarius":"back","reticle":"guard"}
 	var definitions := {}
 	var tuning := {}
 	var ids := PackedStringArray()
@@ -1522,7 +1522,7 @@ func check_cpp_gates() -> bool:
 			var opened: Dictionary = cpp_bridge.command("dev_damage",{"entity_id":actor,"amount":5.0,"cause":"shot","direction":Vector2.LEFT}).value
 			check(opened.reason=="applied" and opened.applied==5.0,"%sは開いている間に正面からも攻撃が通る" % gate_name)
 	cpp_bridge.restore(empty.value)
-	var normal: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin}).value
+	var normal: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin}).value
 	cpp_bridge.command("dev_enemy_combat",{"entity_id":normal,"guard":1.0})
 	check(cpp_bridge.command("dev_damage",{"entity_id":normal,"amount":5.0,"cause":"shot"}).value.reason=="guard" and cpp_bridge.command("dev_damage",{"entity_id":normal,"amount":5.0,"cause":"ram"}).value.reason=="guard","個体の無敵は射撃と体当たりの両方を拒否する")
 	cpp_bridge.restore(empty.value)
@@ -1552,10 +1552,10 @@ func check_cpp_pump() -> bool:
 	var final_only := "--cpp-pump-final" in OS.get_cmdline_user_args()
 	var retry := final_only or "--cpp-pump-fix2" in OS.get_cmdline_user_args()
 	mute_checks = retry
-	var edible := (load("res://data/enemies/drifter.tres") as EnemyDef).duplicate(true) as EnemyDef
+	var edible := (load("res://data/enemies/volatile.tres") as EnemyDef).duplicate(true) as EnemyDef
 	edible.rank = 1
-	var tuning := {"pump":{"hp":5.0,"speed":0.0,"turn":100.0,"params.store_max":2,"params.pull_radius":300.0,"params.pull":200.0,"params.swallow_reach":0.0,"params.swallow_interval":0.1,"params.telegraph":0.3,"params.lock_time":0.1,"params.shell_speed":300.0,"params.shell_r":12.0,"params.shell_range":600.0,"params.burst_radius":80.0,"params.bullet_dmg":7.0,"params.recover":0.2,"params.release_base":2,"params.release_per":1.0,"params.release_speed":100.0,"params.release_dmg":0.5,"params.release_radius":50.0},"drifter":{"speed":0.0},"splitling":{"speed":0.0},"swarm":{"speed":0.0},"bomber":{"hp":100.0,"speed":0.0}}
-	var prepared := await prepare_cpp_attack(115,"pump",PackedStringArray(["pump","drifter","splitling","swarm","hydra_bite","bomber"]),tuning,{&"drifter":edible})
+	var tuning := {"pump":{"hp":5.0,"speed":0.0,"turn":100.0,"params.store_max":2,"params.pull_radius":300.0,"params.pull":200.0,"params.swallow_reach":0.0,"params.swallow_interval":0.1,"params.telegraph":0.3,"params.lock_time":0.1,"params.shell_speed":300.0,"params.shell_r":12.0,"params.shell_range":600.0,"params.burst_radius":80.0,"params.bullet_dmg":7.0,"params.recover":0.2,"params.release_base":2,"params.release_per":1.0,"params.release_speed":100.0,"params.release_dmg":0.5,"params.release_radius":50.0},"volatile":{"speed":0.0},"splitling":{"speed":0.0},"crow":{"speed":0.0},"bomber":{"hp":100.0,"speed":0.0}}
+	var prepared := await prepare_cpp_attack(115,"pump",PackedStringArray(["pump","volatile","splitling","crow","hydra_bite","bomber"]),tuning,{&"volatile":edible})
 	mute_checks = final_only
 	if not prepared: mute_checks = false; return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
@@ -1564,16 +1564,16 @@ func check_cpp_pump() -> bool:
 	cpp_core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
 	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"pump","position":cpp_origin}).value
 	var base_radius: float = cpp_enemy_for(owner).radius
-	var target: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(200,0)}).value
+	var target: int = cpp_bridge.command("dev_spawn",{"definition_id":"volatile","position":cpp_origin+Vector2(200,0)}).value
 	var exclusions: Array[int] = []
 	for flags: Dictionary in [{"held":true},{"stone":1.0},{"shove_time":1.0},{"landmark":true},{"is_boss":true}]:
-		var id: int = cpp_bridge.command("dev_spawn",{"definition_id":"drifter","position":cpp_origin+Vector2(10,30)}).value
+		var id: int = cpp_bridge.command("dev_spawn",{"definition_id":"volatile","position":cpp_origin+Vector2(10,30)}).value
 		if flags.has("landmark") or flags.has("is_boss"):
 			var command := flags.duplicate(); command.entity_id = id
 			cpp_bridge.command("dev_enemy_combat",command)
 		else: cpp_core.set_enemy_motion(id,flags)
 		exclusions.append(id)
-	exclusions.append(cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(10,30)}).value)
+	exclusions.append(cpp_bridge.command("dev_spawn",{"definition_id":"crow","position":cpp_origin+Vector2(10,30)}).value)
 	exclusions.append(cpp_bridge.command("dev_spawn_part",{"parent_id":owner,"definition_id":"hydra_bite","position":cpp_origin+Vector2(10,30)}).value)
 	var rival: int = cpp_bridge.command("dev_spawn",{"definition_id":"pump","position":cpp_origin-Vector2(50,0)}).value
 	cpp_bridge.command("dev_add_rock",{"kind":0,"position":cpp_origin+Vector2(10,-50),"size":10.0,"manual":true})
@@ -1614,7 +1614,7 @@ func check_cpp_pump() -> bool:
 	cpp_bridge.command("dev_relocate",{"entity_id":owner,"position":cpp_origin})
 	cpp_bridge.command("dev_relocate",{"entity_id":target,"position":cpp_origin+Vector2(10,0)})
 	cpp_core.step(0.11)
-	check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling","drifter"]) and cpp_motion_for(owner).mode==RunIds.EnemyModeId.Windup,"編集した収納上限で種類の順番を保って発射予告へ入る")
+	check(cpp_motion_for(owner).stored_types==PackedStringArray(["splitling","volatile"]) and cpp_motion_for(owner).mode==RunIds.EnemyModeId.Windup,"編集した収納上限で種類の順番を保って発射予告へ入る")
 	cpp_core.step(0.05)
 	check(is_equal_approx(cpp_motion_for(owner).timer,0.3) and cpp_core.hostiles_snapshot().is_empty(),"満杯でも攻撃枠がなければ予告時間と圧縮弾を進めない")
 	cpp_core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
@@ -1655,24 +1655,24 @@ func check_cpp_pump() -> bool:
 	return true
 
 func check_cpp_corona() -> bool:
-	var gated := (load("res://data/enemies/drifter.tres") as EnemyDef).duplicate(true) as EnemyDef
+	var gated := (load("res://data/enemies/volatile.tres") as EnemyDef).duplicate(true) as EnemyDef
 	gated.gate = &"solid"
-	var tuning := {"corona":{"speed":0.0,"params.capture_max":2,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":100.0,"params.ring":80.0,"params.spin":1.0,"params.fire_interval":100.0,"params.throw_weight_biter":0.0,"params.throw_effect_scale":1.4},"drifter":{"speed":0.0},"swarm":{"speed":0.0},"splitling":{"speed":0.0},"biter":{"speed":0.0}}
-	if not await prepare_cpp_attack(116,"corona",PackedStringArray(["corona","drifter","swarm","splitling","biter","hydra_bite"]),tuning,{&"drifter":gated}): return false
+	var tuning := {"corona":{"speed":0.0,"params.capture_max":2,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":100.0,"params.ring":80.0,"params.spin":1.0,"params.fire_interval":100.0,"params.throw_weight_biter":0.0,"params.throw_effect_scale":1.4},"volatile":{"speed":0.0},"splitter":{"speed":0.0},"splitling":{"speed":0.0},"biter":{"speed":0.0}}
+	if not await prepare_cpp_attack(116,"corona",PackedStringArray(["corona","volatile","splitter","splitling","biter","hydra_bite"]),tuning,{&"volatile":gated}): return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(500,0),"velocity":Vector2.ZERO})
 	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"corona","position":cpp_origin}).value
 	cpp_core.set_enemy_motion(owner,{"fire_t":100.0})
-	var first: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(80,0)}).value
+	var first: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitter","position":cpp_origin+Vector2(80,0)}).value
 	var second: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(0,100)}).value
 	var original: Dictionary = cpp_enemy_for(first).duplicate()
 	var excluded: Array[int] = []
-	for id: String in ["drifter","biter"]: excluded.append(cpp_bridge.command("dev_spawn",{"definition_id":id,"position":cpp_origin+Vector2(-80,-20)}).value)
+	for id: String in ["volatile","biter"]: excluded.append(cpp_bridge.command("dev_spawn",{"definition_id":id,"position":cpp_origin+Vector2(-80,-20)}).value)
 	for flag: String in ["stone","knock_t","shove_time"]:
-		var id: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(-80,-20)}).value
+		var id: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitter","position":cpp_origin+Vector2(-80,-20)}).value
 		cpp_core.set_enemy_motion(id,{flag:1.0})
 		excluded.append(id)
-	var boss: int = cpp_core.spawn_enemy(&"swarm",cpp_origin+Vector2(-80,-20),{"is_boss":true})
+	var boss: int = cpp_core.spawn_enemy(&"splitter",cpp_origin+Vector2(-80,-20),{"is_boss":true})
 	excluded.append(boss)
 	excluded.append(cpp_bridge.command("dev_spawn_part",{"parent_id":owner,"definition_id":"hydra_bite","position":cpp_origin+Vector2(-80,-20)}).value)
 	cpp_core.step(0.1)
@@ -1706,7 +1706,7 @@ func check_cpp_corona() -> bool:
 	check(cpp_bridge.restore(held.value).ok and cpp_core.enemy_motion_snapshot()==state,"種類別の所属列・周回角・半径・通し番号・所有参照を保持から復元する")
 	cpp_bridge.command("dev_kill",{"entity_id":first,"cause":"debug"})
 	cpp_bridge.command("dev_remove",{"entity_id":first})
-	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(500,0)}).value
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitter","position":cpp_origin+Vector2(500,0)}).value
 	check(replacement!=first and not cpp_motion_for(replacement).has("corona_owner") and cpp_motion_for(replacement).held==0 and cpp_motion_for(owner).corona_count==1,"相手を先に解放し行を使い直しても別個体へ所属を漏らさない")
 	cpp_bridge.restore(held.value)
 	cpp_bridge.command("dev_relocate",{"entity_id":owner,"position":cpp_origin+Vector2(-100,0)})
@@ -1728,7 +1728,7 @@ func spawn_cpp_corona_throw(at: Vector2) -> PackedInt64Array:
 	cpp_bridge.command("dev_ship_motion",{"position":at+Vector2(500,0),"velocity":Vector2.ZERO})
 	cpp_core.set_motion_context(at+Vector2(500,0),at,Vector2(1000,1000))
 	var owner: int = cpp_bridge.command("dev_spawn",{"definition_id":"corona","position":at}).value
-	var ammo: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":at-Vector2(0,80)}).value
+	var ammo: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":at-Vector2(0,80)}).value
 	cpp_core.set_enemy_motion(owner,{"fire_t":0.0})
 	cpp_core.step(0.05)
 	cpp_core.step(0.06)
@@ -1737,8 +1737,8 @@ func spawn_cpp_corona_throw(at: Vector2) -> PackedInt64Array:
 func check_cpp_corona_throw() -> bool:
 	var order_only := "--cpp-corona-throw-order" in OS.get_cmdline_user_args() or "--cpp-corona-throw-order-fix" in OS.get_cmdline_user_args()
 	mute_checks = order_only
-	var tuning := {"corona":{"speed":0.0,"params.capture_max":1,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":1000.0,"params.ring":80.0,"params.spin":1.0,"params.telegraph":0.1,"params.align_angle":PI,"params.fire_interval":0.3,"params.throw_speed":300.0,"params.throw_life":1.0,"params.throw_damage_swarm":8.0,"params.throw_effect_scale":1.6},"swarm":{"speed":0.0,"hp":1000.0}}
-	var prepared := await prepare_cpp_attack(117,"corona_throw",PackedStringArray(["corona","swarm"]),tuning)
+	var tuning := {"corona":{"speed":0.0,"params.capture_max":1,"params.capture_interval":0.05,"params.pull_radius":300.0,"params.pull":1000.0,"params.ring":80.0,"params.spin":1.0,"params.telegraph":0.1,"params.align_angle":PI,"params.fire_interval":0.3,"params.throw_speed":300.0,"params.throw_life":1.0,"params.throw_damage_splitling":8.0,"params.throw_effect_scale":1.6},"splitling":{"speed":0.0,"hp":1000.0}}
+	var prepared := await prepare_cpp_attack(117,"corona_throw",PackedStringArray(["corona","splitling"]),tuning)
 	if not prepared: mute_checks = false; return false
 	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
 	cpp_core.set_attack_formation_mode(true)
@@ -1788,7 +1788,7 @@ func check_cpp_corona_throw() -> bool:
 	cpp_bridge.command("dev_corona_after_combat",{})
 	check(cpp_enemy_for(ammo).dead==1 and is_equal_approx(cpp_core.ship_snapshot().ship_hp,cpp_config.base_hp),"途中で倒された弾薬は後段の機体判定へ当たらない")
 	cpp_bridge.command("dev_remove",{"entity_id":ammo})
-	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"swarm","position":cpp_origin+Vector2(500,0)}).value
+	var replacement: int = cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(500,0)}).value
 	check(replacement!=ammo and cpp_motion_for(replacement).held==0 and not cpp_motion_for(replacement).has("corona_owner"),"投射していた行の別個体へ所属や攻撃を漏らさない")
 	cpp_bridge.restore(launched.value)
 	cpp_bridge.command("dev_remove",{"entity_id":owner})

@@ -60,7 +60,7 @@ func check_cpp_technique() -> void:
 	var compiler = load("res://tools/content/build_boss_program.gd")
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
-	var actor = load("res://data/enemies/drifter.tres").duplicate(true)
+	var actor = load("res://data/enemies/splitling.tres").duplicate(true)
 	actor.speed = 0.0
 	actor.radius = 96.0
 	var boss = load("res://data/bosses/monoceros.tres")
@@ -89,7 +89,7 @@ func check_cpp_technique() -> void:
 	check(bridge.start(142,{"position":Vector2(300,0)}).ok,"固定場面を開始する")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,0),"velocity":Vector2.ZERO})
 	bridge._core.set_motion_context(Vector2(300,0),Vector2(300,0),Vector2(640,360))
-	var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2.ZERO}).value
+	var id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2.ZERO}).value
 	bridge._core.set_enemy_motion(id,{"facing":0.0})
 	var started: Dictionary = bridge.command("dev_boss_technique",{"entity_id":id,"definition":1})
 	check(started.ok,"一角獣の突進を型付きチケットで開始する")

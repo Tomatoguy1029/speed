@@ -46,7 +46,7 @@ func check_cpp_friend_shot() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 85
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling","shield"])
 	var output := "res://.content/dev/run_friend_shot"
 	var builder = load("res://tools/content/build_run_content.gd")
 	var built: Error = builder.build(stage,config,output,"味方弾の地形・貫通・盾".sha256_text())
@@ -71,7 +71,7 @@ func check_cpp_friend_shot() -> void:
 		var from := Vector2(-900,400)
 		var angle := 0.0
 		var positions := [from+Vector2(60,0),from+Vector2(100,0),from+Vector2(160,0),from+Vector2(200,0)]
-		var definition := "drifter"
+		var definition := "splitling"
 		var opts := {"speed":720.0,"life":0.7,"pierce_left":2,"knock":0.0,"visual_key":"weapon/forward","weapon_id":&"W01"}
 		var steps := [0.05,0.05,0.05,0.05,0.05]
 		if kind=="history":
@@ -137,8 +137,8 @@ func check_cpp_friend_shot() -> void:
 		return
 	# 同じ本体の複数部位を通っても、ダメージと命中履歴は本体IDで一度だけ。
 	bridge.restore(initial.value)
-	var parent: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-650,400)}).value
-	var part: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-750,400)}).value
+	var parent: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-650,400)}).value
+	var part: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-750,400)}).value
 	bridge.command("dev_enemy_combat",{"entity_id":part,"damage_target":parent})
 	var full_hp: Array = core.enemies_snapshot().map(func(row): return row.hp)
 	core.fire_shot(Vector2(-900,400),0.0,1.0,{"speed":1000.0,"life":1.0,"pierce_left":3,"weapon_id":&"W01"})
@@ -184,7 +184,7 @@ func t37_normal_contract(core, level: int, definition: TraitDef) -> void:
 func t37_fixture_bridge(config: GameConfig):
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var records: Dictionary = builder.chase_records(ContentManager.enemies[&"drifter"],config)
+	var records: Dictionary = builder.chase_records(ContentManager.enemies[&"splitling"],config)
 	# 既存split検査と同じく、入れ子と上限は抽選成功を固定して境界だけを見る。
 	for row: Dictionary in records.DuplicatorDefinition: row.chance = 1.0
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -201,7 +201,7 @@ func check_cpp_t37() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 87
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_T37"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder.build(stage,config,output,"複製の全段と表示".sha256_text())==OK,"複製の全段の実効値と資源を生成する")
@@ -307,11 +307,11 @@ func check_cpp_t37_kind_merge() -> bool:
 	var bridge = t37_fixture_bridge(config)
 	var core = bridge._core
 	check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T37","levels":5}).ok,"固定抽選の複製を取得する")
-	var source: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-900,0)}).value
+	var source: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-900,0)}).value
 	check(bridge.command("dev_scatter_hull",{"source_id":source,"direction":Vector2.RIGHT,"speed":100.0,"damage":2.0,"shatter_depth":3}).ok,"種類別の星屑を出生列の完了時に複製する")
 	var dust: Array = core.projectiles_snapshot()
 	check(dust.size()==6 and dust.all(func(p): return p.shatter_depth==3 and p.hit_ids==[source]),"星屑の元2件と複製4件が共通の深さと命中済みIDを保持する")
-	check(bridge.command("dev_fire_hull",{"position":Vector2(-900,0),"velocity":Vector2.RIGHT*100.0,"definition_id":"drifter","source_id":source,"radius":12.0,"damage":2.0,"life":1.0,"angle":0.0,"knock":10.0}).ok,"種類別の船体弾を完成後に複製する")
+	check(bridge.command("dev_fire_hull",{"position":Vector2(-900,0),"velocity":Vector2.RIGHT*100.0,"definition_id":"splitling","source_id":source,"radius":12.0,"damage":2.0,"life":1.0,"angle":0.0,"knock":10.0}).ok,"種類別の船体弾を完成後に複製する")
 	var hulls: Array = core.projectiles_snapshot().filter(func(p): return p.kind==2)
 	check(hulls.size()==3 and hulls.all(func(p): return p.source_id==source and p.source_definition==1 and not p.saw),"船体弾の元と複製が元外観と個体IDを保持する")
 	var snapshot: Array = core.projectiles_snapshot()

@@ -37,8 +37,8 @@ func check_cpp_route() -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 181
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
-	stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":1000.0,"speed":0.0}}
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
+	stage.enemy_tuning = {"splitling":{"hp":1000.0,"armor":1000.0,"speed":0.0}}
 	var builder = load("res://tools/content/build_run_content.gd")
 	var output := "res://.content/dev/cpp_route"
 	if builder.build(stage,config,output,"経路制約".sha256_text())!=OK: return false
@@ -56,8 +56,8 @@ func check_cpp_route() -> bool:
 	bridge.command("dev_remove_weapon",{"id":"W01"})
 	var initial: Dictionary = bridge.query_route(path,{}).value
 	check(initial.valid and initial.budget>path[0].distance_to(path[1]),"C++が所有する容量・ゲージから長さの上限を計算する")
-	var top: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-900,200)}).value
-	var bottom: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-900,-200)}).value
+	var top: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-900,200)}).value
+	var bottom: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-900,-200)}).value
 	var radius: float = core.enemies_snapshot()[0].radius
 	var gap: float = initial.sweep_radius+radius+0.2
 	bridge.command("dev_relocate",{"entity_id":top,"position":Vector2(-900,gap)})
@@ -123,17 +123,17 @@ func check_cpp_encounter() -> bool:
 		stage.index = 182
 		stage.resources = StageResources.new()
 		# 規則だけに登場する種類も生成対象へ引き継ぐ。
-		stage.resources.enemy_ids = PackedStringArray(["drifter"])
-		stage.enemy_tuning = {"drifter":{"hp":1.0,"armor":0.0,"speed":0.0}}
+		stage.resources.enemy_ids = PackedStringArray(["splitling"])
+		stage.enemy_tuning = {"splitling":{"hp":1.0,"armor":0.0,"speed":0.0}}
 		var phase := PhaseDef.new()
 		phase.id = &"配置確認"
 		phase.pop_from = 4.0
 		phase.pop_to = 4.0
 		phase.rate = 1200.0
 		phase.attack_budget = 1
-		phase.mix = {"drifter":1.0}
+		phase.mix = {"splitling":1.0}
 		stage.phases = [phase]
-		var region := {"type":"hound" if mode=="pack" else "drifter","pos":[0.0,250.0] if mode=="pack" else [0.0,0.0],"angle":0.0,"jitter":0.0,"role":"fodder" if mode=="window" else "avoid"}
+		var region := {"type":"hound" if mode=="pack" else "splitling","pos":[0.0,250.0] if mode=="pack" else [0.0,0.0],"angle":0.0,"jitter":0.0,"role":"fodder" if mode=="window" else "avoid"}
 		var pattern := {"route":[[-200.0,0.0],[200.0,0.0]],"regions":[region],"rotation":0.0,"scale_min":1.0,"scale_max":1.0,"margin":0.0,"window":0.05 if mode=="window" else 0.0,"attempts":2,"min_fodder":0 if mode=="pack" else 1}
 		stage.encounter_profile = {"enabled":true,"interval":0.5,"phases":["配置確認"],"patterns":[pattern]}
 		var builder = load("res://tools/content/build_run_content.gd")
@@ -189,21 +189,21 @@ func check_cpp_lab_constraints() -> void:
 	add_child(lab)
 	await lab.reset({"empty":true})
 	var route := PackedVector2Array([Vector2(-300,0),Vector2(300,0)])
-	check(lab.perform("spawn",{"type":"drifter","pos":[0,0]}),"制約確認の敵を正式命令で置く")
+	check(lab.perform("spawn",{"type":"splitling","pos":[0,0]}),"制約確認の敵を正式命令で置く")
 	check(CHECK.validate(lab,route).valid,"C++所有の弱い敵は障害物にしない")
 	check(CHECK.validate(lab,route,20,1).status=="unsupported","動く敵の静止判定を時間幅の保証にしない")
-	lab.perform("spawn",{"type":"armored","pos":[0,0]})
+	lab.perform("spawn",{"type":"phoenix","pos":[0,0]})
 	var blocked: Dictionary = CHECK.validate(lab,route)
 	check(not blocked.valid and blocked.blockers.all(func(row): return not row.reason.is_empty()),"C++の中間衝突と理由を同じ形式で表示する")
 	lab.perform("clear")
-	lab.perform("spawn",{"type":"drifter","pos":[0,0]})
-	lab.perform("parameter",{"type":"drifter","key":"speed","value":0})
+	lab.perform("spawn",{"type":"splitling","pos":[0,0]})
+	lab.perform("parameter",{"type":"splitling","key":"speed","value":0})
 	check(CHECK.validate(lab,route,20,1).status=="window","静止したモデルの時間幅を直接判定する")
 	lab.perform("ship",{"pos":[0,0],"gauge":0.01})
 	var low: Dictionary = CHECK.validate(lab,route)
 	check(not low.valid and low.length>low.budget,"ゲージ不足と長さ超過を同じC++判定で表示する")
 	lab.perform("ship",{"pos":[0,0],"gauge":1.0})
-	lab.history.append({"tick":lab.tick+120,"kind":"spawn","args":{"type":"drifter","pos":[900,900]}})
+	lab.history.append({"tick":lab.tick+120,"kind":"spawn","args":{"type":"splitling","pos":[900,900]}})
 	check(CHECK.validate(lab,route,20,2).status=="unsupported","120Hzの未来命令を時間幅へ含める")
 	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"制約の問い合わせ後も通知配信が成功する")
 	lab.queue_free()

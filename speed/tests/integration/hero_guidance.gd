@@ -34,7 +34,7 @@ func _cpp_fixture(lab := false,armor := -1.0,hp := -1.0):
 	cfg.planet_radius = 0.0
 	cfg.landmark_first_window = Vector2(0,1)
 	cfg.landmark_second_window = Vector2(0,1)
-	var actor: EnemyDef = load("res://data/enemies/drifter.tres").duplicate(true)
+	var actor: EnemyDef = load("res://data/enemies/splitling.tres").duplicate(true)
 	if armor>=0.0: actor.armor = armor
 	if hp>0.0: actor.stage_hp = hp
 	actor.rank = 2

@@ -114,7 +114,7 @@ func _ready() -> void:
 			check(false, "編集データをネイティブ実行データへ変換できる")
 		else:
 			var compiler = load(data_path)
-			var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+			var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 			var data: Dictionary = compiler.compile_enemy(definition, ContentManager.base)
 			check(data.enemies[0].has("xp") and data.enemies[0].has("knockback") and data.enemies[0].has("hitstop_multiplier"), "撃破報酬・押出し・停止倍率を編集元から渡す")
 			if not compiler.has_method("build_probe"):
@@ -176,7 +176,7 @@ func check_schema() -> bool:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
 	var comparison = load("res://tools/compare_runtime.gd").new()
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	var data: Dictionary = builder.chase_records(definition, ContentManager.base)
 	var signature: PackedByteArray = schema.sha256("追跡敵の固定入力".to_utf8_buffer())
 	var bytes: PackedByteArray = schema.write_content(data, signature)
@@ -228,7 +228,7 @@ func check_runtime_restore() -> bool:
 	var comparison = load("res://tools/compare_runtime.gd").new()
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	var signature: PackedByteArray = schema.sha256("復帰前の定義".to_utf8_buffer())
 	var bytes: PackedByteArray = builder.compile_chase(definition,ContentManager.base,signature)
 	var original = comparison.create_native()
@@ -275,7 +275,7 @@ func check_run_random() -> bool:
 	var comparison = load("res://tools/compare_runtime.gd").new()
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	var bytes: PackedByteArray = builder.compile_chase(definition,ContentManager.base,schema.sha256("乱数の固定入力".to_utf8_buffer()))
 	var first = comparison.create_native()
 	var second = comparison.create_native()
@@ -305,7 +305,7 @@ func check_run_bridge() -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 79
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_bridge"
 	var signature := "入力接続の固定入力".sha256_text()
 	if builder.build(stage,ContentManager.base,output,signature)!=OK: return false
@@ -392,7 +392,7 @@ func check_run_clock() -> bool:
 	var dt := 1.0/120.0
 	var config := ContentManager.base.duplicate(true) as GameConfig
 	config.world_tick_div = 3
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.speed = 100.0
 	var bridge = clock_fixture(config,definition)
 	var ship: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
@@ -483,7 +483,7 @@ func combat_fixture(hp := 100.0, armor := 0.0):
 	config.ram_speed_ratio = 0.0
 	config.strong_gold_chance = 0.0
 	config.base_attack = 10.0
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.stage_hp = hp
 	definition.xp_reward_counts = PackedInt32Array([1,0,0])
 	definition.armor = armor
@@ -491,7 +491,7 @@ func combat_fixture(hp := 100.0, armor := 0.0):
 	return clock_fixture(config,definition)
 
 func combat_enemy(bridge, position := Vector2(100,0)) -> int:
-	var spawn: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":position})
+	var spawn: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":position})
 	check(spawn.ok, "戦闘の固定対象を出す")
 	return int(spawn.value) if spawn.ok else 0
 
@@ -556,7 +556,7 @@ func check_run_combat() -> bool:
 func timing_fixture(formations := [], forward := {}):
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.draw_time_scale = 1.0
 	var bytes: PackedByteArray = builder.compile_chase(definition,config,schema.sha256("タイマーの固定入力".to_utf8_buffer()))
@@ -602,9 +602,9 @@ func check_run_timers() -> bool:
 	# seed42の最初のPCG32出力3270867926。境界そのものは次の重みへ進む。
 	var roll := 3270867926.0/4294967296.0
 	for delta in [0.0,-1.0/4294967296.0,1.0/4294967296.0]:
-		var marker := {"type":"drifter","offset":Vector2.ZERO,"rotation":0.0}
+		var marker := {"type":"splitling","offset":Vector2.ZERO,"rotation":0.0}
 		var formations := [{"version":2,"entries":[{"weight":roll+delta,"pos":Vector2(-100,0)},{"weight":1.0-roll-delta,"pos":Vector2(100,0)}],
-			"layouts":[{"weight":1.0,"value":-1.0,"types":["drifter"],"placements":[[marker],[marker]]}]}]
+			"layouts":[{"weight":1.0,"value":-1.0,"types":["splitling"],"placements":[[marker],[marker]]}]}]
 		var weighted = timing_fixture(formations)
 		var ship: Vector2 = weighted.read_frame().value.ui.ship.ship_pos
 		check(weighted._core.set_motion_context(ship,Vector2.ZERO,Vector2(1000,1000)), "重み境界の配置領域を設定する")
@@ -625,18 +625,18 @@ func check_run_render(enemies_only := false) -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.world_tick_div = 1
 	config.kill_hitstop = 0.0
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.stage_hp = 1.0
 	definition.armor = 0.0
 	definition.speed = 30.0
 	definition.xp_reward_counts = PackedInt32Array([1,0,0])
 	var stage := RuntimeStage.new()
 	stage.index = 80
-	stage.enemy_tuning = {"drifter":{"hp":1.0}}
+	stage.enemy_tuning = {"splitling":{"hp":1.0}}
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_render"
-	if builder.build(stage,config,output,"表示経路の固定入力".sha256_text(),{&"drifter":definition})!=OK: return false
+	if builder.build(stage,config,output,"表示経路の固定入力".sha256_text(),{&"splitling":definition})!=OK: return false
 	var path := output.path_join("stage_80.json")
 	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
 	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":42},true)
@@ -649,7 +649,7 @@ func check_run_render(enemies_only := false) -> bool:
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	if enemies_only:
 		var ship_position: Vector2 = bridge.read_frame().value.ui.ship.ship_pos
-		bridge.command("dev_spawn",{"definition_id":"drifter","position":ship_position+Vector2(100,0)})
+		bridge.command("dev_spawn",{"definition_id":"splitling","position":ship_position+Vector2(100,0)})
 		await get_tree().process_frame
 		if DisplayServer.get_name()!="headless": await RenderingServer.frame_post_draw
 		check(presentation.frame_view.batches.has(6) and presentation.frame_view.batches[6].multimesh.visible_instance_count==1,"追跡敵の画像を通常画面のMultiMeshへ投入する")
@@ -660,7 +660,7 @@ func check_run_render(enemies_only := false) -> bool:
 	var camera: Dictionary = bridge.read_frame().value.camera
 	var viewport := Rect2(camera.center-Vector2(250,180),Vector2(500,360))
 	var position: Vector2 = camera.center+Vector2(100,0)
-	var entity: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":position}).value
+	var entity: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":position}).value
 	var initial: Dictionary = bridge.read_render(viewport,1.0).value
 	check(render_batch(initial,6).ids.has(entity),"生成直後の敵を表示する")
 	clock_step(bridge)
@@ -676,8 +676,8 @@ func check_run_render(enemies_only := false) -> bool:
 	for batch: Dictionary in current.batches:
 		check(batch.ids.size()*6==batch.transforms.size() and batch.colors.size()==batch.ids.size() and batch.flags.size()==batch.ids.size(),"表示のPacked配列の長さが一致する")
 	var radius: float = bridge._core.enemies_snapshot()[0].radius
-	var edge: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(viewport.end.x+radius*0.5,viewport.get_center().y)}).value
-	var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(viewport.end.x+radius*4.0,viewport.get_center().y)}).value
+	var edge: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(viewport.end.x+radius*0.5,viewport.get_center().y)}).value
+	var outside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(viewport.end.x+radius*4.0,viewport.get_center().y)}).value
 	var visible: Dictionary = bridge.read_render(viewport,1.0).value
 	check(render_batch(visible,6).ids.has(edge) and not render_batch(visible,6).ids.has(outside),"画面端に重なる敵を残し、離れた敵だけを表示から外す")
 	var bad := visible.duplicate(true)
@@ -689,7 +689,7 @@ func check_run_render(enemies_only := false) -> bool:
 	check(not shots.is_empty(),"生成したW01の定義から発射する")
 	if shots.is_empty(): return false
 	var shot: Dictionary = shots.back()
-	var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel.normalized()*8.0}).value
+	var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":shot.pos+shot.vel.normalized()*8.0}).value
 	clock_step(bridge)
 	var events: Array = bridge.read_frame().value.events
 	check(events.any(func(e): return e.type==&"shot_hit") and events.any(func(e): return e.type==&"kill" and e.get("id")==target),"W01の命中から共通撃破へ進む")
@@ -708,7 +708,7 @@ func check_run_render(enemies_only := false) -> bool:
 
 func attack_fixture():
 	var config: GameConfig = ContentManager.base.duplicate(true)
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.speed = 0.0
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
@@ -802,7 +802,7 @@ func check_run_events() -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.world_tick_div = 1
 	config.kill_hitstop = 0.0
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.stage_hp = 1.0
 	definition.armor = 0.0
 	definition.speed = 0.0
@@ -933,7 +933,7 @@ func check_contact_geometry(sweep_only := false) -> bool:
 	config.world_tick_div = 1
 	config.invuln_time = 0.0
 	config.atk_scale = 2.0
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	var records: Dictionary = builder.chase_records(definition,config)
 	for kind in range(7): records.ContactDefinition.append({"id":10+kind,"shape":kind,"scale":0,"hit_policy":3,"add_ship_radius":false,"ship_sweep":false,"width":2.0})
 	for entry in [[30,true,false],[31,false,true],[32,false,false]]:
@@ -963,7 +963,7 @@ func check_contact_geometry(sweep_only := false) -> bool:
 	contact_query(bridge,16,{"center":Vector2(1.001,0),"half":Vector2.ONE},false,"矩形の外は当たらない")
 	contact_query(bridge,10,{"center":Vector2(1.0+config.ship_radius,0),"radius":1.0},false,"機体半径を足さない攻撃を保つ")
 	contact_query(bridge,30,{"center":Vector2(1.0+config.ship_radius,0),"radius":1.0},true,"機体半径を足す攻撃の境界を拾う")
-	var owner: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(10000,10000)}).value
+	var owner: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(10000,10000)}).value
 	for policy in range(4):
 		var attack := contact_attack(bridge,40+policy,owner)
 		bridge.command("pause",{"paused":true})
@@ -980,7 +980,7 @@ func check_contact_geometry(sweep_only := false) -> bool:
 	var result: Dictionary = bridge.command("dev_contact",{"handle":scaled,"radius":1.0,"amount":3.0,"apply":true})
 	check(result.ok and result.value.damage.amount==6.0 and result.value.damage.hp_before-result.value.damage.hp_after==6.0,"定義が選んだ攻撃だけatk_scaleを掛ける")
 	var damage_events: Array = bridge.read_frame().value.events.filter(func(e):return e.type==&"combat_player_damage")
-	check(damage_events.size()==8 and damage_events.all(func(e):return e.payload.cause==&"rain" and e.payload.source==&"drifter"),"原因名・発生元・実HP減少と拒否理由を同じ通知へ残す")
+	check(damage_events.size()==8 and damage_events.all(func(e):return e.payload.cause==&"rain" and e.payload.source==&"splitling"),"原因名・発生元・実HP減少と拒否理由を同じ通知へ残す")
 	bridge.command("dev_end_attack",{"handle":scaled})
 	check_contact_sweep(bridge)
 	bridge.dispose()
@@ -1007,7 +1007,7 @@ func choice_fixture(initial := false) -> Dictionary:
 	config.reroll_count = 3
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"]
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"]
 	var records: Dictionary = builder.chase_records(definition,config)
 	var bytes: PackedByteArray = schema.write_content(records,schema.sha256("カードと準備の固定入力".to_utf8_buffer()))
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
@@ -1241,7 +1241,7 @@ func check_run_lifecycle(display_only := false) -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 1
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var builder = load("res://tools/content/build_run_content.gd")
 	var output := "res://.content/dev/run_lifecycle"
 	if builder.build(stage,config,output,"終了と保存の固定入力".sha256_text())!=OK: return false
@@ -1348,7 +1348,7 @@ func check_run_assets(loading_only := false) -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 82
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var builder = load("res://tools/content/build_run_content.gd")
 	var output := "res://.content/dev/run_assets"
 	if builder.build(stage,ContentManager.base,output,"表示資源の固定入力".sha256_text())!=OK: return false
@@ -1438,7 +1438,7 @@ func check_run_assets(loading_only := false) -> bool:
 func check_schema_section_ids() -> bool:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var records: Dictionary = builder.chase_records(ContentManager.enemies[&"drifter"],ContentManager.base)
+	var records: Dictionary = builder.chase_records(ContentManager.enemies[&"splitling"],ContentManager.base)
 	var bytes: PackedByteArray = schema.write_content(records,"区画番号の読込".sha256_buffer())
 	check(not bytes.is_empty(),"既知の区画を共通スキーマから生成する")
 	if bytes.is_empty(): return false

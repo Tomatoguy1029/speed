@@ -196,7 +196,7 @@ static func _build_units(force: bool, output: String) -> Error:
 			var path := "res://data/content_catalog.tres" if output == ROOT else output.path_join("catalog.tres")
 			return _result(load("res://tools/content/build_catalog.gd").build(path),PackedStringArray([path]))],
 		["audio",["res://assets/audio/","res://tools/content/build_audio.gd","res://scripts/data_types/audio_bank.gd","res://scripts/data_types/sound_entry.gd","res://scripts/data_types/sound_table.gd","res://scripts/data_types/sound_slots.gd"],func(): return _result(load("res://tools/content/build_audio.gd").build(output.path_join("audio.res")),PackedStringArray([output.path_join("audio.res")]))],
-		["probe",["res://data/config.tres","res://data/enemies/drifter.tres","res://data/weapons/W01_forward.tres","res://scripts/data_types/","res://tools/content/build_native_data.gd"],func(): return _result(load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json")),PackedStringArray([output.path_join("dev/native_probe.json")]))]]
+		["probe",["res://data/config.tres","res://data/enemies/splitling.tres","res://data/weapons/W01_forward.tres","res://scripts/data_types/","res://tools/content/build_native_data.gd"],func(): return _result(load("res://tools/content/build_native_data.gd").build_probe(output.path_join("dev/native_probe.json")),PackedStringArray([output.path_join("dev/native_probe.json")]))]]
 	for unit: Array in units:
 		var inputs := _select(files,unit[1])
 		if unit[0] == "attacks": inputs.append_array(preload("res://tools/content/build_attack_visuals.gd").input_paths())
@@ -213,16 +213,11 @@ static func _build_units(force: bool, output: String) -> Error:
 		cache.entries["stage_%d" % source.index].fingerprint = cache.digest(stage_inputs(files,source,output))
 		error = _refresh_source_signature(output.path_join("run/stage_%d.json" % source.index),input_signature)
 		if error != OK: return error
-	var intro_inputs := _select(files,["res://data/","res://assets/","res://shaders/","res://scripts/","res://scenes/","res://tools/content/"])
-	for i in range(intro_inputs.size()-1,-1,-1):
-		if not INPUTS.affects_stage(intro_inputs[i]) or intro_inputs[i].begins_with("res://data/stages/") or intro_inputs[i].begins_with("res://data/bosses/") or intro_inputs[i].begins_with("res://data/codex/"): intro_inputs.remove_at(i)
-	var error: Error = cache.run("intro",intro_inputs,func(): return STAGES.build_intro(output,not force),force)
-	if error != OK: return error
 	var active := {}
 	for row: Dictionary in cache.report: active[row.unit] = true
 	for key in cache.entries.keys():
 		if not active.has(key): cache.entries.erase(key)
-	error = cache.save(output.path_join("dev/build_cache.json"))
+	var error: Error = cache.save(output.path_join("dev/build_cache.json"))
 	if error != OK: return error
 	var outputs: PackedStringArray = cache.outputs()
 	var stamp := FileAccess.open(output.path_join("stamp.json"),FileAccess.WRITE)

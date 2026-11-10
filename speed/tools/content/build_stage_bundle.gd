@@ -33,9 +33,3 @@ static func build_stage(source: StageDef, output: String, input_signature: Strin
 	error = preload("res://tools/content/build_run_content.gd").build(stage,config,output.path_join("run"),input_signature,{},[],{},null,{},PackedStringArray(),reuse_prepared)
 	paths.append_array(_bundle_outputs(output.path_join("run/stage_%d.json" % source.index)))
 	return _result(error,paths)
-
-static func build_intro(output: String, reuse_prepared: bool) -> Dictionary:
-	var intro: Dictionary = load("res://scripts/runtime/intro_sequence.gd").practice_package(load("res://data/config.tres"),load("res://data/visuals/intro_presentation.tres"))
-	var error := preload("res://tools/content/build_run_content.gd").build(intro.stage,intro.config,output.path_join("run/intro"),"導入練習".sha256_text(),intro.definitions,[],{},null,{},PackedStringArray(),reuse_prepared)
-	return _result(error,_bundle_outputs(output.path_join("run/intro/stage_1.json")))
-

@@ -512,7 +512,7 @@ func _open_session() -> bool:
 		stage.index = 88
 		stage.boss_enabled = false
 		stage.resources = StageResources.new()
-		stage.resources.enemy_ids = PackedStringArray(["drifter"])
+		stage.resources.enemy_ids = PackedStringArray(["splitling"])
 		var output := "res://.content/dev/operation_paths"
 		var generated: Error = load("res://tools/content/build_run_content.gd").build(stage,config,output,"操作経路の確認".sha256_text())
 		_check(generated==OK,"操作確認用の最小データを生成する: %s" % error_string(generated))

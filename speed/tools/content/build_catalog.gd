@@ -1,7 +1,7 @@
 ## 索引の生成は制作工程で行い、実行時は結果だけを読む。
 @tool
 extends RefCounted
-const CATEGORIES := {"enemies": "enemy", "phases": "phase", "stages": "stage", "bosses": "boss", "weapons": "weapon", "traits": "trait", "meta_upgrades": "meta", "legendary_modules": "legendary", "heroes": "hero"}
+const CATEGORIES := {"enemies": "enemy", "stages": "stage", "bosses": "boss", "weapons": "weapon", "traits": "trait", "meta_upgrades": "meta", "legendary_modules": "legendary", "heroes": "hero"}
 static func build(output := "res://data/content_catalog.tres") -> Error:
 	var catalog := ContentCatalog.new()
 	var hashes := PackedStringArray([FileAccess.get_sha256("res://tools/content/build_catalog.gd"), FileAccess.get_sha256("res://scripts/data_types/content_entry.gd"), FileAccess.get_sha256("res://tools/content/build_stage_resources.gd")])

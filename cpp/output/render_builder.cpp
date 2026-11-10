@@ -146,7 +146,7 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (!view.grow(radius*1.4142135623730951).has_point(pose.position)) continue;
         if (enemy.stone>0) for (float v:{pose.position.x,pose.position.y,float(enemy.radius)}) petrified_enemies.push_back(v);
         if (!meteor && !iron && definition.kind!=EnemyDefinition::Kind::Shield && definition.weak_arc>0) {
-            const bool native_sprite=definition.id==StringName("drifter") || definition.id==StringName("swarm") || definition.id==StringName("darter") || definition.id==StringName("armored") || definition.id==StringName("splitter") || definition.id==StringName("splitling");
+            const bool native_sprite=definition.id==StringName("splitter") || definition.id==StringName("splitling");
             if (!native_sprite) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(definition.weak_arc)}) enemy_weak.push_back(value);
         }
         if (!meteor && !iron && enemy.radius>=25.0 && enemy.max_hp>0 && enemy.hp<enemy.max_hp) for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(std::max(0.0,enemy.hp/enemy.max_hp))}) enemy_health.push_back(value);
@@ -163,8 +163,8 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
         if (definition.kind==EnemyDefinition::Kind::Hound || definition.kind==EnemyDefinition::Kind::Defender) {
             if (enemy.mode==EnemyMode::Windup && enemy.charge>0) {Dictionary fx;fx["id"]=enemy.id;fx["pos"]=pose.position;fx["angle"]=pose.angle;fx["radius"]=enemy.radius;fx["charge"]=enemy.charge;fx["kind"]=definition.kind==EnemyDefinition::Kind::Hound?"hound":"defender";bite_fx.push_back(fx);}
         }
-        if ((definition.kind==EnemyDefinition::Kind::Gunner || definition.kind==EnemyDefinition::Kind::Defender) && enemy.charge>0) {
-            if (definition.kind==EnemyDefinition::Kind::Defender) enemy_batch.reference_bite_indices.push_back(enemy_batch.gunner.size()/5);
+        if (definition.kind==EnemyDefinition::Kind::Defender && enemy.charge>0) {
+            enemy_batch.reference_bite_indices.push_back(enemy_batch.gunner.size()/5);
             for (float value:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.charge)}) enemy_batch.gunner.push_back(value);
         }
         if (body_visible && definition.kind==EnemyDefinition::Kind::Pump) {

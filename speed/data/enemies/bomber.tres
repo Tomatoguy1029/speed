@@ -13,7 +13,7 @@ visual_settings = {
 "key_energy": 1.0
 }
 armor_colors = {
-"res://assets/pixel/bomber/drifter_armor.png|31x31|edcc46e5ab73e45f9b3740e37db7df8e4bb48e6bd294baeac0146815300b8d35": {
+"res://assets/pixel/bomber/bomber_armor.png|31x31|edcc46e5ab73e45f9b3740e37db7df8e4bb48e6bd294baeac0146815300b8d35": {
 "130": "a7a7a6",
 "148": "a7a7a6",
 "43": "a7a7a6",

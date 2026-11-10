@@ -76,7 +76,7 @@ func _ready() -> void:
 	check(lab.run.state.stage.boss_id == &"hydra", "実験の基準はステージ4のヒュドラ")
 	check(lab.run.state.phase == RunIds.Phase.Play, "カード選択なしで実験できる")
 	check(lab.run.cfg != ContentManager.cfg, "設定を実験ごとに複製する")
-	lab.perform("spawn", {"type": "gunner", "pos": [200, 0], "count": 3})
+	lab.perform("spawn", {"type": "missile", "pos": [200, 0], "count": 3})
 	check(lab.run.enemies.count() == 3, "好きな敵を複数出せる")
 	for n in 120:
 		lab.step()
@@ -259,7 +259,7 @@ func cpp_lab_actions() -> void:
 	check(lab.events.any(func(event): return event.type==&"lab_spawn" and event.enemy_type==&"iron"),"手動配置をタイムラインの出現通知へ渡す")
 	check(lab.perform("move",{"id":rock_id,"pos":[1800,900]}) and is_equal_approx(lab.run.enemies.table.facing[lab.selected],0.6),"ドラッグで向きを省略したら元の向きを保つ")
 	check(lab.bridge.command("dev_field_query",{"action":"rocks"}).value.any(func(rock): return rock.enemy_id==rock_id and rock.position==Vector2(1800,900)),"岩を移動した位置をフィールド側にも反映する")
-	check(lab.perform("spawn",{"type":"gunner","pos":[500,500],"angle":0.25}),"移動確認用の敵を配置する")
+	check(lab.perform("spawn",{"type":"missile","pos":[500,500],"angle":0.25}),"移動確認用の敵を配置する")
 	var parent: int = lab.run.enemies.table.id[lab.selected]
 	var part: Dictionary = lab.bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":"hydra_bite","position":Vector2(550,500)})
 	check(part.ok,"移動確認用の部位を親に付ける")
@@ -274,7 +274,7 @@ func cpp_lab_actions() -> void:
 		check(lab.run.enemies.table.pos[lab.row_for_id(child)].is_equal_approx(Vector2(700,550)),"子の相対位置を親と一緒に回す")
 	if attack.ok:
 		check(core.hazards_snapshot().any(func(hazard): return hazard.pos.is_equal_approx(Vector2(700,560))),"付属した攻撃を消さず同じ相対位置へ動かす")
-	check(lab.perform("parameter",{"type":"gunner","key":"attack_weight","value":0}) and core.enemy_attack_snapshot().any(func(row): return row.id==parent and not row.managed),"攻撃の重さ0を配置済みの個体にも適用する")
+	check(lab.perform("parameter",{"type":"missile","key":"attack_weight","value":0}) and core.enemy_attack_snapshot().any(func(row): return row.id==parent and not row.managed),"攻撃の重さ0を配置済みの個体にも適用する")
 	check(lab.perform("config",{"key":"draw_time_scale","value":2.0}) and lab.run.cfg.draw_time_scale==1.0,"描いている間の速度の上限を維持する")
 	check(lab.perform("config",{"key":"base_attack","value":0.0}) and lab.run.cfg.base_attack==0.01,"通常設定の正の下限を維持する")
 	check(lab.perform("post_max",{"stacks":{"max_speed":2}}) and lab.perform("loadout",{"reset":true}) and lab.run.state.post_max_stacks.is_empty(),"装備リセットで最大強化も消す")
@@ -305,7 +305,7 @@ func cpp_lab_actions() -> void:
 func cpp_definition_edits() -> bool:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.armor = 0.0
 	definition.speed = 0.0
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -321,7 +321,7 @@ func cpp_definition_edits() -> bool:
 		if not bridge.configure(original,{"api_version":1,"run_id":1 if bridge==first else 2,"mode":1,"stage_id":"編集確認","profile":{},"settings":{}}).ok or not bridge.start(832,{}).ok: return false
 		bridge.subscribe("編集確認",func(_frame: Dictionary) -> bool: return true)
 		if not bridge.command("dev_remove_weapon",{"id":"W01"}).ok: return false
-		if not bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-500,300)}).ok: return false
+		if not bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-500,300)}).ok: return false
 	var id: int = first._core.enemies_snapshot()[0].id
 	if not first.command("dev_damage",{"entity_id":id,"amount":1.0,"cause":"shot","no_crit":true}).ok: return false
 	if not first.step(1.0/120.0,first.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)}).ok: return false
@@ -333,15 +333,15 @@ func cpp_definition_edits() -> bool:
 	definition.armor = 7.0
 	definition.speed = 20.0
 	var changed: PackedByteArray = schema.write_content(builder.chase_records(definition,config),"定義編集の確認".sha256_text().hex_decode())
-	var edited: Dictionary = first.replace_definition("drifter",changed)
+	var edited: Dictionary = first.replace_definition("splitling",changed)
 	check(edited.ok,"検証済みの定義を停止境界で原子的に編集する")
 	var after: Dictionary = first._core.enemies_snapshot()[0]
 	check(after.id==id and after.max_hp>before.max_hp and is_equal_approx(after.hp/after.max_hp,before.hp/before.max_hp),"生存個体のIDとHP割合を保つ")
 	check(after.armor>0.0 and after.speed==20.0,"旧値0から装甲と速度を再計算する")
 	check(first.read_frame().value.tick==tick and second._core.enemies_snapshot()[0].armor==0.0,"編集は現在tickと別ランを変えない")
-	var failed_edit: Dictionary = first.replace_definition("drifter",PackedByteArray([1,2,3]))
+	var failed_edit: Dictionary = first.replace_definition("splitling",PackedByteArray([1,2,3]))
 	check(not failed_edit.ok and first._core.enemies_snapshot()[0]==after,"不正な定義は個体を部分変更しない")
-	check(first.replace_definition("drifter",original).ok and first.read_frame().value.tick==tick,"逆命令も現在tickで適用する")
+	check(first.replace_definition("splitling",original).ok and first.read_frame().value.tick==tick,"逆命令も現在tickで適用する")
 	check(first.restore(held.value).ok and first._core.enemies_snapshot()[0]==before,"編集後も保持した旧ContentBundleと個体へ戻る")
 	first.release_checkpoint(held.value)
 	for bridge in [first,second]:
@@ -359,7 +359,7 @@ func cpp_lab() -> void:
 	check(lab.last_error.get("ok",false),"開始設定が成功する: "+str(lab.last_error))
 	if not lab.last_error.get("ok",false): lab.queue_free(); return
 	check(lab.run.state.stage.boss_id==&"hydra" and lab.run.state.phase==RunIds.Phase.Play,"元のステージとカード待ちのない入口を保つ")
-	check(lab.perform("spawn",{"type":"gunner","pos":[200,0],"count":3}) and lab.run.enemies.count()==3,"手動配置は通常の生成サービスへ接続する")
+	check(lab.perform("spawn",{"type":"missile","pos":[200,0],"count":3}) and lab.run.enemies.count()==3,"手動配置は通常の生成サービスへ接続する")
 	var id: int = lab.run.enemies.table.id[lab.selected]
 	check(lab.perform("move",{"id":id,"pos":[300,50],"angle":0.25}) and lab.run.enemies.table.pos[lab.selected]==Vector2(300,50),"論理IDで選択と移動を行う")
 	check(lab.perform("pin",{"value":true,"pos":[-600,0]}),"機体固定を正式命令で設定する")
@@ -376,7 +376,7 @@ func cpp_lab() -> void:
 	check(JSON.stringify(SaveManager.data)==data_before,"実験で共有セーブを変えない")
 	await lab.reset({"empty":true})
 	check(lab.run.enemies.count()==0,"Resetで開始状態へ戻る")
-	check(lab.perform("schedule",{"entries":[{"type":"drifter","pos":[500,500],"start":0,"end":0,"interval":1}]}),"予定配置をC++へ渡す")
+	check(lab.perform("schedule",{"entries":[{"type":"splitling","pos":[500,500],"start":0,"end":0,"interval":1}]}),"予定配置をC++へ渡す")
 	lab.step()
 	check(lab.run.enemies.count()==1,"予定配置をC++の時計と乱数で実行する")
 	print("[cpp_lab_core] 未実施: うみへびの首を含む再生（該当種類の移行待ち）")
@@ -390,19 +390,19 @@ func cpp_lab_history() -> void:
 	add_child(first)
 	add_child(second)
 	for lab in [first,second]:
-		await lab.reset({"empty":true,"overrides":{"drifter":{"armor":0.0,"speed":0.0}}})
-		check(lab.perform("spawn",{"type":"drifter","pos":[500,300]}),"編集確認の個体を正式入口で配置する")
+		await lab.reset({"empty":true,"overrides":{"splitling":{"armor":0.0,"speed":0.0}}})
+		check(lab.perform("spawn",{"type":"splitling","pos":[500,300]}),"編集確認の個体を正式入口で配置する")
 	for n in 24: first.step()
 	var before: Dictionary = first.bridge.read_lab().value.enemies[0].duplicate(true)
 	var id: int = before.id
 	var tick: int = first.tick
-	check(first.perform("parameter",{"type":"drifter","key":"armor","value":7.0}),"Labの現在tickで旧値0の装甲を編集する")
+	check(first.perform("parameter",{"type":"splitling","key":"armor","value":7.0}),"Labの現在tickで旧値0の装甲を編集する")
 	check(first.run.enemies.table.armor[first.row_for_id(id)]>0.0 and first.tick==tick,"装甲を再算出しIDと現在tickを維持する")
 	await first.undo_edit()
 	check(first.run.enemies.table.armor[first.row_for_id(id)]==0.0 and first.tick==tick,"値のundoは同じtickの逆命令で戻す")
 	await first.redo_edit()
 	check(first.run.enemies.table.armor[first.row_for_id(id)]>0.0 and first.tick==tick,"値のredoも同じtickに適用する")
-	check(first.perform("parameter",{"type":"drifter","key":"speed","value":20.0}),"Labの旧値0の速度を編集する")
+	check(first.perform("parameter",{"type":"splitling","key":"speed","value":20.0}),"Labの旧値0の速度を編集する")
 	var after: Dictionary = first.bridge.read_lab().value.enemies[0].duplicate(true)
 	check(after.speed==20.0 and after.id==id and is_equal_approx(after.hp/after.max_hp,before.hp/before.max_hp),"速度編集でもIDとHP割合を維持する")
 	var count: int = first.history.size()
@@ -419,12 +419,12 @@ func cpp_lab_history() -> void:
 func cpp_lab_replay() -> void:
 	var lab = load("res://gyms/enemy_lab/lab_session.gd").new()
 	add_child(lab)
-	await lab.reset({"empty":true,"overrides":{"gunner":{"speed":0.0}}})
-	check(lab.perform("spawn",{"type":"gunner","pos":[500,0]}),"攻撃を持つ敵を配置する")
+	await lab.reset({"empty":true,"overrides":{"missile":{"speed":0.0}}})
+	check(lab.perform("spawn",{"type":"missile","pos":[500,0]}),"攻撃を持つ敵を配置する")
 	for n in 48: lab.step()
 	var tick: int = lab.tick
 	var firing: String = lab.digest()
-	check(lab.perform("spawn",{"type":"drifter","pos":[700,400]}),"攻撃中の現在tickで敵を追加する")
+	check(lab.perform("spawn",{"type":"splitling","pos":[700,400]}),"攻撃中の現在tickで敵を追加する")
 	for n in 12: lab.step()
 	await lab.undo_edit()
 	check(lab.tick==tick+12 and lab.run.enemies.count()==1,"配置の取消は後続入力を保ち現在tickまで再構築する")
@@ -436,14 +436,14 @@ func cpp_lab_replay() -> void:
 		lab.queue_free()
 		await get_tree().process_frame
 		return
-	await lab.reset({"empty":true,"overrides":{"drifter":{"speed":0.0}}})
-	lab.perform("spawn",{"type":"drifter","pos":[500,0]})
+	await lab.reset({"empty":true,"overrides":{"splitling":{"speed":0.0}}})
+	lab.perform("spawn",{"type":"splitling","pos":[500,0]})
 	for n in 12: lab.step()
 	var old_hash: String = lab.bridge.read_recording(true).value.identity.payload_sha256
 	var old_epoch: int = lab.bridge.read_frame().value.epoch
 	await lab.seek(0)
 	for n in 24: lab.step()
-	lab.perform("parameter",{"type":"drifter","key":"speed","value":20.0})
+	lab.perform("parameter",{"type":"splitling","key":"speed","value":20.0})
 	var new_hash: String = lab.bridge.read_recording(true).value.identity.payload_sha256
 	await lab.seek(12)
 	check(old_hash!=new_hash and lab.bridge.read_recording(true).value.identity.payload_sha256==old_hash and lab.run.enemies.table.speed[0]==0.0,"seekで保持した旧ContentBundleへ戻る")
@@ -454,7 +454,7 @@ func cpp_lab_replay() -> void:
 	lab.step()
 	check(lab.run.state.phase==RunIds.Phase.Levelup,"カード待ちを復元対象に含める")
 	var card_tick: int = lab.tick
-	lab.perform("spawn",{"type":"drifter","pos":[900,500]})
+	lab.perform("spawn",{"type":"splitling","pos":[900,500]})
 	await lab.undo_edit()
 	check(lab.tick==card_tick and lab.run.state.phase==RunIds.Phase.Levelup,"カード待ちでも配置取消のtickと候補待ちを維持する")
 	lab.cancel_seek()
@@ -481,11 +481,9 @@ func cpp_lab_formations() -> void:
 		check(not lab.perform("formation",{"path":"res://data/formations/aquila.tscn","layout":1000,"entry":0}),"不正な並びを拒否する")
 		check(lab.bridge.read_recording(true).value.identity.payload_sha256==definition and lab.bridge.read_lab().value==before and lab.history.size()==history,"失敗した配置は定義・個体・履歴を部分変更しない")
 	else:
-		lab.perform("spawn",{"type":"drifter","pos":[500,300]})
-	var phase: PhaseDef = ContentManager.phases.values()[0]
-	check(lab.perform("phase_set",{"ids":[String(phase.id)]}),"時間帯の選択も共通生成した定義と正式命令で置き換える")
-	check(lab.tick==tick and lab.run.enemies.count()==1 and lab.run.state.stage.phases.size()==1 and lab.run.state.stage.phases[0].id==phase.id,"時間帯編集で時計と配置済みの個体を維持する")
-	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"配置と時間帯編集後の読取・回収・通知配信が成功する")
+		lab.perform("spawn",{"type":"splitling","pos":[500,300]})
+	check(lab.tick==tick and lab.run.enemies.count()==1,"配置で時計と配置済みの個体を維持する")
+	check(lab.bridge.read_frame().ok and lab.bridge.collect_frame().ok and lab.bridge.delivery_error.get("ok",false),"配置後の読取・回収・通知配信が成功する")
 	lab.queue_free()
 	await get_tree().process_frame
 
@@ -557,7 +555,7 @@ func cpp_lab_appearance_edits() -> void:
 	if lab.run==null: lab.free(); return
 	lab.perform("spawn",{"type":"biter","pos":[800,0]})
 	var id: int = lab.run.enemies.table.id[lab.selected]
-	lab.perform("spawn",{"type":"drifter","pos":[-800,0]})
+	lab.perform("spawn",{"type":"splitling","pos":[-800,0]})
 	var other: int = lab.run.enemies.table.id[lab.selected]
 	for n in 120: lab.step()
 	var at: int = lab.tick
