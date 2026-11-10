@@ -119,7 +119,7 @@ func apply_frame(data: Dictionary, world_time: float, zoom: float) -> void:
 	_warning_count = 0
 	_thrust_count = 0
 	var pixel := 1.0/maxf(zoom,0.01)
-	var view: Rect2 = data.view.grow(-48.0*pixel)
+	var view: Rect2 = data.view
 	var ids: PackedInt64Array = data.ids
 	var values: PackedFloat64Array = data.values
 	for row in ids.size():
@@ -131,7 +131,7 @@ func apply_frame(data: Dictionary, world_time: float, zoom: float) -> void:
 				var scale_px := values[n+4]/32.0
 				_draw_thrust_values(_frame_parent,position+(HORN_OFFSET*scale_px).rotated(values[n+5]),values[n+5],scale_px,maxf(0.0,values[n+9]-values[n+8]),values[n+8])
 		elif mode==EnemyMode.Windup:
-			var origin := Vector2(values[n+10],values[n+11])
+			var origin := position+(HORN_OFFSET*(values[n+4]/32.0)).rotated(values[n+5])
 			var end := Vector2(values[n+12],values[n+13])
 			var path := clip_warning(origin,end,view)
 			if path.is_empty(): continue
