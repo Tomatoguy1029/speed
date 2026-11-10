@@ -127,4 +127,23 @@ func check_ui() -> void:
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("/tmp/speed-review-settings.png")
 	panel.free()
+	RunManager.ensure_registered(owner)
+	RunManager.current_id = owner.id
+	var hud := preload("res://scripts/ui/hud.gd").new()
+	hud.bridge = owner.bridge
+	hud.cpp_resources = owner.cpp_resources
+	hud.size = get_viewport().get_visible_rect().size
+	add_child(hud)
+	hud.apply_snapshot(owner.bridge.read_frame().value.ui)
+	var codex: Button = hud._pause_box.get_node("CodexButton")
+	var custom: Button = hud._pause_box.get_node("ReviewSettingsButton")
+	check(codex != null and custom != null, "図鑑とカスタム設定の両方をメニューに保持する")
+	codex.pressed.emit()
+	check(hud._menu_overlay is UiScreen and owner.bridge.read_frame().value.ui.phase==hud.Phase.Paused, "図鑑を開いて停止状態を保つ")
+	if hud._menu_overlay is UiScreen: hud._menu_overlay.close_fn.call()
+	await get_tree().process_frame
+	custom.pressed.emit()
+	check(hud._menu_overlay != null and hud._menu_overlay.get_script()==preload("res://scripts/ui/review_settings.gd"), "図鑑から戻ってカスタム設定を開ける")
+	if hud._menu_overlay != null: hud._menu_overlay.finished.emit()
+	hud.free()
 	owner.free()
