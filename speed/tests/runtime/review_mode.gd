@@ -77,6 +77,13 @@ func _ready() -> void:
 	var fresh = make_run(2)
 	check(fresh != null and not fresh.read_frame().value.ui.invincible and fresh.read_frame().value.ui.weapon_levels.size()==1, "次のランへ変更を引き継がない")
 	if fresh != null: fresh.dispose()
+	for stage in [2,3,4,5]:
+		var boss_run = make_run(2,stage)
+		check(boss_run != null, "ステージ%dの審査版を開始する" % stage)
+		if boss_run == null: continue
+		boss_run.command("pause", {"paused":true})
+		check(boss_run.command("review_boss").ok and not boss_run.read_frame().value.ui.boss_bodies.is_empty(), "ステージ%dのボスへ通常の登場処理で移動する" % stage)
+		boss_run.dispose()
 	print("[review_mode] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 

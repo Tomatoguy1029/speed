@@ -309,7 +309,7 @@ func _package_final_runtime() -> void:
 	if not await _package_startup():
 		quit(1)
 		return
-	var save_path: String = SaveManager.SAVE_PATH
+	var save_path: String = SaveManager.save_path()
 	var before_hash := FileAccess.get_sha256(save_path) if FileAccess.file_exists(save_path) else ""
 	var before_runs := int(SaveManager.data.best.runs)
 	var observed := {"results":0,"saves":0,"result":{}}
@@ -326,8 +326,9 @@ func _package_final_runtime() -> void:
 		return
 	_package_measure("最終配布の通常出撃準備",{"loading_timings":session.loading_timings,"ready":session.bridge!=null})
 	var id := session.id
-	# 通常configureのmode=0を保ち、同じランの本番結果通知だけを観測する。
-	var normal_mode: bool = int(session.bridge.recording_origin.options.mode)==0
+	# 各配布版の既定モードを使い、同じランの本番結果通知だけを観測する。
+	var expected_mode := 2 if SaveManager.is_review_build() else 0
+	var normal_mode: bool = int(session.bridge.recording_origin.options.mode)==expected_mode
 	session.cpp_finished.connect(func(result: Dictionary):
 		observed.results += 1
 		observed.result = result.duplicate(true))
