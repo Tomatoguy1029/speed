@@ -4,7 +4,13 @@
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_color_array.hpp>
+#include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/array.hpp>
 #include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 namespace godot {
 // 論理画素の層へ、粒や画素の多いエフェクトを描く。層の形式は fx_reference_canvas.gd の Painter と同じ。
 // 炎の部品は pixelFX fire/_lib.js の式（Sprite Fusion、MIT、Hugo Duprez）。
@@ -17,6 +23,12 @@ class SpeedFxRaster : public RefCounted {
     Vector2 camera_;
     std::vector<float> mask_;
     Vector2 mask_camera_;
+    bool color_used_=false,light_used_=false;
+    std::vector<float> density_;
+    void reference_dot(double x,double y,Color c,double alpha);
+    void reference_add(int x,int y,Color c,double strength);
+    void reference_glow(Vector2 center,double radius,Color c,double strength);
+    void reference_glow_line(Vector2 a,Vector2 b,double radius,Color c,double strength);
     void put(int x,int y,Color c);
     void blend(float x,float y,Color c,double a);
     void add(int x,int y,Color c,double k);
@@ -36,6 +48,15 @@ public:
     void begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera);
     PackedByteArray take_colors();
     PackedByteArray take_lights();
+    bool has_color() const {return color_used_;}
+    bool has_light() const {return light_used_;}
+    void auriga_trail(PackedVector2Array points,PackedFloat64Array strengths,double width,PackedColorArray palette,double clock);
+    void lynx_scratch(Vector2 origin,double angle,double side,double size,double span,double cut,PackedColorArray palette,Dictionary settings);
+    void nova_field(PackedByteArray alpha,PackedFloat32Array emission,Dictionary state,bool front);
+    void dolphin_band(Vector2 center,double radius,double a0,double a1,double width,PackedColorArray palette,double alpha,double dissolve);
+    void dolphin_arc(Vector2 center,double radius,double a0,double a1,Color color,double alpha);
+    void reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,Dictionary settings);
+    void density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette);
     void dim(double amount,double flash);
     void breath(PackedVector2Array fan,double elapsed,double active,double axis,double sweep,double half_angle,double reach,double fan_angle);
     void light_mask_reset();

@@ -10,6 +10,8 @@ const EMISSION := preload("res://data/visuals/canis_nova_emission.tres")
 const SPARK := Color("#ffe7bd")
 const WHITE := Color.WHITE
 const BLUE_LINE := Color("#9ed8ff")
+static var _raster_front := SpeedFxRaster.new()
+static var _raster_back := SpeedFxRaster.new()
 
 static func flash(age: float) -> float:
 	return smoothstep(0.0,0.09,age)*(1.0-smoothstep(0.22,0.98,age))
@@ -33,33 +35,15 @@ static func draw_field(canvas, nova: Dictionary, params: Dictionary) -> void:
 	var aperture: float = float(nova.radius)*canvas.world_scale*(0.18+0.28*tell*(1.0-0.65*smoothstep(0.83,1.0,tell)) if t<0.0 else 0.24+2.65*smoothstep(0.0,0.115,t))
 	var field_origin: Vector2 = canvas.to_logical(nova.field_origin)
 	var range_end := float(nova.ring_end)
-	var logical_size: Vector2i = canvas.logical_size
-	for y in logical_size.y:
-		var iy := floori((y-field_origin.y)/cell)
-		for x in logical_size.x:
-			var ix := floori((x-field_origin.x)/cell)
-			# 範囲外はC++の安全判定と同じく遮光なしとして扱う。
-			var shadow := float(alpha[iy*width+ix])/255.0 if ix>=0 and ix<width and iy>=0 and iy<height else 0.0
-			var visible := 1.0-shadow
-			var dx := x-source.x
-			var dy := y-source.y
-			var distance: float = sqrt(dx*dx+dy*dy)/canvas.world_scale
-			if visible<0.01 or distance>range_end: continue
-			var falloff := (1.0-smoothstep(range_end*0.8,range_end,distance))/(1.0+pow(distance/420.0,2.0))
-			var strength := visible*gain*falloff
-			var angle := atan2(dy,dx)
-			var ray := 0.45+0.55*pow(0.5+0.5*sin(angle*23.0+sin(angle*7.0)*2.3),3.0)
-			canvas.back.light(x,y,TINT,strength*(tell*0.22+burst*0.25))
-			if burst>0.0:
-				canvas.front.light(x,y,FLASH,strength*burst*ray*0.55*(1.0-smoothstep(0.0,range_end,distance)*0.5))
-			var stretch := 1.0 if t<0.0 else 1.0+0.45*burst
-			var tx := floori(96.0+dx*96.0/(aperture*stretch))
-			var ty := floori(96.0+dy*96.0/aperture)
-			if tx>=0 and tx<192 and ty>=0 and ty<192:
-				var flux := float(samples[ty*192+tx])*visible*gain
-				var exposure := tell*1.1 if t<0.0 else burst*(1.35-0.65*smoothstep(0.12,0.56,t))
-				canvas.front.light(x,y,CORONA,flux*exposure*0.8)
-				canvas.front.light(x,y,HOT,flux*flux*exposure)
+	var field := {"width": width, "height": height, "cell": cell, "source": source, "origin": field_origin,
+		"aperture": aperture, "range_end": range_end, "t": t, "tell": tell, "burst": burst, "gain": gain}
+	for pair: Array in [[canvas.back, _raster_back, false], [canvas.front, _raster_front, true]]:
+		var painter = pair[0]
+		var raster = pair[1]
+		raster.begin(PackedByteArray(), painter.lights, painter.width, painter.height, float(canvas.world_scale), canvas._camera_position)
+		raster.nova_field(alpha, samples, field, pair[2])
+		painter.lights = raster.take_lights()
+		painter.has_light = painter.has_light or raster.has_light()
 	canvas.front.glow(source.x,source.y,4.0+tell*6.0+burst*9.0,SOURCE_GLOW,gain*(tell*0.12+burst*0.25))
 	if nova.get("hit_visual",false): _hit_sparks(canvas,nova,t-0.09,burst,gain)
 

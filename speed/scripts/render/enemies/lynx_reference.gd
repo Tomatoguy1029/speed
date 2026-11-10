@@ -4,8 +4,8 @@ extends RefCounted
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 const FROM := [0.03, 0.0, 0.05]
-const TO := [0.9, 1.0, 0.86]
 var _settings: Dictionary = SETTINGS.for_id("G12-lynx")
+var _raster := SpeedFxRaster.new()
 
 func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 	var color := Color(_settings.color)
@@ -16,6 +16,9 @@ func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 	var grow := maxf(0.01, float(_settings.grow) * float(_settings.timing))
 	var cut_time := maxf(0.01, float(_settings.cutT) * float(_settings.timing))
 	canvas.front.place(0, 0)
+	if not shots.is_empty():
+		_raster.begin(canvas.front.colors, canvas.front.lights, canvas.front.width, canvas.front.height, float(canvas.world_scale), canvas._camera_position)
+	var native_palette := PackedColorArray(palette)
 	for shot: Dictionary in shots:
 		var age := float(shot.age)
 		var fraction := clampf(age / grow, 0.0, 1.0)
@@ -27,8 +30,12 @@ func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 		var initial_size := full * initial
 		var shift: Vector2 = (shot.paw - _at(Vector2.ZERO, float(shot.angle), float(shot.side), initial_size, span, 0.0, 0.0)) * (initial_size / size)
 		var origin: Vector2 = shot.pos + shift
-		for k in 3:
-			_scratch(canvas, origin, float(shot.angle), float(shot.side), size, span, k, minf(1, age / cut_time), palette, minf(1, float(_settings.intensity)))
+		_raster.lynx_scratch(origin, float(shot.angle), float(shot.side), size, span, minf(1, age / cut_time), native_palette, _settings)
+	if not shots.is_empty():
+		canvas.front.colors = _raster.take_colors()
+		canvas.front.lights = _raster.take_lights()
+		canvas.front.has_color = canvas.front.has_color or _raster.has_color()
+		canvas.front.has_light = canvas.front.has_light or _raster.has_light()
 	for actor: Dictionary in actors:
 		var angle := float(actor.angle)
 		var side := float(actor.side)
@@ -61,32 +68,3 @@ func _mark(origin: Vector2, angle: float, side: float, size: float, span: float,
 	var normal := Vector2(-tangent.y, tangent.x)
 	var spacing := lerpf(float(_settings.space0), float(_settings.space1), progress)
 	return _at(origin, angle, side, size, span, gap, progress) + normal * ((k - 1) * spacing * size)
-
-func _scratch(canvas, origin: Vector2, angle: float, side: float, size: float, span: float, k: int, cut: float, palette: Array[Color], alpha: float) -> void:
-	var count := maxi(10, floori(size * canvas.world_scale * 1.6 + 0.5))
-	var thickness: float = 0.07 * size * canvas.world_scale * 0.9
-	for i in count:
-		var m := float(i) / count
-		var a := lerpf(FROM[k], TO[k], m)
-		var b := lerpf(FROM[k], TO[k], float(i + 1) / count)
-		if a > cut:
-			break
-		var start: Vector2 = canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, a))
-		var end: Vector2 = canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, minf(cut, b)))
-		var width: float = thickness * smoothstep(0.0, 0.1, m) * pow(1 - m, 0.7) * (0.85 + 0.3 * FX.hash_value(k * 17 + floorf(m * 9)))
-		if width < 0.25:
-			canvas.front.dot(start.x, start.y, palette[3], alpha * 0.8)
-			continue
-		var direction := end - start
-		var normal := Vector2(-direction.y, direction.x).normalized()
-		var q := -width
-		while q <= width:
-			var edge := absf(q) / width
-			var point := start + normal * q
-			canvas.front.dot(point.x, point.y, palette[4] if edge < 0.4 else (palette[3] if edge < 0.75 else palette[2]), alpha)
-			q += 0.5
-		if i % 3 == 0:
-			canvas.front.light(start.x, start.y, palette[2], 0.25 * alpha)
-	if cut < TO[k] and cut > FROM[k]:
-		var tip: Vector2 = canvas.to_logical(_mark(origin, angle, side, size, span, float(_settings.gap), k, cut))
-		canvas.front.glow(tip.x, tip.y, 4, palette[4], 0.6 * alpha)

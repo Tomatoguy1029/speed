@@ -54,26 +54,18 @@ static func _draw_samples(canvas, samples: Array, clock: float, logical_pixel: f
 	var width := ceili(high.x)-origin.x+6
 	var height := ceili(high.y)-origin.y+6
 	if width<=0 or height<=0: return
-	var field := PackedFloat32Array()
-	field.resize(width*height*3)
-	for sample: Dictionary in list: FIELD._splat(field,width,height,origin,sample.point,float(sample.radius),int(sample.layer))
-	var stepped_clock := floorf(clock*settings.update_fps)/settings.update_fps
-	var deformation := float(settings.deformation)/logical_pixel
-	var colors := []
-	for color: Color in [settings.outer_color,settings.inner_color,settings.core_color]:
-		colors.append(Color(roundf(color.r*255.0)/255.0,roundf(color.g*255.0)/255.0,roundf(color.b*255.0)/255.0))
-	var logical_size: Vector2i = canvas.logical_size
-	for y in range(maxi(0,-origin.y),mini(height,logical_size.y-origin.y)):
-		for x in range(maxi(0,-origin.x),mini(width,logical_size.x-origin.x)):
-			var px := x+origin.x
-			var py := y+origin.y
-			var wx := px*logical_pixel
-			var wy := py*logical_pixel
-			var u := (sin(wy*0.075-stepped_clock*4.4)+sin(wx*0.11+wy*0.033+stepped_clock*2.1))*deformation
-			var v := cos(wx*0.08+stepped_clock*3.0)*0.55*deformation
-			if FIELD._read(field,width,height,x+u,y+v,0)<settings.merge_threshold: continue
-			var inner := FIELD._read(field,width,height,x+u,y+v,1)>=settings.merge_threshold
-			var core := inner and FIELD._read(field,width,height,x+u,y+v,2)>=settings.merge_threshold
-			var color: Color = colors[2 if core else 1 if inner else 0]
-			canvas.front.px(px,py,color)
-			if (px&3)==0 and (py&3)==0: canvas.front.glow(px,py,5.0,color,0.3 if core else 0.18 if inner else 0.08)
+	var points := PackedVector2Array()
+	var radii := PackedFloat64Array()
+	var layers := PackedByteArray()
+	for sample: Dictionary in list:
+		points.append(sample.point)
+		radii.append(float(sample.radius))
+		layers.append(int(sample.layer))
+	var colors := PackedColorArray()
+	for color: Color in [settings.outer_color, settings.inner_color, settings.core_color]:
+		colors.append(Color(roundf(color.r * 255.0) / 255.0, roundf(color.g * 255.0) / 255.0, roundf(color.b * 255.0) / 255.0))
+	var deformation := float(settings.deformation) / logical_pixel
+	var display := {"clock": floorf(clock * settings.update_fps) / settings.update_fps, "logical_pixel": logical_pixel,
+		"deformation": deformation, "v_gain": 0.55, "v_deformation": deformation, "threshold": settings.merge_threshold,
+		"glow_radius": 5.0, "strengths": PackedFloat64Array([0.08, 0.18, 0.3])}
+	FIELD._draw_density(canvas, canvas.front, points, radii, layers, origin, width, height, display, colors)

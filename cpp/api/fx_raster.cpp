@@ -2,6 +2,7 @@
 #include <algorithm>
 #include <cmath>
 #include <godot_cpp/core/class_db.hpp>
+#include <godot_cpp/core/math.hpp>
 namespace godot {
 namespace {
 constexpr double PI=3.141592653589793,TAU=PI*2;
@@ -30,6 +31,15 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("begin","colors","lights","width","height","world_scale","camera"),&SpeedFxRaster::begin);
     ClassDB::bind_method(D_METHOD("take_colors"),&SpeedFxRaster::take_colors);
     ClassDB::bind_method(D_METHOD("take_lights"),&SpeedFxRaster::take_lights);
+    ClassDB::bind_method(D_METHOD("has_color"),&SpeedFxRaster::has_color);
+    ClassDB::bind_method(D_METHOD("has_light"),&SpeedFxRaster::has_light);
+    ClassDB::bind_method(D_METHOD("auriga_trail","points","strengths","width","palette","clock"),&SpeedFxRaster::auriga_trail);
+    ClassDB::bind_method(D_METHOD("lynx_scratch","origin","angle","side","size","span","cut","palette","settings"),&SpeedFxRaster::lynx_scratch);
+    ClassDB::bind_method(D_METHOD("nova_field","alpha","emission","state","front"),&SpeedFxRaster::nova_field);
+    ClassDB::bind_method(D_METHOD("dolphin_band","center","radius","a0","a1","width","palette","alpha","dissolve"),&SpeedFxRaster::dolphin_band);
+    ClassDB::bind_method(D_METHOD("dolphin_arc","center","radius","a0","a1","color","alpha"),&SpeedFxRaster::dolphin_arc);
+    ClassDB::bind_method(D_METHOD("reference_beam","a","b","palette","settings"),&SpeedFxRaster::reference_beam);
+    ClassDB::bind_method(D_METHOD("density_field","points","radii","layers","origin","width","height","settings","palette"),&SpeedFxRaster::density_field);
     ClassDB::bind_method(D_METHOD("dim","amount","flash"),&SpeedFxRaster::dim);
     ClassDB::bind_method(D_METHOD("breath","fan","elapsed","active","axis","sweep","half_angle","reach","fan_angle"),&SpeedFxRaster::breath);
     ClassDB::bind_method(D_METHOD("light_mask_reset"),&SpeedFxRaster::light_mask_reset);
@@ -44,12 +54,12 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("sweep_band","path","start","rel","active","radius","color"),&SpeedFxRaster::sweep_band);
     ClassDB::bind_method(D_METHOD("bolt_bar","tail","angle","age","life","speed","length","width","color","time"),&SpeedFxRaster::bolt_bar);
 }
-void SpeedFxRaster::begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera) {colors_=colors;lights_=lights;w_=width;h_=height;wl_=world_scale;camera_=camera;c_=colors_.ptrw();l_=lights_.ptrw();}
+void SpeedFxRaster::begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera) {colors_=colors;lights_=lights;w_=width;h_=height;wl_=world_scale;camera_=camera;c_=colors_.ptrw();l_=lights_.ptrw();color_used_=false;light_used_=false;}
 PackedByteArray SpeedFxRaster::take_colors() {PackedByteArray out=colors_;colors_=PackedByteArray();c_=nullptr;return out;}
 PackedByteArray SpeedFxRaster::take_lights() {PackedByteArray out=lights_;lights_=PackedByteArray();l_=nullptr;return out;}
-void SpeedFxRaster::put(int x,int y,Color c) {if (x<0 || y<0 || x>=w_ || y>=h_) return;uint8_t *q=c_+(y*w_+x)*4;q[0]=uint8_t(c.r*255);q[1]=uint8_t(c.g*255);q[2]=uint8_t(c.b*255);q[3]=255;}
-void SpeedFxRaster::blend(float x,float y,Color c,double a) {if (a<=0.004) return;const int ix=int(std::floor(x)),iy=int(std::floor(y));if (ix<0 || iy<0 || ix>=w_ || iy>=h_) return;a=std::min(a,1.0);uint8_t *q=c_+(iy*w_+ix)*4;const double da=q[3]/255.0,oa=a+da*(1-a),k=a/oa;q[0]=uint8_t(int(c.r*255)*k+q[0]*(1-k));q[1]=uint8_t(int(c.g*255)*k+q[1]*(1-k));q[2]=uint8_t(int(c.b*255)*k+q[2]*(1-k));q[3]=uint8_t(oa*255);}
-void SpeedFxRaster::add(int x,int y,Color c,double k) {if (k<=0.004 || x<0 || y<0 || x>=w_ || y>=h_) return;uint8_t *q=l_+(y*w_+x)*4;q[0]=uint8_t(std::min(255.0,q[0]+int(c.r*255)*k));q[1]=uint8_t(std::min(255.0,q[1]+int(c.g*255)*k));q[2]=uint8_t(std::min(255.0,q[2]+int(c.b*255)*k));}
+void SpeedFxRaster::put(int x,int y,Color c) {if (x<0 || y<0 || x>=w_ || y>=h_) return;uint8_t *q=c_+(y*w_+x)*4;q[0]=uint8_t(c.r*255);q[1]=uint8_t(c.g*255);q[2]=uint8_t(c.b*255);q[3]=255;color_used_=true;}
+void SpeedFxRaster::blend(float x,float y,Color c,double a) {if (a<=0.004) return;const int ix=int(std::floor(x)),iy=int(std::floor(y));if (ix<0 || iy<0 || ix>=w_ || iy>=h_) return;a=std::min(a,1.0);uint8_t *q=c_+(iy*w_+ix)*4;const double da=q[3]/255.0,oa=a+da*(1-a),k=a/oa;q[0]=uint8_t(int(c.r*255)*k+q[0]*(1-k));q[1]=uint8_t(int(c.g*255)*k+q[1]*(1-k));q[2]=uint8_t(int(c.b*255)*k+q[2]*(1-k));q[3]=uint8_t(oa*255);color_used_|=q[3]>0;}
+void SpeedFxRaster::add(int x,int y,Color c,double k) {if (k<=0.004 || x<0 || y<0 || x>=w_ || y>=h_) return;uint8_t *q=l_+(y*w_+x)*4;q[0]=uint8_t(std::min(255.0,q[0]+int(c.r*255)*k));q[1]=uint8_t(std::min(255.0,q[1]+int(c.g*255)*k));q[2]=uint8_t(std::min(255.0,q[2]+int(c.b*255)*k));light_used_|=(q[0]|q[1]|q[2])!=0;}
 void SpeedFxRaster::glow(float x,float y,float r,Color c,double strength) {if (r<1 || strength<=0.004) return;for (int sy=std::max(0,int(std::floor(y-r)));sy<=std::min(h_-1,int(std::ceil(y+r)));++sy) for (int sx=std::max(0,int(std::floor(x-r)));sx<=std::min(w_-1,int(std::ceil(x+r)));++sx) {const double d=std::hypot(sx+0.5-x,sy+0.5-y)/r;if (d<1) add(sx,sy,c,(1-d)*(1-d)*strength);}}
 void SpeedFxRaster::disc(float cx,float cy,float r,Color c,double a) {const float r2=r*r;for (int sy=int(std::floor(cy-r));sy<=int(std::ceil(cy+r));++sy) {const float dy=sy+0.5f-cy,s2=r2-dy*dy;if (s2<0) continue;const float s=std::sqrt(s2);for (int sx=int(std::ceil(cx-s-0.5f));sx<=int(std::floor(cx+s-0.5f));++sx) {if (a>=1) put(sx,sy,c);else blend(sx,sy,c,a);}}}
 void SpeedFxRaster::solid(float x,float y,float r,Color c) {if (r<0.6f) px(x,y,c);else disc(x,y,r,c,1);}
@@ -172,4 +182,265 @@ void SpeedFxRaster::bolt_bar(Vector2 tail,double angle,double age,double life,do
     const Vector2 A=logical(tail);const double Lp=length*wl_,hw=width*0.5*wl_;for (double d=0;d<=Lp;d+=0.5) {const double k=d/Lp,tp=std::pow(std::min({1.0,k/0.45,(1-k)/0.12}),0.7),w=std::max(0.5,hw*tp);const float cx=float(A.x+dir.x*d),cy=float(A.y+dir.y*d);for (double o=-w;o<=w;o+=0.5) {const double e=std::abs(o)/w;if (fade>0.6 || hash1(d*7+o*13+tick30)<fade*1.4) px(float(cx+sd.x*o),float(cy+sd.y*o),pal[e<0.3?4:e<0.65?3:2]);}if (int(d)%2==0) add(int(cx),int(cy),pal[2],0.35*fade);}
     glow(float(A.x+dir.x*Lp*0.7),float(A.y+dir.y*Lp*0.7),float(hw*2.2),pal[2],0.35*fade);
 }
+
+// Painter.dot の明るさ・ディザを保ち、内側の画素ループだけをまとめて処理する。
+void SpeedFxRaster::reference_dot(double x,double y,Color color,double alpha) {
+    if (alpha<=0 || color.a<=0) return;
+    const int ix=int(std::floor(x)),iy=int(std::floor(y));
+    if (ix<0 || iy<0 || ix>=w_ || iy>=h_) return;
+    constexpr int bayer[16]={0,8,2,10,12,4,14,6,3,11,1,9,15,7,13,5};
+    double k=1;
+    if (alpha>=0.12 && alpha<0.999) k=0.2+0.8*alpha;
+    else if (alpha<1 && alpha<=(bayer[((iy&3)<<2)|(ix&3)]+0.5)/16.0) return;
+    uint8_t *q=c_+(iy*w_+ix)*4;
+    q[0]=uint8_t(clamp1(color.r)*255.0*k);
+    q[1]=uint8_t(clamp1(color.g)*255.0*k);
+    q[2]=uint8_t(clamp1(color.b)*255.0*k);
+    q[3]=k!=1?255:uint8_t(clamp1(color.a)*255.0);
+    color_used_|=q[3]>0;
+}
+void SpeedFxRaster::reference_add(int x,int y,Color color,double strength) {
+    if (strength<=0.004 || x<0 || y<0 || x>=w_ || y>=h_) return;
+    uint8_t *q=l_+(y*w_+x)*4;
+    q[0]=uint8_t(std::min(255.0,q[0]+int(double(color.r)*255.0)*strength));
+    q[1]=uint8_t(std::min(255.0,q[1]+int(double(color.g)*255.0)*strength));
+    q[2]=uint8_t(std::min(255.0,q[2]+int(double(color.b)*255.0)*strength));
+    light_used_|=(q[0]|q[1]|q[2])!=0;
+}
+void SpeedFxRaster::reference_glow(Vector2 center,double radius,Color color,double strength) {
+    if (radius<1 || strength<=0.004) return;
+    for (int y=std::max(0,int(std::floor(center.y-radius)));y<=std::min(h_-1,int(std::ceil(center.y+radius)));++y) {
+        for (int x=std::max(0,int(std::floor(center.x-radius)));x<=std::min(w_-1,int(std::ceil(center.x+radius)));++x) {
+            const double d=Vector2(x+0.5,y+0.5).distance_to(center)/radius;
+            if (d<1) reference_add(x,y,color,(1-d)*(1-d)*strength);
+        }
+    }
+}
+void SpeedFxRaster::auriga_trail(PackedVector2Array points,PackedFloat64Array strengths,double width,PackedColorArray palette,double clock) {
+    if (points.size()<2 || strengths.size()!=points.size() || palette.size()<5) return;
+    const auto random=[](int x,int y,int seed) {
+        uint32_t h=0x9e3779b9;
+        for (int n:{x,y,seed}) {h=(h^uint32_t(n))*0x85ebca6b;h^=h>>13;h*=0xc2b2ae35;h^=h>>16;}
+        return double(h)/4294967296.0;
+    };
+    const auto noise=[&](double x,double y) {
+        const int ix=int(std::floor(x)),iy=int(std::floor(y));
+        const double fx=x-ix,fy=y-iy,ux=fx*fx*(3-2*fx),uy=fy*fy*(3-2*fy);
+        return mix1(mix1(random(ix,iy,3),random(ix+1,iy,3),ux),mix1(random(ix,iy+1,3),random(ix+1,iy+1,3),ux),uy)*2-1;
+    };
+    double total=0,cumulative=0;
+    for (int i=1;i<points.size();++i) total+=points[i-1].distance_to(points[i]);
+    for (int i=1;i<points.size();++i) {
+        const Vector2 delta=points[i]-points[i-1];
+        const double length=delta.length();
+        if (length<0.01) continue;
+        const Vector2 u=delta/length,normal(-u.y,u.x);
+        for (double d=0;d<length;d+=0.5) {
+            const double c=cumulative+d,k=mix1(strengths[i-1],strengths[i],d/length);
+            if (k<=0.01) continue;
+            const double taper=std::pow(std::min({1.0,c/10.0,(total-c)/6.0}),0.7);
+            const double h=width*(0.7+0.9*(noise(c*0.22,clock*9)*0.5+0.5))*k*taper;
+            if (h<0.3) continue;
+            const Vector2 point=points[i-1]+u*d;
+            for (double q=-h;q<=h;q+=0.5) {
+                const double edge=std::abs(q)/h;
+                const int level=edge<0.25?4:edge<0.5?3:edge<0.8?2:1;
+                const Vector2 at=point+normal*q;
+                reference_dot(at.x,at.y,palette[level],k*(edge>0.8?0.6:1));
+            }
+            if ((int(std::round(c*2))&3)==0) reference_add(int(std::floor(point.x)),int(std::floor(point.y)),palette[2],0.22*k);
+        }
+        cumulative+=length;
+    }
+}
+void SpeedFxRaster::lynx_scratch(Vector2 origin,double angle,double side,double size,double span,double cut,PackedColorArray palette,Dictionary settings) {
+    if (palette.size()<5 || size<=0) return;
+    const double gap=settings["gap"],space0=settings["space0"],space1=settings["space1"];
+    const double alpha=std::min(1.0,double(settings["intensity"]));
+    const Vector2 forward=Vector2::from_angle(angle),across=Vector2(-forward.y,forward.x)*side;
+    const auto at=[&](double progress) {
+        const Vector2 center=origin+(across*(0.12+gap)-forward*0.70)*size;
+        const double phi=-PI/2+span*(1-progress);
+        return center+(across*1.15*std::cos(phi)-forward*0.85*std::sin(phi))*size;
+    };
+    const auto mark=[&](int k,double progress) {
+        const Vector2 tangent=(at(std::min(1.0,progress+0.01))-at(std::max(0.0,progress-0.01))).normalized();
+        return at(progress)+Vector2(-tangent.y,tangent.x)*((k-1)*mix1(space0,space1,progress)*size);
+    };
+    constexpr double from[3]={0.03,0,0.05},to[3]={0.9,1,0.86};
+    const int count=std::max(10,int(std::floor(size*wl_*1.6+0.5)));
+    const double thickness=0.07*size*wl_*0.9;
+    for (int k=0;k<3;++k) {
+        for (int i=0;i<count;++i) {
+            const double m=double(i)/count,a=mix1(from[k],to[k],m),b=mix1(from[k],to[k],double(i+1)/count);
+            if (a>cut) break;
+            const Vector2 start=logical(mark(k,a)),end=logical(mark(k,std::min(cut,b)));
+            const double width=thickness*smooth(0,0.1,m)*std::pow(1-m,0.7)*(0.85+0.3*hash1(k*17+std::floor(m*9)));
+            if (width<0.25) {reference_dot(start.x,start.y,palette[3],alpha*0.8);continue;}
+            const Vector2 direction=end-start,normal=Vector2(-direction.y,direction.x).normalized();
+            for (double q=-width;q<=width;q+=0.5) {
+                const double edge=std::abs(q)/width;
+                const Vector2 point=start+normal*q;
+                reference_dot(point.x,point.y,palette[edge<0.4?4:edge<0.75?3:2],alpha);
+            }
+            if (i%3==0) reference_add(int(std::floor(start.x)),int(std::floor(start.y)),palette[2],0.25*alpha);
+        }
+        if (cut<to[k] && cut>from[k]) reference_glow(logical(mark(k,cut)),4,palette[4],0.6*alpha);
+    }
+}
+void SpeedFxRaster::nova_field(PackedByteArray alpha,PackedFloat32Array emission,Dictionary state,bool front) {
+    const int width=state["width"],height=state["height"];
+    const double cell=state["cell"],aperture=state["aperture"],range_end=state["range_end"],t=state["t"],tell=state["tell"],burst=state["burst"],gain=state["gain"];
+    const Vector2 source=state["source"],origin=state["origin"];
+    if (width<=0 || height<=0 || cell<=0 || alpha.size()!=int64_t(width)*height || emission.size()!=192*192 || aperture<=0) return;
+    const Color tint=hexc(0x9caec0),flash=hexc(0xe8f4ff),corona=hexc(0x6a9bca),hot=hexc(0xfff0cc);
+    const double stretch=t<0?1:1+0.45*burst,exposure=t<0?tell*1.1:burst*(1.35-0.65*smooth(0.12,0.56,t));
+    const uint8_t *alpha_data=alpha.ptr();
+    const float *samples=emission.ptr();
+    for (int y=0;y<h_;++y) {
+        const int iy=int(std::floor((y-double(origin.y))/cell));
+        const double dy=y-double(source.y);
+        for (int x=0;x<w_;++x) {
+            const int ix=int(std::floor((x-double(origin.x))/cell));
+            const double shadow=ix>=0 && ix<width && iy>=0 && iy<height?alpha_data[iy*width+ix]/255.0:0;
+            const double visible=1-shadow,dx=x-double(source.x),distance=std::sqrt(dx*dx+dy*dy)/wl_;
+            if (visible<0.01 || distance>range_end) continue;
+            const double falloff=(1-smooth(range_end*0.8,range_end,distance))/(1+std::pow(distance/420,2)),strength=visible*gain*falloff;
+            if (!front) {reference_add(x,y,tint,strength*(tell*0.22+burst*0.25));continue;}
+            if (burst>0) {
+                const double angle=std::atan2(dy,dx),ray=0.45+0.55*std::pow(0.5+0.5*std::sin(angle*23+std::sin(angle*7)*2.3),3);
+                reference_add(x,y,flash,strength*burst*ray*0.55*(1-smooth(0,range_end,distance)*0.5));
+            }
+            const int tx=int(std::floor(96+dx*96/(aperture*stretch))),ty=int(std::floor(96+dy*96/aperture));
+            if (tx>=0 && tx<192 && ty>=0 && ty<192) {
+                const double flux=double(samples[ty*192+tx])*visible*gain;
+                reference_add(x,y,corona,flux*exposure*0.8);
+                reference_add(x,y,hot,flux*flux*exposure);
+            }
+        }
+    }
+}
+void SpeedFxRaster::dolphin_band(Vector2 center,double radius,double a0,double a1,double width,PackedColorArray palette,double alpha,double dissolve) {
+    if (radius<=0 || width<=0 || alpha<=0 || palette.size()<3) return;
+    alpha=std::max(0.14,alpha);
+    const int steps=std::max(8,int(std::round((a1-a0)*radius*2)));
+    for (int i=0;i<=steps;++i) {
+        const double u=double(i)/steps,angle=mix1(a0,a1,u),ww=width*std::pow(std::min(1.0,std::min(u,1-u)/0.22),0.75);
+        if (ww<0.3) continue;
+        for (double q=-ww;q<=ww;q+=0.5) {
+            const double e=q/ww,x=center.x+std::cos(angle)*(radius+q),y=center.y+std::sin(angle)*(radius+q);
+            if (dissolve<=0 || hash1(std::round(x)*12.9898+std::round(y)*78.233)>=dissolve) reference_dot(x,y,palette[e>0.55?0:e> -0.45?1:2],alpha);
+        }
+    }
+}
+void SpeedFxRaster::dolphin_arc(Vector2 center,double radius,double a0,double a1,Color color,double alpha) {
+    for (int y=std::max(0,int(std::floor(center.y-radius)));y<=std::min(h_-1,int(std::ceil(center.y+radius)));++y) {
+        for (int x=std::max(0,int(std::floor(center.x-radius)));x<=std::min(w_-1,int(std::ceil(center.x+radius)));++x) {
+            const Vector2 d=Vector2(x+0.5,y+0.5)-center;
+            const double length=d.length(),angle=Math::fposmod(double(d.angle())-a0,TAU);
+            if (length<=radius && length>=radius-1 && angle<=a1-a0) reference_dot(x,y,color,alpha);
+        }
+    }
+}
+
+
+// 炎の動的な3層密度場。領域の保存場所を再利用し、累積順と float32 の丸めは元と揃える。
+void SpeedFxRaster::density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette) {
+    if (width<=0 || height<=0 || palette.size()<3 || points.size()!=radii.size() || points.size()!=layers.size()) return;
+    density_.resize(size_t(width)*height*3);
+    std::fill(density_.begin(),density_.end(),0);
+    for (int i=0;i<points.size();++i) {
+        const double radius=radii[i];
+        const Vector2 point=points[i];
+        const int channel=layers[i];
+        if (radius<0.3 || channel>2) continue;
+        const int x0=std::max(0,int(std::floor(point.x-radius-origin.x))),x1=std::min(width-1,int(std::ceil(point.x+radius-origin.x)));
+        const int y0=std::max(0,int(std::floor(point.y-radius-origin.y))),y1=std::min(height-1,int(std::ceil(point.y+radius-origin.y)));
+        for (int y=y0;y<=y1;++y) for (int x=x0;x<=x1;++x) {
+            const double dx=(x+origin.x+0.5-point.x)/radius,dy=(y+origin.y+0.5-point.y)/radius,d2=dx*dx+dy*dy;
+            if (d2>=1) continue;
+            const size_t index=(size_t(y)*width+x)*3+channel;
+            density_[index]=float(double(density_[index])+std::exp(-d2*3.2)*(1-smooth(0.72,1,std::sqrt(d2))));
+        }
+    }
+    const auto read=[&](double x,double y,int channel) {
+        const int ix=std::clamp(int(std::floor(x+0.5)),0,width-1),iy=std::clamp(int(std::floor(y+0.5)),0,height-1);
+        return density_[(size_t(iy)*width+ix)*3+channel];
+    };
+    struct Mask {Dictionary keys;double cell;Vector2 origin,logical_origin;};
+    std::vector<Mask> masks;
+    const Array input_masks=settings.get("masks",Array());
+    for (int i=0;i<input_masks.size();++i) {
+        const Dictionary row=input_masks[i];
+        masks.push_back({row["keys"],row["cell"],row["origin"],row["logical_origin"]});
+    }
+    const auto visible=[&](int x,int y) {
+        if (masks.empty()) return true;
+        for (const auto &mask:masks) {
+            if (mask.cell<=0) continue;
+            const Vector2 world=mask.origin+(Vector2(x+0.5,y+0.5)-mask.logical_origin)/wl_;
+            const uint64_t key=(uint64_t(uint32_t(int64_t(std::floor(world.x/mask.cell))))<<32)|uint32_t(int64_t(std::floor(world.y/mask.cell)));
+            if (mask.keys.has(int64_t(key))) return true;
+        }
+        return false;
+    };
+    const double clock=settings["clock"],logical_pixel=settings["logical_pixel"],deformation=settings["deformation"],v_gain=settings["v_gain"],v_deformation=settings["v_deformation"],threshold=settings["threshold"],glow_radius=settings["glow_radius"];
+    const PackedFloat64Array strengths=settings["strengths"];
+    const int edge=bool(settings.get("include_edge",false))?1:0;
+    if (strengths.size()<3) return;
+    for (int y=std::max(0,-origin.y);y<std::min(height,h_+edge-origin.y);++y) {
+        const int py=y+origin.y;
+        const double wy=py*logical_pixel;
+        for (int x=std::max(0,-origin.x);x<std::min(width,w_+edge-origin.x);++x) {
+            const int px=x+origin.x;
+            const double wx=px*logical_pixel;
+            const double u=(std::sin(wy*0.075-clock*4.4)+std::sin(wx*0.11+wy*0.033+clock*2.1))*deformation,v=std::cos(wx*0.08+clock*3)*v_gain*v_deformation;
+            if (!visible(px,py) || read(x+u,y+v,0)<threshold) continue;
+            const bool inner=read(x+u,y+v,1)>=threshold,core=inner && read(x+u,y+v,2)>=threshold;
+            const int level=core?2:inner?1:0;
+            reference_dot(px,py,palette[level],1);
+            if ((px&3)==0 && (py&3)==0) reference_glow(Vector2(px,py),glow_radius,palette[level],strengths[level]);
+        }
+    }
+}
+
+
+void SpeedFxRaster::reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength) {
+    if (radius<1 || strength<=0.004) return;
+    const Vector2 delta=b-a;
+    const double l2=std::max(double(delta.length_squared()),0.000000001);
+    for (int y=std::max(0,int(std::floor(std::min(a.y,b.y)-radius)));y<=std::min(h_-1,int(std::ceil(std::max(a.y,b.y)+radius)));++y) {
+        for (int x=std::max(0,int(std::floor(std::min(a.x,b.x)-radius)));x<=std::min(w_-1,int(std::ceil(std::max(a.x,b.x)+radius)));++x) {
+            const Vector2 point(x+0.5,y+0.5);
+            const double u=clamp1(double((point-a).dot(delta))/l2),d=point.distance_to(a+delta*u)/radius;
+            if (d<1) reference_add(x,y,color,(1-d)*(1-d)*strength);
+        }
+    }
+}
+void SpeedFxRaster::reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,Dictionary settings) {
+    const Vector2 delta=b-a;
+    const double length=delta.length();
+    if (length<1 || palette.size()<5) return;
+    const Vector2 direction=delta/length,normal(-direction.y,direction.x);
+    const double time=settings.get("time",0),alpha=clamp1(double(settings.get("alpha",1))),width=settings["w"],d0=double(settings.get("from",0))*length,d1=double(settings.get("to",1))*length,taper=settings.get("taper",0),intensity=settings.get("intensity",1);
+    const bool rounded=settings.get("round",false);
+    for (double d=d0;d<=d1;d+=0.5) {
+        double ends;
+        if (taper!=0) ends=std::pow(std::min({1.0,(d-d0)/taper*(d0>0?1:3),(d1-d)/taper}),0.8);
+        else if (rounded) ends=std::min(1.0,std::sqrt(std::max(0.0,std::min(d,length-d))/(width*0.9+0.01)));
+        else ends=std::min(1.0,(d+2)/4);
+        const double w=width*(1+0.1*std::sin(d*0.35-time*40))*ends,cycle=d*0.03-time*3;
+        const int pulse=cycle-std::floor(cycle)<0.06?1:0;
+        const Vector2 point=a+direction*d;
+        for (double q0=-w*1.25;q0<=w*1.25;q0+=0.5) {
+            const double q=std::abs(q0)/std::max(w,0.01);
+            const int level=std::max(0,(q<0.25?0:q<0.45?1:q<0.7?2:q<0.95?3:4)-pulse);
+            const Vector2 pixel=point+normal*q0;
+            reference_dot(pixel.x,pixel.y,palette[4-level],alpha*(level==4?0.45:1));
+        }
+        if ((int(std::floor(d*2+0.5))&5)==0) reference_add(int(std::floor(point.x)),int(std::floor(point.y)),palette[2],0.25*alpha*intensity);
+    }
+    reference_glow_line(a+direction*d0,a+direction*d1,width*2.6+3,palette[2],0.35*alpha*intensity);
+}
+
 }

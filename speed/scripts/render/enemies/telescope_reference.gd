@@ -10,6 +10,7 @@ var _last_time := -1.0
 var _parent: Node2D
 var _cones := {}
 var _ship_glows := {}
+var _raster := SpeedFxRaster.new()
 
 func setup(parent: Node2D) -> void:
 	_parent = parent
@@ -45,7 +46,7 @@ func render(actors: Array, beams: Array, events: Array, canvas, clock: float) ->
 		var direction := Vector2.from_angle(float(row.angle))
 		var origin: Vector2 = canvas.to_logical(row.pos)
 		var end: Vector2 = canvas.to_logical(row.pos + direction * float(row.length))
-		FX.beam(canvas.front, origin, end, {"color": color, "w": float(row.half_width) * canvas.world_scale, "time": clock, "alpha": minf(1.0, fade * 1.3 * intensity), "to": head, "taper": 10.0 * float(_settings.size)})
+		_beam(canvas.front, origin, end, {"color": color, "w": float(row.half_width) * canvas.world_scale, "time": clock, "alpha": minf(1.0, fade * 1.3 * intensity), "to": head, "taper": 10.0 * float(_settings.size)})
 		if t < 0.08: FX.flare(canvas.front, origin, 16.0 * float(_settings.size) * canvas.world_scale, color, clock, 1.0 - t / 0.08, 6)
 	for event: Dictionary in events:
 		if event.get("type") != &"attack_retired": continue
@@ -151,3 +152,14 @@ func _dust(row: Dictionary, lens: Vector2, angle: float, half: float, color: Col
 func _smooth(a: float, b: float, value: float) -> float:
 	var k := clampf((value - a) / (b - a), 0.0, 1.0)
 	return k * k * (3.0 - 2.0 * k)
+
+func _beam(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
+	if a.distance_to(b) < 1.0: return
+	_raster.begin(painter.colors, painter.lights, painter.width, painter.height, 1.0, Vector2.ZERO)
+	_raster.reference_beam(a, b, PackedColorArray(FX.ramp(options.color)), options)
+	painter.colors = _raster.take_colors()
+	painter.lights = _raster.take_lights()
+	painter.has_color = painter.has_color or _raster.has_color()
+	painter.has_light = painter.has_light or _raster.has_light()
+	if bool(options.get("source", true)) and float(options.get("from", 0)) <= 0.0:
+		FX.flare(painter, a, float(options.w) * 1.3, options.color, float(options.get("time", 0)), clampf(float(options.get("alpha", 1)), 0.0, 1.0))

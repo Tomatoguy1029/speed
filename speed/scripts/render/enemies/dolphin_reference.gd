@@ -6,6 +6,7 @@ const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 var _settings: Dictionary = SETTINGS.for_id("G12-dolphin")
 var _waves := {}
 var _last_time := -1.0
+var _raster := SpeedFxRaster.new()
 
 func render(actors: Array, waves: Array, events: Array, canvas, clock: float) -> void:
 	if _last_time >= 0.0 and clock < _last_time: _waves.clear()
@@ -50,13 +51,10 @@ func render(actors: Array, waves: Array, events: Array, canvas, clock: float) ->
 			_draw_wave(row, float(row.radius) / float(row.speed) + elapsed, canvas, pal)
 
 func _arc(p, center: Vector2, radius: float, a0: float, a1: float, color: Color, alpha: float) -> void:
-	p.shade(center.x-radius, center.y-radius, center.x+radius, center.y+radius, func(x: float, y: float, out: Dictionary):
-		var d := Vector2(x, y) - center
-		var length := d.length()
-		var angle := fposmod(d.angle() - a0, TAU)
-		if length <= radius and length >= radius - 1.0 and angle <= a1-a0:
-			out.c = color
-			out.a = alpha)
+	_raster.begin(p.colors, PackedByteArray(), p.width, p.height, 1.0, Vector2.ZERO)
+	_raster.dolphin_arc(center, radius, a0, a1, color, alpha)
+	p.colors = _raster.take_colors()
+	p.has_color = p.has_color or _raster.has_color()
 
 func _draw_wave(row: Dictionary, time: float, canvas, pal: Array[Color]) -> void:
 	var speed := float(row.speed)
@@ -86,18 +84,7 @@ func _draw_wave(row: Dictionary, time: float, canvas, pal: Array[Color]) -> void
 
 func _band(p, center: Vector2, radius: float, a0: float, a1: float, width: float, colors: Array, alpha: float, dissolve: float) -> void:
 	if radius <= 0 or width <= 0 or alpha <= 0: return
-	alpha = maxf(0.14, alpha)
-	var steps := maxi(8, roundi((a1-a0) * radius * 2.0))
-	for i in range(steps + 1):
-		var u := float(i) / steps
-		var angle := lerpf(a0, a1, u)
-		var ww := width * pow(minf(1.0, minf(u, 1.0-u) / 0.22), 0.75)
-		if ww < 0.3: continue
-		var q := -ww
-		while q <= ww:
-			var e := q / ww
-			var x := center.x + cos(angle) * (radius + q)
-			var y := center.y + sin(angle) * (radius + q)
-			if dissolve <= 0 or FX.hash_value(roundf(x) * 12.9898 + roundf(y) * 78.233) >= dissolve:
-				p.dot(x, y, colors[0] if e > 0.55 else (colors[1] if e > -0.45 else colors[2]), alpha)
-			q += 0.5
+	_raster.begin(p.colors, PackedByteArray(), p.width, p.height, 1.0, Vector2.ZERO)
+	_raster.dolphin_band(center, radius, a0, a1, width, PackedColorArray(colors), alpha, dissolve)
+	p.colors = _raster.take_colors()
+	p.has_color = p.has_color or _raster.has_color()
