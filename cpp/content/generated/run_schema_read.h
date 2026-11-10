@@ -4918,7 +4918,7 @@ inline bool read(BinaryReader &input, DracoFlowGateDefinition &out) {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 16) return false;
+        if (version != 19) return false;
         if (count > input.remaining()/736) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -4936,7 +4936,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 2) return false;
+        if (version != 5) return false;
         if (count > input.remaining()/258) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
