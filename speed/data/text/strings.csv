@@ -87,6 +87,7 @@ stage_select.launch,出撃,Launch
 stage_select.available,出撃可能,Ready to launch
 ,■ ラン中（HUD・3択・ポーズ）,
 hud.draw,描く,Draw
+hud.boost_start_too_far,始点が遠すぎます,Start point is too far
 hud.kills,撃破 {n},Kills {n}
 hud.bonus,ボーナスステージ　残り {n} 秒,Bonus Stage  {n}s Left
 hud.warning,WARNING!!,WARNING!!

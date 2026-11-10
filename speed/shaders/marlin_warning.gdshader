@@ -52,8 +52,10 @@ vec3 to_linear(vec3 color) {
 void fragment() {
 	float a = clamp(floor(UV.x * beam_length + 0.5), 0.0, beam_length);
 	float b = floor((UV.y - 0.5) * 14.0 + 0.5);
-	float envelope = smoothstep(0.0, 11.0, a) * smoothstep(0.0, 36.0, beam_length - a);
-	float along = clamp((a + path_offset) / max(path_length, 0.001), 0.0, 1.0);
+	// 画面で切った端では減衰を始め直さず、吻先から終端までの距離で求める。
+	float path_distance = a + path_offset;
+	float envelope = smoothstep(0.0, 1.0, path_distance + 0.5) * smoothstep(0.0, 36.0, path_length - path_distance);
+	float along = clamp(path_distance / max(path_length, 0.001), 0.0, 1.0);
 	float flow = packet_flow(along);
 	float width = (0.63 + 0.23 * flow) * sqrt(envelope);
 	float core = exp(-pow(b / (width + 0.02), 2.0)) * envelope;

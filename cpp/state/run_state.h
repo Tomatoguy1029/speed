@@ -102,7 +102,7 @@ struct RunState {
         double boost_duration, carry, launch_ratio, glide_ratio, capacity, charge_time, length_mult;
     } draw_config{};
     struct Draw {
-        double gauge = 1, start_charge = 0, amount = 0, limit = 0, length = 0, before_speed = 0;
+        double gauge = 1, start_charge = 0, amount = 0, limit = 0, connection = 0, length = 0, before_speed = 0;
         double speed = 0, rate = 0, seg_pos = 0, total = 0, progress = 0;
         bool drawing = false, started = false, blocked = false, full_charge = false, tracing = false;
         int64_t first_msec = 0, dash_id = 0, segment = 0;

@@ -3,7 +3,7 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dr5auv1brna4u"
-path="res://.godot/imported/bomber_base.png-b3b297ed2a9a16d2d938a50348af4884.ctex"
+path="res://.godot/imported/bomber_base.png-10542597b4851369e5e7a2066bfa64f5.ctex"
 metadata={
 "vram_texture": false
 }
@@ -11,7 +11,7 @@ metadata={
 [deps]
 
 source_file="res://assets/pixel/bomber/bomber_base.png"
-dest_files=["res://.godot/imported/bomber_base.png-b3b297ed2a9a16d2d938a50348af4884.ctex"]
+dest_files=["res://.godot/imported/bomber_base.png-10542597b4851369e5e7a2066bfa64f5.ctex"]
 
 [params]
 
