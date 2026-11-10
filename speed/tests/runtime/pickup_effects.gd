@@ -143,6 +143,7 @@ func check_cpp_reward() -> void:
 		var actual: EnemyDef = load("res://data/enemies/splitter.tres")
 		# AIの移植前も同じ報酬経路を使い、実データの散乱・輪の有無を固定場面で確認する。
 		var probe: EnemyDef = base.duplicate(true)
+		probe.behavior = &"chase"
 		probe.id = id
 		probe.rank = actual.rank
 		probe.params = actual.params.duplicate(true)
@@ -185,6 +186,7 @@ func check_cpp_reward_view() -> bool:
 	for id in [&"splitter",&"splitling"]:
 		var actual: EnemyDef = load("res://data/enemies/splitter.tres")
 		var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
+		definition.behavior = &"chase"
 		definition.id = id
 		definition.rank = actual.rank
 		definition.params = actual.params.duplicate(true)
