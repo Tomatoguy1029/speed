@@ -19,6 +19,7 @@ struct ContactGeometry {bool add_ship_radius=true,ship_sweep=false;};
 class CollisionQuery {
 public:
     static std::vector<size_t> enemy_rows(const godot::RunState &,Point lo,Point hi,bool include_dead=false);
+    static void enemy_rows_into(const godot::RunState &,Point lo,Point hi,std::vector<size_t> &out,bool include_dead=false);
     static double segment_circle_t(Point from,Point to,Point center,double radius);
     static double point_segment_squared(Point point,Point from,Point to);
     static bool point_in_polygon(Point,const std::vector<Point> &);

@@ -504,7 +504,9 @@ Dictionary SpeedRunCore::read_frame_value(bool full_snapshot) {
     for (const auto &v:blast.visuals) {Dictionary item;item["id"]=int64_t(v.id);item["pos"]=v.pos;item["radius"]=v.radius;item["age"]=v.age;blast_visuals.push_back(item);}end_blast["pending"]=pending_blasts;end_blast["visuals"]=blast_visuals;ui["end_blast"]=end_blast;
     ui["capacity"]=runtime.state.draw_config.capacity;ui["charge_time"]=runtime.state.draw_config.charge_time;ui["min_charge"]=runtime.state.draw_config.min_charge;ui["full_burst"]=runtime.state.loadout->full_burst_owned;ui["full_burst_active"]=runtime.state.loadout->full_burst_active;ui["shooting_rate"]=runtime.state.draw.gauge<1.0?1.0:1.0+runtime.state.loadout->effects.full_gauge_rate*runtime.state.draw.gauge;
     ui["character_scale"]=runtime.content->config.character_scale;ui.merge(speed::ProgressionSystem::ui(runtime),true);
-    value["ui"]=full_snapshot?ui.duplicate(true):speed::FrameBuilder::ui_delta(runtime,ui);
+    // 各snapshotは新しいDictionary/Arrayを組み立てる。全体読取ではその所有を返却先へ渡す。
+    // 戦闘側と共有するPacked配列は値型なので、返却先の編集は元の状態へ戻らない。
+    value["ui"]=full_snapshot?ui:speed::FrameBuilder::ui_delta(runtime,ui);
     value["events"]=speed::FrameBuilder::events(runtime);value["resource_requests"]=speed::ProgressionSystem::requests(runtime);value["result"]=speed::Lifecycle::result(runtime);return success(value);
 }
 Dictionary SpeedRunCore::ack_frame_run(int64_t epoch,int64_t sequence) {

@@ -24,6 +24,8 @@ struct FrameWorkspace {
 class FrameBuilder {
 public:
     static void append(RunRuntime &run,godot::StringName type,const godot::Dictionary &payload);
+    // 新規に作った辞書とその内側の可変値を渡し切る内部用。呼出し後は元を再利用しない。
+    static void append_owned(RunRuntime &run,godot::StringName type,godot::Dictionary &&payload);
     static godot::Array events(RunRuntime &run);
     static int acknowledge(RunRuntime &run,int64_t epoch,int64_t sequence);
     static godot::Dictionary ui_delta(RunRuntime &run,const godot::Dictionary &ui);

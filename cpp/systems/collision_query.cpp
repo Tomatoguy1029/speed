@@ -6,8 +6,13 @@
 namespace speed {
 std::vector<size_t> CollisionQuery::enemy_rows(const godot::RunState &state,Point lo,Point hi,bool include_dead) {
     std::vector<size_t> out;
+    enemy_rows_into(state,lo,hi,out,include_dead);
+    return out;
+}
+void CollisionQuery::enemy_rows_into(const godot::RunState &state,Point lo,Point hi,std::vector<size_t> &out,bool include_dead) {
+    out.clear();
     if (state.grid.cols == 0 || hi.x < state.grid.origin.x || hi.y < state.grid.origin.y ||
-            lo.x > state.grid.origin.x + state.grid.cols * state.grid.cell || lo.y > state.grid.origin.y + state.grid.rows * state.grid.cell) return out;
+            lo.x > state.grid.origin.x + state.grid.cols * state.grid.cell || lo.y > state.grid.origin.y + state.grid.rows * state.grid.cell) return;
     const int64_t x0 = std::clamp(int64_t((double(lo.x) - state.grid.origin.x) / state.grid.cell), int64_t(0), state.grid.cols - 1);
     const int64_t x1 = std::clamp(int64_t((double(hi.x) - state.grid.origin.x) / state.grid.cell), int64_t(0), state.grid.cols - 1);
     const int64_t y0 = std::clamp(int64_t((double(lo.y) - state.grid.origin.y) / state.grid.cell), int64_t(0), state.grid.rows - 1);
@@ -19,7 +24,6 @@ std::vector<size_t> CollisionQuery::enemy_rows(const godot::RunState &state,Poin
             row = state.grid.next[row];
         }
     }
-    return out;
 }
 
 double CollisionQuery::segment_circle_t(Point from,Point to,Point center,double radius) {

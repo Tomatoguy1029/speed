@@ -20,6 +20,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
     struct Hit { double time; size_t row; };
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
+    std::vector<size_t> candidates;
     // 命中で末尾へ増えた弾は同じ更新で進め、既に通った空き行は次回に進める。
     for (size_t i = 0; i < runtime.state.friends.size(); ++i) {
         auto &shot = runtime.state.friends[i];
@@ -40,7 +41,8 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
         const double padding = double(shot.radius) + std::max(runtime.state.combat_config.max_enemy_radius, runtime.state.grid.max_radius);
         const Vector2 pad(padding, padding);
         hits.clear();
-        for (size_t row : CollisionQuery::enemy_rows(runtime.state,from.min(to) - pad, from.max(to) + pad)) {
+        CollisionQuery::enemy_rows_into(runtime.state,from.min(to) - pad,from.max(to) + pad,candidates);
+        for (size_t row : candidates) {
             const auto &enemy = runtime.state.enemies[row];
             const auto target=CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));
             if (!runtime.state.enemy_handles.contains(target) || shot.hit_ids.count(runtime.state.enemy_handles.entity_id(target))) continue;

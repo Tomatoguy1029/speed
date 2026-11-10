@@ -4,6 +4,26 @@ const VISUAL_ROLE = preload("res://scripts/data_types/generated/run_ids.gd").ENU
 const SHAPE_KIND = preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.RenderShapeKind
 const EFFECT_SETTINGS = preload("res://data/visuals/effect_settings.tres")
 const COMET_VISUAL := preload("res://scripts/render/comet_visual.gd")
+## 描画で読む通知だけを購読する。音・録画・HUDの購読と受領順は窓口が別に保つ。
+const EFFECT_EVENT_TYPES := {
+	&"anchor_capture":true, &"anchor_fire":true, &"hurt":true, &"kill":true,
+	&"combat_damage":true, &"hydra_cue":true, &"canis_cue":true, &"canis_ignite_arrived":true,
+	&"beam":true, &"meteor_impact":true, &"hero_power":true, &"shot_hit":true,
+	&"draco_shake":true, &"draco_roar":true, &"shield_stolen":true, &"shield_block":true,
+	&"rock_break":true, &"ruler_split":true, &"cepheus_summon":true,
+	&"telescope_charge":true, &"telescope_fire":true, &"critical_lance":true, &"critical_lance_hit":true,
+	&"flood_end":true, &"attack_visual_end":true, &"explode":true, &"debris_trail":true,
+	&"ring":true, &"bud":true, &"gem_burst":true, &"boss_explode":true, &"ship_explode":true,
+	&"duplicate":true, &"swallow":true, &"barrier_hit":true, &"barrier_restore":true,
+	&"weapon_fire":true, &"slash_mark":true, &"slash_release":true, &"flash_slash":true,
+	&"escort_deploy":true, &"escort_slash":true, &"full_burst_ready":true,
+	&"monoceros_slash_release":true, &"boss_defeated":true, &"boss_cancelled":true, &"final_strike":true,
+}
+const REFERENCE_EVENT_TYPES := {&"attack_retired":true, &"biter_cue":true, &"beam":true, &"flood_end":true, &"enemy_retire":true}
+
+static func presentation_event_types() -> Array:
+	return EFFECT_EVENT_TYPES.keys() + REFERENCE_EVENT_TYPES.keys()
+
 var perf := PerfLog.new()
 var boss_hit_feedback := preload("res://scripts/bosses/boss_hit_feedback.gd").new()
 var metrics_record := {}
@@ -1142,6 +1162,13 @@ func apply_frame(frame: Dictionary) -> bool:
 
 ## 固定更新の間に届いた通知を、次の表示まで保持する。
 func receive_frame(frame: Dictionary) -> bool:
+	return _receive_frame(frame,false)
+
+## bridge が購読者ごとに独立させた封筒だけを渡す。保持中も他の購読者や公開読取とは共有しない。
+func receive_owned_frame(frame: Dictionary) -> bool:
+	return _receive_frame(frame,true)
+
+func _receive_frame(frame: Dictionary, owns_events: bool) -> bool:
 	_mark_clock = float(frame.ui.world_time)
 	if frame.epoch!=_epoch:
 		_epoch = frame.epoch
@@ -1242,17 +1269,27 @@ func receive_frame(frame: Dictionary) -> bool:
 		_meteor_shards.clear()
 		_shield_transfers.clear()
 	var feedback_targets := {}
+	var damage_targets := {}
 	for body: Dictionary in frame.ui.get("boss_bodies",[]):
+		if int(body.kind) in [0,1,2]: damage_targets[int(body.actor)]=true
 		if int(body.kind) not in [0,4]:continue
 		feedback_targets[int(body.actor)]=true
 		for clone: Dictionary in body.get("clones",[]):feedback_targets[int(clone.id)]=true
 	for event: Dictionary in frame.events:
-		var payload: Dictionary = event.payload.duplicate(true)
-		if event.type=="combat_damage" and payload.get("target","")=="enemy" and float(payload.get("applied",0.0))>0.0 and feedback_targets.has(int(payload.get("target_id",0))):
-			boss_hit_feedback.pulse(int(payload.target_id))
-		payload["type"] = event.type
+		var event_type := StringName(event.type)
+		if REFERENCE_EVENT_TYPES.has(event_type):
+			_reference_events.append(event if owns_events else event.duplicate(true))
+		if not EFFECT_EVENT_TYPES.has(event_type): continue
+		var source: Dictionary = event.payload
+		if event_type==&"combat_damage":
+			if source.get("target","")!="enemy" or float(source.get("applied",0.0))<=0.0: continue
+			var target_id := int(source.get("target_id",0))
+			if feedback_targets.has(target_id): boss_hit_feedback.pulse(target_id)
+			if not damage_targets.has(target_id): continue
+		# 専用の封筒は保持し、typeを足す外側だけを分ける。参照演出と共通の通知は値だけを読む。
+		var payload: Dictionary = source.duplicate(not owns_events)
+		payload["type"] = event_type
 		_queued_events.append(payload)
-		_reference_events.append(event.duplicate(true))
 	return true
 
 func update_reference_effects(frame: Dictionary, real_dt: float) -> void:

@@ -20,6 +20,7 @@ var delivery_error: Dictionary = {}
 var _metrics_record := {}
 var _metrics_bytes := 0
 var _latest_bytes := 0
+var _latest_view_bytes := -1
 var _delivery_bytes := 0
 var _delivery_sizes := {}
 var _resource_wait_started := 0
@@ -226,6 +227,7 @@ func restore(id: int) -> Dictionary:
 	_ui = {}
 	_latest = {}
 	_latest_bytes = 0
+	_latest_view_bytes = -1
 	_delivery_bytes = 0
 	_delivery_sizes = {}
 	_delivery = {}
@@ -255,6 +257,7 @@ func dispose() -> Dictionary:
 		_subscribers.clear()
 		_latest = {}
 		_latest_bytes = 0
+		_latest_view_bytes = -1
 		_delivery_bytes = 0
 		_delivery_sizes = {}
 		_ui = {}
@@ -281,21 +284,33 @@ func _read_locked(public_copy := true) -> Dictionary:
 	_latest = result.value
 	_latest.ui = _ui
 	_latest_bytes = _packed_bytes(_latest)
+	_latest_view_bytes = -1
 	perf.since(&"bridge_copy",began)
 	return _copy_latest() if public_copy else _ok(_latest)
 
-func _copy_latest() -> Dictionary:
+func _copy_latest(include_events := true) -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
-	var snapshot := _ok(_latest.duplicate(true))
-	_metrics_bytes += _latest_bytes
+	var source := _latest
+	var copied_bytes := _latest_bytes
+	if not include_events:
+		# 表示の更新は通知購読を使うので、同じ通知列をsnapshotでもう一度複製しない。
+		source = _latest.duplicate()
+		source.events = []
+		if _latest_view_bytes<0: _latest_view_bytes = _packed_bytes(source)
+		copied_bytes = _latest_view_bytes
+	var snapshot := _ok(source.duplicate(true))
+	_metrics_bytes += copied_bytes
 	perf.since(&"bridge_copy",began)
 	return snapshot
 
-func latest_frame() -> Dictionary:
+func latest_frame(include_events := true) -> Dictionary:
 	if _busy: return _error(7,"latest_frame","配信中は読めません")
 	if _core==null: return _error(4,"latest_frame","破棄済みです")
-	if _latest.is_empty(): return read_frame()
-	return _copy_latest()
+	if _latest.is_empty():
+		if include_events: return read_frame()
+		var result := _read_locked(false)
+		if not result.ok: return result
+	return _copy_latest(include_events)
 
 func read_metrics(reader: StringName = &"") -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")
@@ -345,7 +360,11 @@ func subscribe(name: String, consumer: Callable, ui_fields: Variant = null, even
 				if str(key).is_empty(): return false
 				if str(key) not in fields: fields.append(str(key))
 		selections.append(fields)
-	_subscribers[name] = {"consumer":consumer,"ui_fields":selections[0],"event_types":selections[1],"epoch":0,"sequence":0,"revision":-1}
+	var event_types_set: Variant = null
+	if selections[1]!=null:
+		event_types_set = {}
+		for event_type: String in selections[1]: event_types_set[StringName(event_type)] = true
+	_subscribers[name] = {"consumer":consumer,"ui_fields":selections[0],"event_types":event_types_set,"epoch":0,"sequence":0,"revision":-1}
 	_delivery_sizes.erase(name)
 	return true
 
@@ -376,7 +395,7 @@ func _copy_delivery(fields: Variant, event_types: Variant) -> Dictionary:
 		var selected_events := []
 		if not event_types.is_empty():
 			for event: Dictionary in _delivery.events:
-				if str(event.type) in event_types: selected_events.append(event)
+				if event_types.has(StringName(event.type)): selected_events.append(event)
 		source.events=selected_events
 	return source.duplicate(true)
 
