@@ -590,12 +590,26 @@ func _draw_cpp_gauge_ring() -> void:
 	var draw: Dictionary = _cpp_ui.draw
 	var capacity := float(_cpp_ui.capacity)
 	var amount := float(draw.gauge)*capacity
-	var displayed := float(draw.draw_gauge)*(1.0-float(draw.draw_length)/maxf(1.0,float(draw.draw_limit))) if draw.drawing else amount
-	_draw_gauge_values(float(_cpp_ui.min_charge),capacity,amount,draw.drawing,not draw.drawing and not draw.tracing,displayed,_cpp_ui.full_burst)
+	var displayed := float(draw.draw_gauge)*(1.0-(float(draw.draw_length)+float(draw.get("draw_connection",0.0)))/maxf(1.0,float(draw.draw_limit))) if draw.drawing else amount
+	var placing_start: bool = not draw.tracing and (not draw.drawing or not draw.draw_started)
+	var too_far := false
+	var reach := float(draw.get("draw_reach",INF))
+	if placing_start and _cpp_ui.input_enabled and amount>=float(_cpp_ui.min_charge) and is_finite(reach):
+		var cursor_world: Vector2 = _cpp_ui.view_center+(get_viewport().get_mouse_position()-size*0.5)*(float(_cpp_ui.view_half.x)*2.0/maxf(1.0,size.x))
+		too_far = _cpp_ui.ship.ship_pos.distance_to(cursor_world)>=reach
+	_draw_gauge_values(float(_cpp_ui.min_charge),capacity,amount,draw.drawing and not too_far,not draw.drawing and not draw.tracing,displayed,_cpp_ui.full_burst,not too_far)
+	if too_far:
+		var message := tr("hud.boost_start_too_far")
+		var text_size := _font.get_string_size(message,HORIZONTAL_ALIGNMENT_LEFT,-1,14)
+		var at := get_viewport().get_mouse_position()+Vector2(20,56)
+		at.x = clampf(at.x,8.0,maxf(8.0,size.x-text_size.x-8.0))
+		at.y = clampf(at.y,18.0,maxf(18.0,size.y-8.0))
+		draw_string_outline(_font,at,message,HORIZONTAL_ALIGNMENT_LEFT,-1,14,3,Color.BLACK)
+		draw_string(_font,at,message,HORIZONTAL_ALIGNMENT_LEFT,-1,14,BOOST_STYLE.unavailable_color)
 
-func _draw_gauge_values(min_charge: float,capacity: float,amount: float,drawing: bool,charging: bool,displayed: float,full_burst: bool) -> void:
+func _draw_gauge_values(min_charge: float,capacity: float,amount: float,drawing: bool,charging: bool,displayed: float,full_burst: bool,start_reachable := true) -> void:
 	var c := get_viewport().get_mouse_position()+Vector2(26,26)
-	var usable := amount >= min_charge
+	var usable := amount >= min_charge and start_reachable
 	if usable and not _ring_usable and charging:
 		_ring_pulse_t = RING_PULSE_TIME
 	_ring_usable = usable
@@ -606,6 +620,9 @@ func _draw_gauge_values(min_charge: float,capacity: float,amount: float,drawing:
 	amount = displayed
 	var flash := _ring_flash_t / _ring_flash_max if _ring_flash_t > 0.0 else 0.0
 	var pulse := 1.0 - _ring_pulse_t / RING_PULSE_TIME if _ring_pulse_t > 0.0 else -1.0
+	if not start_reachable:
+		flash = 0.0
+		pulse = -1.0
 	BOOST_GAUGE.draw(self, c, amount, capacity, min_charge, drawing, usable, flash, pulse, BOOST_STYLE, RING_GAP)
 
 ## 内側・外側のどれかのリングが、before から after の間に溜まりきったか

@@ -60,10 +60,12 @@ static func editor_arguments() -> PackedStringArray:
 		"--script","res://tools/content/build_all.gd","--","--editor-build-report"])
 
 ## エディターが保持した古いC++拡張・Resourceを、生成に使わない。
-static func build_for_editor() -> Error:
+static func build_for_editor(timeline_only := false) -> Error:
 	last_build_report = []
 	var output := []
-	var exit_code := OS.execute(OS.get_executable_path(),editor_arguments(),output,true)
+	var arguments := editor_arguments()
+	if timeline_only: arguments.append("--timeline-only")
+	var exit_code := OS.execute(OS.get_executable_path(),arguments,output,true)
 	var result_error: Error = FAILED
 	for chunk: String in output:
 		for line: String in chunk.split("\n"):
@@ -231,3 +233,26 @@ static func build_cpp_stage(source: StageDef, config: GameConfig, output := ROOT
 	var stage := preload("res://tools/content/build_runtime_stage.gd").compile(source,output,config)
 	if stage == null: return ERR_INVALID_DATA
 	return preload("res://tools/content/build_run_content.gd").build(stage,config,output.path_join("run"),signature(),definitions)
+
+## 途中再生の生成も、新しいプロセスで読み込んだ設定とC++拡張を使う。
+static func prepare_timeline_request(output := "res://.content") -> Error:
+	var request := preload("res://addons/stage_launcher/launch_request.gd")
+	var pending := request.pending_timeline()
+	if pending.is_empty(): return OK
+	var error := request.set_timeline_content({})
+	if error != OK: return error
+	if not pending.stage is int or pending.stage <= 0 or not (pending.time is float or pending.time is int) or not is_finite(float(pending.time)) or pending.time < 0 or not pending.source is String or not ResourceLoader.exists(pending.source): return ERR_INVALID_DATA
+	var source := ResourceLoader.load(pending.source,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
+	if source == null or source.index != pending.stage: return ERR_INVALID_DATA
+	var config := ResourceLoader.load("res://data/config.tres","",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as GameConfig
+	var path := output.path_join("run/stage_%d.json" % source.index)
+	# 新しい索引が完成しないかぎり、前回の生成結果を起動へ渡さない。
+	if FileAccess.file_exists(path):
+		error = DirAccess.remove_absolute(ProjectSettings.globalize_path(path))
+		if error != OK: return error
+	error = build_cpp_stage(source,config,output)
+	if error != OK: return error
+	if not FileAccess.file_exists(path): return ERR_CANT_CREATE
+	var index: Variant = JSON.parse_string(FileAccess.get_file_as_string(path))
+	if not index is Dictionary or not index.get("input_sha256",null) is String: return ERR_INVALID_DATA
+	return request.set_timeline_content({"index":path,"signature":index.input_sha256})

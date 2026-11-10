@@ -1,4 +1,5 @@
 ## 承認された試作の全実効値。描画値と比較条件を技IDごとに保持する。
+@tool
 class_name FxReferenceSettings
 extends Resource
 

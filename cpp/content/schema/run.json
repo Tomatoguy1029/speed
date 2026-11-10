@@ -668,7 +668,7 @@
           "runtime": "control.boss_touch_damage"
         }
       ],
-      "version": 16
+      "version": 19
     },
     {
       "name": "StringEntry",
@@ -951,7 +951,7 @@
           "value": 0.0
         }
       ],
-      "version": 2
+      "version": 5
     },
     {
       "name": "LoadoutDefinition",

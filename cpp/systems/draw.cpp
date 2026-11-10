@@ -24,6 +24,14 @@
 #include <cmath>
 using namespace godot;
 
+namespace {
+double available_draw_length(const RunState &state) {
+    if (!state.ship_ready) return 0;
+    const auto &d=state.draw_config;
+    return d.length*d.capacity*state.draw.gauge*(state.ship_config.max_speed/state.ship_config.base_max_speed)*d.length_mult;
+}
+}
+
 bool SpeedRunCore::configure_draw(const Dictionary &config, const Dictionary &stats) {
     if (runtime.state.started || runtime.state.closed) return false;
     DrawConfig c{};
@@ -59,7 +67,8 @@ void SpeedRunCore::begin_draw(bool press, Vector2 pen, int64_t clock_msec) {
     runtime.state.draw.full_charge = runtime.state.draw.gauge >= 1.0 - 1e-6;
     runtime.state.draw.start_charge = runtime.state.draw.gauge;
     runtime.state.draw.amount = runtime.state.draw_config.capacity * runtime.state.draw.gauge;
-    runtime.state.draw.limit = runtime.state.draw_config.length * runtime.state.draw.amount * (runtime.state.ship_config.max_speed / runtime.state.ship_config.base_max_speed) * runtime.state.draw_config.length_mult;
+    runtime.state.draw.limit = available_draw_length(runtime.state);
+    runtime.state.draw.connection = press?runtime.state.ship.pos.distance_to(pen):0;
     runtime.state.draw.length = 0;
     runtime.state.draw.points.clear();
     if (press) { runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
@@ -71,7 +80,7 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
     const Vector2 d = pen - last;
     const double length = d.length();
     if (length < runtime.state.draw_config.point_step) return;
-    const double remain = runtime.state.draw.limit - runtime.state.draw.length;
+    const double remain = runtime.state.draw.limit - runtime.state.draw.connection - runtime.state.draw.length;
     if (remain <= 0.5) return;
     double added = std::min(length, remain);
     const auto hit=speed::FieldSystem::first_body_hit(runtime,last,last+d/length*added,runtime.state.ship_config.ship_radius);
@@ -96,7 +105,10 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 
 void SpeedRunCore::commit_draw() {
     if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
-    runtime.state.draw.gauge = std::max(0.0, runtime.state.draw.gauge - runtime.state.draw.start_charge * std::min(1.0, runtime.state.draw.length / runtime.state.draw.limit));
+    const auto &draw=runtime.state.draw;
+    const double used=draw.connection+draw.length;
+    const bool at_limit=!draw.blocked && draw.limit-used<runtime.state.draw_config.point_step;
+    runtime.state.draw.gauge = std::max(0.0, draw.gauge - draw.start_charge * (at_limit?1.0:std::min(1.0,used/draw.limit)));
     if (runtime.state.control.bonus_remaining>0) runtime.state.draw.gauge=1;
     auto points = runtime.state.draw.points;
     if (runtime.state.ship.pos.distance_to(points[0]) > 1) points.insert(0, runtime.state.ship.pos);
@@ -160,18 +172,22 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
     if (!runtime.state.draw.drawing && !runtime.state.draw.tracing) {
         // しし座の獅子の間は、なぞり（ブースト）を始められない
         if (speed::LeoBehavior::active(runtime)) return true;
-        if ((press || alt) && runtime.state.draw_config.capacity * runtime.state.draw.gauge >= runtime.state.draw_config.min_charge) begin_draw(press, pen, clock_msec);
+        if ((press || alt) && runtime.state.draw_config.capacity * runtime.state.draw.gauge >= runtime.state.draw_config.min_charge) {
+            const auto &s=runtime.state;
+            const double limit=available_draw_length(s);
+            if (!press || s.ship.pos.distance_to(pen)<limit) begin_draw(press,pen,clock_msec);
+        }
         return true;
     }
     if (!runtime.state.draw.drawing) return true;
     if (!runtime.state.draw.started) {
-        if (press) { runtime.state.draw.started = true; runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
+        if (press && runtime.state.ship.pos.distance_to(pen)<runtime.state.draw.limit) { runtime.state.draw.connection=runtime.state.ship.pos.distance_to(pen);runtime.state.draw.started = true; runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
         else if (touch && release) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); }
         return true;
     }
     if (bool(input.has_cursor)) extend_draw(pen, camera_zoom);
     if (touch && (release || alt)) commit_draw();
-    else if (runtime.state.draw.length >= runtime.state.draw.limit - 0.5 || runtime.state.draw.blocked) commit_draw();
+    else if (runtime.state.draw.limit-runtime.state.draw.connection-runtime.state.draw.length<runtime.state.draw_config.point_step || runtime.state.draw.blocked) commit_draw();
     else if (press && clock_msec - runtime.state.draw.first_msec >= runtime.state.draw_config.confirm_delay * 1000.0 && runtime.state.draw.points.size() >= 2) commit_draw();
     return true;
 }
@@ -279,7 +295,8 @@ Dictionary SpeedRunCore::draw_snapshot() const {
     out["gauge"] = runtime.state.draw.gauge; out["drawing"] = runtime.state.draw.drawing; out["draw_started"] = runtime.state.draw.started;
     out["draw_blocked"] = runtime.state.draw.blocked; out["trace_full_charge"] = runtime.state.draw.full_charge;
     out["draw_start_charge"] = runtime.state.draw.start_charge; out["draw_gauge"] = runtime.state.draw.amount;
-    out["draw_limit"] = runtime.state.draw.limit; out["draw_length"] = runtime.state.draw.length; out["draw_points"] = runtime.state.draw.points;
+    out["draw_limit"] = runtime.state.draw.limit; out["draw_length"] = runtime.state.draw.length; out["draw_connection"] = runtime.state.draw.connection; out["draw_points"] = runtime.state.draw.points;
+    out["draw_reach"] = runtime.state.draw.drawing?runtime.state.draw.limit:available_draw_length(runtime.state);
     out["tracing"] = runtime.state.draw.tracing; out["dash_id"] = runtime.state.draw.dash_id; out["trace_path"] = runtime.state.draw.path;
     out["trace_lengths"] = runtime.state.draw.lengths; out["trace_total"] = runtime.state.draw.total; out["trace_progress"] = runtime.state.draw.progress;
     return out;
