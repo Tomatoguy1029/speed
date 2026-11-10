@@ -10,6 +10,7 @@ enum class CargoLoss {Retreat,Released,Cleared,OwnerRemoved,Capacity};
 class PickupSystem {
 public:
     static double collect_rows(godot::SpeedRunCore &,const std::vector<size_t> &,CrystalCollectMethod);
+    static void collect_coin(RunRuntime &,double value=0);
     static double collect_all(godot::SpeedRunCore &);
     static void step_capsules(godot::SpeedRunCore &,double dt);
     static bool carry(RunRuntime &,EnemyHandle,size_t crystal_row);

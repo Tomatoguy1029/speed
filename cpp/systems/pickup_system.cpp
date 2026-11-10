@@ -24,19 +24,22 @@ void drop_gem(RunRuntime &run,godot::Vector2 position,double value) {
     run.state.pickups.index_gem(row);
 }
 
+void collect_enemy_coins(RunRuntime &run,int64_t count) {
+    for (int64_t i=0;i<count;++i) {
+        // 散布で使っていた乱数を進め、以降の結晶・カプセル等の抽選を維持する。
+        run.state.control.rng.randf();
+        run.state.control.rng.randf();
+        PickupSystem::collect_coin(run);
+    }
+}
+
 void drop_legacy(RunRuntime &run,const Corpse &enemy) {
     const auto &c = run.state.pickup_config;
     const double value = enemy.xp * c.xp_mult * (c.xp_bonus > 0 ? c.xp_bonus : 1.0);
     run.state.pickups.xp_dropped += value;
     drop_gem(run,enemy.pos, value);
     const int64_t coin_count = enemy.elite ? 3 + run.state.control.rng.randi_range(0, 3).value() : (run.state.control.rng.randf() < 0.03 ? 1 : 0);
-    for (int64_t k = 0; k < coin_count; ++k) {
-        const double angle = run.state.control.rng.randf() * (2.0 * godot::Math::PI);
-        const double share = run.state.control.rng.randf();
-        const godot::RunState::Coin coin{enemy.pos + godot::Vector2::from_angle(angle) * share * enemy.radius, true, false};
-        if (run.state.pickups.free_coins.empty()) run.state.pickups.coins.push_back(coin);
-        else { run.state.pickups.coins[run.state.pickups.free_coins.back()] = coin; run.state.pickups.free_coins.pop_back(); }
-    }
+    collect_enemy_coins(run,coin_count);
     if (run.state.control.rng.randf() < std::min(c.drop_max, c.drop_base * std::pow(enemy.xp, c.drop_power))) {
         const double fraction = std::clamp(run.state.time / c.shift_time, 0.0, 1.0);
         std::vector<float> weights;
@@ -118,6 +121,12 @@ double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<si
     const double actual=base*multiplier;
     ProgressionSystem::add_experience(core,actual);p.collected_actual_xp+=actual;
     EventBuilder::crystals_collected(run,details,base,actual,multiplier,method);return actual;
+}
+void PickupSystem::collect_coin(RunRuntime &run,double value) {
+    godot::Dictionary item;item["kind"]=godot::StringName("coin");item["value"]=value;run.state.collections.append(item);
+    if (run.api_configured) ++run.state.lifecycle.coins;
+    EventBuilder::flush_combat(run);
+    godot::Dictionary event;event["kind"]=godot::StringName("coin");FrameBuilder::append(run,"pickup",event);
 }
 double PickupSystem::collect_all(godot::SpeedRunCore &core) {
     std::vector<size_t> rows;for (size_t row=0;row<core.runtime.state.pickups.gems.size();++row) if (core.runtime.state.pickups.gems[row].alive) rows.push_back(row);
@@ -208,11 +217,7 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor && !run.content->rock_fields.empty();
     const double chance=meteor?run.content->rock_fields.front().meteor_coin_chance:0.03;
     const int64_t count=enemy.elite?3+state.control.rng.randi_range(0,3).value():(state.control.rng.randf()<chance?(meteor?1+state.control.rng.randi_range(0,2).value():1):0);
-    for (int64_t i=0;i<count;++i) {
-        const double angle=state.control.rng.randf()*2.0*godot::Math::PI,share=state.control.rng.randf();
-        const godot::RunState::Coin coin{enemy.pos+godot::Vector2::from_angle(angle)*share*enemy.radius,true,false};
-        if (state.pickups.free_coins.empty()) state.pickups.coins.push_back(coin);else {state.pickups.coins[state.pickups.free_coins.back()]=coin;state.pickups.free_coins.pop_back();}
-    }
+    collect_enemy_coins(run,count);
     if (meteor) {
         const auto &config=run.content->rock_fields.front();
         if (state.control.rng.randf()<config.meteor_heal_chance) state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Heal});

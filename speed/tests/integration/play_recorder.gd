@@ -134,7 +134,8 @@ func verify_cpp_combat_limits() -> void:
 		if scenario=="line": first.payload["detail"] = "あ".repeat(6000)
 		var events := [first,{"type":"boss_action","sequence":2,"payload":{"step":"end"}},
 			{"type":"hurt","sequence":4 if scenario=="gap" else 3,"payload":{"amount":2}},
-			{"type":"combat_player_damage","sequence":5 if scenario=="gap" else 4,"payload":{"hp_before":8,"hp_after":6}}]
+			{"type":"combat_player_damage","sequence":5 if scenario=="gap" else 4,"payload":{"hp_before":8,"hp_after":6}},
+			{"type":"pickup","sequence":6 if scenario=="gap" else 5,"payload":{"kind":"coin"}}]
 		for event in events:
 			event.merge({"epoch":1,"tick":1,"t":0.0,"world_t":0.0})
 		rec.consume_cpp_frame({"run_id":123,"ui":{"run_time":0.0},"events":events})
@@ -143,6 +144,7 @@ func verify_cpp_combat_limits() -> void:
 		var diagnostics: Array = rows.filter(func(row):return row.type in ["boss_action","boss_decision"])
 		check(rows.any(func(row):return row.type=="hurt"),"%s: 診断の制限で通常の被弾を落とさない" % scenario)
 		check(rows.any(func(row):return row.type=="combat_player_damage"),"%s: 機体の被弾判定を詳細度0でも保存する" % scenario)
+		check(rows.filter(func(row):return row.type=="pickup" and row.kind=="coin").size()==1,"%s: 部品の取得通知を診断の制限と詳細度に関係なく保存する" % scenario)
 		var expected := 0 if scenario in ["bytes","off"] else 2 if scenario in ["gap","effect_loss"] else 1
 		check(diagnostics.size()==expected,"%s: 詳細度と診断の上限を保存時に適用する" % scenario)
 		var summary: Dictionary = rows.back().get("combat_summary",{})

@@ -7,6 +7,12 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-coins" in OS.get_cmdline_user_args():
+		check(check_cpp_coins(),"部品の即時獲得を最後まで確認する")
+		check(check_cpp_meteor_coins(),"隕石の部品抽選を最後まで確認する")
+		print("[cpp_coins] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-visible" in OS.get_cmdline_user_args():
 		check(check_cpp_visible(),"描画上限の確認を最後まで実施する")
 		print("[cpp_visible] failed=%d" % failed)
@@ -625,4 +631,90 @@ func check_cpp_visible() -> bool:
 	check(is_equal_approx(after.xp_statistics.collected_actual_xp,base_total(before.gems)*1.875),"描画数によらず全基準XPへ倍率を一回適用する")
 	check(base_total(after.xp_statistics.lost)==0.0,"描画制限でXPを失わない")
 	bridge.dispose()
+	return true
+
+func check_cpp_coins() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
+	definition.xp_reward_counts = PackedInt32Array([0,0,0])
+	var bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	bridge.collect_frame()
+	var records: Array = []
+	bridge.subscribe("coins",func(frame):
+		records.append_array(frame.events)
+		return true)
+	for elite in [false,true]:
+		var before: int = bridge._ui.coins
+		for i in (4 if elite else 128):
+			var id: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":elite})
+			var killed: Dictionary = bridge.command("dev_kill",{"entity_id":id,"cause":"shot"})
+			check(killed.ok and killed.value.killed,"離れた敵を実際の撃破入口で倒す")
+		var snapshot: Dictionary = bridge._core.pickups_snapshot()
+		check(bridge._ui.coins==(24 if elite else 4),"固定乱数での通常敵3%・エリート3〜6個の抽選数を維持する")
+		check(bridge._core.random_state()==(-7232949288372105844 if elite else -3329702314789444196),"部品の散布を省いても後続の乱数列を維持する")
+		check(snapshot.coins.is_empty(),"撃破した敵の部品を地面に残さない")
+		check(bridge._ui.coins>before,"回収範囲に関係なく撃破時に部品を加算する")
+	var amount: int = bridge._ui.coins
+	check(records.filter(func(event): return event.type==&"pickup" and event.payload.kind==&"coin").size()==amount,"部品1個ごとの既存取得通知を維持する")
+	var saved: Dictionary = bridge.checkpoint()
+	var enemy: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true})
+	bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"})
+	var after: int = bridge._ui.coins
+	var rng = bridge._core.random_state()
+	bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"})
+	check(bridge._ui.coins==after,"同じ敵を重複撃破しても部品を二重加算しない")
+	check(bridge.restore(saved.value).ok,"部品取得前の保持点へ復帰する")
+	bridge.collect_frame()
+	check(bridge._ui.coins==amount,"取得した部品をチェックポイントから復帰する")
+	enemy = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true})
+	bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"})
+	check(bridge._ui.coins==after and bridge._core.random_state()==rng,"復帰後の部品数と次の抽選を再現する")
+	bridge.release_checkpoint(saved.value)
+	var boss: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true,"is_boss":true})
+	bridge.command("dev_kill",{"entity_id":boss,"cause":"shot"})
+	var removed: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true})
+	bridge.command("dev_remove",{"entity_id":removed})
+	check(bridge._ui.coins==after,"ボス本体の専用決着と非撃破の退場を部品の通常抽選へ混ぜない")
+	bridge._core.step_pickups(0.1)
+	bridge.collect_frame()
+	check(bridge._ui.coins==after,"後続の回収更新で部品を重複加算しない")
+	check(bridge.command("dev_finish",{"cleared":false}).ok,"部品獲得済みのランを終了する")
+	check(bridge.read_frame().value.result.coins==after,"自動獲得した部品を結果・保存用の獲得数へ引き継ぐ")
+	bridge.dispose()
+	return true
+
+func check_cpp_meteor_coins() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	for chance: float in [0.0,1.0]:
+		var data: Dictionary = builder.chase_records(ContentManager.enemies[&"meteor"],config).duplicate(true)
+		var terrain := {"id":1,"meteor_count":0,"iron_count":0,"saw_count":0,"planet_radius":0.0,
+			"meteor_coin_chance":chance,"meteor_heal_chance":1.0,"meteor_magnet_chance":1.0,
+			"saw_speed":0.0,"saw_power":0.0,"saw_life":0.0,"meteor":1,"iron":1,"saw":1,
+			"meteor_radius_0":16.0,"meteor_radius_1":16.0}
+		for i in 6: terrain["meteor_visual_%d" % i] = 1
+		data.RockFieldDefinition = [terrain]
+		var bytes: PackedByteArray = schema.write_content(data,schema.sha256("隕石の部品抽選".to_utf8_buffer()))
+		var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+		if not bridge.configure(bytes,{"api_version":1,"run_id":93,"mode":1,"stage_id":"meteor_coins","profile":{},"settings":{}}).ok:
+			check(false,"隕石の実データと固有報酬の定義を生成する")
+			return false
+		check(bridge.start(933,{"position":Vector2(-3000,0)}).ok,"隕石の抽選場面を開始する")
+		bridge.collect_frame()
+		var total := 0
+		for i in 8:
+			var id: int = bridge._core.spawn_enemy(&"meteor",Vector2(9000,500))
+			check(bridge.command("dev_kill",{"entity_id":id,"cause":"shot"}).ok,"隕石を共通の撃破入口で破壊する")
+			var amount: int = bridge._ui.coins-total
+			check((amount>=1 and amount<=3) if chance==1.0 else amount==0,"隕石固有の確率と1〜3個の部品数を維持する")
+			total = bridge._ui.coins
+		var snapshot: Dictionary = bridge._core.pickups_snapshot()
+		check(snapshot.coins.is_empty() and snapshot.gems.size()==8 and snapshot.capsules.size()==16,"隕石の部品だけを即時獲得し、固定結晶と回復・回収カプセルを維持する")
+		bridge.dispose()
 	return true
