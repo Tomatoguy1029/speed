@@ -45,6 +45,7 @@ func apply_snapshot(ui: Dictionary) -> void:
 
 func _process(delta: float) -> void:
 	_layout_cpp_art()
+	if _stage_progress!=null:_stage_progress.apply_snapshot(_cpp_ui,show_status)
 	if not preview_paused:
 		_update_speed_indicator(delta)
 		_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
