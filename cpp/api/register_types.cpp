@@ -3,6 +3,7 @@
 #include "fx_raster.h"
 #include "pixel_fx.h"
 #include "weapon_geometry.h"
+#include "instance_buffer.h"
 #include <godot_cpp/godot.hpp>
 
 void initialize_speed_runtime(godot::ModuleInitializationLevel level) {
@@ -11,6 +12,7 @@ void initialize_speed_runtime(godot::ModuleInitializationLevel level) {
     GDREGISTER_CLASS(godot::SpeedFxRaster);
     GDREGISTER_CLASS(godot::SpeedPixelFx);
     GDREGISTER_CLASS(godot::SpeedWeaponGeometry);
+    GDREGISTER_CLASS(godot::SpeedInstanceBuffer);
 }
 
 void uninitialize_speed_runtime(godot::ModuleInitializationLevel level) {

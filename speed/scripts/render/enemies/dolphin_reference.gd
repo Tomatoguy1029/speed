@@ -51,7 +51,7 @@ func render(actors: Array, waves: Array, events: Array, canvas, clock: float) ->
 			_draw_wave(row, float(row.radius) / float(row.speed) + elapsed, canvas, pal)
 
 func _arc(p, center: Vector2, radius: float, a0: float, a1: float, color: Color, alpha: float) -> void:
-	_raster.begin(p.colors, PackedByteArray(), p.width, p.height, 1.0, Vector2.ZERO)
+	_raster.begin_painter(p, 1.0, Vector2.ZERO, true, false)
 	_raster.dolphin_arc(center, radius, a0, a1, color, alpha)
 	p.colors = _raster.take_colors()
 	p.has_color = p.has_color or _raster.has_color()
@@ -84,7 +84,7 @@ func _draw_wave(row: Dictionary, time: float, canvas, pal: Array[Color]) -> void
 
 func _band(p, center: Vector2, radius: float, a0: float, a1: float, width: float, colors: Array, alpha: float, dissolve: float) -> void:
 	if radius <= 0 or width <= 0 or alpha <= 0: return
-	_raster.begin(p.colors, PackedByteArray(), p.width, p.height, 1.0, Vector2.ZERO)
+	_raster.begin_painter(p, 1.0, Vector2.ZERO, true, false)
 	_raster.dolphin_band(center, radius, a0, a1, width, PackedColorArray(colors), alpha, dissolve)
 	p.colors = _raster.take_colors()
 	p.has_color = p.has_color or _raster.has_color()

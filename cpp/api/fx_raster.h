@@ -46,6 +46,7 @@ protected:
     static void _bind_methods();
 public:
     void begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera);
+    void begin_painter(Object *painter,double world_scale,Vector2 camera,bool colors,bool lights);
     PackedByteArray take_colors();
     PackedByteArray take_lights();
     bool has_color() const {return color_used_;}
@@ -56,6 +57,9 @@ public:
     void dolphin_band(Vector2 center,double radius,double a0,double a1,double width,PackedColorArray palette,double alpha,double dissolve);
     void dolphin_arc(Vector2 center,double radius,double a0,double a1,Color color,double alpha);
     void reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,Dictionary settings);
+    void corona_vortices(PackedFloat64Array owners,PackedColorArray palette);
+    void corona_selection(Vector2 from,Vector2 to,double charge,double radius,double intensity,PackedColorArray palette,double clock);
+    void corona_trail(Vector2 center,Vector2 direction,double trail,double age,double clock,double seed_angle,PackedColorArray palette);
     void density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette);
     void dim(double amount,double flash);
     void breath(PackedVector2Array fan,double elapsed,double active,double axis,double sweep,double half_angle,double reach,double fan_angle);

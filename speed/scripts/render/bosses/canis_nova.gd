@@ -40,7 +40,7 @@ static func draw_field(canvas, nova: Dictionary, params: Dictionary) -> void:
 	for pair: Array in [[canvas.back, _raster_back, false], [canvas.front, _raster_front, true]]:
 		var painter = pair[0]
 		var raster = pair[1]
-		raster.begin(PackedByteArray(), painter.lights, painter.width, painter.height, float(canvas.world_scale), canvas._camera_position)
+		raster.begin_painter(painter, float(canvas.world_scale), canvas._camera_position, false, true)
 		raster.nova_field(alpha, samples, field, pair[2])
 		painter.lights = raster.take_lights()
 		painter.has_light = painter.has_light or raster.has_light()

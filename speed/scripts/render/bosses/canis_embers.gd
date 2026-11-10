@@ -100,7 +100,7 @@ static func _draw_group(canvas, rows: Array, clock: float, logical_pixel: float,
 ## 動く粒の入力をまとめて渡し、密度領域の保存場所は再利用する。
 static func _draw_density(canvas, painter, points: PackedVector2Array, radii: PackedFloat64Array, layers: PackedByteArray, origin: Vector2i, width: int, height: int, display: Dictionary, palette: PackedColorArray) -> void:
 	var raster: SpeedFxRaster = canvas.get_density_raster()
-	raster.begin(painter.colors, painter.lights, painter.width, painter.height, float(canvas.world_scale), canvas._camera_position)
+	raster.begin_painter(painter, float(canvas.world_scale), canvas._camera_position, true, true)
 	raster.density_field(points, radii, layers, origin, width, height, display, palette)
 	painter.colors = raster.take_colors()
 	painter.lights = raster.take_lights()

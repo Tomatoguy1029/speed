@@ -158,7 +158,18 @@ func apply_frame(row: Dictionary) -> void:
 	_dirty = true
 	_begin_buffers()
 	_set_glows(row.get("glows",PackedFloat32Array()))
+	for part: Dictionary in _parts:
+		var sign := 1 if part.name=="jaw_left" else -1 if part.name=="jaw_right" else 0
+		var side := (-1 if part.name=="body" else 1) if _ruler else 0
+		var began := Time.get_ticks_usec() if perf.active else 0
+		part.base.apply_enemy_frame(row,part.pivot,float(part.get("angle",0.0)),sign,side,_biting and _biter)
+		perf.since(&"enemies.body",began)
+	if not _biting or not _death_masks.is_empty(): return
+	var values: Dictionary = row.biter
 	for i in row.ids.size():
+		if values.modes[i]!=3: continue
+		var spark_age: float = values.rests[i]-values.timers[i]-SNAP
+		if not (spark_age>=0.0 and spark_age<SPARK_TIME): continue
 		var n: int = i*6
 		var radius := Vector2(row.transforms[n],row.transforms[n+1]).length()
 		var angle := atan2(row.transforms[n+1],row.transforms[n])
@@ -167,26 +178,9 @@ func apply_frame(row: Dictionary) -> void:
 		if not deformation.is_empty():
 			radius = deformation[i*5]
 			angle = deformation[i*5+1]
-		var jaw := 0.0
-		if _biting:
-			var values: Dictionary = row.biter
-			if _biter: jaw = deg_to_rad(jaw_angle(values.modes[i],values.charges[i],values.timers[i],values.rests[i]))
-			if values.modes[i]==3 and _death_masks.is_empty():
-				var spark_age: float = values.rests[i]-values.timers[i]-SNAP
-				if spark_age>=0.0 and spark_age<SPARK_TIME:
-					var direction := Vector2.from_angle(angle-PI/2.0)
-					var mouth := position+direction*radius*(16.0/17.0)
-					_sparks.add(mouth+direction*12.0*(radius/17.0),angle-PI/2.0,32.0*(radius/17.0),Color(spark_age/SPARK_TIME,0,0,1))
-		for part: Dictionary in _parts:
-			if _ruler and row.ruler_sides[i]!=0 and row.ruler_sides[i]!=(-1 if part.name=="body" else 1): continue
-			var turn := jaw if part.name=="jaw_left" else -jaw if part.name=="jaw_right" else 0.0
-			turn+=float(part.get("angle",0.0))
-			var pivot: Vector2 = part.pivot*(radius/17.0)
-			var center := position+(pivot-pivot.rotated(turn)).rotated(angle)
-			var began := Time.get_ticks_usec() if perf.active else 0
-			part.base.add(center,angle+turn,radius,row.colors[i])
-			if not deformation.is_empty(): part.base.deform_last(Vector2(deformation[i*5+2],deformation[i*5+3]),deformation[i*5+4])
-			perf.since(&"enemies.body",began)
+		var direction := Vector2.from_angle(angle-PI/2.0)
+		var mouth := position+direction*radius*(16.0/17.0)
+		_sparks.add(mouth+direction*12.0*(radius/17.0),angle-PI/2.0,32.0*(radius/17.0),Color(spark_age/SPARK_TIME,0,0,1))
 
 func end() -> void:
 	if _pump!=null:

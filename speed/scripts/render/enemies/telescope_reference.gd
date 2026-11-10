@@ -155,7 +155,7 @@ func _smooth(a: float, b: float, value: float) -> float:
 
 func _beam(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
 	if a.distance_to(b) < 1.0: return
-	_raster.begin(painter.colors, painter.lights, painter.width, painter.height, 1.0, Vector2.ZERO)
+	_raster.begin_painter(painter, 1.0, Vector2.ZERO, true, true)
 	_raster.reference_beam(a, b, PackedColorArray(FX.ramp(options.color)), options)
 	painter.colors = _raster.take_colors()
 	painter.lights = _raster.take_lights()

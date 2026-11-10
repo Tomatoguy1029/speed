@@ -17,7 +17,7 @@ func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 	var cut_time := maxf(0.01, float(_settings.cutT) * float(_settings.timing))
 	canvas.front.place(0, 0)
 	if not shots.is_empty():
-		_raster.begin(canvas.front.colors, canvas.front.lights, canvas.front.width, canvas.front.height, float(canvas.world_scale), canvas._camera_position)
+		_raster.begin_painter(canvas.front, float(canvas.world_scale), canvas._camera_position, true, true)
 	var native_palette := PackedColorArray(palette)
 	for shot: Dictionary in shots:
 		var age := float(shot.age)

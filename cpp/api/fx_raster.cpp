@@ -1,6 +1,7 @@
 #include "fx_raster.h"
 #include <algorithm>
 #include <cmath>
+#include <initializer_list>
 #include <godot_cpp/core/class_db.hpp>
 #include <godot_cpp/core/math.hpp>
 namespace godot {
@@ -15,6 +16,23 @@ double noise1(double x,double seed) {const double i=std::floor(x),f=x-i;return m
 double N(double time,double rate,double seed,double offset=0) {return noise1(time*rate+offset,seed);}
 double noise2(double x,double y,double seed) {const double i=std::floor(x),j=std::floor(y),f=x-i,g=y-j,u=f*f*(3-2*f),v=g*g*(3-2*g);const auto at=[&](double a,double b) {return hash1(a*1.37+b*57.3+seed*7.1);};return mix1(mix1(at(i,j),at(i+1,j),u),mix1(at(i,j+1),at(i+1,j+1),u),v)*2-1;}
 double fbm(double x,double y,double seed,int octaves) {double sum=0,amp=0.5,total=0;for (int k=0;k<octaves;++k) {sum+=amp*noise2(x,y,seed+k*3.1);total+=amp;x*=2;y*=2;amp*=0.5;}return sum/total;}
+// Aquarius の整数ハッシュと乱数。Corona の粒の発生順を同じまま扱う。
+uint32_t reference_hash(std::initializer_list<int64_t> values) {
+    uint32_t h=0x9e3779b9;
+    for (int64_t n:values) {h=(h^uint32_t(n))*0x85ebca6b;h^=h>>13;h*=0xc2b2ae35;h^=h>>16;}
+    return h;
+}
+struct ReferenceRng {
+    uint32_t state;
+    explicit ReferenceRng(uint32_t seed):state(seed?seed:1) {}
+    double next() {
+        state+=0x6d2b79f5;
+        uint32_t t=(state^(state>>15))*(state|1);
+        t^=t+((t^(t>>7))*(t|61));
+        return double(t^(t>>14))/4294967296.0;
+    }
+    double between(double a,double b) {return mix1(a,b,next());}
+};
 Color hexc(uint32_t v) {return Color(((v>>16)&255)/255.0f,((v>>8)&255)/255.0f,(v&255)/255.0f);}
 const Color FLAME[9]={hexc(0xffffff),hexc(0xfbf4ff),hexc(0xe6d8ff),hexc(0xc9b0ff),hexc(0xa884ff),hexc(0x8259ee),hexc(0x5f3cc8),hexc(0x412a94),hexc(0x291c62)};
 const Color DARK[8]={hexc(0xf4e2ff),hexc(0xd39bff),hexc(0x9a4cf0),hexc(0x6a24c4),hexc(0x3e1484),hexc(0x220b50),hexc(0x110630),hexc(0x070214)};
@@ -29,6 +47,7 @@ struct Ramp {Color v[5];explicit Ramp(Color c) {const auto mk=[&](double l,doubl
 }
 void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("begin","colors","lights","width","height","world_scale","camera"),&SpeedFxRaster::begin);
+    ClassDB::bind_method(D_METHOD("begin_painter","painter","world_scale","camera","colors","lights"),&SpeedFxRaster::begin_painter);
     ClassDB::bind_method(D_METHOD("take_colors"),&SpeedFxRaster::take_colors);
     ClassDB::bind_method(D_METHOD("take_lights"),&SpeedFxRaster::take_lights);
     ClassDB::bind_method(D_METHOD("has_color"),&SpeedFxRaster::has_color);
@@ -39,6 +58,9 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("dolphin_band","center","radius","a0","a1","width","palette","alpha","dissolve"),&SpeedFxRaster::dolphin_band);
     ClassDB::bind_method(D_METHOD("dolphin_arc","center","radius","a0","a1","color","alpha"),&SpeedFxRaster::dolphin_arc);
     ClassDB::bind_method(D_METHOD("reference_beam","a","b","palette","settings"),&SpeedFxRaster::reference_beam);
+    ClassDB::bind_method(D_METHOD("corona_vortices","owners","palette"),&SpeedFxRaster::corona_vortices);
+    ClassDB::bind_method(D_METHOD("corona_selection","from","to","charge","radius","intensity","palette","clock"),&SpeedFxRaster::corona_selection);
+    ClassDB::bind_method(D_METHOD("corona_trail","center","direction","trail","age","clock","seed_angle","palette"),&SpeedFxRaster::corona_trail);
     ClassDB::bind_method(D_METHOD("density_field","points","radii","layers","origin","width","height","settings","palette"),&SpeedFxRaster::density_field);
     ClassDB::bind_method(D_METHOD("dim","amount","flash"),&SpeedFxRaster::dim);
     ClassDB::bind_method(D_METHOD("breath","fan","elapsed","active","axis","sweep","half_angle","reach","fan_angle"),&SpeedFxRaster::breath);
@@ -55,6 +77,15 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("bolt_bar","tail","angle","age","life","speed","length","width","color","time"),&SpeedFxRaster::bolt_bar);
 }
 void SpeedFxRaster::begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera) {colors_=colors;lights_=lights;w_=width;h_=height;wl_=world_scale;camera_=camera;c_=colors_.ptrw();l_=lights_.ptrw();color_used_=false;light_used_=false;}
+void SpeedFxRaster::begin_painter(Object *painter,double world_scale,Vector2 camera,bool colors,bool lights) {
+    ERR_FAIL_NULL(painter);
+    // 同期描画の間だけ元の参照を外す。別の所有者がいる配列は ptrw が従来どおり複製する。
+    colors_=PackedByteArray();lights_=PackedByteArray();
+    if (colors) {colors_=painter->get("colors");painter->set("colors",PackedByteArray());}
+    if (lights) {lights_=painter->get("lights");painter->set("lights",PackedByteArray());}
+    w_=painter->get("width");h_=painter->get("height");wl_=world_scale;camera_=camera;
+    c_=colors_.ptrw();l_=lights_.ptrw();color_used_=false;light_used_=false;
+}
 PackedByteArray SpeedFxRaster::take_colors() {PackedByteArray out=colors_;colors_=PackedByteArray();c_=nullptr;return out;}
 PackedByteArray SpeedFxRaster::take_lights() {PackedByteArray out=lights_;lights_=PackedByteArray();l_=nullptr;return out;}
 void SpeedFxRaster::put(int x,int y,Color c) {if (x<0 || y<0 || x>=w_ || y>=h_) return;uint8_t *q=c_+(y*w_+x)*4;q[0]=uint8_t(c.r*255);q[1]=uint8_t(c.g*255);q[2]=uint8_t(c.b*255);q[3]=255;color_used_=true;}
@@ -441,6 +472,76 @@ void SpeedFxRaster::reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,
         if ((int(std::floor(d*2+0.5))&5)==0) reference_add(int(std::floor(point.x)),int(std::floor(point.y)),palette[2],0.25*alpha*intensity);
     }
     reference_glow_line(a+direction*d0,a+direction*d1,width*2.6+3,palette[2],0.35*alpha*intensity);
+}
+
+
+void SpeedFxRaster::corona_vortices(PackedFloat64Array owners,PackedColorArray palette) {
+    if (palette.size()<5) return;
+    for (int i=0;i+6<owners.size();i+=7) {
+        const Vector2 center=logical(Vector2(owners[i],owners[i+1]));
+        const double radius=owners[i+2]*wl_,rotation=owners[i+3];
+        for (int particle=0;particle<70;++particle) {
+            const double r=radius*(0.55+0.6*hash1(particle)),angle=rotation*(0.8+0.4*hash1(particle+9))+hash1(particle*3)*TAU;
+            for (int k=0;k<4;++k) reference_dot(center.x+std::cos(angle-k*0.08)*r,center.y+std::sin(angle-k*0.08)*r,palette[k<1?3:2],0.55-0.12*k);
+        }
+    }
+}
+void SpeedFxRaster::corona_selection(Vector2 from,Vector2 to,double charge,double radius,double intensity,PackedColorArray palette,double clock) {
+    if (palette.size()<5) return;
+    const Vector2 delta=to-from,normal=Vector2(-delta.y,delta.x)/std::max(double(delta.length()),0.000001);
+    for (int i=0;i<14;++i) {
+        const double f=Math::fposmod(hash1(i*3.1)+clock*2.6,1.0),wave=(hash1(i*7.7)-0.5)*10*std::sin(PI*f);
+        const Vector2 point=from+delta*f+normal*wave;
+        reference_dot(point.x,point.y,palette[f>0.7?4:3],charge*(0.4+0.6*f));
+    }
+    reference_glow(to,radius,palette[2],0.4*charge*intensity);
+}
+void SpeedFxRaster::corona_trail(Vector2 center,Vector2 direction,double trail,double age,double clock,double seed_angle,PackedColorArray palette) {
+    if (palette.size()<8) return;
+    const Vector2 normal(-direction.y,direction.x);
+    const int64_t frame=int64_t(std::floor(clock*30)),noise_seed=int64_t(seed_angle*9);
+    const auto random=[&](int64_t x,int64_t y) {return double(reference_hash({x,y,noise_seed}))/4294967296.0;};
+    const auto noise=[&](double x,double y) {
+        const int64_t ix=int64_t(std::floor(x)),iy=int64_t(std::floor(y));
+        const double fx=x-ix,fy=y-iy,ux=fx*fx*(3-2*fx),uy=fy*fy*(3-2*fy);
+        return mix1(mix1(random(ix,iy),random(ix+1,iy),ux),mix1(random(ix,iy+1),random(ix+1,iy+1),ux),uy)*2-1;
+    };
+    for (double d=0;d<=trail;d+=0.5) {
+        const double q=d/std::max(trail,1.0),heat=1-std::pow(d/std::max(trail,1.0),0.8)+noise(d*0.12-clock*40,3)*0.12;
+        const double width=(0.6+2.6*std::pow(1-std::min(1.0,q/0.35),1.4))*(q<0.35?1:0.5);
+        const Vector2 point=center-direction*d;
+        if (q>0.55 && hash1(std::floor(d/3)*7.1+frame)<(q-0.55)*1.6) continue;
+        for (double w=-width;w<=width;w+=0.5) {
+            const double edge=std::abs(w)/std::max(width,0.01);
+            const int level=edge<0.38?(heat>0.8?7:heat>0.6?6:heat>0.42?4:heat>0.25?3:2):(heat>0.6?5:heat>0.35?3:2);
+            const Vector2 at=point+normal*w;
+            reference_dot(at.x,at.y,palette[level],q<0.85?1:(1-q)/0.15);
+        }
+    }
+    reference_glow_line(center,center-direction*trail*0.45,6,palette[4],0.35);
+    reference_glow_line(center,center-direction*trail*0.2,3,palette[7],0.3);
+    const int64_t seed=int64_t(23+seed_angle*10);
+    for (int i=0;i<16;++i) {
+        ReferenceRng g(reference_hash({seed,i,911}));
+        const double born=g.next()*0.4,lifetime=g.between(0.1,0.28);
+        for (double elapsed=Math::fposmod(age-born,0.4);elapsed<lifetime;elapsed+=0.4) {
+            ReferenceRng r(reference_hash({seed,i}));
+            const double k=elapsed/lifetime,back=r.between(4,trail*0.5),side=r.between(-1,1)*30*elapsed;
+            const Vector2 point=center-direction*(back+40*elapsed*wl_)+normal*side,start=point+direction*2;
+            int x=int(std::floor(start.x)),y=int(std::floor(start.y));
+            const int end_x=int(std::floor(point.x)),end_y=int(std::floor(point.y)),dx=std::abs(end_x-x),dy=-std::abs(end_y-y),sx=x<end_x?1:-1,sy=y<end_y?1:-1,n=std::max({1,dx,-dy});
+            int err=dx+dy,step=0;
+            while (true) {
+                const double u=double(step)/n;
+                reference_dot(x,y,palette[u>0.5?7:4],1-k);
+                ++step;
+                if (x==end_x && y==end_y) break;
+                const int e2=2*err;
+                if (e2>=dy) {err+=dy;x+=sx;}
+                if (e2<=dx) {err+=dx;y+=sy;}
+            }
+        }
+    }
 }
 
 }

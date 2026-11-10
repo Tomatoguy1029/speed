@@ -19,7 +19,7 @@ func render(rows: Array, canvas, clock: float) -> void:
 			FX.sparks(canvas.front, canvas.to_logical(middle), fposmod(fade_time - left, 0.4), (clock - float(row.age)) * 7, 2, Color("ffe6b0"), 20, 0.4, -PI / 2.0, 0.8)
 	if groups.is_empty(): return
 	var painter = canvas.back
-	_raster.begin(painter.colors, painter.lights, painter.width, painter.height, float(canvas.world_scale), canvas._camera_position)
+	_raster.begin_painter(painter, float(canvas.world_scale), canvas._camera_position, true, true)
 	for group: Array in groups.values():
 		group.sort_custom(func(a: Dictionary, b: Dictionary): return int(a.order) < int(b.order))
 		_draw_trail(group, canvas, clock)
