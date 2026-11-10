@@ -443,6 +443,11 @@ Dictionary SpeedRunCore::read_frame_value(bool full_snapshot) {
     ui["max_speed"]=runtime.state.ship_config.max_speed;ui["steer_cruise"]=runtime.state.ship_config.steer_cruise;
     ui["ship_vel"]=runtime.state.ship.vel;ui["tracing"]=runtime.state.draw.tracing;ui["ship_boost_t"]=runtime.state.ship.boost_t;ui["glide"]=runtime.state.ship.glide;
     ui["view_center"]=runtime.state.view_center;ui["view_half"]=runtime.state.view_half;ui["rare_comets"]=speed::FieldSystem::rare_comet_positions(runtime);ui["bonus_remaining"]=control.bonus_remaining;ui["run_time"]=runtime.state.time;ui["world_time"]=runtime.state.world_time;ui["kills"]=runtime.state.kills;
+    Dictionary stage_clock;
+    stage_clock["boss_at"]=runtime.state.lifecycle.endless || runtime.content->stage_boss.empty()?-1.0:control.boss_at>=0?control.boss_at:runtime.content->stage_boss.front().start;
+    stage_clock["time_limit"]=runtime.state.lifecycle.endless?-1.0:control.time_limit;
+    stage_clock["boss_spawned"]=runtime.state.world.boss_spawned;
+    ui["stage_clock"]=stage_clock;
     Array voices;
     const auto &state=runtime.state;
     if (state.phase!=Phase::Finishing && state.phase!=Phase::Ended) for (size_t group=0;group<state.behavior_rows.size();++group) {
