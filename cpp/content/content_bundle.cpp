@@ -874,7 +874,9 @@ std::shared_ptr<const ContentBundle> ContentBundle::read(const godot::PackedByte
         } else if (defender!=bundle->defenders.end()) return {};
         const auto split=std::find_if(bundle->splits.begin(),bundle->splits.end(),[&](const auto &p){return p.id==row.id;});
         if (row.kind==26) {
-            if (split==bundle->splits.end() || split->death_split>INT32_MAX-split->split_extra || split->child>records.EnemyRecord_rows.size() || records.EnemyRecord_rows[split->child-1].kind!=0) return {};
+            if (split==bundle->splits.end() || split->death_split>INT32_MAX-split->split_extra || split->child>records.EnemyRecord_rows.size()) return {};
+            const auto child_kind=records.EnemyRecord_rows[split->child-1].kind;
+            if (child_kind!=0 && child_kind!=2) return {};
             definition.split_definition=uint32_t(split-bundle->splits.begin()+1);
         } else if (split!=bundle->splits.end()) return {};
         const auto item_reticle=std::find_if(bundle->reticles.begin(),bundle->reticles.end(),[&](const auto &p){return p.id==row.id;});
