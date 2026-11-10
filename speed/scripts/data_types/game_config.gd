@@ -269,6 +269,10 @@ extends Resource
 @export var boost_min_q: float
 ## 標準の体当たり1回分の給油量
 @export var fuel_per_hit: float
+## 星1・2の敵の給油量に掛ける倍率。実行用の敵データを生成するときに適用する。
+@export var fuel_regular_mult: float = 1.0
+## 星3〜10の敵の給油量に掛ける倍率。実行用の敵データを生成するときに適用する。
+@export var fuel_strong_mult: float = 1.0
 ## エンドホールが戻す基本容量の割合
 @export var fuel_hole_ratio: float
 ## 給油倍率の増加の上限
