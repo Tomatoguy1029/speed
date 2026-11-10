@@ -261,6 +261,7 @@ func check_cpp_rocks() -> void:
 	config.meteor_magnet_chance = 1.0
 	var stage := RuntimeStage.new()
 	stage.index = 85
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_rocks"
@@ -326,7 +327,7 @@ func check_cpp_rocks() -> void:
 	var killed: Dictionary = bridge.command("dev_kill",{"entity_id":target,"cause":"ram"})
 	check(killed.ok and killed.value.killed,"隕石の撃破を共通の撃破・報酬へ通す")
 	var drops: Dictionary = bridge._core.pickups_snapshot()
-	check(not drops.gems.is_empty() and drops.coins.size()>=1 and drops.coins.size()<=3 and drops.capsules.size()==2,"隕石の固定結晶・固有の部品数・回復/マグネットを出す")
+	check(not drops.gems.is_empty() and drops.coins.is_empty() and bridge._ui.coins>=1 and bridge._ui.coins<=3 and drops.capsules.size()==2,"隕石の部品を即時加算し、固定結晶・回復/マグネットを出す")
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	presentation._present_cpp(0.0)
 	check(not presentation.frame_view._meteor_shards.is_empty(),"隕石の撃破から既存の画像片を表示する")
