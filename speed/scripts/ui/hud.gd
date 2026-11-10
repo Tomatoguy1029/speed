@@ -223,6 +223,7 @@ func _process(delta: float) -> void:
 	_update_speed_indicator(delta)
 	_update_cpp_finish()
 	_update_cpp_cinematic()
+	if _stage_progress!=null:_stage_progress.apply_snapshot(_cpp_ui,show_status)
 	if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
 		_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
 		_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
@@ -657,7 +658,6 @@ func apply_snapshot(ui: Dictionary) -> void:
 	var rerolls := int(_cpp_ui.get("rerolls_left",0))
 	var phase := int(_cpp_ui.get("phase",-1))
 	_cpp_ui = ui
-	if _stage_progress!=null:_stage_progress.apply_snapshot(ui)
 	if phase != int(ui.phase):
 		if input_router != null: input_router.cancel_gesture()
 		_card_discard.merge(_card_held)
@@ -1136,7 +1136,6 @@ func _update_cpp_cinematic() -> void:
 	var active: bool=int(_cpp_ui.phase)==Phase.Play
 	_speed_indicator.visible=active and bars<=0.0
 	var combat_visible := show_status and bars<=0.0 and int(_cpp_ui.phase) not in [Phase.Dying,Phase.Finishing,Phase.Ended]
-	_stage_progress.visible=combat_visible and not _cpp_ui.get("boss_finish",{}).get("active",false)
 	var finale_shown:=false
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		if body.get("finale",{}).get("active",false):finale_shown=true

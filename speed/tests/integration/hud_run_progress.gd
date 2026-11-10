@@ -26,6 +26,17 @@ func _ready() -> void:
 	check(ui.stage_clock.time_limit==900.0 and ui.stage_clock.boss_at>=495.0,"ステージ2の実効時計を表示へ渡す")
 	var state: Dictionary=progress_script.project(ui)
 	check(state.progress_alpha==1.0 and state.hp_alpha==0.0 and state.countdown=="","開始時は進行バーだけを表示する")
+	var preview: Control=load("res://gyms/game_context_hud.gd").new()
+	preview.bridge=bridge
+	preview.config=ContentManager.cfg
+	add_child(preview)
+	bridge.collect_frame()
+	preview._process(0.0)
+	check(preview._stage_progress.visible and preview._stage_progress._view.progress_alpha==1.0,"実験場のプレビューHUDも進行表示を更新する")
+	preview.show_status=false
+	preview._process(0.0)
+	check(not preview._stage_progress.visible,"プレビューの状態表示オフも反映する")
+	preview.free()
 	for remaining in [301.0,300.0,299.0,0.0]:
 		var sample: Dictionary=ui.duplicate(true)
 		sample.run_time=float(ui.stage_clock.time_limit)-remaining

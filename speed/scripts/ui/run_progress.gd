@@ -1,5 +1,6 @@
 ## C++の時計とボス状態から描く進行表示。独立した時計を進めず、途中開始・復帰も同じ投影を使う。
 extends Control
+const Phase := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.Phase
 const ART_SIZE := Vector2(640,360)
 const LEFT := 205.0
 const RIGHT := 435.0
@@ -40,8 +41,9 @@ static func project(ui: Dictionary) -> Dictionary:
 		view.countdown="%d:%02d" % [seconds/60,seconds%60]
 	return view
 
-func apply_snapshot(ui: Dictionary) -> void:
+func apply_snapshot(ui: Dictionary,show_status: bool=true) -> void:
 	_view=project(ui)
+	visible=show_status and float(ui.get("cinematic_bars",0.0))<=0.0 and not ui.get("boss_finish",{}).get("active",false) and int(ui.get("phase",-1)) not in [Phase.Dying,Phase.Finishing,Phase.Ended]
 	queue_redraw()
 
 func _art_transform() -> void:
