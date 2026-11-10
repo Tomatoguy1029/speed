@@ -24,6 +24,14 @@
 #include <cmath>
 using namespace godot;
 
+namespace {
+double available_draw_length(const RunState &state) {
+    if (!state.ship_ready) return 0;
+    const auto &d=state.draw_config;
+    return d.length*d.capacity*state.draw.gauge*(state.ship_config.max_speed/state.ship_config.base_max_speed)*d.length_mult;
+}
+}
+
 bool SpeedRunCore::configure_draw(const Dictionary &config, const Dictionary &stats) {
     if (runtime.state.started || runtime.state.closed) return false;
     DrawConfig c{};
@@ -59,7 +67,7 @@ void SpeedRunCore::begin_draw(bool press, Vector2 pen, int64_t clock_msec) {
     runtime.state.draw.full_charge = runtime.state.draw.gauge >= 1.0 - 1e-6;
     runtime.state.draw.start_charge = runtime.state.draw.gauge;
     runtime.state.draw.amount = runtime.state.draw_config.capacity * runtime.state.draw.gauge;
-    runtime.state.draw.limit = runtime.state.draw_config.length * runtime.state.draw.amount * (runtime.state.ship_config.max_speed / runtime.state.ship_config.base_max_speed) * runtime.state.draw_config.length_mult;
+    runtime.state.draw.limit = available_draw_length(runtime.state);
     runtime.state.draw.connection = press?runtime.state.ship.pos.distance_to(pen):0;
     runtime.state.draw.length = 0;
     runtime.state.draw.points.clear();
@@ -165,8 +173,8 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
         // しし座の獅子の間は、なぞり（ブースト）を始められない
         if (speed::LeoBehavior::active(runtime)) return true;
         if ((press || alt) && runtime.state.draw_config.capacity * runtime.state.draw.gauge >= runtime.state.draw_config.min_charge) {
-            const auto &s=runtime.state;const auto &d=s.draw_config;
-            const double limit=d.length*d.capacity*s.draw.gauge*(s.ship_config.max_speed/s.ship_config.base_max_speed)*d.length_mult;
+            const auto &s=runtime.state;
+            const double limit=available_draw_length(s);
             if (!press || s.ship.pos.distance_to(pen)<limit) begin_draw(press,pen,clock_msec);
         }
         return true;
@@ -288,6 +296,7 @@ Dictionary SpeedRunCore::draw_snapshot() const {
     out["draw_blocked"] = runtime.state.draw.blocked; out["trace_full_charge"] = runtime.state.draw.full_charge;
     out["draw_start_charge"] = runtime.state.draw.start_charge; out["draw_gauge"] = runtime.state.draw.amount;
     out["draw_limit"] = runtime.state.draw.limit; out["draw_length"] = runtime.state.draw.length; out["draw_connection"] = runtime.state.draw.connection; out["draw_points"] = runtime.state.draw.points;
+    out["draw_reach"] = runtime.state.draw.drawing?runtime.state.draw.limit:available_draw_length(runtime.state);
     out["tracing"] = runtime.state.draw.tracing; out["dash_id"] = runtime.state.draw.dash_id; out["trace_path"] = runtime.state.draw.path;
     out["trace_lengths"] = runtime.state.draw.lengths; out["trace_total"] = runtime.state.draw.total; out["trace_progress"] = runtime.state.draw.progress;
     return out;

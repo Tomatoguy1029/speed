@@ -127,6 +127,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | stage&#95;select.available | 出撃可能 | Ready to launch |
 |  | ■ ラン中（HUD・3択・ポーズ） |  |
 | hud.draw | 描く | Draw |
+| hud.boost&#95;start&#95;too&#95;far | 始点が遠すぎます | Start point is too far |
 | hud.kills | 撃破 {n} | Kills {n} |
 | hud.bonus | ボーナスステージ　残り {n} 秒 | Bonus Stage  {n}s Left |
 | hud.warning | WARNING!! | WARNING!! |

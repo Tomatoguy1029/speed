@@ -68,7 +68,7 @@ static func style_for(values: Dictionary, radius := 14.0, gap := 7.0) -> BoostGa
 
 static func draw(c: CanvasItem, at: Vector2, amount: float, capacity: float, min_charge: float,
 		drawing: bool, usable: bool, flash: float, pulse: float, style: BoostGaugeStyle, gap: float) -> void:
-	var col: Color = style.unavailable_color if amount < 0.25 else style.normal_color
+	var col: Color = style.normal_color if usable else style.unavailable_color
 	if drawing: col = style.path_color
 	var bounds := style.bounds
 	if flash > 0.0:
