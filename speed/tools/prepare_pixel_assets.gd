@@ -2,8 +2,9 @@
 ## godot --headless --path speed --script res://tools/prepare_pixel_assets.gd
 extends SceneTree
 
-const NAMES := ["drifter", "swarm", "darter", "armored", "splitter", "splitling",
-	"leech", "gunner", "missile", "battleship", "titan", "meteor_0",
+## 空欄のセルは使わない絵で、切り出さない。
+const NAMES := ["", "", "", "", "splitter", "splitling",
+	"leech", "", "missile", "", "", "meteor_0",
 	"meteor_1", "moon", "planet", "airship"]
 const SIZES := [32, 24, 32, 48, 40, 20, 40, 32, 40, 96, 80, 48, 48, 96, 128, 40]
 ## 生成アトラスは3段目の大型2体がセル境界を越えるため、実際の余白で区切る。
@@ -15,7 +16,7 @@ func _initialize() -> void:
 	print("Atlas: ", source.get_size(), " alpha=", source.detect_alpha())
 	for i in NAMES.size():
 		# 手描きの原寸素材をアトラスの旧画像で上書きしない。
-		if NAMES[i] in ["drifter", "swarm", "darter", "armored", "splitter", "splitling", "meteor_0", "meteor_1", "airship"]:
+		if NAMES[i] in ["", "splitter", "splitling", "meteor_0", "meteor_1", "airship"]:
 			continue
 		var x := i % 4
 		var y := i / 4

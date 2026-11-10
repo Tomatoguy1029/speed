@@ -63,7 +63,7 @@ func _ready() -> void:
 func cpp_save(parent: Node, failure_only: bool) -> bool:
 	var source := StageDef.new()
 	source.index = 196 if failure_only else 197
-	source.enemies = [&"drifter"]
+	source.enemies = [&"splitling"]
 	var fixture := "/tmp/speed-cpp-save-%d.tres" % source.index
 	if ResourceSaver.save(source,fixture)!=OK: return false
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -83,7 +83,7 @@ func cpp_save(parent: Node, failure_only: bool) -> bool:
 	while session.bridge==null and session.cpp_error==OK: await parent.get_tree().process_frame
 	if session.bridge==null: return false
 	var bridge = session.bridge
-	if not bridge.command("dev_remove_weapon",{"id":"W01"}).ok or not bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-500,300)}).ok: return false
+	if not bridge.command("dev_remove_weapon",{"id":"W01"}).ok or not bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-500,300)}).ok: return false
 	var original: Dictionary = bridge._core.enemies_snapshot()[0]
 	var layer := CanvasLayer.new()
 	parent.add_child(layer)
@@ -95,29 +95,29 @@ func cpp_save(parent: Node, failure_only: bool) -> bool:
 	if overlay.content_edit==null: return false
 	var panel: Control = overlay.panel
 	panel.stage_path = fixture
-	panel._select_enemy("drifter")
-	var base: float = ContentManager.enemies[&"drifter"].base_hp(config)
+	panel._select_enemy("splitling")
+	var base: float = ContentManager.enemies[&"splitling"].base_hp(config)
 	panel._edit_value(base*2.0,"hp",base)
 	if failure_only:
 		overlay.hide()
 		overlay.show()
-		check(overlay.panel==panel and panel.is_dirty() and panel.values.drifter.hp==base*2.0 and IO.read_stage(fixture).enemy_tuning.is_empty(),"F4を閉じても未保存値を保持し編集元には書かない")
+		check(overlay.panel==panel and panel.is_dirty() and panel.values.splitling.hp==base*2.0 and IO.read_stage(fixture).enemy_tuning.is_empty(),"F4を閉じても未保存値を保持し編集元には書かない")
 		var previous := FileAccess.get_sha256(path)
 		var generated: Array = []
 		panel.saved.connect(func(_stage): generated.append(true))
 		panel._save()
 		check(panel._status.text.contains("次回起動時") and generated.size()==1,"Saveは編集元の保存だけを通知する")
-		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous,"保存済みの編集元と古い生成物を区別する")
-		panel.values = {"drifter":{"hp":NAN}}
+		check(IO.read_stage(fixture).enemy_tuning.splitling.hp==base*2.0 and FileAccess.get_sha256(path)==previous,"保存済みの編集元と古い生成物を区別する")
+		panel.values = {"splitling":{"hp":NAN}}
 		panel._save()
-		check(IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0 and FileAccess.get_sha256(path)==previous and not panel._status.text.contains("次回起動時"),"不正な保存値で編集元と生成物を変更しない")
+		check(IO.read_stage(fixture).enemy_tuning.splitling.hp==base*2.0 and FileAccess.get_sha256(path)==previous and not panel._status.text.contains("次回起動時"),"不正な保存値で編集元と生成物を変更しない")
 	else:
 		var notifications: Array = []
 		bridge.subscribe("保存確認",func(frame: Dictionary) -> bool:
 			notifications.append_array(frame.events)
 			return true)
 		panel._save()
-		check(panel._status.text.contains("次回起動時") and not panel.is_dirty() and IO.read_stage(fixture).enemy_tuning.drifter.hp==base*2.0,"Saveが編集元へ保存し、次回起動時の生成を表示する")
+		check(panel._status.text.contains("次回起動時") and not panel.is_dirty() and IO.read_stage(fixture).enemy_tuning.splitling.hp==base*2.0,"Saveが編集元へ保存し、次回起動時の生成を表示する")
 		# 次回起動と同じ共通入口で、保存済みSourceから実行用データを生成する。
 		if load("res://addons/content_build/builder.gd").build_cpp_stage(IO.read_stage(fixture),config,output)!=OK: return false
 		var saved_path: String = output.path_join("run/stage_%d.json" % source.index)
@@ -126,9 +126,9 @@ func cpp_save(parent: Node, failure_only: bool) -> bool:
 		next.auto_step = false
 		while next.bridge==null and next.cpp_error==OK: await parent.get_tree().process_frame
 		if next.bridge==null: return false
-		if not next.bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-500,300)}).ok: return false
+		if not next.bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-500,300)}).ok: return false
 		check(is_equal_approx(next.bridge._core.enemies_snapshot()[0].max_hp,original.max_hp*2.0),"保存後の生成物で次のC++ランを起動する")
-		check(notifications.any(func(event): return event.type==&"enemy_tuning_saved" and event.payload.path==fixture and event.payload.values.drifter.hp==base*2.0),"保存内容を生成済みの型付き定義から通知する")
+		check(notifications.any(func(event): return event.type==&"enemy_tuning_saved" and event.payload.path==fixture and event.payload.values.splitling.hp==base*2.0),"保存内容を生成済みの型付き定義から通知する")
 		check(next.bridge.read_frame().ok and next.bridge.collect_frame().ok and next.bridge.delivery_error.get("ok",false),"再出撃のフレーム回収と通知配信が成功する")
 		next.free()
 	var stepped: Dictionary = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})

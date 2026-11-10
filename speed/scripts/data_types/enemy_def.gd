@@ -13,7 +13,7 @@ var stage_hp := -1.0
 ## データ編集の画面での並び順
 const EDITOR_ORDER := 3
 ## 絵の正面が上向きの種類（ほかの種類の絵は、正面が下向き）
-const NATIVE_SPRITES := [&"drifter", &"swarm", &"darter", &"armored", &"splitter", &"splitling"]
+const NATIVE_SPRITES := [&"splitter", &"splitling"]
 
 ## 実験場と本番で共有する、種類ごとの外観上書き。
 const VISUAL_LIMITS := {
@@ -49,20 +49,12 @@ const PARAMS_DOCS := {
 	"impact_dmg": ["着地の炎の威力", "着地時に1回だけ与えるダメージ。", "HP"],
 	"impact_time": ["着地の炎の表示時間", "着地で1回だけ当たる炎の余韻を表示する時間。", "世界秒"],
 	"recover_time": ["停止時間", "着地後に停止して攻撃の隙を作る時間。", "世界秒"],
-	"throw_weight_drifter": ["投擲の重み：ドリフター", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
-	"throw_damage_drifter": ["投擲の威力：ドリフター", "この種類を投げたときの固定ダメージ。", "HP"],
-	"throw_weight_swarm": ["投擲の重み：スウォーム", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
-	"throw_damage_swarm": ["投擲の威力：スウォーム", "この種類を投げたときの固定ダメージ。", "HP"],
 	"throw_weight_splitling": ["投擲の重み：分裂体", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
 	"throw_damage_splitling": ["投擲の威力：分裂体", "この種類を投げたときの固定ダメージ。", "HP"],
 	"throw_weight_biter": ["投擲の重み：噛みつく雑魚", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
 	"throw_damage_biter": ["投擲の威力：噛みつく雑魚", "この種類を投げたときの固定ダメージ。", "HP"],
-	"throw_weight_darter": ["投擲の重み：ダーター", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
-	"throw_damage_darter": ["投擲の威力：ダーター", "この種類を投げたときの固定ダメージ。", "HP"],
 	"throw_weight_splitter": ["投擲の重み：分裂する雑魚", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
 	"throw_damage_splitter": ["投擲の威力：分裂する雑魚", "この種類を投げたときの固定ダメージ。", "HP"],
-	"throw_weight_armored": ["投擲の重み：装甲型", "旋回している種類だけで抽選する重み。0 で対象外。", "重み"],
-	"throw_damage_armored": ["投擲の威力：装甲型", "この種類を投げたときの固定ダメージ。", "HP"],
 	"capture_interval": ["渦の捕捉間隔", "近くの敵を戦闘格子から捕捉する間隔。", "世界秒"],
 	"capture_max": ["渦の保持数", "同時に旋回させる敵の上限。", "体"],
 	"align_angle": ["投擲方向の許容差", "可視速度が機体を向くとみなす角度。フレーム間の通過も検出する。", "ラジアン"],
@@ -278,7 +270,7 @@ var resolved_xp_reward: Dictionary = {}
 ## 単位：文字
 @export var shape: StringName
 ## 行動の種類
-## chase（追う）、dash（構えて突進）、split（分裂体を生む）、gunner（距離を保って撃つ）、missile（ミサイルを撃つ）、battleship（扇状に撃つ）、drift（漂う）。
+## chase（追う）、split（分裂体を生む）、missile（ミサイルを撃つ）、battleship（扇状に撃つ）、drift（漂う）。
 ## 単位：文字
 @export var behavior: StringName
 ## 撃つ弾の見た目。空なら攻撃の種類ごとの共通シーンを使う。

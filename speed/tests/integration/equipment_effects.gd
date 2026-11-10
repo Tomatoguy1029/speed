@@ -437,7 +437,7 @@ func check_cpp_w01(weapon_id: StringName = &"W01") -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 88
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_%s" % weapon_id
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder.build(stage,config,output,"射撃の全Lvと特性・解除".sha256_text())==OK,"射撃の全Lvの値を生成する")
@@ -594,7 +594,7 @@ func check_cpp_w01_detail(session: RunSession,idle: Dictionary,viewport: Diction
 	check(not shots.is_empty(),"命中確認に実際に発射したW01の弾を使う")
 	if shots.is_empty(): return
 	var shot: Dictionary = shots[-1]
-	var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel*0.04})
+	var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":shot.pos+shot.vel*0.04})
 	check(created.ok,"発射済みのW01の弾の前へ敵を置く")
 	var before: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)[0].hp
 	core.step_projectiles(0.05)
@@ -620,7 +620,7 @@ func check_cpp_w01_detail(session: RunSession,idle: Dictionary,viewport: Diction
 func t07_bridge(config: GameConfig,profile: Dictionary,enemy_definition: EnemyDef = null):
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var bytes: PackedByteArray = builder.compile_chase(enemy_definition if enemy_definition!=null else ContentManager.enemies[&"drifter"],config,schema.sha256("数値特性の固定場面".to_utf8_buffer()))
+	var bytes: PackedByteArray = builder.compile_chase(enemy_definition if enemy_definition!=null else ContentManager.enemies[&"splitling"],config,schema.sha256("数値特性の固定場面".to_utf8_buffer()))
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":93,"mode":1,"stage_id":"t07","profile":profile,"settings":{}})
 	if not configured.ok:
@@ -742,7 +742,7 @@ func t09_contact_hits(bridge,config: GameConfig,count: int) -> Array:
 		events.append_array(frame.events)
 		return true)
 	for _i in count:
-		var id: int = bridge._core.spawn_enemy(&"drifter",Vector2(-3000,0))
+		var id: int = bridge._core.spawn_enemy(&"splitling",Vector2(-3000,0))
 		bridge._core.rebuild_enemy_grid(200.0)
 		bridge.command("dev_ship_motion",{"position":Vector2(-2900,0),"velocity":Vector2(config.base_max_speed*2.0,0)})
 		bridge._core.collide_ship(Vector2(-3100,0),config.ship_radius)
@@ -756,7 +756,7 @@ func check_cpp_t09() -> bool:
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	var definition: TraitDef = load("res://data/traits/T09_critRate.tres")
-	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var enemy: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	enemy.hp = 1000000.0
 	enemy.armor = 0.0
 	var bridge = t07_bridge(config,{},enemy)
@@ -905,7 +905,7 @@ func check_cpp_t11() -> bool:
 	config.base_crit_chance = 0.0
 	var definition: TraitDef = load("res://data/traits/T11_attack.tres")
 	var weapon: WeaponDef = load("res://data/weapons/W01_forward.tres")
-	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var enemy: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	enemy.hp = 1000000.0
 	enemy.armor = 0.0
 	var factor := 1.3
@@ -934,7 +934,7 @@ func check_cpp_t11() -> bool:
 	if config.post_max.target(weapon.id).has("followup"): post+=config.post_max.amount(&"followup",{&"followup":3})
 	var expected := attack*float(weapon.params.damage_by_level[0])*post
 	check(is_equal_approx(shots[0].damage,expected),"W01は共通攻撃力の後に武器の威力と最大段後の加算を一度だけ掛ける")
-	var target: int = core.spawn_enemy(&"drifter",shots[0].pos+shots[0].vel.normalized()*80.0)
+	var target: int = core.spawn_enemy(&"splitling",shots[0].pos+shots[0].vel.normalized()*80.0)
 	core.rebuild_enemy_grid(200.0)
 	var before: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].hp
 	check(core.step_projectiles(0.1),"実際の味方弾を命中まで更新する")
@@ -970,7 +970,7 @@ func check_cpp_t11_ram() -> bool:
 	config.moon_count = 0
 	config.base_crit_chance = 0.0
 	var definition: TraitDef = load("res://data/traits/T11_attack.tres")
-	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var enemy: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	enemy.hp = 1000000.0
 	enemy.armor = 0.0
 	var bridge = t07_bridge(config,{"mult":{"attack":1.3,"max_speed":1.1}},enemy)
@@ -1122,7 +1122,7 @@ func check_cpp_t31() -> bool:
 	var start: Vector2 = core.ship_snapshot().ship_pos
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
 	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
-	var target: int = core.spawn_enemy(&"drifter",start+Vector2(200,100),{"facing":0.0})
+	var target: int = core.spawn_enemy(&"splitling",start+Vector2(200,100),{"facing":0.0})
 	bridge.step(1.0/120.0,idle,viewport)
 	var locked: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].facing
 	check(is_equal_approx(locked,0.0),"なぞり中は自律操舵を止める")
@@ -1195,7 +1195,7 @@ func check_cpp_t31() -> bool:
 func t34_sweep(bridge,config: GameConfig,offset: float) -> float:
 	var core = bridge._core
 	var start: Vector2 = core.ship_snapshot().ship_pos
-	var target: int = core.spawn_enemy(&"drifter",start+Vector2(config.draw_length*0.25,offset))
+	var target: int = core.spawn_enemy(&"splitling",start+Vector2(config.draw_length*0.25,offset))
 	var before: float = core.enemies_snapshot().filter(func(item): return item.id==target)[0].hp
 	core.rebuild_enemy_grid(200.0)
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
@@ -1212,14 +1212,14 @@ func check_cpp_t34() -> bool:
 	config.moon_count = 0
 	config.base_crit_chance = 0.0
 	var definition: TraitDef = load("res://data/traits/T34_bigSwing.tres")
-	var enemy: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var enemy: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	enemy.hp = 1000000.0
 	enemy.armor = 0.0
 	var bridge = t07_bridge(config,{},enemy)
 	if bridge==null: return false
 	var core = bridge._core
 	check(bridge._ui.area_multiplier==1.0 and is_equal_approx(bridge._ui.trace_radius,config.trace_radius),"未取得でもtresの基礎突進半径を使う")
-	var probe: int = core.spawn_enemy(&"drifter",Vector2(-3000,1000))
+	var probe: int = core.spawn_enemy(&"splitling",Vector2(-3000,1000))
 	var radius: float = core.enemies_snapshot().filter(func(item): return item.id==probe)[0].radius
 	bridge.command("dev_remove",{"entity_id":probe})
 	var initial: Dictionary = bridge.checkpoint()
@@ -1406,7 +1406,7 @@ func check_cpp_w02_detail(session: RunSession,idle: Dictionary,viewport: Diction
 		check(is_equal_approx(shot.vel.length(),1300.0*post.factor(&"projectile_speed",{&"projectile_speed":3})) and is_equal_approx(shot.life+1.0/120.0,float(definition.params.life)*post.factor(&"duration",{&"duration":4})),"最大段後の弾速と寿命を発射時に適用する")
 		check(is_equal_approx(shot.knock,float(definition.params.knock)*post.factor(&"knockback",{&"knockback":5})),"最大段後の押し出しを適用する")
 		check(is_equal_approx(shot.damage,ContentManager.base.base_attack*float(definition.params.damage_by_level[-1])*(1.0+post.amount(&"weapon_damage",{&"weapon_damage":2})+post.amount(&"followup",{&"followup":3}))),"最大段後の威力と追撃を共通倍率から適用する")
-		var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel*0.04})
+		var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":shot.pos+shot.vel*0.04})
 		check(created.ok,"散弾の命中対象を発射先へ置く")
 		var before: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)[0].hp
 		core.step_projectiles(0.05)
@@ -1487,7 +1487,7 @@ func check_cpp_w23_detail(session: RunSession,idle: Dictionary,viewport: Diction
 		check(is_equal_approx(shot.vel.length(),1300.0*post.factor(&"projectile_speed",{&"projectile_speed":3})) and is_equal_approx(shot.life+1.0/120.0,float(definition.params.life)*post.factor(&"duration",{&"duration":4})),"最大段後の弾速と寿命を発射時に適用する")
 		check(is_equal_approx(shot.knock,float(definition.params.knock)*post.factor(&"knockback",{&"knockback":5})),"最大段後の押し出しを適用する")
 		check(is_equal_approx(shot.damage,ContentManager.base.base_attack*float(definition.params.damage_by_level[-1])*(1.0+post.amount(&"weapon_damage",{&"weapon_damage":2})+post.amount(&"followup",{&"followup":3}))),"最大段後の威力と追撃を共通倍率から適用する")
-		var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":shot.pos+shot.vel*0.04})
+		var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":shot.pos+shot.vel*0.04})
 		check(created.ok,"後方射撃の命中対象を発射先へ置く")
 		var before: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==created.value)[0].hp
 		core.step_projectiles(0.05)
@@ -1540,7 +1540,7 @@ func check_cpp_w05() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 85
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_W05"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder.build(stage,config,output,"バリアの全Lvと共通防御".sha256_text())==OK,"バリアの全Lvと防御の固定値を生成する")
@@ -1634,7 +1634,7 @@ func check_cpp_w05() -> void:
 	check(is_equal_approx(core.barrier_snapshot().restore,post.reduced(float(definition.params.revive_by_level[-1]),&"weapon_interval",{&"weapon_interval":2},post.minimum_interval)),"最大段後の復旧時間を基準から短縮する")
 	var wave: Dictionary = core.barrier_snapshot().waves[0]
 	check(is_equal_approx(wave.damage,4.0*(1+post.amount(&"weapon_damage",{&"weapon_damage":2})+post.amount(&"followup",{&"followup":3}))),"バリアの波へ威力と追撃の共通倍率を適用する")
-	var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":wave.pos+Vector2(60,0)}).value
+	var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":wave.pos+Vector2(60,0)}).value
 	core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 	var hp_before: float = core.enemies_snapshot().filter(func(item): return item.id==enemy)[0].hp
 	for tick in 60: bridge.step(1.0/120.0,idle,viewport)
@@ -1674,12 +1674,12 @@ func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	var stage := RuntimeStage.new()
 	stage.index = 84
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"] if id in ["T03","T06"] else ["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling","shield"] if id in ["T03","T06"] else ["splitling"])
 	if id=="C_overlap":
-		stage.resources.enemy_ids = PackedStringArray(["drifter","corona","biter"])
-		stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0,"speed":0.0},"corona":{"speed":0.0,"params.spin":0.0,"params.pull":0.0,"params.telegraph":100.0,"params.fire_interval":100.0},"biter":{"hp":1.0,"armor":0.0,"speed":0.0}}
-	if id=="T_stats": stage.enemy_tuning = {"drifter":{"hp":100000.0,"armor":0.0,"speed":0.0}}
-	if id=="W28": stage.enemy_tuning = {"drifter":{"hp":1000.0,"armor":0.0}}
+		stage.resources.enemy_ids = PackedStringArray(["splitling","corona","biter"])
+		stage.enemy_tuning = {"splitling":{"hp":1000.0,"armor":0.0,"speed":0.0},"corona":{"speed":0.0,"params.spin":0.0,"params.pull":0.0,"params.telegraph":100.0,"params.fire_interval":100.0},"biter":{"hp":1.0,"armor":0.0,"speed":0.0}}
+	if id=="T_stats": stage.enemy_tuning = {"splitling":{"hp":100000.0,"armor":0.0,"speed":0.0}}
+	if id=="W28": stage.enemy_tuning = {"splitling":{"hp":1000.0,"armor":0.0}}
 	if id=="T06": stage.enemy_tuning = {"shield":{"hp":200.0}}
 	var output := "res://.content/dev/run_"+id
 	var builder = load("res://tools/content/build_run_content.gd")
@@ -1790,7 +1790,7 @@ func check_cpp_t04() -> void:
 	gear_level = 5
 	var origin: Vector2 = core.ship_snapshot().ship_pos
 	for distance in [200.0,500.0,800.0]:
-		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(distance,0)}).value
 		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 	var contacts: Array = []
 	bridge.subscribe("t04_contacts",func(frame: Dictionary):
@@ -1849,7 +1849,7 @@ func check_cpp_t04() -> void:
 
 func trait_kill_fixture(bridge, cause: String = "shot") -> void:
 	var pos: Vector2 = bridge._core.ship_snapshot().ship_pos+Vector2(0,3000)
-	var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":pos})
+	var created: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":pos})
 	check(created.ok,"撃破の対象を通常の生成入口から配置する")
 	if created.ok:
 		var killed: Dictionary = bridge.command("dev_kill",{"entity_id":created.value,"cause":cause})
@@ -1942,7 +1942,7 @@ func check_cpp_t33() -> void:
 	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
 	var origin: Vector2 = core.ship_snapshot().ship_pos
 	for distance in [200.0,500.0,800.0]:
-		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(distance,0)}).value
 		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 	trait_start_trace(bridge,config.draw_length)
 	trait_kill_fixture(bridge,"afterimage")
@@ -2062,7 +2062,7 @@ func check_cpp_w29() -> void:
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
 		bridge.command("dev_post_weapon_power",{"damage":2,"followup":0})
 		var target: Vector2 = core.ship_snapshot().ship_pos+Vector2(120,75)
-		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target}).value
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target}).value
 		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 		events.clear()
 		trait_start_trace(bridge,120.0)
@@ -2162,7 +2162,7 @@ func check_cpp_t32() -> void:
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T04","levels":5})
 		var origin: Vector2 = core.ship_snapshot().ship_pos
 		for offset in [Vector2(400,0),Vector2(400,70),Vector2(750,0)]:
-			var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+offset}).value
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+offset}).value
 			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 			if offset.y>0: bridge.command("dev_damage",{"entity_id":enemy,"amount":3.0,"knock":0.0,"no_crit":true})
 		events.clear()
@@ -2215,7 +2215,7 @@ func check_cpp_t32() -> void:
 		bridge.collect_frame()
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T32","levels":3})
 		var origin: Vector2 = core.ship_snapshot().ship_pos
-		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(distance,0)}).value
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(distance,0)}).value
 		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 		events.clear()
 		trait_start_trace(bridge,400.0)
@@ -2307,7 +2307,7 @@ func check_cpp_w07() -> void:
 			if d>far:
 				far = d
 				trigger_at = item.pos
-		var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":trigger_at}).value
+		var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":trigger_at}).value
 		core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
 		var queue: Array[int] = []
 		var queued := {}
@@ -2419,9 +2419,9 @@ func check_cpp_t03() -> void:
 		while bridge._ui.vortex.items[0].age+1.0/120.0<definition.params.charge: bridge.step(1.0/120.0,idle,viewport)
 		var center: Vector2 = core.ship_snapshot().ship_pos
 		for offset in [Vector2(0,100),Vector2(35,120),Vector2(70,130)]:
-			var enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+offset}).value
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+offset}).value
 			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
-		var guarded: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(-40,-100)}).value
+		var guarded: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(-40,-100)}).value
 		core.set_enemy_motion(guarded,{"held":true,"vel":Vector2.ZERO})
 		bridge.command("dev_enemy_combat",{"entity_id":guarded,"guard":1.0})
 		var tough: int = bridge.command("dev_spawn",{"definition_id":"shield","position":center+Vector2(60,-120)}).value
@@ -2515,7 +2515,7 @@ func check_cpp_t06() -> void:
 		bridge.command("set_settings",{"hitstop":true})
 		var origin: Vector2 = core.ship_snapshot().ship_pos
 		for offset in [Vector2(180,0),Vector2(400,0),Vector2(650,0)]:
-			var enemy: int = bridge.command("dev_spawn",{"definition_id":"shield" if offset.x==180.0 else "drifter","position":origin+offset}).value
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"shield" if offset.x==180.0 else "splitling","position":origin+offset}).value
 			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO,"facing":0.0})
 		var tough: int = bridge.command("dev_spawn",{"definition_id":"shield","position":origin+Vector2(500,50)}).value
 		core.set_enemy_motion(tough,{"held":true,"vel":Vector2.ZERO,"facing":0.0})
@@ -2621,7 +2621,7 @@ func check_cpp_t06_source_clock() -> bool:
 	bridge.command("set_settings",{"hitstop":true})
 	trait_start_trace(bridge,1200.0)
 	var origin: Vector2 = core.ship_snapshot().ship_pos
-	bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(200,0)})
+	bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(200,0)})
 	var shield: int = bridge.command("dev_spawn",{"definition_id":"shield","position":origin+Vector2(400,0)}).value
 	core.set_enemy_motion(shield,{"held":true,"facing":0.0,"vel":Vector2.ZERO})
 	check(bridge.command("dev_fire_light_lances",{"position":origin,"direction":Vector2.RIGHT,"length":700.0,"width":20.0,"damage":10.0,"knock":0.0}).ok,"元の時計を比べる槍と発射光・命中火花を生成する")
@@ -2657,7 +2657,7 @@ func w03_bridge(bytes: PackedByteArray, seed_value: int):
 func w03_kill(bridge, depth: int = 0, cause: String = "shot", preset: float = 0.0, capture: bool = false, boss: bool = false) -> int:
 	var core = bridge._core
 	var position: Vector2 = core.ship_snapshot().ship_pos+Vector2(100,100)
-	var id: int = core.spawn_enemy(&"drifter",position,{"is_boss":true}) if boss else bridge.command("dev_spawn",{"definition_id":"drifter","position":position}).value
+	var id: int = core.spawn_enemy(&"splitling",position,{"is_boss":true}) if boss else bridge.command("dev_spawn",{"definition_id":"splitling","position":position}).value
 	core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
 	var hp: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==id)[0].hp
 	if capture: bridge.command("dev_enemy_combat",{"entity_id":id,"capture_on_death":true})
@@ -2673,7 +2673,7 @@ func check_cpp_w03() -> void:
 	config.xp_base = 100000.0
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"drifter"],config,schema.sha256("星砕きの固定入力".to_utf8_buffer()))
+	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"splitling"],config,schema.sha256("星砕きの固定入力".to_utf8_buffer()))
 	# PCG32の固定seed3490で実連鎖を確認し、通常候補も初回にW03を含む。
 	var seed_value := 3490
 	var session = await trait_test_session("W03",config,seed_value)
@@ -2726,7 +2726,7 @@ func check_cpp_w03() -> void:
 		if should_check: check(core.projectiles_snapshot()==dust,"停止中は破片の位置・寿命・深さを進めない")
 		bridge.command("pause",{"paused":false})
 		var target_position: Vector2 = dust[0].pos+dust[0].vel.normalized()*40.0
-		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target_position}).value
+		var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target_position}).value
 		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 		var saved: Dictionary = bridge.checkpoint()
 		events.clear()
@@ -2831,7 +2831,7 @@ func check_cpp_w04() -> void:
 		bridge.command("dev_post_scatter",{"interval":0,"projectile":0,"duration":0,"knockback":2,"area":2})
 		bridge.command("dev_post_weapon_power",{"damage":2,"followup":0})
 		var origin: Vector2 = core.ship_snapshot().ship_pos
-		var struck: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(100,0)}).value
+		var struck: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(100,0)}).value
 		core.set_enemy_motion(struck,{"held":true,"vel":Vector2.ZERO})
 		trait_start_trace(bridge,1000.0)
 		for tick in 30:
@@ -2846,7 +2846,7 @@ func check_cpp_w04() -> void:
 		var expected_radius: float = definition.params.radius*(1.0+0.1*(tier-1))*(1.0+area.stack_bonus(2))*(1.0+2.0*config.post_max.increments.area)
 		if not retry or level>1: check(is_equal_approx(wave.radius,expected_radius) and is_equal_approx(wave.damage,bridge._ui.attack_power*definition.params.damage*(1.0+0.3*(tier-1))*(1.0+2.0*config.post_max.increments.weapon_damage)),"全段の半径と発動時威力・最大段後倍率を一度だけ合成する")
 		core.step_draw(1.0)
-		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":wave.pos+Vector2(0,60)}).value
+		var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":wave.pos+Vector2(0,60)}).value
 		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==target)[0].hp
 		for tick in 240:
@@ -2928,7 +2928,7 @@ func check_cpp_w08() -> void:
 		var origin: Vector2 = core.ship_snapshot().ship_pos
 		trait_start_trace(bridge,1200.0)
 		var target_pos := Vector2.INF
-		var enemy_definition: EnemyDef = ContentManager.definition(&"enemies",&"drifter")
+		var enemy_definition: EnemyDef = ContentManager.definition(&"enemies",&"splitling")
 		for tick in 240:
 			var step: Dictionary = bridge.step(1.0/120.0,idle,viewport)
 			if not retry or level>1: check(step.ok and bridge.read_frame().ok and bridge.delivery_error.ok,"発進波の固定更新と通知が成功する")
@@ -2946,7 +2946,7 @@ func check_cpp_w08() -> void:
 			if target_pos.is_finite(): break
 		check(target_pos.is_finite(),"実際に残した輪の後方の重なり位置を取得する")
 		if not target_pos.is_finite(): break
-		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target_pos}).value
+		var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target_pos}).value
 		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==target)[0].hp
 		for tick in 10:
@@ -3014,7 +3014,7 @@ func check_cpp_w17() -> void:
 		var roots: Array[int] = []
 		for j in 13:
 			var pos: Vector2 = origin if j==0 else origin+Vector2.from_angle((j-1)*TAU/12.0)*100.0
-			var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":pos}).value
+			var id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":pos}).value
 			core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
 			roots.append(id)
 		core.collide_ship(origin,1.0)
@@ -3023,7 +3023,7 @@ func check_cpp_w17() -> void:
 		var arc: Dictionary = bridge._ui.contact_arc.duplicate(true)
 		var visual: Dictionary = arc.visuals[0]
 		check(visual.segments.size()==2*(1+level*int(definition.params.chains_per_level)) and is_equal_approx(arc.ready_at,bridge._ui.world_time+definition.params.cooldown),"全段の追加対象枠と世界時刻の待ちを使う")
-		var hp: float = ContentManager.definition(&"enemies",&"drifter").hp
+		var hp: float = ContentManager.definition(&"enemies",&"splitling").hp
 		var damage: float = bridge._ui.attack_power*definition.params.damage*(1.0+0.3*(definition.level_steps[level-1]-1))
 		var hit: Array = core.enemies_snapshot().filter(func(v): return v.id!=roots[0] and is_equal_approx(v.hp,hp-damage))
 		check(hit.size()==level*int(definition.params.chains_per_level),"枝分けして同じ敵を重複せず即時命中する")
@@ -3051,7 +3051,7 @@ func check_cpp_w17() -> void:
 		bridge.collect_frame()
 		for tick in 5: bridge.step(1.0/120.0,idle,viewport)
 		check(bridge._ui.contact_arc==after and core.enemies_snapshot()==enemies,"途中復帰で待ち時刻と電撃の表示・命中結果を再現する")
-		var another: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":core.ship_snapshot().ship_pos}).value
+		var another: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":core.ship_snapshot().ship_pos}).value
 		core.set_enemy_motion(another,{"held":true,"vel":Vector2.ZERO})
 		core.collide_ship(core.ship_snapshot().ship_pos,1.0)
 		bridge.command("set_ui_overlay",{"active":false})
@@ -3086,7 +3086,7 @@ func check_cpp_w04_clock() -> void:
 	bridge.command("dev_remove_weapon",{"id":"W01"})
 	bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W04","levels":1})
 	var origin: Vector2 = core.ship_snapshot().ship_pos
-	var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(100,0)}).value
+	var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(100,0)}).value
 	core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 	trait_start_trace(bridge,1200.0)
 	for tick in 30:
@@ -3104,7 +3104,7 @@ func check_cpp_w04_clock() -> void:
 	var ripple_dt: float = bridge._ui.contact_wave.ripples[0].age-before.ripples[0].age
 	check(wave_dt>0.0 and wave_dt<1.0/120.0 and is_equal_approx(ripple_dt,1.0/120.0),"なぞり中は波・閃光の世界秒と画面の歪みの実秒を分ける")
 	bridge.command("set_settings",{"hitstop":true})
-	var hit_target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":core.ship_snapshot().ship_pos+Vector2(0,200)}).value
+	var hit_target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":core.ship_snapshot().ship_pos+Vector2(0,200)}).value
 	bridge.command("dev_damage",{"entity_id":hit_target,"amount":0.01,"cause":"ram","crit":true})
 	before = bridge._ui.contact_wave.duplicate(true)
 	check(bridge._ui.hitstop>1.0/120.0,"歪みの実秒を確認するヒットストップを作る")
@@ -3193,7 +3193,7 @@ func check_cpp_t05() -> void:
 	bridge.command("pause",{"paused":false})
 	# 同じ波の命中が次の波を追加する場面。次の波を同じ回で進めない。
 	for i in every*3:
-		var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":wave.pos+Vector2(5.0,0.0)})
+		var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":wave.pos+Vector2(5.0,0.0)})
 		check(spawned.ok,"連鎖の相手を同じ生成入口で配置する")
 	var saved: Dictionary = bridge.checkpoint()
 	check(saved.ok,"波の命中前を保持する")
@@ -3258,14 +3258,14 @@ func check_cpp_w21() -> void:
 		var start: Vector2 = trait_start_trace(bridge,1200.0)
 		var sources: Array[int] = []
 		for j in 6:
-			var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":start+Vector2(0,15.0*j)}).value
+			var id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":start+Vector2(0,15.0*j)}).value
 			check(bridge.command("dev_damage",{"entity_id":id,"amount":100000.0,"cause":"ram"}).ok,"撃破入口から船体を回収する")
 			sources.append(id)
 		check(bridge._ui.mass_tow.cargo.size()==6 and core.projectiles_snapshot().is_empty(),"死亡した船体を値コピーし星砕きを抑える")
 		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"捕獲通知を表示と記録へ配信する")
 		check(bridge.step(1.0/120.0,idle,viewport).ok,"元の敵の行を回収する更新を通す")
 		check(core.enemies_snapshot().is_empty() and bridge._ui.mass_tow.cargo.size()==6,"元の敵が消えても牽引する")
-		var replacement: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":start+Vector2(0,900)}).value
+		var replacement: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":start+Vector2(0,900)}).value
 		core.set_enemy_motion(replacement,{"held":true,"vel":Vector2.ZERO})
 		check(bridge._ui.mass_tow.cargo[0].source_id==sources[0],"再利用した敵の行と船体を混同しない")
 		presentation._present_cpp(0.01)
@@ -3372,8 +3372,8 @@ func check_cpp_w22() -> void:
 		var pending: Dictionary = bridge._ui.bipolar.pending[0]
 		check(not bridge._ui.bipolar.active and pending.from==from and pending.to==to and is_equal_approx(pending.delay,0.18),"実際の終了位置まで0.18世界秒の予告を作る")
 		var midpoint: Vector2 = from.lerp(to,0.5)
-		var hit: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":midpoint}).value
-		var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":midpoint+Vector2(0,300)}).value
+		var hit: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":midpoint}).value
+		var outside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":midpoint+Vector2(0,300)}).value
 		for id in [hit,outside]: core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
 		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==hit)[0].hp
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T11","levels":1})
@@ -3449,7 +3449,7 @@ func check_cpp_w25() -> void:
 		verify.call(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W25","levels":level}).ok,"ウィングを全段取得する")
 		var center: Vector2 = core.ship_snapshot().ship_pos
 		for j in 16:
-			var id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2.from_angle(TAU*j/16.0)*230.0}).value
+			var id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2.from_angle(TAU*j/16.0)*230.0}).value
 			core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
 		verify.call(bridge.step(1.0/120.0,idle,viewport).ok,"編隊を配置して最初の射撃を行う")
 		var wing: Dictionary = bridge._ui.interceptor
@@ -3488,7 +3488,7 @@ func check_cpp_w25() -> void:
 		var enemies: Array = core.enemies_snapshot()
 		var shots: Array = core.projectiles_snapshot()
 		var after: Dictionary = bridge._ui.interceptor.duplicate(true)
-		verify.call(enemies.any(func(e): return e.hp<ContentManager.definition(&"enemies",&"drifter").hp),"ウィングの実弾が共通衝突から敵へ同期命中する")
+		verify.call(enemies.any(func(e): return e.hp<ContentManager.definition(&"enemies",&"splitling").hp),"ウィングの実弾が共通衝突から敵へ同期命中する")
 		verify.call(bridge.restore(saved.value).ok and bridge.collect_frame().ok,"編隊と連射の途中へ復帰する")
 		for tick in 35: bridge.step(1.0/120.0,idle,viewport)
 		verify.call(bridge._ui.interceptor==after and core.projectiles_snapshot()==shots and core.enemies_snapshot()==enemies,"機体・標的/期限・連射・発射済みの弾と命中を再現する")
@@ -3565,7 +3565,7 @@ func check_cpp_w26() -> void:
 		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"編隊の全段の基準を復元する")
 		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W26","levels":level}).ok,"編隊を全段取得する")
 		var center: Vector2 = core.ship_snapshot().ship_pos
-		var hit: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(200.0,30.758*config.character_scale)}).value
+		var hit: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(200.0,30.758*config.character_scale)}).value
 		core.set_enemy_motion(hit,{"held":true,"vel":Vector2.ZERO})
 		var hp: float = core.enemies_snapshot().filter(func(e): return e.id==hit)[0].hp
 		events.clear()
@@ -3611,19 +3611,19 @@ func check_cpp_w26() -> void:
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T34","levels":2})
 		bridge.command("dev_post_scatter",{"interval":0,"projectile":0,"duration":0,"knockback":0,"area":2})
 		var center: Vector2 = core.ship_snapshot().ship_pos
-		var probe: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(999,999)}).value
+		var probe: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(999,999)}).value
 		var enemy_radius: float = core.enemies_snapshot().filter(func(e):return e.id==probe)[0].radius
 		core.remove_enemy(probe)
 		var area: TraitDef = ContentManager.definition(&"traits",&"T34")
 		var radius: float = float(definition.params.drone_hit_radius)*config.character_scale*(1.0+area.stack_bonus(2))*(1.0+2.0*config.post_max.increments.area)
-		var inside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240.0,13.0*1.82*config.character_scale+enemy_radius+radius-0.01)}).value
-		var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240.0,13.0*1.82*config.character_scale+enemy_radius+radius+0.01)}).value
+		var inside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(240.0,13.0*1.82*config.character_scale+enemy_radius+radius-0.01)}).value
+		var outside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(240.0,13.0*1.82*config.character_scale+enemy_radius+radius+0.01)}).value
 		for id: int in [inside,outside]: core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
 		trait_start_trace(bridge,600.0)
 		for tick in 45: bridge.step(1.0/120.0,idle,viewport)
 		check(bridge.read_frame().ok and bridge.collect_frame().ok and bridge.delivery_error.ok,"範囲補正後の命中通知を配信する")
 		var enemies: Array = core.enemies_snapshot()
-		check(enemies.all(func(e):return e.id!=inside) and enemies.any(func(e):return e.id==outside and e.hp==ContentManager.definition(&"enemies",&"drifter").hp),"範囲特性と最大段後補正を一度ずつ掛けて通過半径の内外を分ける")
+		check(enemies.all(func(e):return e.id!=inside) and enemies.any(func(e):return e.id==outside and e.hp==ContentManager.definition(&"enemies",&"splitling").hp),"範囲特性と最大段後補正を一度ずつ掛けて通過半径の内外を分ける")
 	bridge.release_checkpoint(initial.value)
 	bridge.unsubscribe("w26_check")
 	session.free()
@@ -3663,7 +3663,7 @@ func check_cpp_w27() -> void:
 		for tick in 8: check(bridge.step(1.0/120.0,idle,viewport).ok,"実秒で軌跡を記録する")
 		var echoes: Dictionary = bridge._ui.afterimage
 		check(echoes.echoes[0].legs>0 and is_equal_approx(echoes.echoes[0].share,float(definition.params.echo_total_by_level[level-1])/level),"各段の通常突進の合計予算を機数へ分配する")
-		var hit: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,0)}).value
+		var hit: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(10,0)}).value
 		core.set_enemy_motion(hit,{"held":true,"vel":Vector2.ZERO})
 		events.clear()
 		for tick in 12: check(bridge.step(1.0/120.0,idle,viewport).ok,"世界の減速中も分身を実秒で再生する")
@@ -3731,7 +3731,7 @@ func check_cpp_w28() -> bool:
 		check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"閃光斬の全段の基準へ復帰する")
 		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W28","levels":level}).ok,"閃光斬を全段取得する")
 		var center: Vector2 = core.ship_snapshot().ship_pos
-		var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(100,0)}).value
+		var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(100,0)}).value
 		core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 		events.clear()
 		trait_start_trace(bridge,600.0)
@@ -3828,7 +3828,7 @@ func check_cpp_overlap() -> bool:
 	for id in ["W04","W28","W21","W03"]:
 		check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1}).ok,"同時作用の実際の武器を取得する")
 	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1})
-	var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(100,0)}).value
+	var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(100,0)}).value
 	core.set_enemy_motion(target,{"vel":Vector2.ZERO})
 	trait_start_trace(bridge,600.0)
 	check(core.step_draw(1.0) and core.step_draw(10.0),"世界を進めず最初の突進を終えて次を充填する")
@@ -3872,14 +3872,14 @@ func check_cpp_overlap() -> bool:
 	check(bridge._ui.mass_tow.cargo.size()==1 and events.filter(func(e):return e.type==&"anchor_capture").size()==1 and not events.any(func(e):return e.type==&"hull_scatter"),"死亡後はアンカーキャノンが先に船体を取り星砕きを抑える")
 	check(bridge._ui.rampage.kills==1,"通常の撃破は特性の撃破hookを一度だけ通す")
 	bridge.command("dev_remove",{"entity_id":target})
-	var next: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(500,300)}).value
+	var next: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(500,300)}).value
 	for tick in 2: bridge.step(1.0/120.0,idle,viewport)
 	motion = core.enemy_motion_snapshot().filter(func(e):return e.id==next)
 	check(next!=target and motion[0].held==0 and motion[0].slash_hold==0 and not motion[0].has("corona_owner") and bridge._ui.flash_slash.marks.is_empty() and bridge._ui.flash_slash.dash_count==0,"死亡行を使う別個体へ冠・印・索引・保持を漏らさない")
 	check(bridge.restore(initial.value).ok and bridge.collect_frame().ok,"船体を一撃で使う境界へ復帰する")
 	for id in ["W03","W21"]: bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1})
 	trait_start_trace(bridge,600.0)
-	var fresh: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(100,100)}).value
+	var fresh: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(100,100)}).value
 	core.set_enemy_motion(fresh,{"held":true,"vel":Vector2.ZERO})
 	events.clear()
 	bridge.command("dev_damage",{"entity_id":fresh,"amount":1000.0,"cause":"shot","direction":Vector2.RIGHT,"knock":0.0,"no_crit":true})
@@ -3890,7 +3890,7 @@ func check_cpp_overlap() -> bool:
 		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T33","levels":1})
 		trait_start_trace(bridge,600.0)
 		core.step_draw(0.1)
-		var echo_target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,0)}).value
+		var echo_target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(10,0)}).value
 		core.set_enemy_motion(echo_target,{"held":true,"vel":Vector2.ZERO})
 		hp = core.enemies_snapshot().filter(func(e):return e.id==echo_target)[0].hp
 		bridge.command("dev_damage",{"entity_id":echo_target,"amount":hp-1.0,"cause":"shot","knock":0.0})
@@ -3966,7 +3966,7 @@ func check_cpp_stats() -> bool:
 				if id!=weapon_id: bridge.command("dev_remove_weapon",{"id":id})
 			var definition: WeaponDef = ContentManager.definition(&"weapons",StringName(weapon_id))
 			if weapon_id=="W25":
-				var target: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":core.ship_snapshot().ship_pos+Vector2(250,0)}).value
+				var target: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":core.ship_snapshot().ship_pos+Vector2(250,0)}).value
 				core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 			var times: Array[float] = []
 			for tick in 200:
@@ -3999,11 +3999,11 @@ func check_cpp_stats() -> bool:
 		if id!="W27": bridge.command("dev_remove_weapon",{"id":id})
 	var center: Vector2 = trait_start_trace(bridge,600.0)
 	core.step_draw(0.1)
-	var probe: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(999,999)}).value
+	var probe: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(999,999)}).value
 	var enemy_radius: float = core.enemies_snapshot().filter(func(e):return e.id==probe)[0].radius
 	bridge.command("dev_remove",{"entity_id":probe})
-	var inside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,enemy_radius+config.trace_radius*bridge._ui.area_multiplier-0.01)}).value
-	var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(10,enemy_radius+config.trace_radius*bridge._ui.area_multiplier+0.01)}).value
+	var inside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(10,enemy_radius+config.trace_radius*bridge._ui.area_multiplier-0.01)}).value
+	var outside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(10,enemy_radius+config.trace_radius*bridge._ui.area_multiplier+0.01)}).value
 	for id in [inside,outside]: core.set_enemy_motion(id,{"held":true,"vel":Vector2.ZERO})
 	var hp: float = core.enemies_snapshot().filter(func(e):return e.id==inside)[0].hp
 	for tick in 20: bridge.step(1.0/120.0,idle,viewport)
@@ -4017,15 +4017,15 @@ func check_cpp_stats() -> bool:
 		bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":1})
 		var definition: WeaponDef = ContentManager.definition(&"weapons",StringName(id))
 		center = core.ship_snapshot().ship_pos
-		probe = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(999,999)}).value
+		probe = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(999,999)}).value
 		enemy_radius = core.enemies_snapshot().filter(func(e):return e.id==probe)[0].radius
 		bridge.command("dev_remove",{"entity_id":probe})
 		var y: float = float(definition.params.width)*bridge._ui.area_multiplier*0.5 if id=="W22" else 13.0*1.82*config.character_scale+float(definition.params.drone_hit_radius)*config.character_scale*bridge._ui.area_multiplier
 		if id=="W22":
 			trait_start_trace(bridge,600.0)
 			core.step_draw(1.0)
-		inside = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240,y+enemy_radius-0.01)}).value
-		outside = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(240,y+enemy_radius+0.01)}).value
+		inside = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(240,y+enemy_radius-0.01)}).value
+		outside = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(240,y+enemy_radius+0.01)}).value
 		for target in [inside,outside]: core.set_enemy_motion(target,{"held":true,"vel":Vector2.ZERO})
 		hp = core.enemies_snapshot().filter(func(e):return e.id==inside)[0].hp
 		if id=="W26": trait_start_trace(bridge,600.0)

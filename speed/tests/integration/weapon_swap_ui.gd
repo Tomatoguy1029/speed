@@ -21,7 +21,7 @@ func _cpp_ready() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 88
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/comet_swap_ui"
 	_check(load("res://tools/content/build_run_content.gd").build(stage,config,output,"彗星交換の正式UI".sha256_text())==OK,"正規生成から交換資源を準備する")
 	var path := output.path_join("stage_88.json")

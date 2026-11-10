@@ -49,7 +49,7 @@ func compare_zones(effects: bool) -> void:
 	var library := load("res://.content/attack_visuals.res").duplicate(true)
 	if effects:
 		library.set_meta("looks",{"res://scenes/attacks/zone_bite.tscn":{"Hit":Resource.new(),"Fade":Resource.new()}})
-	var definition := ContentManager.enemies[&"drifter"].duplicate(true) as EnemyDef
+	var definition := ContentManager.enemies[&"splitling"].duplicate(true) as EnemyDef
 	definition.speed = 0.0
 	var core = comparison.create_native()
 	core.configure(DATA.compile_enemy(definition,config))
@@ -59,7 +59,7 @@ func compare_zones(effects: bool) -> void:
 	check(core.configure_bite_zone(DATA.compile_bite_zone(library)),"判定の寿命と表示終了の条件を準備する")
 	core.start(422,1)
 	var at: Vector2 = core.ship_snapshot().ship_pos
-	var id: int = core.spawn_enemy(&"drifter",at+Vector2(1000,0))
+	var id: int = core.spawn_enemy(&"splitling",at+Vector2(1000,0))
 	core.drain_events()
 	check(core.request_attack("噛みつき",PackedStringArray(["beam"]),id,1.0,0.0,1.0),"噛みつきの攻撃枠を取得する")
 	var token: int = core.attack_budget_snapshot().groups[0].token
@@ -108,7 +108,7 @@ func check_cpp_beam() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 86
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_beam"
 	var builder = load("res://tools/content/build_run_content.gd")
 	var built: Error = builder.build(stage,config,output,"ビームの予告・命中・解除".sha256_text())
@@ -129,7 +129,7 @@ func check_cpp_beam() -> void:
 	var target := Vector2(-900,0)
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
 	core.set_motion_context(target,target,Vector2(640,360))
-	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(-100,100)}).value
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target+Vector2(-100,100)}).value
 	var empty: Dictionary = bridge.checkpoint()
 	var shot := beam_pair(bridge,target+Vector2(-100,100),owner_id,0.25)
 	core.step_hazards(0.125)
@@ -183,9 +183,9 @@ func check_cpp_beam() -> void:
 			bridge.command("dev_kill",{"entity_id":owner_id,"cause":"ram"})
 		elif ending=="reuse":
 			core.remove_enemy(owner_id)
-			bridge.command("dev_spawn",{"definition_id":"drifter","position":from})
+			bridge.command("dev_spawn",{"definition_id":"splitling","position":from})
 		elif ending=="pump":
-			var pump_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(500,500)}).value
+			var pump_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target+Vector2(500,500)}).value
 			core.set_enemy_motion(owner_id,{"pump_owner":pump_id})
 		var dt := 1.25 if ending=="skip" else 0.125
 		core.step_hazards(dt)
@@ -332,7 +332,7 @@ func check_cpp_wall() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 87
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_wall"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder.build(stage,config,output,"壁の予告・再接触・終了".sha256_text())==OK,"壁の共通定義を生成する")
@@ -348,7 +348,7 @@ func check_cpp_wall() -> void:
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var target := Vector2(-900,0)
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
-	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(-300,300)}).value
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target+Vector2(-300,300)}).value
 	var emitted: Dictionary = bridge.command("dev_fire_wall",{"position":target-Vector2(100,0),"angle":0.0,"length":200.0,"width":32.0,"delay":0.25,"active":1.0,"damage":7.0,"owner_id":owner_id})
 	check(emitted.ok,"発生源から残る壁を生成する")
 	if not emitted.ok: session.free(); return
@@ -375,7 +375,7 @@ func check_cpp_wall() -> void:
 	check(presentation.frame_view.apply_frame(frame),"有効な壁を通常の表示へ渡す")
 	await get_tree().process_frame
 	bridge.command("dev_remove",{"entity_id":owner_id})
-	var replacement: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":target+Vector2(500,500)}).value
+	var replacement: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":target+Vector2(500,500)}).value
 	core.step_hazards(0.01)
 	check(core.hazards_snapshot().size()==1 and core.hazards_snapshot()[0].owner_id==owner_id and replacement!=owner_id,"発生元の退場と行再利用でも元の所有者IDで壁が残る")
 	var active: Dictionary = bridge.checkpoint()

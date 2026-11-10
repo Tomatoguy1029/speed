@@ -148,6 +148,10 @@ def package(root, lock, args):
     shutil.copy2(root / 'cpp/dependencies.json', licenses / 'dependencies.json')
     presets = project / 'export_presets.cfg'
     config = presets.read_text()
+    if getattr(args, 'review', False):
+        config = config.replace('custom_features=""', 'custom_features="review"')
+        project_settings = project / 'project.godot'
+        project_settings.write_text(project_settings.read_text().replace('config/name="Speed"', 'config/name="Speed 審査版"'))
     if args.platform == 'macos':
         for arch in ['arm64', 'x86_64']:
             setting = 'application/min_macos_version_' + arch
@@ -187,7 +191,7 @@ def package(root, lock, args):
     revision = subprocess.check_output(['git', '-C', str(root), 'rev-parse', 'HEAD'], text=True).strip()
     (destination / 'package.json').write_text(json.dumps({
         'source_commit': revision, 'runtime_id': runtime_id(root / 'cpp'),
-        'platform': args.platform, 'engine': version,
+        'platform': args.platform, 'engine': version, 'edition': 'review' if getattr(args, 'review', False) else 'normal',
         'artifact': str(artifact.relative_to(destination)),
         'files': {str(path.relative_to(destination)): hashlib.sha256(path.read_bytes()).hexdigest()
                   for path in ([artifact] if args.platform == 'macos' else sorted(artifact.parent.rglob('*')))
@@ -211,6 +215,7 @@ def main():
     parser.add_argument('--package-dir', type=Path, help='新しい独立作業先。ビルド・共通生成・exportを順に行う')
     parser.add_argument('--godot', help='dependencies.jsonと一致するGodot本体')
     parser.add_argument('--templates', type=Path, help='version.txtを持つ固定版export templateディレクトリ')
+    parser.add_argument('--review', action='store_true', help='専用セーブとカスタム設定を使う審査版を配布する')
     parser.add_argument('--verify', action='store_true', help='配布エンジンで最小ランとライブラリ欠落時の失敗を確認する')
     parser.add_argument('--rendered', action='store_true', help='Macの配布確認を描画付き起動する')
     parser.add_argument('--verify-loading', action='store_true', help='Mac配布版で初回・再出撃・装備準備・取消・戻るの時間と回収を確認する')

@@ -12,7 +12,7 @@ signal zoom_changed
 var session
 var mode := 0 # 0 選択、1 配置、2 線、3 試遊
 var place_once := false # パレットで選んだ1回の配置。配置ツールでは連続して置ける。
-var spawn_type := "drifter"
+var spawn_type := "splitling"
 var spawn_count := 1
 var center := Vector2.ZERO
 var zoom := 1.0

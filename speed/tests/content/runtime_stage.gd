@@ -41,7 +41,7 @@ func _ready() -> void:
 			bridge.dispose()
 		check(builder.names(source).clips[0] == "recording_label", "記録用の名前を別の表に保存する")
 		var minimal := StageDef.new()
-		minimal.enemies = [&"drifter"]
+		minimal.enemies = [&"splitling"]
 		var prepared: Resource = builder.compile(minimal)
 		var manifest: Resource = prepared.get("resources")
 		check(manifest != null, "ステージが使う資源の一覧を生成する")

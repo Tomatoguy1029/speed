@@ -3,7 +3,7 @@ extends RefCounted
 const ARMOR_PAINT := preload("res://tools/content/visual_transforms.gd")
 const VERSION := 1
 const ROOT := "user://enemy_lab"
-const COMMANDS := ["boss_appearance", "armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "phase_set", "meta", "time", "edit_range", "level", "route", "pin", "field", "post_max"]
+const COMMANDS := ["boss_appearance", "armor_paint", "spawn", "boss", "move", "delete", "clear", "command", "input", "invincible", "ship", "parameter", "director", "schedule", "loadout", "config", "hero", "guard", "individual", "boss_parameter", "meta", "time", "edit_range", "level", "route", "pin", "field", "post_max"]
 
 static func plain(value):
 	if value is Vector2:
@@ -58,10 +58,7 @@ static func preset(session, route: PackedVector2Array, pattern: Dictionary) -> D
 	spec["gauge"] = session.run.state.gauge
 	spec["time"] = session.run.state.time
 	spec["schedule"] = session.schedule.duplicate(true)
-	var phase_ids := []
-	for phase in session.run.state.stage.phases:
-		if ContentManager.phases.has(phase.id): phase_ids.append(String(phase.id))
-	var commands := [{"tick": 0, "kind": "phase_set", "args": {"ids": phase_ids}}]
+	var commands := []
 	var t = session.run.enemies.table
 	for i in t.alive.size():
 		if not t.alive[i] or t.dead[i] or t.parent[i] >= 0:
@@ -252,10 +249,6 @@ static func _validate_command(command) -> String:
 	if command.kind == "director":
 		var error := _director_problem(args)
 		if not error.is_empty(): return error
-	if command.kind == "phase_set":
-		if not args.get("ids", []) is Array: return TranslationServer.translate("lab.error_b03790ec83")
-		for id in args.get("ids", []):
-			if not ContentManager.phases.has(StringName(id)): return TranslationServer.translate("lab.error_1ba7e23ea5")
 	if command.kind == "schedule":
 		var error := _schedule_problem(args.get("entries", []))
 		if not error.is_empty(): return error

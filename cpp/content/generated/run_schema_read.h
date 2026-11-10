@@ -1102,25 +1102,6 @@ inline bool read(BinaryReader &input, ShieldDefinition &out) {
     if (out.reflected < 1) return false;
     return true;
 }
-inline bool read(BinaryReader &input, GunnerDefinition &out) {
-    if (!input.read_u32(out.id)) return false;
-    if (out.id < 1) return false;
-    if (!input.read_f64(out.accel)) return false;
-    if (out.accel < 0) return false;
-    if (!input.read_f64(out.keep)) return false;
-    if (out.keep < 0) return false;
-    if (!input.read_f64(out.telegraph)) return false;
-    if (out.telegraph < 0) return false;
-    if (!input.read_f64(out.bullet_speed)) return false;
-    if (out.bullet_speed < 0) return false;
-    if (!input.read_f64(out.bullet_damage)) return false;
-    if (out.bullet_damage < 0) return false;
-    if (!input.read_f64(out.slow)) return false;
-    if (out.slow < 0) return false;
-    if (!input.read_f64(out.admission_duration)) return false;
-    if (out.admission_duration < 0) return false;
-    return true;
-}
 inline bool read(BinaryReader &input, BeamerDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
@@ -1195,23 +1176,6 @@ inline bool read(BinaryReader &input, DriftDefinition &out) {
 inline bool read(BinaryReader &input, PartDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
-    return true;
-}
-inline bool read(BinaryReader &input, DashDefinition &out) {
-    if (!input.read_u32(out.id)) return false;
-    if (out.id < 1) return false;
-    if (!input.read_f64(out.range)) return false;
-    if (out.range < 0) return false;
-    if (!input.read_f64(out.warn)) return false;
-    if (out.warn < 0) return false;
-    if (!input.read_f64(out.dash_time)) return false;
-    if (out.dash_time < 0) return false;
-    if (!input.read_f64(out.dash_speed)) return false;
-    if (out.dash_speed < 0) return false;
-    if (!input.read_f64(out.recover)) return false;
-    if (out.recover < 0) return false;
-    if (!input.read_f64(out.admission_duration)) return false;
-    if (out.admission_duration < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, BattleshipDefinition &out) {
@@ -5361,12 +5325,6 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         for (uint32_t i=0; i<count; ++i) { ShieldDefinition row; if (!read(input,row)) return false; out.ShieldDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
-    case 28: {
-        if (version != 1) return false;
-        if (count > input.remaining()/60) return false;
-        for (uint32_t i=0; i<count; ++i) { GunnerDefinition row; if (!read(input,row)) return false; out.GunnerDefinition_rows.push_back(std::move(row)); }
-        return input.remaining()==0;
-    }
     case 29: {
         if (version != 1) return false;
         if (count > input.remaining()/69) return false;
@@ -5395,12 +5353,6 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         if (version != 1) return false;
         if (count > input.remaining()/4) return false;
         for (uint32_t i=0; i<count; ++i) { PartDefinition row; if (!read(input,row)) return false; out.PartDefinition_rows.push_back(std::move(row)); }
-        return input.remaining()==0;
-    }
-    case 50: {
-        if (version != 1) return false;
-        if (count > input.remaining()/52) return false;
-        for (uint32_t i=0; i<count; ++i) { DashDefinition row; if (!read(input,row)) return false; out.DashDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 57: {
@@ -6567,8 +6519,6 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HoundDefinition_rows) if (!HoundDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> ShieldDefinition_ids;
     for (const auto &row:data.ShieldDefinition_rows) if (!ShieldDefinition_ids.insert(row.id).second) return false;
-    std::unordered_set<uint32_t> GunnerDefinition_ids;
-    for (const auto &row:data.GunnerDefinition_rows) if (!GunnerDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BeamerDefinition_ids;
     for (const auto &row:data.BeamerDefinition_rows) if (!BeamerDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> MissileEnemyDefinition_ids;
@@ -6579,8 +6529,6 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.DriftDefinition_rows) if (!DriftDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> PartDefinition_ids;
     for (const auto &row:data.PartDefinition_rows) if (!PartDefinition_ids.insert(row.id).second) return false;
-    std::unordered_set<uint32_t> DashDefinition_ids;
-    for (const auto &row:data.DashDefinition_rows) if (!DashDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> BattleshipDefinition_ids;
     for (const auto &row:data.BattleshipDefinition_rows) if (!BattleshipDefinition_ids.insert(row.id).second) return false;
     std::unordered_set<uint32_t> SniperDefinition_ids;
@@ -6987,14 +6935,12 @@ inline bool validate_references(const ContentRecords &data) {
     for (const auto &row:data.HoundDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.ShieldDefinition_rows) if (!HostileDefinition_ids.count(row.reflected)) return false;
-    for (const auto &row:data.GunnerDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.BeamerDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.MissileEnemyDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.RocketDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.RocketDefinition_rows) if (!ContactDefinition_ids.count(row.contact)) return false;
     for (const auto &row:data.DriftDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.PartDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
-    for (const auto &row:data.DashDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.BattleshipDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.SniperDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;
     for (const auto &row:data.MarlinDefinition_rows) if (!EnemyRecord_ids.count(row.id)) return false;

@@ -53,9 +53,9 @@ func _cpp_perseus() -> void:
 	var bridge = fixture._cpp_fixture(true)
 	_cpp_rescue(bridge,"perseus")
 	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2.ZERO})
-	var inside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(120,0)}).value
-	var outside: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(50000,0)}).value
-	var source: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(250,80)}).value
+	var inside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(120,0)}).value
+	var outside: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(50000,0)}).value
+	var source: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(250,80)}).value
 	check(bridge.command("dev_fire_enemy",{"source_id":source,"angle":0.0,"speed":100.0}).ok,"画面内の敵弾を用意する")
 	var input := Intent.new()
 	input.hero_press = true
@@ -149,16 +149,16 @@ func _cpp_leo() -> void:
 	frame = _cpp_step(bridge)
 	check(is_equal_approx(frame.ui.ship.ship_vel.length(),600.0),"獅子は定義の速さで駆ける")
 	check(bridge._core.handle_draw({"press":true,"pen":Vector2(-300,0)},0,1.0) and not bridge._core.draw_snapshot().drawing,"獅子の間はなぞりを始められない")
-	var armored: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":frame.ui.ship.ship_pos+Vector2(100,0)}).value
+	var struck: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":frame.ui.ship.ship_pos+Vector2(100,0)}).value
 	var held: Dictionary = bridge.checkpoint()
 	check(held.ok,"しし座の残り時間と敵を保持する")
 	var start: int = fixture._cpp_events.size()
 	_cpp_step(bridge)
-	var hits: Array = fixture._cpp_events.slice(start).filter(func(e): return e.type=="combat_damage" and e.payload.target_id==armored and e.payload.applied>0.0)
+	var hits: Array = fixture._cpp_events.slice(start).filter(func(e): return e.type=="combat_damage" and e.payload.target_id==struck and e.payload.applied>0.0)
 	check(hits.size()==1 and hits[0].payload.cause=="ram" and hits[0].payload.applied<=25.0+0.001,"獅子の体に触れた敵へ、特性を除いた攻撃力×2.5で当たる")
 	start = fixture._cpp_events.size()
 	for i in 12: _cpp_step(bridge)
-	check(not fixture._cpp_events.slice(start).any(func(e): return e.type=="combat_damage" and e.payload.target_id==armored),"同じ敵には間隔を置いて当たる")
+	check(not fixture._cpp_events.slice(start).any(func(e): return e.type=="combat_damage" and e.payload.target_id==struck),"同じ敵には間隔を置いて当たる")
 	bridge.command("dev_tick_heroes",{"dt":10.0,"run_time":10.0})
 	frame = _cpp_read(bridge)
 	check(frame.ui.hero.active==0.0,"実秒の期限で獅子が終わる")
@@ -181,8 +181,8 @@ func _cpp_gemini() -> void:
 	var input := Intent.new()
 	input.hero_press = true
 	_cpp_step(bridge,input)
-	var main_enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(0,100)}).value
-	var twin_enemy: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(0,-100)}).value
+	var main_enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(0,100)}).value
+	var twin_enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(0,-100)}).value
 	bridge.command("dev_ship_motion",{"position":Vector2(-300,0),"velocity":Vector2.ZERO})
 	check(bridge._core.handle_draw({"press":true,"pen":Vector2(-300,0)},0,1.0),"ふたご座でも線は一本だけ描く")
 	check(bridge._core.handle_draw({"has_cursor":true,"pen":Vector2(300,200)},1000,1.0),"線を斜めに伸ばす")

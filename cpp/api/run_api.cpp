@@ -101,7 +101,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
         !is(options,"api_version",Variant::INT) || !is(options,"run_id",Variant::INT) || !is(options,"mode",Variant::INT) ||
         !is(options,"stage_id",Variant::STRING) || !is(options,"profile",Variant::DICTIONARY) || !is(options,"settings",Variant::DICTIONARY)) return failure(1,"options","設定の型または項目が不正です");
     if (int64_t(options["api_version"])!=1) return failure(2,"api_version","APIの版が一致しません");
-    if (int64_t(options["run_id"])<=0 || int64_t(options["mode"])<0 || int64_t(options["mode"])>1 || String(options["stage_id"]).is_empty()) return failure(1,"options","ラン番号・モード・ステージが不正です");
+    if (int64_t(options["run_id"])<=0 || int64_t(options["mode"])<0 || int64_t(options["mode"])>2 || String(options["stage_id"]).is_empty()) return failure(1,"options","ラン番号・モード・ステージが不正です");
     const Dictionary profile=options["profile"],settings=options["settings"];
     if (!keys(settings,{"hitstop"}) || (settings.has("hitstop") && !is(settings,"hitstop",Variant::BOOL))) return failure(1,"settings","未登録の設定項目があります");
     if (bytes.size()<88 || std::memcmp(bytes.ptr(),"SPDRUN01",8)) return failure(1,"bundle","生成物の形式が不正です");
@@ -111,7 +111,7 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
     speed::apply_config(candidate->runtime.content->config,candidate->runtime.state);
     auto &state=candidate->runtime.state;const auto &s=state.ship_config;const auto &d=state.draw_config;const auto &c=state.control;
     if (s.max_hp<=0 || s.max_speed<=0 || s.base_max_speed<=0 || s.field_radius<=0 || d.length<=0 || d.run_time<=0 || d.capacity<=0 || !speed::FuelSystem::valid(state) || d.length_mult<=0 || d.scale_min>1 || c.base_view<=0 || c.zoom_ref_speed<=0 || c.zoom_min<=0 || c.zoom_min>1 || state.frame_grid_cell<=0 || candidate->runtime.content->config.character_scale<=0) return failure(1,"bundle.config","機体・描線・カメラの設定が不正です");
-    candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])==1;
+    candidate->runtime.api_run_id=options["run_id"];candidate->runtime.api_development=int64_t(options["mode"])!=0;candidate->runtime.api_review=int64_t(options["mode"])==2;
     candidate->runtime.state.control.stage_id=String(options["stage_id"]);candidate->runtime.api_configured=true;
     const auto &forward=candidate->runtime.content->forward_levels.front();
     state.forward.base_interval=state.forward.interval=forward.interval;state.forward.fire.remaining=forward.interval;state.forward.damage=forward.damage;
@@ -205,7 +205,8 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     if (id==runtime.last_command_id) return runtime.last_command_response.duplicate(true);
     const String kind=envelope["kind"];const Dictionary payload=envelope["payload"];Dictionary response;
     if (runtime.state.control.revision==INT64_MAX) return failure(9,"state_revision","状態番号が上限です");
-    if (kind=="pause" && payload.size()==1 && is(payload,"paused",Variant::BOOL)) {
+    if (kind.begins_with("review_")) response=review_command(kind,payload);
+    else if (kind=="pause" && payload.size()==1 && is(payload,"paused",Variant::BOOL)) {
         if (runtime.state.phase==Phase::Ended) response=failure(4,"phase","終了したランは停止できません");
         else {
             if (bool(payload["paused"]) && runtime.state.phase!=Phase::Paused) {runtime.state.control.resume_phase=int32_t(runtime.state.phase);runtime.state.phase=Phase::Paused;runtime.state.hitstop=0;}

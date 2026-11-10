@@ -2,49 +2,42 @@
 extends Node
 const RunIds := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS
 var failed := 0
-var gunner_finished := false
-var gunner_cycle := false
+var ranged_finished := false
 var missile_enemy := false
 var battleship_enemy := false
 var ranged_type_override := ""
 var ranged_retry := false
 func check(ok: bool, label: String) -> void:
 	if ranged_retry and "発射位置・向き・弾" not in label and "戦艦の確認が最後まで進んだ" not in label: return
-	if gunner_cycle and label not in ["周期を過ぎる大きな更新でも1更新に1回ずつ発射する","射撃型の確認が最後まで進んだ"]: return
 	if not ok:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
 	if "--cpp-ranged-restart" in OS.get_cmdline_user_args():
 		battleship_enemy = true
-		for kind in ["battleship","spreader"]:
+		for kind in ["spreader"]:
 			ranged_type_override = kind
-			gunner_finished = false
-			await check_cpp_gunner()
-			check(gunner_finished,"連続出撃の表示準備を最後まで実施: "+kind)
+			ranged_finished = false
+			await check_cpp_ranged()
+			check(ranged_finished,"連続出撃の表示準備を最後まで実施: "+kind)
 		print("[cpp_ranged_restart] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
 	if "--cpp-enemy-scalar-precision" in OS.get_cmdline_user_args():
-		await check_cpp_gunner()
-		check(gunner_finished,"敵の時間と向きの精度確認を最後まで実施する")
+		await check_cpp_ranged()
+		check(ranged_finished,"敵の時間と向きの精度確認を最後まで実施する")
 		print("[cpp_enemy_scalar_precision] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
 	if "--cpp-battleship-enemy" in OS.get_cmdline_user_args():
 		battleship_enemy = true
-		ranged_type_override = "battleship"
+		ranged_type_override = "spreader"
 		ranged_retry = "--cpp-battleship-reuse-fixes" in OS.get_cmdline_user_args()
 		for argument in OS.get_cmdline_user_args():
 			if argument.begins_with("--cpp-ranged-type="): ranged_type_override = argument.get_slice("=",1)
-		await check_cpp_gunner()
-		check(gunner_finished,"戦艦の確認が最後まで進んだ: "+ranged_type_override)
+		await check_cpp_ranged()
+		check(ranged_finished,"戦艦の確認が最後まで進んだ: "+ranged_type_override)
 		print("[cpp_battleship_enemy] failed=%d" % failed)
-		get_tree().quit(1 if failed else 0)
-		return
-	if "--cpp-dash-enemy" in OS.get_cmdline_user_args():
-		await check_cpp_dash()
-		print("[cpp_dash_enemy] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
 	if "--cpp-part-enemy" in OS.get_cmdline_user_args():
@@ -64,19 +57,13 @@ func _ready() -> void:
 		return
 	if "--cpp-missile-enemy" in OS.get_cmdline_user_args():
 		missile_enemy = true
-		await check_cpp_gunner()
-		check(gunner_finished,"ミサイル艇の確認が最後まで進んだ")
+		await check_cpp_ranged()
+		check(ranged_finished,"ミサイル艇の確認が最後まで進んだ")
 		print("[cpp_missile_enemy] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
-	if "--cpp-gunner" in OS.get_cmdline_user_args() or "--cpp-gunner-cycle" in OS.get_cmdline_user_args():
-		gunner_cycle = "--cpp-gunner-cycle" in OS.get_cmdline_user_args()
-		await check_cpp_gunner()
-		check(gunner_finished,"射撃型の確認が最後まで進んだ")
-		print("[cpp_gunner] failed=%d" % failed)
-		get_tree().quit(1 if failed else 0)
-		return
-	await check_cpp_gunner()
+	missile_enemy = true
+	await check_cpp_ranged()
 	print("[enemy_motion] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
@@ -90,7 +77,7 @@ func _motion(core, id: int) -> Dictionary:
 		if motion.id==id: return motion
 	return {}
 
-func check_cpp_gunner() -> void:
+func check_cpp_ranged() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.start_radius = 900.0
 	config.planet_radius = 100.0
@@ -101,9 +88,9 @@ func check_cpp_gunner() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 84
 	stage.resources = StageResources.new()
-	var type: String = ranged_type_override if not ranged_type_override.is_empty() else ("missile" if missile_enemy else "gunner")
+	var type: String = ranged_type_override if not ranged_type_override.is_empty() else "missile"
 	stage.resources.enemy_ids = PackedStringArray([type])
-	var output := "res://.content/dev/run_gunner"
+	var output := "res://.content/dev/run_ranged"
 	var builder = load("res://tools/content/build_run_content.gd")
 	var built: Error = builder.build(stage,config,output,"射撃型の行動と予算".sha256_text())
 	check(built==OK,"射撃型の実効値・外観・射撃の定義を生成する")
@@ -118,7 +105,7 @@ func check_cpp_gunner() -> void:
 		session.free()
 		return
 	if "--cpp-ranged-restart" in OS.get_cmdline_user_args():
-		gunner_finished = true
+		ranged_finished = true
 		session.free()
 		await get_tree().process_frame
 		return
@@ -129,17 +116,17 @@ func check_cpp_gunner() -> void:
 	var initial: Dictionary = bridge.checkpoint()
 	if "--cpp-enemy-scalar-precision" in OS.get_cmdline_user_args():
 		core.configure_attack_budget({"enabled":false})
-		var id: int = bridge.command("dev_spawn",{"definition_id":"gunner","position":target+Vector2(800,120)}).value
+		var id: int = bridge.command("dev_spawn",{"definition_id":type,"position":target+Vector2(800,120)}).value
 		core.set_motion_context(target,target,Vector2(640,360))
 		check(core.set_enemy_motion(id,{"fire_t":0.8,"charge":0.1234567890123,"facing":0.2345678901234}),"倍精度の時間と向きを設定できる")
 		var state: Dictionary = core.enemy_motion_snapshot()[0]
 		check(state.fire_t==0.8 and state.charge==0.1234567890123 and core.enemies_snapshot()[0].facing==0.2345678901234,"敵表の倍精度を入力から状態まで保つ")
 		core.step(0.8)
 		check(core.hostiles_snapshot().size()==1,"残り時間と同じ更新で射撃し、丸めによって次の更新へ遅れない")
-		gunner_finished = true
+		ranged_finished = true
 		session.free()
 		return
-	for kind in (["normal"] if gunner_cycle or ranged_retry else ["normal","death","reuse"]):
+	for kind in (["normal"] if ranged_retry else ["normal","death","reuse"]):
 		bridge.restore(initial.value)
 		core.set_attack_formation_mode(true)
 		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
@@ -177,13 +164,13 @@ func check_cpp_gunner() -> void:
 			previous_count = core.hostiles_snapshot().size()
 			if step<2 and not ranged_retry:
 				check(core.hostiles_snapshot().is_empty() and _motion(core,id).charge==0.0,"枠を待つ間は予告と射撃を始めず追跡する: %s/%d" % [kind,step])
-			if step==2 and kind=="normal" and not gunner_cycle and not ranged_retry:
+			if step==2 and kind=="normal" and not ranged_retry:
 				warning = bridge.checkpoint()
 				warning_state = core.enemy_motion_snapshot()
 				var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
 				var marked := false
 				for batch: Dictionary in frame.batches:
-					var mark_name := "battleship" if battleship_enemy else ("missile" if missile_enemy else "gunner")
+					var mark_name := "battleship" if battleship_enemy else "missile"
 					if batch.has(mark_name): marked = batch[mark_name].size()==(6 if battleship_enemy else 5) and batch[mark_name][4]>0.0
 				check(marked,"射撃の予告を表示用の値へ渡す")
 				if battleship_enemy:
@@ -191,44 +178,43 @@ func check_cpp_gunner() -> void:
 						if batch.has("battleship"): check(is_equal_approx(batch.battleship[2],_enemy(core,id).radius) and is_equal_approx(batch.battleship[5],definition.weak_arc),"大型の当たり半径と背面の弱点を同じ本体へ渡す")
 				var presentation: RunPresentation = session.view.get_node("RunPresentation")
 				presentation._present_cpp(0.0)
-				check(presentation.frame_view.apply_frame(frame) and presentation.frame_view.get("_battleship" if battleship_enemy else ("_missile" if missile_enemy else "_gunner")).size()==(6 if battleship_enemy else 5),"射撃型の本体と砲口の光を通常画面へ表示する")
+				check(presentation.frame_view.apply_frame(frame) and presentation.frame_view.get("_battleship" if battleship_enemy else "_missile").size()==(6 if battleship_enemy else 5),"射撃型の本体と砲口の光を通常画面へ表示する")
 				await get_tree().process_frame
 		if kind=="normal" and not ranged_retry:
 			check(emitted_count==2*expected_volley and core.hostiles_snapshot().size()==2*expected_volley,"周期を過ぎる大きな更新でも1更新に1回ずつ発射する")
-			if not gunner_cycle:
-				bridge.restore(warning.value)
-				check(core.enemy_motion_snapshot()==warning_state,"予告中の位置と射撃状態を復元する")
-				core.step(0.125)
-				check(core.hostiles_snapshot().size()==expected_volley,"予告中の保持点から同じ発射へ進む")
-				if missile_enemy or battleship_enemy:
-					var fired: Dictionary = bridge.checkpoint()
-					check(bridge.command("dev_kill",{"entity_id":id,"cause":"ram"}).ok,"弾の飛行中に発生元を倒す")
-					var parent_gone := true
-					var source_count := 0
-					for attack: Dictionary in core.attack_snapshot():
-						if attack.source_id==id:
-							source_count += 1
-							parent_gone = parent_gone and not attack.source_alive
-					check(parent_gone and source_count==expected_volley and core.hostiles_snapshot().size()==expected_volley,"親消失後も発射済みの弾と出どころを保つ")
-					core.step_hostiles(5.0)
-					check(core.hostiles_snapshot().is_empty(),"発射済みの弾を命中または寿命で終了する")
-					check(bridge.restore(fired.value).ok,"発射済みの敵と弾を値から復帰する")
-					var pending_shots: Array = core.hostiles_snapshot()
-					core.step_hostiles(0.125)
-					var advanced_shots: Array = core.hostiles_snapshot()
-					check(bridge.restore(fired.value).ok and core.hostiles_snapshot()==pending_shots,"保持元へ飛行中の変更を漏らさない")
-					core.step_hostiles(0.125)
-					check(core.hostiles_snapshot()==advanced_shots,"復帰後も同じ追尾と飛行になる")
-					var restored_id := id
-					var old_handle: PackedInt64Array = core.enemy_handle(restored_id)
-					check(bridge.command("dev_remove",{"entity_id":restored_id}).ok,"発生元を撃破と別の退場で片付ける")
-					check(not core.valid_enemy_handle(old_handle) and core.hostiles_snapshot().size()==expected_volley,"退場は旧個体の参照を失効し発射済み弾を保つ")
-					bridge.release_checkpoint(fired.value)
-				bridge.release_checkpoint(warning.value)
+			bridge.restore(warning.value)
+			check(core.enemy_motion_snapshot()==warning_state,"予告中の位置と射撃状態を復元する")
+			core.step(0.125)
+			check(core.hostiles_snapshot().size()==expected_volley,"予告中の保持点から同じ発射へ進む")
+			if missile_enemy or battleship_enemy:
+				var fired: Dictionary = bridge.checkpoint()
+				check(bridge.command("dev_kill",{"entity_id":id,"cause":"ram"}).ok,"弾の飛行中に発生元を倒す")
+				var parent_gone := true
+				var source_count := 0
+				for attack: Dictionary in core.attack_snapshot():
+					if attack.source_id==id:
+						source_count += 1
+						parent_gone = parent_gone and not attack.source_alive
+				check(parent_gone and source_count==expected_volley and core.hostiles_snapshot().size()==expected_volley,"親消失後も発射済みの弾と出どころを保つ")
+				core.step_hostiles(5.0)
+				check(core.hostiles_snapshot().is_empty(),"発射済みの弾を命中または寿命で終了する")
+				check(bridge.restore(fired.value).ok,"発射済みの敵と弾を値から復帰する")
+				var pending_shots: Array = core.hostiles_snapshot()
+				core.step_hostiles(0.125)
+				var advanced_shots: Array = core.hostiles_snapshot()
+				check(bridge.restore(fired.value).ok and core.hostiles_snapshot()==pending_shots,"保持元へ飛行中の変更を漏らさない")
+				core.step_hostiles(0.125)
+				check(core.hostiles_snapshot()==advanced_shots,"復帰後も同じ追尾と飛行になる")
+				var restored_id := id
+				var old_handle: PackedInt64Array = core.enemy_handle(restored_id)
+				check(bridge.command("dev_remove",{"entity_id":restored_id}).ok,"発生元を撃破と別の退場で片付ける")
+				check(not core.valid_enemy_handle(old_handle) and core.hostiles_snapshot().size()==expected_volley,"退場は旧個体の参照を失効し発射済み弾を保つ")
+				bridge.release_checkpoint(fired.value)
+			bridge.release_checkpoint(warning.value)
 		elif kind=="death": check(core.hostiles_snapshot().is_empty(),"予告中に倒れた敵は発射しない")
 	bridge.release_checkpoint(initial.value)
 	session.free()
-	gunner_finished = true
+	ranged_finished = true
 
 func check_cpp_rocket() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
@@ -414,7 +400,7 @@ func check_cpp_part() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 82
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"]+types)
+	stage.resources.enemy_ids = PackedStringArray(["splitling"]+types)
 	var output := "res://.content/dev/run_part"
 	var builder = load("res://tools/content/build_run_content.gd")
 	var built: Error = builder.build(stage,config,output,"親に従う部位の生成と解放".sha256_text())
@@ -434,7 +420,7 @@ func check_cpp_part() -> void:
 	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
 	var target: Vector2 = core.ship_snapshot().ship_pos
 	core.set_motion_context(target,target,Vector2(640,360))
-	var parent: int = core.spawn_enemy(&"drifter",target+Vector2(500,0),{"is_boss":true,"attack_group":7,"attack_value":2.0,"attack_priority":3.0})
+	var parent: int = core.spawn_enemy(&"splitling",target+Vector2(500,0),{"is_boss":true,"attack_group":7,"attack_value":2.0,"attack_priority":3.0})
 	core.set_enemy_motion(parent,{"held":true})
 	var ids := PackedInt64Array()
 	for i in types.size():
@@ -482,7 +468,7 @@ func check_cpp_part() -> void:
 	check(bridge.restore(pending.value).ok,"親の退場と行の再利用の場面へ戻す")
 	var old_parent: PackedInt64Array = core.enemy_handle(parent)
 	core.remove_enemy(parent)
-	var replacement: int = core.spawn_enemy(&"drifter",target+Vector2(500,0),{})
+	var replacement: int = core.spawn_enemy(&"splitling",target+Vector2(500,0),{})
 	check(not core.valid_enemy_handle(old_parent) and not bridge.command("dev_move_part",{"parent_id":replacement,"entity_id":int(ids[0]),"position":target,"facing":0.0}).ok,"親の行を再利用しても旧部位を新しい親へ結び直さない")
 	core.step(0.05)
 	all_dead = true
@@ -494,78 +480,4 @@ func check_cpp_part() -> void:
 	var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":replacement,"definition_id":types[0],"position":target+Vector2(200,0)})
 	check(made.ok and int(made.value)!=int(ids[0]) and not core.valid_enemy_handle(old_part),"部位の行の再利用で古い親子IDを失効する")
 	bridge.release_checkpoint(pending.value)
-	session.free()
-
-func check_cpp_dash() -> void:
-	var config: GameConfig = ContentManager.base.duplicate(true)
-	config.start_radius = 900.0
-	config.planet_radius = 100.0
-	for key in ["moon_count","meteor_count","iron_count","saw_count"]: config.set(key,0)
-	var stage := RuntimeStage.new()
-	stage.index = 81
-	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["darter"])
-	var output := "res://.content/dev/run_dash"
-	var builder = load("res://tools/content/build_run_content.gd")
-	var built: Error = builder.build(stage,config,output,"突進する敵の予告と硬直".sha256_text())
-	check(built==OK,"突進する敵の編集値と外観を生成する")
-	if built!=OK: return
-	var path := output.path_join("stage_81.json")
-	var index: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
-	var session: RunSession = RunManager.create_session(self,{"runtime":"cpp","cpp_index":path,"cpp_signature":index.input_sha256,"seed":980},true)
-	session.auto_step = false
-	while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
-	check(session.bridge!=null,"突進する敵のランと表示を準備する")
-	if session.bridge==null:
-		session.free()
-		return
-	var bridge = session.bridge
-	var core = bridge._core
-	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,480)})
-	var target: Vector2 = core.ship_snapshot().ship_pos
-	var initial: Dictionary = bridge.checkpoint()
-	var cases := ["normal","death","reuse"]
-	for argument in OS.get_cmdline_user_args():
-		if argument.begins_with("--cpp-dash-case="): cases = [argument.get_slice("=",1)]
-	for kind in cases:
-		bridge.restore(initial.value)
-		core.set_motion_context(target,target,Vector2(640,360))
-		var position := target+Vector2(300,100)
-		var id: int = core.spawn_enemy(&"darter",position,{})
-		core.set_attack_formation_mode(true)
-		core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
-		var modes := [RunIds.EnemyModeId.Move]
-		var pending: Dictionary = {}
-		var pending_state: Array = []
-		var next_state: Array = []
-		for tick in (21 if kind=="normal" else 5):
-			if tick==1:
-				core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
-			if tick==3 and kind=="death":
-				bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
-			if tick==3 and kind=="reuse":
-				core.remove_enemy(id)
-				var old_id := id
-				id = core.spawn_enemy(&"darter",position,{})
-				check(id!=old_id and not core.set_enemy_motion(old_id,{"facing":1.0}),"予告中の行を再利用しても旧突進のIDを受け付けない")
-			core.advance_attack_budget(core.inspect().world_time+0.125)
-			core.step(0.125)
-			modes.append(_motion(core,id).mode)
-			if tick==0: check(_motion(core,id).mode==RunIds.EnemyModeId.Move,"予算0では予告を始めず追跡する")
-			if tick==2 and kind=="normal":
-				pending = bridge.checkpoint()
-				pending_state = core.enemy_motion_snapshot()
-				var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(800,500),Vector2(1600,1000))).value
-				var presentation: RunPresentation = session.view.get_node("RunPresentation")
-				check(presentation.frame_view.apply_frame(frame) and not frame.batches.is_empty(),"予告中の姿勢を通常画面へ表示する")
-				await get_tree().process_frame
-			if tick==3 and kind=="normal": next_state = core.enemy_motion_snapshot()
-		if kind=="normal":
-			check(modes.has(RunIds.EnemyModeId.Windup) and modes.has(RunIds.EnemyModeId.Dash) and modes.has(RunIds.EnemyModeId.Recover) and modes[-1]==RunIds.EnemyModeId.Move,"追跡・予告・突進・硬直を一巡する")
-			check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_state,"予告中の向きと残り時間を値で復帰する")
-			core.step(0.125)
-			check(core.enemy_motion_snapshot()==next_state,"予告中の復帰後に同じ突進へ進む")
-			bridge.release_checkpoint(pending.value)
-		elif kind=="death": check(core.enemies_snapshot()[0].dead!=0,"予告中に倒した敵は突進を再開しない")
-	bridge.release_checkpoint(initial.value)
 	session.free()

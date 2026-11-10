@@ -10,12 +10,10 @@
 #include "../bosses/flow/flow_runner.h"
 #include "../bosses/flow/phase_controller.h"
 #include "../bosses/monoceros/horn_wave.h"
-#include "../behaviors/enemies/gunner.h"
 #include "../behaviors/enemies/missile.h"
 #include "../behaviors/enemies/rocket.h"
 #include "../behaviors/enemies/drift.h"
 #include "../behaviors/enemies/part.h"
-#include "../behaviors/enemies/dash.h"
 #include "../behaviors/enemies/battleship.h"
 #include "../behaviors/enemies/sniper.h"
 #include "../behaviors/enemies/marlin.h"
@@ -339,8 +337,6 @@ bool SpeedRunCore::advance_enemies(double delta) {
                 speed::SniperBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Battleship) {
                 speed::BattleshipBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
-            } else if (def.kind==speed::EnemyDefinition::Kind::Dash) {
-                speed::DashBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Part) {
                 speed::PartBehavior::step(runtime,uint32_t(row));
             } else if (def.kind==speed::EnemyDefinition::Kind::Drift) {
@@ -351,8 +347,6 @@ bool SpeedRunCore::advance_enemies(double delta) {
                 speed::MissileBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind==speed::EnemyDefinition::Kind::Beamer) {
                 speed::BeamerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
-            } else if (def.kind==speed::EnemyDefinition::Kind::Gunner) {
-                speed::GunnerBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else if (def.kind == speed::EnemyDefinition::Kind::Shield) {
                 speed::ShieldBehavior::step(runtime,uint32_t(row),far?delta*3.0:delta);
             } else {

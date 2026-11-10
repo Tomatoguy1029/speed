@@ -247,7 +247,7 @@ func cpp_live() -> bool:
 	var source := RuntimeStage.new()
 	source.index = 198
 	source.resources = StageResources.new()
-	source.resources.enemy_ids = PackedStringArray(["drifter"])
+	source.resources.enemy_ids = PackedStringArray(["splitling"])
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	config.moon_count = 0
 	config.meteor_count = 0
@@ -264,7 +264,7 @@ func cpp_live() -> bool:
 		session.auto_step = false
 		while session.bridge==null and session.cpp_error==OK: await get_tree().process_frame
 		if session.bridge==null: return false
-		if not session.bridge.command("dev_remove_weapon",{"id":"W01"}).ok or not session.bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-600,250)}).ok: return false
+		if not session.bridge.command("dev_remove_weapon",{"id":"W01"}).ok or not session.bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-600,250)}).ok: return false
 	var bridge = first.bridge
 	var old: Dictionary = bridge._core.enemies_snapshot()[0]
 	if not bridge.command("dev_damage",{"entity_id":old.id,"amount":1.0,"cause":"shot","no_crit":true}).ok: return false
@@ -280,10 +280,10 @@ func cpp_live() -> bool:
 	await frames()
 	if overlay.panel==null: return false
 	var panel: Control = overlay.panel
-	panel._select_enemy("drifter")
+	panel._select_enemy("splitling")
 	panel._category = "すべて"
 	panel._refresh_rows()
-	var base: float = ContentManager.enemies[&"drifter"].base_hp(config)
+	var base: float = ContentManager.enemies[&"splitling"].base_hp(config)
 	panel._edit_value(base*2.0,"hp",base)
 	var after: Dictionary = bridge._core.enemies_snapshot()[0]
 	check(after.id==old.id and after.max_hp>old.max_hp and is_equal_approx(after.hp/after.max_hp,old.hp/old.max_hp),"F4の一時編集が生存個体のIDとHP割合を維持する")
@@ -291,8 +291,8 @@ func cpp_live() -> bool:
 	panel._edit_value(3.0,"rank",1.0)
 	panel._edit_value(4.0,"xp_reward_counts.mid",0.0)
 	var recording: Dictionary = bridge.read_recording(true)
-	check(recording.ok and recording.value.xp_config.enemy_rewards.drifter.rank==3 and recording.value.xp_config.enemy_rewards.drifter.counts[1]==4,"星と結晶の数を編集境界で解決し録画用定義へ渡す")
-	if not bridge.command("dev_spawn",{"definition_id":"drifter","position":Vector2(-300,250)}).ok: return false
+	check(recording.ok and recording.value.xp_config.enemy_rewards.splitling.rank==3 and recording.value.xp_config.enemy_rewards.splitling.counts[1]==4,"星と結晶の数を編集境界で解決し録画用定義へ渡す")
+	if not bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-300,250)}).ok: return false
 	check(bridge._core.enemies_snapshot()[1].max_hp==bridge._core.enemies_snapshot()[0].max_hp,"次の出現も同じ編集定義を使う")
 	panel.values.clear()
 	panel._changed()
@@ -316,23 +316,23 @@ func cpp_live() -> bool:
 func cpp_reward_display() -> void:
 	var source := RuntimeStage.new()
 	source.index = 4
-	source.enemies = [&"drifter"]
+	source.enemies = [&"splitling"]
 	var config: GameConfig = ContentManager.base.duplicate(true)
 	var panel = load("res://scripts/dev/stage_enemy_panel.gd").new()
 	panel.bind_run(source,config,{})
 	add_child(panel)
-	panel._select_enemy("drifter")
+	panel._select_enemy("splitling")
 	panel._category = "すべて"
 	panel._refresh_rows()
-	var common: EnemyDef = ContentManager.enemies[&"drifter"]
+	var common: EnemyDef = ContentManager.enemies[&"splitling"]
 	panel._edit_value(3.0,"rank",float(common.rank))
-	var resolved := StageEnemyTuning.resolve(common,panel.values.drifter)
+	var resolved := StageEnemyTuning.resolve(common,panel.values.splitling)
 	var hp_text: String = panel._row_controls.hp[0].text
 	var reward_text: String = panel._row_controls["xp_reward_counts.mid"][0].text
 	check(hp_text.contains("実効 "+String.num(resolved.base_hp(config),3)) and reward_text.contains("実効 "+String.num(float(resolved.resolve_xp_reward().counts[1]),3)),"星の数を変えるとHPと固定報酬の実効値表示も更新する")
 	var reward_base := StageEnemyTuning.base_value(common,"xp_reward_counts.mid",config)
 	panel._toggle_override(true,"xp_reward_counts.mid",reward_base)
-	check(panel.values.drifter["xp_reward_counts.mid"]==resolved.resolve_xp_reward().counts[1],"結晶の上書きONは現在の星から計算した値で始める")
+	check(panel.values.splitling["xp_reward_counts.mid"]==resolved.resolve_xp_reward().counts[1],"結晶の上書きONは現在の星から計算した値で始める")
 	panel._reset_key("rank",panel._row_controls.rank[2],float(common.rank))
 	check(panel._row_controls.hp[0].text.contains("実効 "+String.num(common.base_hp(config),3)),"星の上書きを解除すると派生HP表示も基準へ戻る")
 	panel.free()

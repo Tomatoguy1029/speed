@@ -14,12 +14,12 @@ func check(ok: bool, label: String) -> void:
 
 func _ready() -> void:
 	DirAccess.make_dir_recursive_absolute(fixture_root)
-	var common := IO.definition("drifter")
+	var common := IO.definition("splitling")
 	check(KEY in StageEnemyTuning.keys_for(common), "敵種類の調整項目に停止時間倍率を公開")
 	check(StageEnemyTuning.base_value(common, KEY, ContentManager.cfg) == 1.0, "未指定の共通値は1")
 	check(FIELDS.category(KEY) == "ヒットストップ", "命中演出の分類に表示")
 	for value in [0.0, 0.1, 1.0, 2.0]:
-		check(IO.validate({"drifter": {KEY: value}}).is_empty(), "保存時に有効な倍率を受け付ける")
+		check(IO.validate({"splitling": {KEY: value}}).is_empty(), "保存時に有効な倍率を受け付ける")
 		var def := common.duplicate(true) as EnemyDef
 		def.hitstop_multiplier = value
 		var path := fixture_root.path_join("definition.tres")
@@ -35,12 +35,12 @@ func _ready() -> void:
 		check(ResourceLoader.load(path, "", ResourceLoader.CACHE_MODE_IGNORE).hitstop_multiplier == value, "ボス定義を再読込")
 		DirAccess.remove_absolute(path)
 	for bad in [-0.1, INF, NAN]:
-		check(not IO.validate({"drifter": {KEY: bad}}).is_empty(), "ステージの不正な倍率を保存前に拒否")
+		check(not IO.validate({"splitling": {KEY: bad}}).is_empty(), "ステージの不正な倍率を保存前に拒否")
 	var source := ContentManager.stage(1).duplicate(true) as StageDef
 	source.enemy_tuning = {}
 	var stage_path := fixture_root.path_join("stage.tres")
 	ResourceSaver.save(source, stage_path)
-	var values := {"drifter": {KEY: 0.0}, "armored": {KEY: 0.25}}
+	var values := {"splitling": {KEY: 0.0}, "splitter": {KEY: 0.25}}
 	check(IO.save(stage_path, values, {}).has("stage"), "既存の保存境界から敵種類ごとの差分を保存")
 	var saved := IO.read_stage(stage_path)
 	check(saved.enemy_tuning == values, "保存したステージの倍率を再読込")
@@ -50,7 +50,7 @@ func _ready() -> void:
 	generated = ResourceLoader.load(generated_path, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as RuntimeStage
 	check(generated.enemy_tuning == values, "生成物の再読込で敵別倍率を保持")
 	var native_builder = load("res://tools/content/build_run_content.gd")
-	for id in [&"drifter", &"armored", &"swarm"]:
+	for id in [&"splitling", &"splitter", &"volatile"]:
 		var definition: EnemyDef = IO.definition(String(id))
 		var resolved := StageEnemyTuning.resolve(definition, generated.enemy_tuning.get(String(id), {}))
 		var records: Dictionary = native_builder.chase_records(resolved, ContentManager.base, generated)
@@ -60,19 +60,19 @@ func _ready() -> void:
 	check(native_builder.chase_records(live, ContentManager.base).EnemyRecord[0].hitstop_multiplier == 0.5, "ライブ編集後の再生成で倍率を更新")
 	var inherited := StageEnemyTuning.resolve(common, {})
 	check(native_builder.chase_records(inherited, ContentManager.base).EnemyRecord[0].hitstop_multiplier == common.hitstop_multiplier, "上書き解除は共通値を継承")
-	check(IO.definition("drifter").hitstop_multiplier == 1.0, "共通ファイルは変更しない")
+	check(IO.definition("splitling").hitstop_multiplier == 0.3, "共通ファイルは変更しない")
 	var panel := load("res://scripts/dev/stage_enemy_panel.gd").new() as Control
 	panel.stage_path = stage_path
 	add_child(panel)
 	panel.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	panel.call("_select_enemy", "drifter")
+	panel.call("_select_enemy", "splitling")
 	panel.set("_category", "ヒットストップ")
 	panel.call("_refresh_rows")
 	var controls: Array = panel.get("_row_controls")[KEY]
 	var spin := FIELDS.editor(controls)
 	check(spin.min_value == 0.0 and spin.value == 0.0, "UIは停止なしのゼロを編集・表示")
 	spin.value = 0.2
-	check(panel.get("values").drifter[KEY] == 0.2, "UI入力が敵種類の差分になる")
+	check(panel.get("values").splitling[KEY] == 0.2, "UI入力が敵種類の差分になる")
 	for arg in OS.get_cmdline_user_args():
 		if arg.begins_with("--capture=") and DisplayServer.get_name() != "headless":
 			await get_tree().process_frame
@@ -81,7 +81,7 @@ func _ready() -> void:
 			check(panel.get("_status").get_global_rect().end.y <= get_viewport().get_visible_rect().end.y, "ヒットストップ編集欄と保存状態が画面内に収まる")
 			get_viewport().get_texture().get_image().save_png(arg.trim_prefix("--capture="))
 	panel.call("_toggle_override", false, KEY, 1.0)
-	check(not panel.get("values").has("drifter"), "チェックOFFで共通値へ戻す")
+	check(not panel.get("values").has("splitling"), "チェックOFFで共通値へ戻す")
 	panel.free()
 	DirAccess.remove_absolute(stage_path)
 	DirAccess.remove_absolute(generated_path)

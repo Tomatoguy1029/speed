@@ -45,7 +45,7 @@
 | ボス | 対象の `data/bosses/`・`scripts/bosses/`（編集元）、`cpp/bosses/`（戦闘）、`scenes/bosses/`（表示） | ボスの個別仕様と[AI・技・演出の分担](../architecture.md#61-敵とボスの-ai) |
 | 敵の絵・攻撃の描画 | `assets/pixel/`、`scripts/render/run_presentation.gd`、対象の描画処理 | [アートスタイル](../game/art-style.md)・[素材の入口](../../speed/assets/pixel/README.md)。ヒュドラは[個別素材と演出](../game/bosses/hydra.md#8-素材と演出) |
 
-ステージの `phases` が参照するリソースを辿って編集する。専用時間帯はステージ内部にも保存でき、`data/phases/s4_*.tres` の存在だけでは通常ランへの適用を判断できない。雑魚の曲線を持つステージでは、時間帯の `mix`・`pop_from`・`pop_to` より曲線を確認する。
+時間帯はステージの `phases` に埋め込んであり、そこを編集する。雑魚の曲線を持つステージでは、時間帯の `mix`・`pop_from`・`pop_to` より曲線を確認する。
 
 HPは `EnemyDef.base_hp()` の計算結果で確認する。星の基準対象は `config.rank_hits`・`base_attack` と敵の `toughness` を使い、`hp` 欄と実効HPを区別する。サイズ・エリートなどの補正は[敵の共通仕様](../spec.md#111-見た目と強さ)へ辿る。武器・特性の威力は、保存値・攻撃力に対する倍率・成長後の計算値を分ける。
 

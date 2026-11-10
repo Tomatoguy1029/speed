@@ -655,16 +655,6 @@ struct ShieldDefinition {
     double shield_time{};
     uint32_t reflected{};
 };
-struct GunnerDefinition {
-    uint32_t id{};
-    double accel{};
-    double keep{};
-    double telegraph{};
-    double bullet_speed{};
-    double bullet_damage{};
-    double slow{};
-    double admission_duration{};
-};
 struct BeamerDefinition {
     uint32_t id{};
     double accel{};
@@ -706,15 +696,6 @@ struct DriftDefinition {
 };
 struct PartDefinition {
     uint32_t id{};
-};
-struct DashDefinition {
-    uint32_t id{};
-    double range{};
-    double warn{};
-    double dash_time{};
-    double dash_speed{};
-    double recover{};
-    double admission_duration{};
 };
 struct BattleshipDefinition {
     uint32_t id{};
@@ -3009,13 +2990,11 @@ struct ContentRecords {
     std::vector<PostMaxInterval> PostMaxInterval_rows;
     std::vector<HoundDefinition> HoundDefinition_rows;
     std::vector<ShieldDefinition> ShieldDefinition_rows;
-    std::vector<GunnerDefinition> GunnerDefinition_rows;
     std::vector<BeamerDefinition> BeamerDefinition_rows;
     std::vector<MissileEnemyDefinition> MissileEnemyDefinition_rows;
     std::vector<RocketDefinition> RocketDefinition_rows;
     std::vector<DriftDefinition> DriftDefinition_rows;
     std::vector<PartDefinition> PartDefinition_rows;
-    std::vector<DashDefinition> DashDefinition_rows;
     std::vector<BattleshipDefinition> BattleshipDefinition_rows;
     std::vector<SniperDefinition> SniperDefinition_rows;
     std::vector<MarlinDefinition> MarlinDefinition_rows;
@@ -3189,5 +3168,5 @@ struct ContentRecords {
     std::vector<DracoClonesDefinition> DracoClonesDefinition_rows;
     std::vector<DracoFlowGateDefinition> DracoFlowGateDefinition_rows;
 };
-inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=243;
+inline constexpr uint32_t FORMAT_VERSION=1, ABI_VERSION=1, SECTION_COUNT=241;
 }

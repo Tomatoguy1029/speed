@@ -31,6 +31,13 @@ var _increments_alpha := 1.0
 
 func _ready() -> void:
 	_build_title_art()
+	if SaveManager.is_review_build():
+		var badge := Label.new()
+		badge.text = tr("review.badge")
+		badge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		badge.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+		badge.grow_horizontal = Control.GROW_DIRECTION_BEGIN
+		add_child(badge)
 	var replay := Button.new()
 	replay.name = "ReplayIntroButton"
 	replay.text = tr("intro.replay")

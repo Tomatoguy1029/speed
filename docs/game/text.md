@@ -385,9 +385,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.message&#95;cdff100dfe | 自機を表示中心へ移動・充填 | Move ship to view center and charge |
 | lab.message&#95;c66777f550 | ステージ経過（実秒） | Stage time (real seconds) |
 | lab.message&#95;54036730a6 | ステージ時計へ適用 | Set stage clock |
-| lab.message&#95;568b393d89 | 復元した通常の出現 | Original stage roster |
-| lab.message&#95;df7c5eeb44 | 追加版の出現（実験のみ） | Added roster (lab only) |
-| lab.message&#95;ace6599b1c | 出現の時間帯を切替 | Switch phase roster |
 | lab.message&#95;0c0e2d79f0 | 基礎攻撃力 | Base attack |
 | lab.message&#95;0aee0183fd | 最高速度 | Maximum speed |
 | lab.message&#95;017dfdb22a | 線の長さ | Drawing length |
@@ -615,8 +612,6 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | lab.exit&#95;clearance | 抜けた先に残す余裕の半径 | Exit clearance radius |
 | lab.min&#95;spacing | 敵中心どうしの最小距離 | Minimum distance between enemy centers |
 | lab.attack&#95;legend | ■ 予告・発動　／ 残留　数値は 発動＋残留 | ■ Telegraph / active  / Lingering; active + lingering |
-| lab.error&#95;b03790ec83 | 時間帯一覧の形式が違います | Invalid phase list |
-| lab.error&#95;1ba7e23ea5 | 未知の時間帯です | Unknown phase ID |
 | lab.error&#95;ea2fd16cf8 | 攻撃量の上限が不正です | Invalid attack budget |
 | lab.error&#95;76545bdd1e | 攻撃管理の形式が違います | Invalid attack settings |
 | lab.error&#95;141fdea6d8 | 攻撃分類の値が不正です | Invalid attack category value |
@@ -739,26 +734,12 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.ui.reset&#95;help | 再生を始めた時の状態に戻す（配置は残す。それ以降の記録は分岐として残す） | Back to when playback started (keeps placements; later records stay as a branch) |
 | lab.ui.how&#95;moves | 動き | Behavior |
 | lab.ui.how&#95;to&#95;kill | 倒し方 | How to defeat |
-| lab.enemy.drifter.move | 追ってくる。ときどき画面の中を広く回る | Chases you and sometimes roams widely across the screen |
-| lab.enemy.drifter.kill | HP を削る（体当たり・武器） | Wear down its HP (ram or weapons) |
-| lab.enemy.swarm.move | 小さな体で群れになって追ってくる | Small bodies that chase you in packs |
-| lab.enemy.swarm.kill | HP を削る | Wear down its HP |
-| lab.enemy.darter.move | 近づくと構えてから突進し、突進のあとしばらく止まる | Winds up when close then dashes and stops for a while |
-| lab.enemy.darter.kill | HP を削る。止まっている間が狙いどき | Wear down its HP. Strike while it is stopped |
-| lab.enemy.armored.move | 硬い装甲で追ってくる | Chases you behind heavy armor |
-| lab.enemy.armored.kill | 攻撃力が装甲以上なら貫ける。背面に当てると必ずクリティカル | Pierce it when your attack meets its armor. Hits on its back always crit |
 | lab.enemy.splitter.move | 経験値が詰まった体で機体を追う。生きている間は増えない | Chases the ship with a body full of experience. It does not multiply while alive |
 | lab.enemy.splitter.kill | 倒すと経験値をその場に全部落とし、小さく速い分裂体2体に分かれる | Defeating it drops all its experience on the spot and splits it into two small fast splitlings |
 | lab.enemy.splitling.move | 小さく速い体で追ってくる。それ以上は分かれない | A small fast body that chases you. It does not split further |
 | lab.enemy.splitling.kill | HP を削る | Wear down its HP |
-| lab.enemy.gunner.move | 距離を保って回り込み、光ってから弾を撃つ | Keeps its distance and circles then fires after a flash |
-| lab.enemy.gunner.kill | HP を削る | Wear down its HP |
 | lab.enemy.missile.move | 遠い距離を保ち、予告のあとホーミングミサイルを撃つ | Keeps far away and fires homing missiles after a warning |
 | lab.enemy.missile.kill | HP を削る | Wear down its HP |
-| lab.enemy.titan.move | 大きな体で追ってくる。大きさは毎回変わる | A large chaser whose size varies each time |
-| lab.enemy.titan.kill | HP が多い。何度も貫く | High HP. Pierce it many times |
-| lab.enemy.battleship.move | 追ってきて、予告のあと扇状に弾を撃つ | Chases you and fires a fan of bullets after a warning |
-| lab.enemy.battleship.kill | HP を削る。背面が弱点 | Wear down its HP. Its back is the weak point |
 | lab.enemy.rocket.move | 出た向きのまま一直線に飛び、機体に近づくと爆発する。少しすると消える | Flies straight in its spawn direction and explodes near you then fades |
 | lab.enemy.rocket.kill | HP を削る | Wear down its HP |
 | lab.enemy.bomber.move | 追ってきて、近づくとカウントダウンに入り、止まらずに詰め寄る。2回明滅し終わると爆発する | Chases you and starts a countdown when close then keeps closing in. It explodes after blinking twice |
@@ -1054,6 +1035,26 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.armor.lower | 下半分 | Lower half |
 | lab.armor.color | 塗る色 | Paint color |
 | lab.armor.help | 左クリックで装甲片を塗り、右クリックで元の色に戻します。上下左右につながるピクセルだけを同じ片として扱い、斜めの接触は分けます。画像は元の向きで表示します。外観の保存ボタンでステージにも反映できます。 | Left-click to paint a piece; right-click to restore its original color. Only horizontal and vertical neighbors connect. Diagonal contacts stay separate. The image uses its original orientation. Save appearance to use the paint in stages. |
+| review.badge | 審査版 | Review build |
+| review.title | カスタム設定（審査版のみ） | Custom settings (review build) |
+| review.run_only | 変更はこのプレイだけに適用します。次のプレイは通常の設定で始まります。 | Changes apply to this run only. The next run uses normal settings. |
+| review.unlock_all | 全ステージ解放 | Unlock all stages |
+| review.weapon | 武器 | Weapons |
+| review.trait | 特性 | Traits |
+| review.hero | 英雄の力 | Hero power |
+| review.meta | 機体強化 | Ship upgrades |
+| review.slots | 所持枠 {used} / {max} | Slots {used} / {max} |
+| review.add | 追加（空き枠を使用） | Add (use an empty slot) |
+| review.level | 適用するレベル | Target level |
+| review.apply_equipment | 選択した装備・レベルを適用 | Apply equipment and level |
+| review.remove | 選択した所持装備を削除 | Remove selected owned equipment |
+| review.none | なし | None |
+| review.apply | 適用 | Apply |
+| review.invincible | 無敵 | Invincible |
+| review.boss | ボス戦へ移動（敵と弾を消去） | Jump to boss (clear enemies and projectiles) |
+| review.preparing | 準備しています… | Preparing… |
+| review.applied | 適用しました。 | Applied. |
+| review.unavailable | 操作できません。準備完了後、通常プレイを一時停止して試してください。 | Unavailable. Pause normal play after preparation and try again. |
 <!-- csv:end -->
 
 ### 互換行
@@ -1069,9 +1070,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | --- | --- |
 | enemies/aquarius.tres | みずがめ座 |
 | enemies/aquila.tres | わし座 |
-| enemies/armored.tres | 装甲型 |
 | enemies/auriga.tres | ぎょしゃ座 |
-| enemies/battleship.tres | 戦艦 |
 | enemies/beamer.tres | ビームの敵 |
 | enemies/biter.tres | 噛みつく雑魚 |
 | enemies/bomber.tres | 自爆する雑魚 |
@@ -1082,11 +1081,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | enemies/crab.tres | かに座 |
 | enemies/cross.tres | みなみじゅうじ座 |
 | enemies/crow.tres | からす座 |
-| enemies/darter.tres | ダーター |
 | enemies/defender.tres | 守る雑魚 |
 | enemies/dolphin.tres | いるか座 |
-| enemies/drifter.tres | ドリフター |
-| enemies/gunner.tres | 射撃型 |
 | enemies/hound.tres | 猟犬 |
 | enemies/hydra&#95;beam.tres | うみへび座のビームの首 |
 | enemies/hydra&#95;bite.tres | うみへび座の噛みつく首 |
@@ -1111,9 +1107,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | enemies/splitling.tres | 分裂体 |
 | enemies/splitter.tres | 分裂する雑魚 |
 | enemies/spreader.tres | 拡散弾の敵 |
-| enemies/swarm.tres | スウォーム |
 | enemies/telescope.tres | ぼうえんきょう座 |
-| enemies/titan.tres | タイタン |
 | enemies/triangle.tres | みなみのさんかく座 |
 | enemies/triangle&#95;star.tres | みなみのさんかく座の星 |
 | enemies/volatile.tres | 誘爆する雑魚 |

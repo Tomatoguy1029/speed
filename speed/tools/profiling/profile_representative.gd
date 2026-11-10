@@ -41,10 +41,10 @@ func _ready() -> void:
 	startup_us = Time.get_ticks_usec()
 	process_priority = 100000
 	position_rng.seed = 1029
-	var types := String(options.get("mix","biter:1,hound:1,shield:1,beamer:1,gunner:1"))
+	var types := String(options.get("mix","biter:1,hound:1,shield:1,beamer:1"))
 	for item in types.split(",",false):
 		var pair := item.split(":")
-		if pair.size()!=2 or pair[0] not in ["biter","hound","shield","beamer","gunner"] or not pair[1].is_valid_int() or int(pair[1])<=0 or int(pair[1])>100:
+		if pair.size()!=2 or pair[0] not in ["biter","hound","shield","beamer"] or not pair[1].is_valid_int() or int(pair[1])<=0 or int(pair[1])>100:
 			fail("C++代表計測の敵IDと比率が不正です")
 			return
 		for n in int(pair[1]): mix.append(StringName(pair[0]))

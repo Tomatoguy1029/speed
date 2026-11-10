@@ -3,7 +3,7 @@ extends EnemyVisual
 const BODY_SHADER := preload("res://shaders/pump_reservoir.gdshader")
 const WIND_SHADER := preload("res://shaders/pump_wind.gdshader")
 const SWALLOW_SECONDS := 0.2
-const ENEMIES := [preload("res://assets/pixel/drifter.png"), preload("res://assets/pixel/swarm.png"), preload("res://assets/pixel/splitling.png")]
+const ENEMIES := [preload("res://assets/pixel/bomber.png"), preload("res://assets/pixel/splitter.png"), preload("res://assets/pixel/splitling.png")]
 var swallows: Array[Dictionary] = []
 var _bodies: Array[MeshInstance2D] = []
 var _winds: Array[MeshInstance2D] = []

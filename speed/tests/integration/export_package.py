@@ -59,7 +59,6 @@ def inspect(path: Path, runtime_package=False) -> dict:
         assert lock == json.loads((Path(__file__).resolve().parents[3] / "cpp/dependencies.json").read_text()), "固定依存を配布へ保持する"
         assert "extensions/run/run_core.gdextension" in files, "ラン拡張の接続定義を含める"
         indexes = [(f".content/run/stage_{stage}.json", stage) for stage in range(1, 6)]
-        indexes.append((".content/run/intro/stage_1.json", 1))
         for index_path, stage in indexes:
             index = json.loads(files[index_path])
             assert index["format"] == 1 and index["stage_id"] == str(stage), "本番のステージ索引が必要"

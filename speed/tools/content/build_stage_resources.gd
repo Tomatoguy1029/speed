@@ -2,7 +2,7 @@
 @tool
 extends RefCounted
 ## C++へ登録した種類の描画資源と派生敵。制作時に値の依存を解決する。
-const BEHAVIOR_ATTACKS := {"aquarius": ["flood"], "aquila": ["zone"], "auriga": ["wall"], "beamer": ["beam", "cross"], "biter": ["zone"], "cepheus": ["bolt"], "clock": ["wall"], "crab": ["zone"], "cross": ["cross"], "dolphin": ["wave"], "enemy_behavior": ["enemy", "zone"], "gunner": ["enemy"], "lynx": ["slash"], "missile": ["enemy"], "phoenix": ["zone"], "pulser": ["wave"], "pump": ["shell"], "ruler": ["wall"], "saw": ["saw"], "sniper": ["beam"], "triangle": ["wall"]}
+const BEHAVIOR_ATTACKS := {"aquarius": ["flood"], "aquila": ["zone"], "auriga": ["wall"], "beamer": ["beam", "cross"], "biter": ["zone"], "cepheus": ["bolt"], "clock": ["wall"], "crab": ["zone"], "cross": ["cross"], "dolphin": ["wave"], "enemy_behavior": ["enemy", "zone"], "lynx": ["slash"], "missile": ["enemy"], "phoenix": ["zone"], "pulser": ["wave"], "pump": ["shell"], "ruler": ["wall"], "saw": ["saw"], "sniper": ["beam"], "triangle": ["wall"]}
 const BEHAVIOR_ENEMIES := {"beamer": ["cross"], "biter": ["biter"], "cepheus": ["cepheus_soldier"], "corona_vortex": ["corona"], "marlin": ["marlin"], "missile": ["missile"], "soldier": ["cepheus"], "split": ["splitling"], "triangle": ["triangle_star"]}
 static func _add(paths: Dictionary, path: String) -> void:
 	if paths.has(path) or not ResourceLoader.exists(path): return

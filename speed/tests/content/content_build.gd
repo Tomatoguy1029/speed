@@ -85,14 +85,14 @@ func check_run_content() -> bool:
 	config.saw_count = 0
 	var stage := StageDef.new()
 	stage.index = 77
-	stage.enemies = [&"drifter"]
+	stage.enemies = [&"splitling"]
 	var saved_path := "res://.content/dev/cpp_build_probe.tres"
 	check(ResourceSaver.save(stage,saved_path)==OK, "制作ステージを保存できる")
 	stage = ResourceLoader.load(saved_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
-	var definition: EnemyDef = ContentManager.enemies[&"drifter"].duplicate(true)
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
 	definition.rank = 4
 	definition.xp_reward_counts = PackedInt32Array([0,2,0])
-	var definitions := {&"drifter":definition}
+	var definitions := {&"splitling":definition}
 	check(builder.build_cpp_stage(stage,config,"res://.content",definitions)==OK, "共通生成入口から保存したステージを生成できる")
 	var path := "res://.content/run/stage_77.json"
 	var first: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(path))
@@ -100,12 +100,12 @@ func check_run_content() -> bool:
 	check(not prepared.is_empty(), "索引・バイナリ・資源一覧が同じ版で読める")
 	var session := RunSession.new()
 	check(session.start_cpp_content(path,first.input_sha256,932)==OK, "Sessionの同じ開始経路からC++ランを始める")
-	check(session.cpp_core.spawn_enemy(&"drifter",Vector2.ZERO,{})>0, "保存したステージの敵を生成できる")
+	check(session.cpp_core.spawn_enemy(&"splitling",Vector2.ZERO,{})>0, "保存したステージの敵を生成できる")
 	var previous_hp: float = session.cpp_core.enemies_snapshot()[0].hp
 	var original_counts: PackedInt32Array = definition.resolve_xp_reward().counts.duplicate()
 	definition.xp_reward_counts = PackedInt32Array([0,0,0])
 	check(definition.resolve_xp_reward().counts != original_counts, "動的な報酬上書きも同じ解決経路へ通る")
-	stage.enemy_tuning = {"drifter":{"hp":100.0}}
+	stage.enemy_tuning = {"splitling":{"hp":100.0}}
 	check(ResourceSaver.save(stage,saved_path)==OK, "ステージの調整値を保存する")
 	stage = ResourceLoader.load(saved_path,"",ResourceLoader.CACHE_MODE_IGNORE_DEEP) as StageDef
 	check(builder.build_cpp_stage(stage,config,"res://.content",definitions)==OK, "調整値を再生成する")
@@ -113,7 +113,7 @@ func check_run_content() -> bool:
 	check(first.input_sha256!=second.input_sha256, "入力の値変更で生成署名が変わる")
 	var next := RunSession.new()
 	check(next.start_cpp_content(path,second.input_sha256,932)==OK, "再生成後も同じ開始経路を使う")
-	check(next.cpp_core.spawn_enemy(&"drifter",Vector2.ZERO,{})>0, "再生成後の敵を生成する")
+	check(next.cpp_core.spawn_enemy(&"splitling",Vector2.ZERO,{})>0, "再生成後の敵を生成する")
 	check(next.cpp_core.enemies_snapshot()[0].hp!=previous_hp and session.cpp_core.enemies_snapshot()[0].hp==previous_hp, "新しいランだけが変更後の値を使う")
 	var before := FileAccess.get_file_as_string(path)
 	var compiled = load("res://tools/content/build_runtime_stage.gd").compile(stage,"res://.content",config)

@@ -29,7 +29,7 @@ func motion_flags(bridge, id: int) -> Dictionary:
 
 func check_tracking_policy() -> bool:
 	var builder = load("res://tools/content/build_run_content.gd")
-	for kind in [&"drifter",&"biter"]:
+	for kind in [&"splitling",&"biter"]:
 		var config: GameConfig = ContentManager.base.duplicate(true)
 		config.world_tick_div = 1
 		config.kill_hitstop = 0.0

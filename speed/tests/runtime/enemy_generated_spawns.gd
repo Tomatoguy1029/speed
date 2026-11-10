@@ -61,7 +61,7 @@ func check_cpp_split() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 95
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["splitter","drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitter","splitling"])
 	var definition := load("res://data/enemies/splitter.tres").duplicate(true) as EnemyDef
 	definition.params.bud_interval = 0.1
 	definition.params.max_buds = 2
@@ -167,14 +167,14 @@ func check_cpp_defender() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 97
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","defender","hydra_bite"])
-	var strong := load("res://data/enemies/drifter.tres").duplicate(true) as EnemyDef
+	stage.resources.enemy_ids = PackedStringArray(["splitling","defender","hydra_bite"])
+	var strong := load("res://data/enemies/splitling.tres").duplicate(true) as EnemyDef
 	strong.rank = 3
 	strong.speed = 0.0
 	var part := load("res://data/enemies/hydra_bite.tres").duplicate(true) as EnemyDef
 	part.rank = 5
 	var output := "res://.content/dev/run_defender"
-	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"守備の並びと相手の喪失".sha256_text(),{&"drifter":strong,&"hydra_bite":part})
+	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"守備の並びと相手の喪失".sha256_text(),{&"splitling":strong,&"hydra_bite":part})
 	check(built==OK,"守備と噛みつきの編集値・資源を生成する")
 	if built!=OK: return
 	var path := output.path_join("stage_97.json")
@@ -191,8 +191,8 @@ func check_cpp_defender() -> void:
 	defender_step(bridge)
 	var target: Vector2 = core.ship_snapshot().ship_pos
 	core.set_motion_context(target,target,Vector2(640,360))
-	var guarded: int = core.spawn_enemy(&"drifter",target+Vector2(400,0),{})
-	var held: int = core.spawn_enemy(&"drifter",target+Vector2(250,0),{})
+	var guarded: int = core.spawn_enemy(&"splitling",target+Vector2(400,0),{})
+	var held: int = core.spawn_enemy(&"splitling",target+Vector2(250,0),{})
 	core.set_enemy_motion(held,{"held":true})
 	var child: int = bridge.command("dev_spawn_part",{"parent_id":guarded,"definition_id":"hydra_bite","position":target+Vector2(230,0)}).value
 	var ids: Array[int] = []
@@ -241,7 +241,7 @@ func check_cpp_defender() -> void:
 	core.set_enemy_motion(boosted,{"slash_hold":false})
 	check(bridge.command("dev_defender_clear_boost",{"entity_id":boosted}).ok,"ボス側から速度指示を明示解除できる")
 	bridge.command("dev_retreat",{"entity_id":guarded})
-	var replacement: int = core.spawn_enemy(&"drifter",target+Vector2(2000,0),{})
+	var replacement: int = core.spawn_enemy(&"splitling",target+Vector2(2000,0),{})
 	core.step(0.01)
 	check(split_entity(core,boosted,true).guard_target_id==0 and replacement!=guarded,"守る相手の行を再利用しても古い相手を守り続けない")
 	for id in ids.slice(1): bridge.command("dev_retreat",{"entity_id":id})

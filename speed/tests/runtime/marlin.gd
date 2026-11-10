@@ -32,8 +32,8 @@ func check_cpp_marlin() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 80
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["marlin","drifter","hydra_bite"])
-	stage.enemy_tuning = {"drifter":{"speed":0.0}}
+	stage.resources.enemy_ids = PackedStringArray(["marlin","splitling","hydra_bite"])
+	stage.enemy_tuning = {"splitling":{"speed":0.0}}
 	var output := "res://.content/dev/run_marlin"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"かじき座の巡航と通過時命中".sha256_text())
 	check(built==OK,"かじき座の編集値と外観を生成する")
@@ -70,10 +70,10 @@ func check_cpp_marlin() -> void:
 	check(frame.marlin.ids.size()==1 and frame.marlin.values.size()==14 and presentation.frame_view.apply_frame(frame),"画面外から続く停止予告を共通の表示経路へ渡す")
 	await get_tree().process_frame
 	var victims: Array[int] = []
-	for x in [100,400,900]: victims.append(core.spawn_enemy(&"drifter",position+Vector2(x,0),{}))
-	var outside: int = core.spawn_enemy(&"drifter",position+Vector2(400,150),{})
-	var guarded: int = core.spawn_enemy(&"drifter",position+Vector2(600,0),{"guard":8.0})
-	var parent: int = core.spawn_enemy(&"drifter",position+Vector2(800,200),{"is_boss":true})
+	for x in [100,400,900]: victims.append(core.spawn_enemy(&"splitling",position+Vector2(x,0),{}))
+	var outside: int = core.spawn_enemy(&"splitling",position+Vector2(400,150),{})
+	var guarded: int = core.spawn_enemy(&"splitling",position+Vector2(600,0),{"guard":8.0})
+	var parent: int = core.spawn_enemy(&"splitling",position+Vector2(800,200),{"is_boss":true})
 	var part: int = bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":"hydra_bite","position":position+Vector2(700,0)}).value
 	core.set_motion_context(target+Vector2(0,800),target,Vector2(640,360))
 	for tick in 9:
@@ -105,7 +105,7 @@ func check_cpp_marlin() -> void:
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"marlin",position,{})
 	check(replacement!=id and cpp_motion(core,replacement).anchor==Vector2.ZERO and cpp_motion(core,replacement).charge==0.0,"行の再利用で固定照準・溜めを引き継がない")
-	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	var owner: int = core.spawn_enemy(&"splitling",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.8})
 	core.remove_enemy(owner)
 	core.step(0.1)

@@ -6,7 +6,7 @@ var input_source: Callable
 class Values extends RefCounted:
 	const BEHAVIORS := {
 		"biter": ["zone"], "defender": ["zone"], "hound": ["zone"], "auriga": ["residue"],
-		"dash": ["dash"], "gunner": ["aimed"], "missile": ["homing"], "battleship": ["aimed"],
+		"missile": ["homing"], "battleship": ["aimed"],
 		"rocket": ["dash", "zone"], "bomber": ["zone"], "beamer": ["beam"], "pulser": ["wave"],
 		"pump": ["aimed", "zone"], "sniper": ["aimed"], "ruler": ["beam"], "clock": ["residue"],
 		"lynx": ["aimed"], "triangle": ["residue"],

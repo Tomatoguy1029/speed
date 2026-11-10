@@ -19,7 +19,7 @@ func _cpp_ready() -> void:
 	config.trait_slots = 1
 	var builder = load("res://tools/content/build_run_content.gd")
 	var schema = load("res://tools/content/generated/run_schema.gd")
-	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"drifter"],config,schema.sha256("最大後強化の候補・効果・保持".to_utf8_buffer()))
+	var bytes: PackedByteArray = builder.compile_chase(ContentManager.enemies[&"splitling"],config,schema.sha256("最大後強化の候補・効果・保持".to_utf8_buffer()))
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	var configured: Dictionary = bridge.configure(bytes,{"api_version":1,"run_id":941,"mode":1,"stage_id":"最大後強化","profile":{},"settings":{}})
 	_check(configured.ok,"最大後強化のtyped定義を読み込む: %s" % configured)

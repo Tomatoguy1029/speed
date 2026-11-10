@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dlqg8dea2fr2r"
-path="res://.godot/imported/armored.png-f3242eecbc00a7aed7fc073e401c24f4.ctex"
+uid="uid://dr5auv1brna4u"
+path="res://.godot/imported/bomber_base.png-b3b297ed2a9a16d2d938a50348af4884.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/pixel/armored.png"
-dest_files=["res://.godot/imported/armored.png-f3242eecbc00a7aed7fc073e401c24f4.ctex"]
+source_file="res://assets/pixel/bomber/bomber_base.png"
+dest_files=["res://.godot/imported/bomber_base.png-b3b297ed2a9a16d2d938a50348af4884.ctex"]
 
 [params]
 

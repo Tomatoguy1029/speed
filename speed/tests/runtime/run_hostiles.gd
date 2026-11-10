@@ -138,7 +138,7 @@ func check_cpp_bullet() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 86
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_bullet"
 	var builder = load("res://tools/content/build_run_content.gd")
 	check(builder!=null and builder.can_instantiate(),"敵弾の生成入口を読み込める")
@@ -164,7 +164,7 @@ func check_cpp_bullet() -> void:
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2(100,0)})
 	core.set_motion_context(target,target,Vector2(640,360))
 	var source_position := Vector2(-1500,0)
-	var source_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":source_position}).value
+	var source_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":source_position}).value
 	var empty: Dictionary = bridge.checkpoint()
 	var emitted: Dictionary = bridge.command("dev_fire_enemy",{"source_id":source_id,"angle":0.0,"speed":600.0,"damage":11.0,"slow":0.3})
 	check(emitted.ok,"発生元の位置・半径から通常敵弾を発射する")
@@ -232,7 +232,7 @@ func check_cpp_bullet() -> void:
 	bullet_finished = true
 
 func missile_emit_pair(bridge,position: Vector2,angle: float,speed: float,settings: Dictionary) -> Dictionary:
-	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"drifter","position":position})
+	var spawned: Dictionary = bridge.command("dev_spawn",{"definition_id":"splitling","position":position})
 	check(spawned.ok,"誘導弾の生存する発生元を生成する")
 	if not spawned.ok: return {}
 	var emitted: Dictionary = bridge.command("dev_fire_missile",{"source_id":spawned.value,"angle":angle,"speed":speed,
@@ -262,7 +262,7 @@ func check_cpp_missile() -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 87
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter","shield"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling","shield"])
 	var builder = load("res://tools/content/build_run_content.gd")
 	var output := "res://.content/dev/run_missile"
 	var built: Error = builder.build(stage,config,output,"誘導弾の発生元・追尾・石化・飛行・被弾・終了".sha256_text())
@@ -396,7 +396,7 @@ func check_cpp_wave() -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 88
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var builder = load("res://tools/content/build_run_content.gd")
 	var output := "res://.content/dev/run_wave"
 	if builder.build(stage,config,output,"波動の予告・拡大・切れ目・命中・終了".sha256_text())!=OK: return false
@@ -422,7 +422,7 @@ func check_cpp_wave() -> bool:
 		if not rings.ok: return false
 		wave_pair_step(core,0.4,"複数の輪を同じ行順で拡大する")
 		if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
-		var victim_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(110,0)}).value
+		var victim_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(110,0)}).value
 		var hp: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==victim_id)[0].hp
 		var emitted: Dictionary = wave_emit_pair(bridge,params.merged({"enemy_damage":1.0},true))
 		if emitted.is_empty(): return false
@@ -496,7 +496,7 @@ func check_cpp_wave() -> bool:
 	for after_launch in [false,true]:
 		for pulled in [false,true]:
 			if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
-			var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center}).value
+			var owner_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center}).value
 			emitted = wave_emit_pair(bridge,params.merged({"owner_id":owner_id,"style":3},true))
 			if emitted.is_empty(): return false
 			if after_launch:
@@ -506,7 +506,7 @@ func check_cpp_wave() -> bool:
 				check(bridge.restore(launched.value).ok,"独立した完成輪を保持復帰する")
 				bridge.release_checkpoint(launched.value)
 			if pulled:
-				var pump_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(20,0)}).value
+				var pump_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(20,0)}).value
 				check(bridge.command("dev_enemy_combat",{"entity_id":owner_id,"pump_owner":pump_id}).ok,"発生元を吸引中にする")
 			else:
 				bridge.command("dev_kill",{"entity_id":owner_id,"cause":"ram"})
@@ -514,7 +514,7 @@ func check_cpp_wave() -> bool:
 			check((not core.hazards_snapshot().is_empty())==after_launch,"発射前だけ取り消し、発射後は自然寿命まで残す")
 	# 敵への波は通過帯を一度ずつ当て、機体の命中済み状態とは別に保持する。
 	if not wave_reset(bridge,empty,center+Vector2(1000,0),config): return false
-	var victim_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":center+Vector2(110,0)}).value
+	var victim_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":center+Vector2(110,0)}).value
 	var hp: float = core.enemies_snapshot().filter(func(enemy): return enemy.id==victim_id)[0].hp
 	emitted = wave_emit_pair(bridge,params.merged({"enemy_damage":1.0},true))
 	if emitted.is_empty(): return false
@@ -544,7 +544,7 @@ func check_cpp_slash() -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 88
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_slash"
 	var builder = load("res://tools/content/build_run_content.gd")
 	if builder.build(stage,config,output,"斬撃の左右と3本の爪痕".sha256_text())!=OK:
@@ -563,7 +563,7 @@ func check_cpp_slash() -> bool:
 	var origin := Vector2(-900,0)
 	bridge.command("dev_ship_motion",{"position":origin-Vector2(0,300),"velocity":Vector2.ZERO})
 	core.set_motion_context(origin-Vector2(0,300),origin,Vector2(640,360))
-	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(-300,300)}).value
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(-300,300)}).value
 	var empty: Dictionary = bridge.checkpoint()
 	var params := {"position":origin,"angle":0.0,"speed":100.0,"size":60.0,"range":200.0,"damage":7.0,"side":1.0,"owner_id":owner_id}
 	var fired: Dictionary = bridge.command("dev_fire_slash",params)
@@ -638,7 +638,7 @@ func check_cpp_bolt() -> bool:
 	var stage := RuntimeStage.new()
 	stage.index = 89
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var output := "res://.content/dev/run_bolt"
 	var builder = load("res://tools/content/build_run_content.gd")
 	if builder.build(stage,config,output,"兵の光弾の飛行・命中・終了".sha256_text())!=OK:
@@ -657,7 +657,7 @@ func check_cpp_bolt() -> bool:
 	var origin := Vector2(-900,0)
 	bridge.command("dev_ship_motion",{"position":origin+Vector2(0,100),"velocity":Vector2.ZERO})
 	core.set_motion_context(origin+Vector2(0,100),origin,Vector2(640,360))
-	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"drifter","position":origin+Vector2(-300,300)}).value
+	var owner_id: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(-300,300)}).value
 	var empty: Dictionary = bridge.checkpoint()
 	var params := {"position":origin,"angle":PI*0.5,"speed":100.0,"damage":9.0,"owner_id":owner_id}
 	if "--cpp-bolt-tail-fix" in OS.get_cmdline_user_args():
@@ -739,7 +739,7 @@ func check_cpp_pulser() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 74
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["pulser","drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["pulser","splitling"])
 	stage.enemy_tuning = {"pulser":{"speed":0.0,"params.telegraph":0.25,"params.fire_interval":1.0,"params.wave_radius":300.0,"params.wave_speed":100.0}}
 	var output := "res://.content/dev/run_pulser"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"波動の敵の予告と発射".sha256_text())
@@ -807,7 +807,7 @@ func check_cpp_pulser() -> void:
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"pulser",position,{})
 	check(replacement!=id and pulse_motion(core,replacement).mode==RunIds.EnemyModeId.Move and pulse_motion(core,replacement).charge==0.0,"行の再利用で予告を引き継がない")
-	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	var owner: int = core.spawn_enemy(&"splitling",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.0})
 	core.remove_enemy(owner)
 	core.step(0.1)
@@ -828,8 +828,8 @@ func check_cpp_dolphin() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 75
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["dolphin","drifter"])
-	stage.enemy_tuning = {"dolphin":{"speed":0.0,"params.telegraph":0.3,"params.fire_interval":1.0,"params.wave_radius":300.0,"params.wave_speed":300.0,"params.enemy_dmg":7.0,"params.bullet_dmg":4.0},"drifter":{"speed":0.0,"hp":100.0,"armor":0.0}}
+	stage.resources.enemy_ids = PackedStringArray(["dolphin","splitling"])
+	stage.enemy_tuning = {"dolphin":{"speed":0.0,"params.telegraph":0.3,"params.fire_interval":1.0,"params.wave_radius":300.0,"params.wave_speed":300.0,"params.enemy_dmg":7.0,"params.bullet_dmg":4.0},"splitling":{"speed":0.0,"hp":100.0,"armor":0.0}}
 	var output := "res://.content/dev/run_dolphin"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"いるか座の予告と敵への波".sha256_text())
 	check(built==OK,"いるか座の編集値と外観を生成する")
@@ -882,8 +882,8 @@ func check_cpp_dolphin() -> void:
 	var direction := Vector2.from_angle(wave.angle)
 	var ahead: Vector2 = wave.pos+direction*100.0
 	var behind: Vector2 = wave.pos-direction*100.0
-	var victim: int = core.spawn_enemy(&"drifter",ahead,{"size":1.0})
-	var outside: int = core.spawn_enemy(&"drifter",behind,{"size":1.0})
+	var victim: int = core.spawn_enemy(&"splitling",ahead,{"size":1.0})
+	var outside: int = core.spawn_enemy(&"splitling",behind,{"size":1.0})
 	var hp: float = dolphin_enemy(core,victim).hp
 	var outside_hp: float = dolphin_enemy(core,outside).hp
 	bridge.command("dev_ship_motion",{"position":ahead,"velocity":Vector2.ZERO})
@@ -917,7 +917,7 @@ func check_cpp_dolphin() -> void:
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"dolphin",position,{})
 	check(replacement!=id and pulse_motion(core,replacement).mode==RunIds.EnemyModeId.Move and pulse_motion(core,replacement).charge==0.0,"行の再利用で古い構えを引き継がない")
-	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	var owner: int = core.spawn_enemy(&"splitling",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.0})
 	core.remove_enemy(owner)
 	core.step(0.1)
@@ -933,7 +933,7 @@ func check_cpp_lynx() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 76
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["lynx","drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["lynx","splitling"])
 	stage.enemy_tuning = {"lynx":{"params.telegraph":0.25,"params.fire_interval":1.0}}
 	var output := "res://.content/dev/run_lynx"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"やまねこ座の左右の爪".sha256_text())
@@ -1004,7 +1004,7 @@ func check_cpp_lynx() -> void:
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"lynx",position,{})
 	check(replacement!=id and pulse_motion(core,replacement).buds==0 and pulse_motion(core,replacement).charge==0.0,"行の再利用で左右と溜めを引き継がない")
-	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	var owner: int = core.spawn_enemy(&"splitling",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner,"fire_t":0.01})
 	core.remove_enemy(owner)
 	core.step(0.1)
@@ -1020,8 +1020,8 @@ func check_cpp_soldier() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 78
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["cepheus_soldier","drifter"])
-	stage.enemy_tuning = {"cepheus_soldier":{"armor":0.0},"drifter":{"speed":0.0}}
+	stage.resources.enemy_ids = PackedStringArray(["cepheus_soldier","splitling"])
+	stage.enemy_tuning = {"cepheus_soldier":{"armor":0.0},"splitling":{"speed":0.0}}
 	var output := "res://.content/dev/run_soldier"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"兵の隊列と王の消失".sha256_text())
 	check(built==OK,"兵の編集値と外観を生成する")
@@ -1042,7 +1042,7 @@ func check_cpp_soldier() -> void:
 	core.set_motion_context(target,target,Vector2(640,360))
 	core.configure_attack_budget({"enabled":false,"budget":4.0,"jitter":0.0})
 	var anchor := target-Vector2(500,0)
-	var king: int = core.spawn_enemy(&"drifter",anchor,{"facing":0.0})
+	var king: int = core.spawn_enemy(&"splitling",anchor,{"facing":0.0})
 	core.set_enemy_motion(king,{"held":true})
 	var a_goal := anchor+Vector2(120,-60)
 	var b_goal := anchor+Vector2(120,60)
@@ -1113,7 +1113,7 @@ func check_cpp_auriga() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 79
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["auriga","drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["auriga","splitling"])
 	stage.enemy_tuning = {"auriga":{"speed":100.0,"params.trail_step":0.1,"params.trail_time":0.3,"params.trail_width":8.0,"params.wheel_gap":20.0,"params.bullet_dmg":3.0}}
 	var output := "res://.content/dev/run_auriga"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"ぎょしゃ座の車輪跡".sha256_text())
@@ -1177,7 +1177,7 @@ func check_cpp_auriga() -> void:
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"auriga",position,{})
 	check(replacement!=id and pulse_motion(core,replacement).age==0.0 and pulse_motion(core,replacement).fire_t==0.0,"行の再利用で時計と古い帯の所有を引き継がない")
-	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	var owner: int = core.spawn_enemy(&"splitling",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner})
 	core.remove_enemy(owner)
 	core.configure_attack_budget({"enabled":false,"budget":1.0,"jitter":0.0})
@@ -1198,7 +1198,7 @@ func check_cpp_clock() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 81
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["clock","drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["clock","splitling"])
 	stage.enemy_tuning = {"clock":{"speed":0.0,"params.telegraph":0.25,"params.hand_long":60.0,"params.hand_short":30.0,"params.hand_width":8.0,"params.bullet_dmg":5.0}}
 	var output := "res://.content/dev/run_clock"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"とけい座の二本の針".sha256_text())
@@ -1259,7 +1259,7 @@ func check_cpp_clock() -> void:
 	core.remove_enemy(id)
 	var replacement: int = core.spawn_enemy(&"clock",position,{})
 	check(replacement!=id and pulse_motion(core,replacement).spin==0.0 and pulse_motion(core,replacement).hands==PackedInt64Array([0,0]),"行の再利用で時計と古い針を引き継がない")
-	var owner: int = core.spawn_enemy(&"drifter",target,{})
+	var owner: int = core.spawn_enemy(&"splitling",target,{})
 	core.set_enemy_motion(replacement,{"pump_owner":owner})
 	core.remove_enemy(owner)
 	core.configure_attack_budget({"enabled":false,"budget":1.0,"jitter":0.0})
@@ -1379,7 +1379,7 @@ func check_cpp_cepheus() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 93
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["cepheus","drifter"])
+	stage.resources.enemy_ids = PackedStringArray(["cepheus","splitling"])
 	stage.enemy_tuning = {"cepheus":{"speed":0.0,"armor":0.0,"params.summon_time":0.1,"params.reinforce_interval":10.0,"params.mutiny_time":0.4},"cepheus_soldier":{"armor":0.0}}
 	var output := "res://.content/dev/run_cepheus"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"ケフェウスの召喚と号令".sha256_text())
@@ -1480,8 +1480,8 @@ func check_cpp_triangle_star() -> void:
 	var stage := RuntimeStage.new()
 	stage.index = 94
 	stage.resources = StageResources.new()
-	stage.resources.enemy_ids = PackedStringArray(["darter","triangle_star"])
-	stage.enemy_tuning = {"darter":{"speed":0.0,"params.windup":0.05,"params.dash_speed":0.0,"params.dash_time":0.3}}
+	stage.resources.enemy_ids = PackedStringArray(["triangle","triangle_star"])
+	stage.enemy_tuning = {"triangle":{"speed":0.0,"params.stop_time":0.05,"params.move_time":0.3}}
 	var output := "res://.content/dev/run_triangle_star"
 	var built: Error = preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"三角形の星の部位とゲート".sha256_text())
 	check(built==OK,"三角形の星の編集値と専用画像を生成する")
@@ -1501,8 +1501,8 @@ func check_cpp_triangle_star() -> void:
 	var target: Vector2 = core.ship_snapshot().ship_pos
 	core.configure_attack_budget({"enabled":false,"budget":4.0,"jitter":0.0})
 	core.set_motion_context(target,target,Vector2(640,360))
-	# 親triangleは別の移行単位。既存DASH種類で部位の親mode依存を確かめる。
-	var parent: int = core.spawn_enemy(&"darter",target+Vector2(500,0),{})
+	# 親の三角形が辺を移動する間（Dash）だけ、星のゲートが働く。
+	var parent: int = core.spawn_enemy(&"triangle",target+Vector2(500,0),{})
 	var at := target+Vector2(200,100)
 	var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":"triangle_star","position":at})
 	check(made.ok,"既存の部位生成入口で星を登録する")
@@ -1541,7 +1541,7 @@ func check_cpp_triangle_star() -> void:
 	check(core.hazards_snapshot().is_empty() and not dolphin_enemy(core,parent).dead,"星の途中撃破で付属軌跡を終了し親へダメージを転送しない")
 	bridge.restore(pending.value)
 	core.remove_enemy(parent)
-	var replacement: int = core.spawn_enemy(&"darter",target+Vector2(500,0),{})
+	var replacement: int = core.spawn_enemy(&"triangle",target+Vector2(500,0),{})
 	core.step(0.01)
 	core.step_hazards(0.01)
 	check(dolphin_enemy(core,star).dead and core.hazards_snapshot().is_empty() and replacement!=parent,"親の先行削除と行の再利用で古い星を新しい親へ結び付けない")
@@ -1760,7 +1760,7 @@ func check_cpp_triangle() -> bool:
 	var stage:=RuntimeStage.new()
 	stage.index=108
 	stage.resources=StageResources.new()
-	stage.resources.enemy_ids=PackedStringArray(["triangle","drifter"])
+	stage.resources.enemy_ids=PackedStringArray(["triangle","splitling"])
 	stage.enemy_tuning={"triangle":{"speed":30.0,"params.move_time":0.2,"params.stop_time":0.1}}
 	var output:="res://.content/dev/run_triangle"
 	var built: Error=preload("res://tools/content/build_run_content.gd").build(stage,cfg,output,"三角形の星生成と辺移動".sha256_text())
@@ -1819,7 +1819,7 @@ func check_cpp_triangle() -> bool:
 	check(pulse_motion(core,parent).buds==1 and core.hazards_snapshot().is_empty() and triangle_vertices(core,parent,parts,0.0,150.0),"次の頂点に着くと線を終了して星を停止する")
 	bridge.command("dev_kill",{"entity_id":parts[0].id,"cause":"shot"})
 	core.remove_enemy(parts[0].id)
-	var unrelated: int=core.spawn_enemy(&"drifter",target+Vector2(600,300),{})
+	var unrelated: int=core.spawn_enemy(&"splitling",target+Vector2(600,300),{})
 	for n in 8:
 		ruler_tick(core,0.05)
 		if not core.hazards_snapshot().is_empty(): break
