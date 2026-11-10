@@ -63,6 +63,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.ship_config_glide_duration_mult < 0) return false;
     if (!input.read_f64(out.ship_config_invulnerability)) return false;
     if (out.ship_config_invulnerability < 0) return false;
+    if (!input.read_f64(out.draw_config_min_charge)) return false;
+    if (out.draw_config_min_charge < 0) return false;
     if (!input.read_f64(out.draw_config_length)) return false;
     if (out.draw_config_length < 0) return false;
     if (!input.read_f64(out.draw_config_point_step)) return false;
@@ -87,6 +89,8 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.draw_config_glide_ratio < 0) return false;
     if (!input.read_f64(out.draw_config_capacity)) return false;
     if (out.draw_config_capacity < 0) return false;
+    if (!input.read_f64(out.draw_config_charge_time)) return false;
+    if (out.draw_config_charge_time < 0) return false;
     if (!input.read_f64(out.draw_config_length_mult)) return false;
     if (out.draw_config_length_mult < 0) return false;
     if (!input.read_f64(out.camera_base_view)) return false;
@@ -192,40 +196,6 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.fx_monoceros_lance_timing < 0) return false;
     if (!input.read_f64(out.fx_boss_touch_damage)) return false;
     if (out.fx_boss_touch_damage < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_capacity)) return false;
-    if (out.draw_config_fuel_capacity < 0) return false;
-    if (!input.read_f64(out.draw_config_cruise_drain)) return false;
-    if (out.draw_config_cruise_drain < 0) return false;
-    if (!input.read_f64(out.draw_config_regen_rate)) return false;
-    if (out.draw_config_regen_rate < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_low)) return false;
-    if (out.draw_config_fuel_low < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_speed_min)) return false;
-    if (out.draw_config_fuel_speed_min < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_slow_time)) return false;
-    if (out.draw_config_fuel_slow_time < 0) return false;
-    if (!input.read_f64(out.draw_config_boost_cost_ratio)) return false;
-    if (out.draw_config_boost_cost_ratio < 0) return false;
-    if (!input.read_f64(out.draw_config_boost_min_cost)) return false;
-    if (out.draw_config_boost_min_cost < 0) return false;
-    if (!input.read_f64(out.draw_config_boost_min_q)) return false;
-    if (out.draw_config_boost_min_q < 0) return false;
-    if (!input.read_f64(out.fuel_crystal_low)) return false;
-    if (out.fuel_crystal_low < 0) return false;
-    if (!input.read_f64(out.fuel_crystal_mid)) return false;
-    if (out.fuel_crystal_mid < 0) return false;
-    if (!input.read_f64(out.fuel_crystal_high)) return false;
-    if (out.fuel_crystal_high < 0) return false;
-    if (!input.read_f64(out.boss_crystal_damage)) return false;
-    if (out.boss_crystal_damage < 1e-06) return false;
-    if (!input.read_u32(out.boss_crystal_kind)) return false;
-    if (out.boss_crystal_kind > 2) return false;
-    if (!input.read_f64(out.draw_config_fuel_hole_ratio)) return false;
-    if (out.draw_config_fuel_hole_ratio < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_gain_max)) return false;
-    if (out.draw_config_fuel_gain_max < 0) return false;
-    if (!input.read_f64(out.draw_config_fuel_notify_reset)) return false;
-    if (out.draw_config_fuel_notify_reset < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, StringEntry &out) {
@@ -1928,8 +1898,6 @@ inline bool read(BinaryReader &input, NumericTraitLevel &out) {
     if (out.length_bonus < 0) return false;
     if (!input.read_f64(out.glide_bonus)) return false;
     if (out.glide_bonus < 0) return false;
-    if (!input.read_f64(out.cruise_drain_ratio)) return false;
-    if (out.cruise_drain_ratio < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, PostMaxChargeDefinition &out) {
@@ -1937,6 +1905,11 @@ inline bool read(BinaryReader &input, PostMaxChargeDefinition &out) {
     if (out.id < 1) return false;
     if (!input.read_f64(out.increment)) return false;
     if (out.increment < 0) return false;
+    if (!input.read_f64(out.minimum_ratio)) return false;
+    if (out.minimum_ratio < 0) return false;
+    if (out.minimum_ratio > 1) return false;
+    if (!input.read_f64(out.minimum_time)) return false;
+    if (out.minimum_time < 0) return false;
     return true;
 }
 inline bool read(BinaryReader &input, PostMaxCritDefinition &out) {
@@ -4945,8 +4918,8 @@ inline bool read(BinaryReader &input, DracoFlowGateDefinition &out) {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 18) return false;
-        if (count > input.remaining()/852) return false;
+        if (version != 19) return false;
+        if (count > input.remaining()/736) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -4963,7 +4936,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 4: {
-        if (version != 4) return false;
+        if (version != 5) return false;
         if (count > input.remaining()/258) return false;
         for (uint32_t i=0; i<count; ++i) { EnemyRecord row; if (!read(input,row)) return false; out.EnemyRecord_rows.push_back(std::move(row)); }
         return input.remaining()==0;
@@ -5554,14 +5527,14 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
         return input.remaining()==0;
     }
     case 30: {
-        if (version != 10) return false;
-        if (count > input.remaining()/108) return false;
+        if (version != 9) return false;
+        if (count > input.remaining()/100) return false;
         for (uint32_t i=0; i<count; ++i) { NumericTraitLevel row; if (!read(input,row)) return false; out.NumericTraitLevel_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
     case 31: {
-        if (version != 2) return false;
-        if (count > input.remaining()/12) return false;
+        if (version != 1) return false;
+        if (count > input.remaining()/28) return false;
         for (uint32_t i=0; i<count; ++i) { PostMaxChargeDefinition row; if (!read(input,row)) return false; out.PostMaxChargeDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -7171,6 +7144,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.ship_config.acceleration=config.ship_config_acceleration;
     state.ship_config.glide_duration_mult=config.ship_config_glide_duration_mult;
     state.ship_config.invulnerability=config.ship_config_invulnerability;
+    state.draw_config.min_charge=config.draw_config_min_charge;
     state.draw_config.length=config.draw_config_length;
     state.draw_config.point_step=config.draw_config_point_step;
     state.draw_config.confirm_delay=config.draw_config_confirm_delay;
@@ -7183,6 +7157,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.draw_config.launch_ratio=config.draw_config_launch_ratio;
     state.draw_config.glide_ratio=config.draw_config_glide_ratio;
     state.draw_config.capacity=config.draw_config_capacity;
+    state.draw_config.charge_time=config.draw_config_charge_time;
     state.draw_config.length_mult=config.draw_config_length_mult;
     state.control.base_view=config.camera_base_view;
     state.control.zoom_ref_speed=config.camera_zoom_ref_speed;
@@ -7229,23 +7204,6 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.trace_radius=config.trace_radius;
     state.control.boss_ram_hitstop=config.fx_boss_ram_hitstop;
     state.control.boss_touch_damage=config.fx_boss_touch_damage;
-    state.draw_config.fuel_capacity=config.draw_config_fuel_capacity;
-    state.draw_config.cruise_drain=config.draw_config_cruise_drain;
-    state.draw_config.regen_rate=config.draw_config_regen_rate;
-    state.draw_config.fuel_low=config.draw_config_fuel_low;
-    state.draw_config.fuel_speed_min=config.draw_config_fuel_speed_min;
-    state.draw_config.fuel_slow_time=config.draw_config_fuel_slow_time;
-    state.draw_config.boost_cost_ratio=config.draw_config_boost_cost_ratio;
-    state.draw_config.boost_min_cost=config.draw_config_boost_min_cost;
-    state.draw_config.boost_min_q=config.draw_config_boost_min_q;
-    state.pickup_config.fuel_crystal_low=config.fuel_crystal_low;
-    state.pickup_config.fuel_crystal_mid=config.fuel_crystal_mid;
-    state.pickup_config.fuel_crystal_high=config.fuel_crystal_high;
-    state.pickup_config.boss_crystal_damage=config.boss_crystal_damage;
-    state.pickup_config.boss_crystal_kind=config.boss_crystal_kind;
-    state.draw_config.fuel_hole_ratio=config.draw_config_fuel_hole_ratio;
-    state.draw_config.fuel_gain_max=config.draw_config_fuel_gain_max;
-    state.draw_config.fuel_notify_reset=config.draw_config_fuel_notify_reset;
 }
 inline godot::Dictionary config_snapshot(const RunConfig &config) {
     godot::Dictionary out;
@@ -7277,6 +7235,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["ship_config_acceleration"]=config.ship_config_acceleration;
     out["ship_config_glide_duration_mult"]=config.ship_config_glide_duration_mult;
     out["ship_config_invulnerability"]=config.ship_config_invulnerability;
+    out["draw_config_min_charge"]=config.draw_config_min_charge;
     out["draw_config_length"]=config.draw_config_length;
     out["draw_config_point_step"]=config.draw_config_point_step;
     out["draw_config_confirm_delay"]=config.draw_config_confirm_delay;
@@ -7289,6 +7248,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["draw_config_launch_ratio"]=config.draw_config_launch_ratio;
     out["draw_config_glide_ratio"]=config.draw_config_glide_ratio;
     out["draw_config_capacity"]=config.draw_config_capacity;
+    out["draw_config_charge_time"]=config.draw_config_charge_time;
     out["draw_config_length_mult"]=config.draw_config_length_mult;
     out["camera_base_view"]=config.camera_base_view;
     out["camera_zoom_ref_speed"]=config.camera_zoom_ref_speed;
@@ -7346,23 +7306,6 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["fx_monoceros_kick_life"]=config.fx_monoceros_kick_life;
     out["fx_monoceros_lance_timing"]=config.fx_monoceros_lance_timing;
     out["fx_boss_touch_damage"]=config.fx_boss_touch_damage;
-    out["draw_config_fuel_capacity"]=config.draw_config_fuel_capacity;
-    out["draw_config_cruise_drain"]=config.draw_config_cruise_drain;
-    out["draw_config_regen_rate"]=config.draw_config_regen_rate;
-    out["draw_config_fuel_low"]=config.draw_config_fuel_low;
-    out["draw_config_fuel_speed_min"]=config.draw_config_fuel_speed_min;
-    out["draw_config_fuel_slow_time"]=config.draw_config_fuel_slow_time;
-    out["draw_config_boost_cost_ratio"]=config.draw_config_boost_cost_ratio;
-    out["draw_config_boost_min_cost"]=config.draw_config_boost_min_cost;
-    out["draw_config_boost_min_q"]=config.draw_config_boost_min_q;
-    out["fuel_crystal_low"]=config.fuel_crystal_low;
-    out["fuel_crystal_mid"]=config.fuel_crystal_mid;
-    out["fuel_crystal_high"]=config.fuel_crystal_high;
-    out["boss_crystal_damage"]=config.boss_crystal_damage;
-    out["boss_crystal_kind"]=config.boss_crystal_kind;
-    out["draw_config_fuel_hole_ratio"]=config.draw_config_fuel_hole_ratio;
-    out["draw_config_fuel_gain_max"]=config.draw_config_fuel_gain_max;
-    out["draw_config_fuel_notify_reset"]=config.draw_config_fuel_notify_reset;
     return out;
 }
 inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {

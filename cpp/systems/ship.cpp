@@ -1,6 +1,5 @@
 #include "../api/run_core.h"
 #include "field.h"
-#include "fuel.h"
 #include "boss_contact_feedback.h"
 #include "geometry.h"
 #include "../behaviors/heroes/leo.h"
@@ -52,7 +51,7 @@ void SpeedRunCore::steer_ship(double want, double dt) {
         if (runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.vel = Vector2::from_angle(want) * lion->speed;
         return;
     }
-    const double cruise = c.max_speed * c.steer_cruise * speed::FuelSystem::speed_ratio(runtime.state);
+    const double cruise = c.max_speed * c.steer_cruise;
     if (sp < cruise) runtime.state.ship.vel += Vector2::from_angle(want) * std::min(c.acceleration * dt, cruise - sp);
     if (runtime.state.ship.vel.is_zero_approx()) runtime.state.ship.heading = Vector2::from_angle(want);
 }
@@ -72,7 +71,7 @@ void SpeedRunCore::move_ship(double dt, Vector2 accel) {
     }
     if (runtime.state.ship.glide) {
         runtime.state.ship.glide_t += dt;
-        const double cruise = c.max_speed * c.steer_cruise * speed::FuelSystem::speed_ratio(runtime.state);
+        const double cruise = c.max_speed * c.steer_cruise;
         double sp = runtime.state.ship.glide_speed;
         const double distance_ratio=std::clamp(runtime.state.draw.total/std::max(runtime.state.draw_config.length,1.0),0.0,1.0);
         const double duration_mult=distance_ratio*c.glide_duration_mult;
@@ -97,17 +96,12 @@ void SpeedRunCore::move_ship(double dt, Vector2 accel) {
             runtime.state.ship.boost_t -= dt;
             if (runtime.state.ship.boost_t <= 0) runtime.state.ship.fade_t = 0.3;
         } else {
-            const bool fading=runtime.state.ship.fade_t>0;
-            if (fading) {
+            if (runtime.state.ship.fade_t > 0) {
                 runtime.state.ship.fade_t -= dt;
                 if (target > c.max_speed * c.cruise_floor) target *= std::pow(c.energy_cut, dt / 0.3);
             }
-            const double cruise=c.max_speed*c.steer_cruise;
-            const double fuel_cruise=cruise*speed::FuelSystem::speed_ratio(runtime.state);
-            const double floor=std::min(c.max_speed*c.cruise_floor,fuel_cruise);
-            if (!fading && fuel_cruise<cruise && target>=fuel_cruise && target<=cruise)
-                target=fuel_cruise+(target-fuel_cruise)*std::exp(-dt/runtime.state.draw_config.fuel_slow_time);
-            else if (target>floor) target=floor+(target-floor)*std::exp(-c.cruise_drag*dt);
+            const double floor = c.max_speed * c.cruise_floor;
+            if (target > floor) target = floor + (target - floor) * std::exp(-c.cruise_drag * dt);
         }
         if (target > c.max_speed) target = c.max_speed + (target - c.max_speed) * std::exp(-c.overcap_decay * dt);
         runtime.state.ship.vel *= target / sp;

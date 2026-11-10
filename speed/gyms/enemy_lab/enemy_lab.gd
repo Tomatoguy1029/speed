@@ -690,9 +690,7 @@ func _refresh() -> void:
 	_branch.set_item_text(0, TranslationServer.translate("lab.message_98f82d7b9f") + " " + session.current_branch)
 	for index in session.branches.size():
 		_branch.set_item_text(index + 1, String(session.branches[index].name))
-	var route_length: float = CHECK.length(canvas.route)
-	if not canvas.route.is_empty(): route_length += session.run.state.ship_pos.distance_to(canvas.route[0])
-	_status.tooltip_text = tr("lab.message_15d10dbb3a") % [session.tick * session.DT, session.furthest * session.DT, session.run.state.world_time, session.run.enemies.count(), int(session.spec.seed)] + "\n" + tr("lab.route_length") % [route_length, session.run.draw.budget(session.run.state.fuel), 100 * route_length / maxf(0.01, session.run.draw.budget(session.run.state.fuel))]
+	_status.tooltip_text = tr("lab.message_15d10dbb3a") % [session.tick * session.DT, session.furthest * session.DT, session.run.state.world_time, session.run.enemies.count(), int(session.spec.seed)] + "\n" + tr("lab.route_length") % [CHECK.length(canvas.route), session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge), 100 * CHECK.length(canvas.route) / maxf(0.01, session.run.draw.budget(session.run.state.stats.capacity * session.run.state.gauge))]
 	canvas.queue_redraw()
 	if workspace._history.visible: _timeline.queue_redraw()
 	if not canvas.result.is_empty() and _evaluation_revision >= 0 and _evaluation_revision != session.revision:

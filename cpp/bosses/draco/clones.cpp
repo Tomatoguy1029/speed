@@ -37,7 +37,7 @@ void DracoClones::begin(RunRuntime &r,TechniqueState &t) {
     for (uint32_t j=0;j<3;++j) {
         const auto actor=j?spawn(r,p.clone_enemy,s.center+godot::Vector2::from_angle(j*tau/3)*650):t.actor;if (!alive(r,actor)) {t.stage=TechniqueStage::Failed;break;}
         DracoCloneUnit u;u.index=j;u.inner.actor=actor;u.inner.definition=order[j];u.inner.previous_ship=r.state.ship_pos;u.origin=r.state.enemies[actor.slot].pos;u.neck.actor=actor;u.neck.target=s.center;u.neck.angle=(s.center-u.origin).angle();u.neck.length=100;u.neck.head_hp=r.state.enemies[actor.slot].hp;u.neck.normal=order[j];u.face=u.neck.angle;
-        if (j) {r.state.enemies[actor.slot].boss_clone=true;r.state.enemies[actor.slot].radius=radius;r.state.enemies[actor.slot].hp=r.state.enemies[actor.slot].max_hp=p.clone_hp;for (uint32_t k=0;k<DracoBody::rule(r,*b).body_segments;++k) {const auto part=spawn(r,p.part_enemy,u.origin);if (!alive(r,part)) continue;auto &e=r.state.enemies[part.slot];e.parent=t.actor;e.parent_id=r.state.enemy_handles.entity_id(t.actor);e.damage_target=actor;e.hp=e.max_hp=999999;u.parts.push_back(part);}}
+        if (j) {r.state.enemies[actor.slot].radius=radius;r.state.enemies[actor.slot].hp=r.state.enemies[actor.slot].max_hp=p.clone_hp;for (uint32_t k=0;k<DracoBody::rule(r,*b).body_segments;++k) {const auto part=spawn(r,p.part_enemy,u.origin);if (!alive(r,part)) continue;auto &e=r.state.enemies[part.slot];e.parent=t.actor;e.parent_id=r.state.enemy_handles.entity_id(t.actor);e.damage_target=actor;e.hp=e.max_hp=999999;u.parts.push_back(part);}}
         shape(r,*b,u);s.units.push_back(std::move(u));
     }
 }

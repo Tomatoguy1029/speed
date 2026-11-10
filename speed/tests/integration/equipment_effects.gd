@@ -636,25 +636,38 @@ func check_cpp_t07() -> bool:
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	var definition: TraitDef = load("res://data/traits/T07_quickCharge.tres")
-	var bridge = t07_bridge(config,{"mult":{"fuel_gain":1.2}})
+	var factor := 0.8
+	var bridge = t07_bridge(config,{"reduce":{"charge_time":factor}})
 	if bridge==null: return false
-	check(is_equal_approx(bridge._ui.regen_rate,config.regen_rate),"機体の充電効率は時間回復へ混ぜない")
+	check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*factor),"未取得時は永続強化までの充填時間を使う")
 	for level in range(1,config.trait_max_stacks+1):
 		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":1}).ok,"T07を共通取得入口で重ねる")
-		check(is_equal_approx(bridge._ui.regen_rate,config.regen_rate*(1.0+definition.stack_bonus(level))),"各段の生成値から時間回復を求める")
-	var trained: float = bridge._ui.regen_rate
-	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":1}).ok and bridge._ui.regen_rate==trained,"上限を越えて取得しない")
-	bridge.command("dev_post_charge",{"stacks":5})
-	check(is_equal_approx(bridge._ui.fuel_gain_mult,1.35) and bridge._ui.regen_rate==trained,"追加強化は給油量だけに加算する")
+		check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*factor/(1.0+definition.stack_bonus(level))),"各段の生成値から一度だけ実効充填時間を求める")
+	var baseline: float = bridge._ui.charge_time
+	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":1}).ok and bridge._ui.charge_time==baseline,"上限を越えて取得せず実効値も変えない")
+	check(bridge.command("dev_post_charge",{"stacks":5}).ok,"最大段後の短縮を同じ再計算へ渡す")
+	var expected: float = config.post_max.reduced(baseline,&"charge_time",{&"charge_time":5},config.post_max.minimum_charge_time)
+	check(is_equal_approx(bridge._ui.charge_time,expected),"通常特性から最大段後の短縮へ同じ順で適用する")
 	var saved: Dictionary = bridge.checkpoint()
 	bridge.command("dev_post_charge",{"stacks":10000})
-	check(is_equal_approx(bridge._ui.fuel_gain_mult,1.0+config.fuel_gain_max),"給油倍率は永続強化と合算して上限で止める")
-	bridge.command("dev_remove_trait",{"id":"T07"})
-	check(is_equal_approx(bridge._ui.regen_rate,config.regen_rate),"解除で時間回復を戻す")
-	bridge.restore(saved.value)
+	var floor_time := minf(baseline,maxf(config.post_max.minimum_charge_time,baseline*config.post_max.minimum_time_ratio))
+	check(is_equal_approx(bridge._ui.charge_time,floor_time),"最大段後の充填短縮は元と同じ下限で止める")
+	check(bridge.command("dev_remove_trait",{"id":"T07"}).ok,"特性を解除して実効値を再計算する")
+	bridge.command("dev_post_charge",{"stacks":0})
+	check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*factor),"解除後も永続強化を保ち、特性の効果を残さない")
+	check(bridge.restore(saved.value).ok,"所持段・永続倍率・最大段後の積み増しを保持して復帰する")
 	bridge.collect_frame()
-	check(is_equal_approx(bridge._ui.regen_rate,trained) and is_equal_approx(bridge._ui.fuel_gain_mult,1.35),"復帰後も時間回復と給油倍率を分けて保持する")
+	check(is_equal_approx(bridge._ui.charge_time,expected),"復帰後に同じ実効値を表示へ渡す")
 	bridge.release_checkpoint(saved.value)
+	# 実際の描線でゲージを使い、利用側のstep_drawで充填量を確認する。
+	var core = bridge._core
+	var start := Vector2(-3000,0)
+	check(core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0),"実際の描線入力を開始する")
+	check(core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0),"線を発進してゲージを消費する")
+	check(core.step_draw(10.0) and not core.draw_snapshot().tracing,"なぞりを終えて再充填へ戻る")
+	var gauge: float = core.draw_snapshot().gauge
+	check(gauge<1.0 and core.step_draw(0.01),"利用側の実時間で再充填する")
+	check(is_equal_approx(core.draw_snapshot().gauge,minf(1.0,gauge+0.01/expected)),"実効充填時間が戦闘のゲージ増分へ一度だけ効く")
 	bridge.dispose()
 	OS.remove_logger(capture)
 	check(capture.count()==0,"急速充填の状態に実行エラーがない: %s" % [capture.messages()])
@@ -663,19 +676,42 @@ func check_cpp_t07() -> bool:
 func check_cpp_t07_view() -> bool:
 	OS.add_logger(capture)
 	var config: GameConfig = ContentManager.base.duplicate(true)
-	var bridge = t07_bridge(config,{})
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var factor := 0.8
+	var bridge = t07_bridge(config,{"reduce":{"charge_time":factor}})
 	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":config.trait_max_stacks})
+	bridge.command("dev_post_charge",{"stacks":5})
+	var core = bridge._core
+	var start := Vector2(-3000,0)
+	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
+	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
+	core.step_draw(10.0)
+	core.step_draw(0.01)
+	var baseline := 0.0
+	bridge.command("set_ui_overlay",{"active":false})
 	var hud = load("res://scripts/ui/hud.gd").new()
 	hud.bridge = bridge
 	hud.size = Vector2(640,480)
 	add_child(hud)
 	bridge.collect_frame()
 	for _frame in range(3): await get_tree().process_frame
-	check(is_equal_approx(hud._fuel_meter.fuel,bridge._ui.fuel) and is_equal_approx(hud._fuel_meter.maximum,bridge._ui.fuel_max),"HUDは燃料の絶対量と最大量を読む")
+	check(hud._cpp_ui.charge_time==bridge._ui.charge_time and is_equal_approx(hud._ring_amount,core.draw_snapshot().gauge),"HUDのリングへ同じ実効値と充填量を描画する")
 	hud.free()
 	bridge.dispose()
+	# 元の充填時間が表示上の最小秒数より短い場合も、特性を弱めない。
+	config.dash_charge_time = 0.1
+	bridge = t07_bridge(config,{"reduce":{"charge_time":factor}})
+	if bridge==null: return false
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T07","levels":config.trait_max_stacks})
+	baseline = bridge._ui.charge_time
+	bridge.command("dev_post_charge",{"stacks":10000})
+	check(is_equal_approx(bridge._ui.charge_time,baseline),"元から短い充填を最大段後の下限で長くしない")
+	bridge.dispose()
+	await get_tree().process_frame
 	OS.remove_logger(capture)
-	check(capture.count()==0,"燃料のHUDに実行エラーがない: %s" % [capture.messages()])
+	check(capture.count()==0,"急速充填の状態・HUDに実行エラーがない: %s" % [capture.messages()])
 	return true
 
 func check_cpp_t08() -> bool:
@@ -688,34 +724,34 @@ func check_cpp_t08() -> bool:
 	if bridge==null: return false
 	var core = bridge._core
 	check(bridge._ui.capacity==1.0,"取得前は容量1で始まる")
-	# 容量を増やしたときも燃料の絶対量を保つ。
+	# 元からあるゲージの割合を、容量の変更で勝手に入れ替えない。
 	var start := Vector2(-3000,0)
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0)
 	core.handle_draw({"touch":true,"has_cursor":true,"pen_release":true,"pen":start+Vector2(config.draw_length*0.5,0)},100,1.0)
 	core.step_draw(10.0)
-	var fuel: float = core.draw_snapshot().fuel
-	check(fuel<config.fuel_capacity,"実際の描線でゲージを消費しておく")
+	var gauge: float = core.draw_snapshot().gauge
+	check(gauge<1.0,"実際の描線でゲージを消費しておく")
 	for level in range(1,config.trait_max_stacks+1):
 		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T08","levels":1}).ok,"T08を共通の取得入口で重ねる")
-		check(is_equal_approx(bridge._ui.capacity,1.0+definition.stack_bonus(level)) and core.draw_snapshot().fuel==fuel,"tresの各段を一度反映し、燃料の絶対量を保つ")
+		check(is_equal_approx(bridge._ui.capacity,1.0+definition.stack_bonus(level)) and core.draw_snapshot().gauge==gauge,"tresの各段を一度反映し、充填の割合を保つ")
 	var capacity: float = bridge._ui.capacity
 	check(not bridge.command("dev_grant_equipment",{"kind":"trait","id":"T08","levels":1}).ok and bridge._ui.capacity==capacity,"上限を越えて容量を増やさない")
 	var saved: Dictionary = bridge.checkpoint()
 	bridge.command("dev_post_charge",{"stacks":10000})
-	check(bridge._ui.capacity==capacity,"最大段後の給油倍率を容量の増分へ混ぜない")
+	check(bridge._ui.capacity==capacity,"最大段後の充填短縮を容量の増分へ混ぜない")
 	var position: Vector2 = core.ship_snapshot().ship_pos
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":position},200,1.0)
 	var draw: Dictionary = core.draw_snapshot()
-	check(is_equal_approx(draw.draw_gauge,fuel/config.fuel_capacity) and is_equal_approx(draw.draw_limit,config.draw_length*fuel/config.fuel_capacity/config.boost_cost_ratio),"利用側は容量を含む実充填量から描ける長さを求める")
+	check(is_equal_approx(draw.draw_gauge,gauge*capacity) and is_equal_approx(draw.draw_limit,config.draw_length*gauge*capacity),"利用側は容量を含む実充填量から描ける長さを求める")
 	core.handle_draw({"touch":true,"pen_release":true},210,1.0)
-	var before: float = core.draw_snapshot().fuel
+	var charge: float = bridge._ui.charge_time
 	core.step_draw(0.01)
-	check(is_equal_approx(core.draw_snapshot().fuel,before),"描線だけの更新では時間回復しない")
-	var retained: float = core.draw_snapshot().fuel
-	check(bridge.command("dev_remove_trait",{"id":"T08"}).ok and bridge._ui.capacity==1.0 and core.draw_snapshot().fuel==minf(config.fuel_capacity,retained),"解除で容量だけを戻し、燃料を新しい上限で止める")
+	check(is_equal_approx(core.draw_snapshot().gauge,minf(1.0,gauge+0.01/(charge*capacity))),"再充填は実充填量で1単位分の速さを保つ")
+	var retained: float = core.draw_snapshot().gauge
+	check(bridge.command("dev_remove_trait",{"id":"T08"}).ok and bridge._ui.capacity==1.0 and core.draw_snapshot().gauge==retained,"解除で容量だけを戻し、ゲージの割合を保つ")
 	check(bridge.restore(saved.value).ok,"取得段と容量とゲージを保持して復帰する")
 	bridge.collect_frame()
-	check(bridge._ui.capacity==capacity and core.draw_snapshot().fuel==fuel,"復帰後も容量と充填量が対応する")
+	check(bridge._ui.capacity==capacity and core.draw_snapshot().gauge==gauge,"復帰後も容量と充填量が対応する")
 	bridge.release_checkpoint(saved.value)
 	var hud = load("res://scripts/ui/hud.gd").new()
 	hud.bridge = bridge
@@ -723,12 +759,8 @@ func check_cpp_t08() -> bool:
 	add_child(hud)
 	bridge.collect_frame()
 	for _frame in range(3): await get_tree().process_frame
-	check(hud._cpp_ui.capacity==capacity and is_equal_approx(hud._fuel_meter.fuel,fuel),"HUDは容量が増えても同じ燃料の量を示す")
-	var low_position: Vector2 = core.ship_snapshot().ship_pos
-	bridge.command("dev_edit",{"kind":"ship","payload":{"position":low_position,"fuel":7.0}})
-	core.handle_draw({"press":true,"pen":low_position},300,1.0)
-	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*7.0/config.fuel_capacity/config.boost_cost_ratio),"燃料7の描線上限に突進速度の最低量を足さない")
-	core.handle_draw({"touch":true,"pen_release":true},310,1.0)
+	check(hud._cpp_ui.capacity==capacity and is_equal_approx(hud._ring_amount,gauge*capacity),"HUDは容量と実充填量から追加のリングを描く")
+	check(hud._lap_filled(0.99,1.01,capacity) and not hud._lap_filled(1.5,1.9,capacity),"容量の途中の1周だけでも満充填の境界を判定する")
 	hud.free()
 	bridge.dispose()
 	await get_tree().process_frame
@@ -825,12 +857,12 @@ func check_cpp_t10() -> bool:
 	config.moon_count = 0
 	var definition: TraitDef = load("res://data/traits/T10_speed.tres")
 	var factor := 1.2
-	var profile := {"mult":{"max_speed":factor,"fuel_gain":1.1}}
+	var profile := {"mult":{"max_speed":factor},"reduce":{"charge_time":0.9}}
 	var bridge = t07_bridge(config,profile)
 	if bridge==null: return false
 	var core = bridge._core
 	check(is_equal_approx(bridge._ui.max_speed,config.base_max_speed*factor),"未取得時は永続強化を掛けた最高速度を使う")
-	check(is_equal_approx(bridge._ui.fuel_gain_mult,1.1),"速度の永続値を読んでも給油倍率の永続値を保つ")
+	check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*0.9),"速度の永続値を読んでも充填の永続値を保つ")
 	var velocity: Vector2 = core.ship_snapshot().ship_vel
 	for level in range(1,config.trait_max_stacks+1):
 		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T10","levels":1}).ok,"T10を共通の取得入口で重ねる")
@@ -851,7 +883,7 @@ func check_cpp_t10() -> bool:
 	check(absf(core.ship_snapshot().ship_vel.length()-result)<0.0001,"操舵と減速は同じ実効最高速度を使う")
 	var position: Vector2 = core.ship_snapshot().ship_pos
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":position},0,1.0)
-	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*expected/config.base_max_speed/config.boost_cost_ratio),"描線の距離にも実効最高速度の比率が効く")
+	check(is_equal_approx(core.draw_snapshot().draw_limit,config.draw_length*expected/config.base_max_speed),"描線の距離にも実効最高速度の比率が効く")
 	core.handle_draw({"touch":true,"pen_release":true},100,1.0)
 	velocity = core.ship_snapshot().ship_vel
 	bridge.command("dev_remove_trait",{"id":"T10"})
@@ -868,9 +900,9 @@ func check_cpp_t10() -> bool:
 	add_child(hud)
 	bridge.collect_frame()
 	for _frame in range(3): await get_tree().process_frame
-	check(is_equal_approx(hud._cpp_ui.max_speed,expected) and is_equal_approx(hud._fuel_meter.fuel,bridge._ui.fuel),"HUDは実効最高速度と燃料を読む")
+	check(is_equal_approx(hud._cpp_ui.max_speed,expected) and hud._speed_indicator_mode()==hud.SPEED_INDICATOR.NORMAL,"HUDの通常の速度判定も実効最高速度を使う")
 	bridge.command("dev_ship_motion",{"position":Vector2.ZERO,"velocity":Vector2(expected*config.steer_cruise+2.0,0)})
-	check(is_equal_approx(hud._cpp_ui.max_speed,expected),"移動速度が変わっても実効最高速度を保持する")
+	check(hud._speed_indicator_mode()==hud.SPEED_INDICATOR.FAST,"巡航より速い状態も同じ境界で速度計へ渡す")
 	hud.free()
 	bridge.dispose()
 	await get_tree().process_frame
@@ -1066,7 +1098,7 @@ func check_cpp_t14() -> bool:
 	check(is_equal_approx(bridge._ui.length_mult,expected),"最大段後の延長は通常の育成後へ掛ける")
 	var start := Vector2(-3000,0)
 	check(core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},0,1.0),"実際の描線入力を開始する")
-	var limit := config.draw_length*expected*speed_factor/config.boost_cost_ratio
+	var limit := config.draw_length*expected*speed_factor
 	check(is_equal_approx(core.draw_snapshot().draw_limit,limit),"速度の倍率・充填量・延長倍率を含む距離上限を開始時に決める")
 	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*0.25,0)},10,1.0),"延長された距離の途中まで描く")
 	var partial: Dictionary = core.draw_snapshot()
@@ -1079,10 +1111,10 @@ func check_cpp_t14() -> bool:
 	add_child(hud)
 	bridge.collect_frame()
 	for _frame in range(3): await get_tree().process_frame
-	check(is_equal_approx(hud._cpp_ui.length_mult,expected) and is_equal_approx(hud._cpp_ui.draw.draw_limit,limit) and is_equal_approx(hud._cpp_ui.draw.draw_length/limit,0.25) and is_equal_approx(hud._fuel_meter.fuel,config.fuel_capacity*0.75),"HUDへ描き途中の長さと消費後の残量を渡す")
+	check(is_equal_approx(hud._cpp_ui.length_mult,expected) and is_equal_approx(hud._cpp_ui.draw.draw_limit,limit) and is_equal_approx(hud._cpp_ui.draw.draw_length/limit,0.25),"HUDへ同じ延長倍率と描き途中のゲージ消費率を渡す")
 	check(core.handle_draw({"touch":true,"has_cursor":true,"pen":start+Vector2(limit*2.0,0)},20,1.0),"上限を越える入力も実際の描線へ通す")
 	var committed: Dictionary = core.draw_snapshot()
-	check(committed.tracing and not committed.drawing and is_equal_approx(committed.trace_total,limit) and is_equal_approx(committed.fuel,0.0),"上限で線を止めて発進し、上限相当のゲージを消費する")
+	check(committed.tracing and not committed.drawing and is_equal_approx(committed.trace_total,limit) and committed.gauge<0.00001,"上限で線を止めて発進し、上限相当のゲージを消費する")
 	bridge.command("dev_remove_trait",{"id":"T14"})
 	check(is_equal_approx(bridge._ui.length_mult,factor*config.post_max.factor(&"line_length",{&"line_length":3})) and core.draw_snapshot().trace_total==committed.trace_total,"解除で特性分だけを外し、開始済みの線を縮めない")
 	bridge.command("dev_post_length",{"stacks":0})
@@ -1092,7 +1124,7 @@ func check_cpp_t14() -> bool:
 	check(core.draw_snapshot()==partial and is_equal_approx(bridge._ui.length_mult,expected),"復帰後も同じ点列と実効距離へ戻る")
 	bridge.release_checkpoint(saved.value)
 	core.handle_draw({"touch":true,"pen_release":true},30,1.0)
-	check(core.draw_snapshot().tracing and is_equal_approx(core.draw_snapshot().fuel,config.fuel_capacity*0.75),"復帰した途中の線を発進すると実際に描いた分だけ消費する")
+	check(core.draw_snapshot().tracing and is_equal_approx(core.draw_snapshot().gauge,0.75),"復帰した途中の線を発進すると実際に描いた分だけ消費する")
 	hud.free()
 	bridge.dispose()
 	await get_tree().process_frame
@@ -1176,7 +1208,7 @@ func check_cpp_t31() -> bool:
 	bridge.collect_frame()
 	bridge.release_checkpoint(beginning.value)
 	# 延長した線でも距離比は1まで。倍の長さで時間まで倍にしない。
-	bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"gauge_full","args":{}}})
+	core.step_draw(config.dash_charge_time*2.0)
 	bridge.command("dev_ship_motion",{"position":Vector2(-3000,0),"velocity":Vector2.ZERO})
 	start = core.ship_snapshot().ship_pos
 	core.handle_draw({"press":true,"touch":true,"has_cursor":true,"pen":start},200,1.0)
@@ -1949,7 +1981,7 @@ func check_cpp_t33() -> void:
 	if not retry_launch: check(bridge._ui.rampage.kills==0,"残像による撃破は共通の除外順に従って数えない")
 	for tick in 70: bridge.step(1.0/120.0,idle,viewport)
 	if not retry_launch: check(bridge._ui.rampage.kills==3 and bridge._ui.rampage.strength>0.0 and bridge._ui.rampage.strength<0.25,"実際の連続した体当たり撃破を終了後の強さへ反映する")
-	for tick in ceili(config.boost_min_cost/config.regen_rate*120.0)+2: bridge.step(1.0/120.0,idle,viewport)
+	for tick in ceili(config.dash_charge_time*config.draw_min_charge*120.0)+2: bridge.step(1.0/120.0,idle,viewport)
 	trait_start_trace(bridge,config.draw_length*0.5)
 	check(bridge._ui.rampage.kills==0 and bridge._ui.rampage.strength==0.0 and bridge._ui.rampage.multiplier==1.0,"次の発進で撃破数と強さを戻す")
 	bridge.restore(initial.value)
@@ -1963,11 +1995,16 @@ func check_cpp_t33() -> void:
 	check(capture.count()==0,"快進撃の同期・倍率・表示に実行エラーがない: %s" % [capture.messages()])
 
 func check_cpp_t36() -> void:
+	var interval_only: bool = "--cpp-t36-interval" in OS.get_cmdline_user_args()
+	var retry: bool = interval_only or "--cpp-t36-fixes" in OS.get_cmdline_user_args()
 	var capture := ErrorCapture.new()
 	OS.add_logger(capture)
 	var config := trait_test_config()
-	config.cruise_drain = config.regen_rate
-	var session = await trait_test_session("T36",config,637)
+	config.base_attack = 100.0
+	config.xp_base = 100000.0
+	# 通常候補は固定seed 637の2回目の引き直しでT36を含む。
+	var seed_value := 637
+	var session = await trait_test_session("T36",config,seed_value)
 	if session==null:
 		OS.remove_logger(capture)
 		return
@@ -1975,56 +2012,76 @@ func check_cpp_t36() -> void:
 	var core = bridge._core
 	var idle: Dictionary = bridge.pack_intent(Intent.new())
 	var viewport := {"logical_size":Vector2(640,480)}
+	bridge.step(1.0/120.0,idle,viewport)
+	bridge.command("set_settings",{"hitstop":false})
+	var initial: Dictionary = bridge.checkpoint()
 	var events: Array = []
 	bridge.subscribe("t36",func(frame: Dictionary):
 		events.append_array(frame.events)
 		return true)
-	var initial: Dictionary = bridge.checkpoint()
 	var definition: TraitDef = ContentManager.definition(&"traits",&"T36")
 	for level in range(1,config.trait_max_stacks+1):
 		bridge.restore(initial.value)
 		bridge.collect_frame()
-		bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":level})
-		var coefficient: float = definition.params.rate_base+definition.params.rate_per*level
-		for ratio in [0.5,0.96,1.0]:
-			bridge.command("dev_edit",{"kind":"ship","payload":{"position":core.ship_snapshot().ship_pos,"gauge":ratio}})
-			check(is_equal_approx(bridge._ui.shooting_rate,1.0+coefficient*ratio),"全段で燃料に比例した連射倍率を渡す")
-			check(is_equal_approx(bridge._ui.full_burst_strength,ratio),"常時の光も燃料に比例する")
-		events.clear()
-		bridge.command("dev_edit",{"kind":"ship","payload":{"position":core.ship_snapshot().ship_pos,"gauge":0.96}})
-		bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"gauge_full","args":{}}})
-		check(events.filter(func(event): return event.type==&"full_burst_ready").is_empty(),"95%を下回るまで満タンへの通知を繰り返さない")
-		bridge.command("dev_edit",{"kind":"ship","payload":{"position":core.ship_snapshot().ship_pos,"gauge":0.9}})
-		bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"gauge_full","args":{}}})
-		check(events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"95%未満から基本容量へ戻ると一度だけ通知する")
+		check(bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":level}).ok,"フルバーストを全段取得する")
 		bridge.command("dev_grant_equipment",{"kind":"weapon","id":"W02","levels":1})
 		events.clear()
-		var first_tick := -1
+		bridge.step(1.0/120.0,idle,viewport)
+		var rate: float = 1.0+definition.params.rate_base+definition.params.rate_per*level
+		if not retry or level>1: check(is_equal_approx(bridge._ui.shooting_rate,rate) and bridge._ui.full_burst_active,"全段で満充填時の射撃倍率を生成値から適用する")
+		if not retry or level>1: check(events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"満充填への移行を一度通知する")
+		var fired: Array = events.filter(func(event): return event.type==&"weapon_fire" and event.payload.id==&"W02")
 		var ticks := 0
-		var fired: Array = []
+		var first_tick := -1
 		while fired.size()<2 and ticks<240:
 			bridge.step(1.0/120.0,idle,viewport)
 			ticks += 1
 			fired = events.filter(func(event): return event.type==&"weapon_fire" and event.payload.id==&"W02")
 			if first_tick<0 and not fired.is_empty(): first_tick = ticks
-		check(fired.size()>=2 and absf(float(ticks-first_tick)/120.0-0.9/(1.0+coefficient))<=1.0/120.0,"満タンのときの散弾の実発射間隔を全段で保つ")
-	var saved: Dictionary = bridge.checkpoint()
-	bridge.restore(saved.value)
+		check(fired.size()>=2 and absf(float(ticks-first_tick)/120.0-0.9/rate)<=1.0/120.0,"実際の散弾の連射間隔へ全段の倍率を適用する")
+		if not retry or level>1: check(events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"満充填中に通知を繰り返さない")
+		if failures: break
+	if not retry:
+		var presentation: RunPresentation = session.view.get_node("RunPresentation")
+		presentation._present_cpp(0.01)
+		check(presentation.frame_view._full_burst_visual!=null,"通常の表示へ満充填の光を接続する")
+		var saved: Dictionary = bridge.checkpoint()
+		bridge.restore(saved.value)
+		bridge.collect_frame()
+		events.clear()
+		bridge.step(1.0/120.0,idle,viewport)
+		presentation._present_cpp(0.01)
+		check(bridge._ui.full_burst_active and events.all(func(event): return event.type!=&"full_burst_ready") and presentation.frame_view._full_burst_visual!=null,"値型復帰で満充填表示を作り直し通知を重複しない")
+		trait_start_trace(bridge,16.0)
+		bridge.step(1.0/120.0,idle,viewport)
+		check(not bridge._ui.full_burst_active and bridge._ui.shooting_rate==1.0,"発進で1未満になった瞬間に通常連射へ戻す")
+		var before: Dictionary = bridge._ui.duplicate(true)
+		bridge.command("pause",{"paused":true})
+		for tick in 3: bridge.step(1.0/120.0,idle,viewport)
+		check(bridge._ui.draw.gauge==before.draw.gauge and bridge._ui.full_burst_active==before.full_burst_active,"停止中は充填と移行を進めない")
+		bridge.command("pause",{"paused":false})
+		events.clear()
+		for tick in 100:
+			bridge.step(1.0/120.0,idle,viewport)
+			if bridge._ui.full_burst_active: break
+		check(bridge._ui.full_burst_active and events.filter(func(event): return event.type==&"full_burst_ready").size()==1,"復帰後の再充填で光と連射を一度有効にする")
+		var origin: Vector2 = core.ship_snapshot().ship_pos
+		for distance in [80.0,180.0]:
+			var enemy: int = bridge.command("dev_spawn",{"definition_id":"splitling","position":origin+Vector2(distance,0)}).value
+			core.set_enemy_motion(enemy,{"held":true,"vel":Vector2.ZERO})
+		var kills := 0
+		for tick in 160: bridge.step(1.0/120.0,idle,viewport)
+		for event: Dictionary in events:
+			if event.type==&"kill": kills += 1
+		check(kills>=2 and bridge._ui.full_burst_active,"実際の連続撃破後も満充填の効果を維持する")
+		bridge.command("dev_remove_trait",{"id":"T36"})
+		presentation._present_cpp(0.01)
+		check(not bridge._ui.full_burst and not bridge._ui.full_burst_active and bridge._ui.shooting_rate==1.0 and presentation.frame_view._full_burst_visual==null,"解除で倍率・状態・光を片付ける")
+		bridge.release_checkpoint(saved.value)
+	bridge.restore(initial.value)
 	bridge.collect_frame()
-	events.clear()
-	bridge.step(1.0/120.0,idle,viewport)
-	check(events.filter(func(event): return event.type==&"full_burst_ready").is_empty(),"保持復帰で満タン通知を重複しない")
-	trait_start_trace(bridge,16.0)
-	bridge.step(1.0/120.0,idle,viewport)
-	check(bridge._ui.shooting_rate>1.0 and bridge._ui.full_burst_strength<1.0,"短いブーストの後も残った燃料ぶんの効果が続く")
-	var before: Dictionary = bridge._ui.duplicate(true)
-	bridge.command("pause",{"paused":true})
-	for tick in 3: bridge.step(1.0/120.0,idle,viewport)
-	check(bridge._ui.fuel==before.fuel,"停止中は燃料を動かさない")
-	bridge.command("pause",{"paused":false})
-	bridge.command("dev_remove_trait",{"id":"T36"})
-	check(not bridge._ui.full_burst and bridge._ui.shooting_rate==1.0 and bridge._ui.full_burst_strength==0.0,"解除で連射倍率と光を片付ける")
-	bridge.release_checkpoint(saved.value)
+	bridge.command("dev_grant_equipment",{"kind":"trait","id":"T36","levels":1})
+	if not interval_only: await trait_select_upgrade(session,"T36",config,idle,viewport)
 	bridge.release_checkpoint(initial.value)
 	session.free()
 	await get_tree().process_frame
@@ -2453,11 +2510,11 @@ func check_cpp_t03() -> void:
 		if should_check: check(presentation.frame_view._vortex_visual.captures.size()==3,"復帰した捕捉の粒も状態から作り直す")
 		var recovered := false
 		for tick in 70:
-			var fuel: float = bridge._ui.fuel
+			var gauge: float = bridge._ui.draw.gauge
 			bridge.step(1.0/120.0,idle,viewport)
 			if bridge._ui.vortex.items.is_empty():
-				var amount: float = config.fuel_capacity*config.fuel_hole_ratio*minf(1.0,3.0/definition.params.kills_by_level[level-1])
-				if should_check: check(bridge._ui.fuel>=minf(bridge._ui.fuel_max,fuel+amount)-config.cruise_drain/120.0,"渦が消える瞬間に段ごとの撃破数からゲージを一度戻す")
+				var amount: float = 3.0/definition.params.kills_by_level[level-1]
+				if should_check: check(is_equal_approx(bridge._ui.draw.gauge,minf(bridge._ui.capacity,minf(1.0,gauge+1.0/120.0/bridge._ui.charge_time)+amount)),"渦が消える瞬間に段ごとの撃破数からゲージを一度戻す")
 				recovered = true
 				break
 		if should_check: check(recovered,"渦の溜め・保持・崩壊を終えて終了する")
@@ -3934,25 +3991,25 @@ func check_cpp_stats() -> bool:
 		for id in traits: check(bridge.command("dev_grant_equipment",{"kind":"trait","id":id,"levels":5 if boundary_only else 1}).ok,"全16武器とともに全18特性を各段で取得する")
 		if boundary_only: continue
 		check(bridge._ui.weapon_levels.size()==16 and bridge._ui.trait_levels.size()==18 and bridge._ui.trait_levels.all(func(t):return t.level==level),"全18特性と全16武器の接続を段ごとに保つ")
-		var fields := {"T07":"regen_rate","T08":"capacity","T09":"crit_chance","T10":"max_speed","T11":"attack_mult","T12":"pickup_radius","T14":"length_mult","T31":"glide_duration_mult","T34":"area_multiplier","T35":"shot_multiplier"}
+		var fields := {"T07":"charge_time","T08":"capacity","T09":"crit_chance","T10":"max_speed","T11":"attack_mult","T12":"pickup_radius","T14":"length_mult","T31":"glide_duration_mult","T34":"area_multiplier","T35":"shot_multiplier"}
 		for id in fields:
 			var definition: TraitDef = ContentManager.definition(&"traits",StringName(id))
 			var amount: float = 1.0+definition.stack_bonus(level)
 			var expected: float = amount
 			match id:
-				"T07": expected = config.regen_rate*amount
+				"T07": expected = config.dash_charge_time/amount
 				"T09": expected = minf(float(definition.params.max),config.base_crit_chance+definition.stack_bonus(level))
 				"T10": expected = config.base_max_speed*amount
 				"T12": expected = config.pickup_radius*amount
 			check(is_equal_approx(float(bridge._ui[fields[id]]),expected),"全武器を持つ各段の実効値を一度だけ合成する: %s" % id)
 		check(bridge._ui.vortex.ready and bridge._ui.kill_sonic.ready and bridge._ui.crit_beam.ready and bridge._ui.run_up.ready and bridge._ui.rampage.equipped and bridge._ui.full_burst and bridge._ui.full_charge.maximum>1.0,"行動する特性の実行状態を数値特性と一緒に登録する")
-	var stats: Array = [bridge._ui.attack_mult,bridge._ui.area_multiplier,bridge._ui.shot_multiplier,bridge._ui.regen_rate,bridge._ui.capacity,bridge._ui.shooting_rate]
+	var stats: Array = [bridge._ui.attack_mult,bridge._ui.area_multiplier,bridge._ui.shot_multiplier,bridge._ui.charge_time,bridge._ui.capacity,bridge._ui.shooting_rate]
 	if not boundary_only:
 		for id in weapons:
 			check(bridge.command("dev_remove_weapon",{"id":id}).ok,"特性を保持したまま各武器を交換する")
 			var definition: WeaponDef = ContentManager.definition(&"weapons",StringName(id))
 			check(bridge.command("dev_grant_equipment",{"kind":"weapon","id":id,"levels":definition.level_steps.size()}).ok,"交換した武器を最大段で同じ特性へつなぎ直す")
-			check(bridge._ui.weapon_levels.size()==16 and bridge._ui.trait_levels.size()==18 and [bridge._ui.attack_mult,bridge._ui.area_multiplier,bridge._ui.shot_multiplier,bridge._ui.regen_rate,bridge._ui.capacity,bridge._ui.shooting_rate]==stats,"交換前後で共有倍率を重ねず全特性を維持する")
+			check(bridge._ui.weapon_levels.size()==16 and bridge._ui.trait_levels.size()==18 and [bridge._ui.attack_mult,bridge._ui.area_multiplier,bridge._ui.shot_multiplier,bridge._ui.charge_time,bridge._ui.capacity,bridge._ui.shooting_rate]==stats,"交換前後で共有倍率を重ねず全特性を維持する")
 	var full: Dictionary = bridge.checkpoint()
 	var events: Array = []
 	bridge.subscribe("stats_check",func(frame: Dictionary):

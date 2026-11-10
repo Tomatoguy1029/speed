@@ -8,9 +8,10 @@ extends Resource
 ## 武器ID → 実際に増幅するパラメータ・専用の発射/接触経路。
 ## W03のcollision_radius・hull_lifeは船体/破片の専用経路を表す。表示専用の寿命・光跡は含めない。
 @export var targets: Dictionary = {}
-## 攻撃間隔は基準のこの割合まで短縮する。
+## 攻撃間隔・充填時間は基準のこの割合まで短縮する。
 @export var minimum_time_ratio: float = 0.2
 @export var minimum_interval: float = 0.05
+@export var minimum_charge_time: float = 0.25
 @export var maximum_invulnerability: float = 2.0
 @export var maximum_repair_fraction: float = 1.0
 

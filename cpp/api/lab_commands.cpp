@@ -1,4 +1,3 @@
-#include "../systems/fuel.h"
 #include "run_core.h"
 #include "../systems/equipment.h"
 #include "../behaviors/weapons/barrier.h"
@@ -47,9 +46,9 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         if (!keys(p,{"lab_mode","auto_spawn","auto_boss","invincible","position","gauge","time","level","empty","enemy_ai","terrain","rocks"})) return reply(false);
         for (const char *key:{"lab_mode","auto_spawn","auto_boss","invincible","empty","enemy_ai","terrain","rocks"}) if (p.has(key) && p[key].get_type()!=Variant::BOOL) return reply(false);
         Vector2 at=s.ship.pos;if (p.has("position") && !point(p,"position",at)) return reply(false);
-        double gauge,time,level;if (!scalar(p,"gauge",s.draw.fuel/speed::FuelSystem::maximum(s),gauge) || gauge<0 || !scalar(p,"time",s.time,time) || time<0 || !scalar(p,"level",s.loadout->level,level) || level<1 || level>1000) return reply(false);
+        double gauge,time,level;if (!scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0 || !scalar(p,"time",s.time,time) || time<0 || !scalar(p,"level",s.loadout->level,level) || level<1 || level>1000) return reply(false);
         c.lab_mode=p.get("lab_mode",true);c.lab_enemy_ai=p.get("enemy_ai",true);s.population.frame_enabled=p.get("auto_spawn",false);s.world.boss_spawned=!bool(p.get("auto_boss",false));s.invincible=p.get("invincible",true);
-        s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;speed::FuelSystem::set(runtime,speed::FuelSystem::maximum(s)*gauge);s.time=time;s.loadout->level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
+        s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();s.view_center=s.enemy_aim=at;c.camera_center=at;c.camera_ready=false;s.draw.gauge=gauge;s.time=time;s.loadout->level=int64_t(level);speed::EquipmentSystem::refresh_effects(runtime);
         if (bool(p.get("empty",false))) {s.field.bodies.clear();s.field.rocks.clear();s.field.rock_handles={};s.field.wells.clear();s.field.warp_gone=-1;}
         if (!bool(p.get("terrain",true))) s.field.bodies.clear();
         if (!bool(p.get("rocks",true))) {s.field.rocks.clear();s.field.rock_handles={};}
@@ -121,14 +120,14 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         Vector2 heading;if (p.size()!=3 || !point(p,"heading",heading) || heading.length_squared()<0.0001 || p.get("targets",Variant()).get_type()!=Variant::PACKED_INT64_ARRAY) return reply(false);
         const PackedInt64Array ids=p["targets"];std::vector<speed::EnemyHandle> targets;
         for (const auto entity:ids) {const auto row=s.rows_by_id.find(entity);if (row==s.rows_by_id.end() || s.enemies[row->second].dead) return reply(false);targets.push_back(s.enemy_handles.at(row->second));}
-        if (targets.empty()) return reply(false);heading=heading.normalized();s.ship.heading=heading;speed::FuelSystem::set(runtime,speed::FuelSystem::maximum(s));
+        if (targets.empty()) return reply(false);heading=heading.normalized();s.ship.heading=heading;s.draw.gauge=s.draw_config.capacity;
         if (weapon_matches(runtime.content->flash_slash_levels) || duplicator) for (auto target:targets) s.enemies[target.slot].hp=s.enemies[target.slot].max_hp=100.0;
         if (weapon_matches(runtime.content->knockback_levels)) {s.loadout->knockback.chance=1;speed::DamageRequest hit;hit.struck=targets.front();hit.amount=100;hit.cause=speed::Cause::Shot;hit.direction=heading;speed::CombatResolver::damage_enemy(runtime,hit);}
         if (weapon_matches(runtime.content->interceptor_levels)) speed::InterceptorBehavior::step(runtime,1.0);
         if (duplicator) {s.loadout->duplicator.chance=1;if (s.forward.ready) speed::ForwardBehavior::step(runtime,0.5);}
         if (weapon_matches(runtime.content->barrier_levels)) {speed::ShipDamageRequest hit;hit.amount=1;hit.has_impact=true;hit.impact=s.ship.pos+heading*100;speed::BarrierBehavior::block(runtime,hit,1);}
         if (matches(runtime.content->crit_beam_levels)) {speed::DamageRequest hit;hit.has_impact=true;hit.impact=s.ship.pos;speed::DamageResult result;speed::CritBeamBehavior::critical(runtime,hit,result);}
-        if (matches(runtime.content->full_charge_levels)) {speed::FuelSystem::set(runtime,s.draw_config.fuel_capacity*s.draw_config.fuel_notify_reset*0.99);speed::FullBurstBehavior::step(runtime);speed::FuelSystem::set(runtime,speed::FuelSystem::maximum(s));speed::FullBurstBehavior::step(runtime);}
+        if (matches(runtime.content->full_charge_levels)) {s.draw.gauge=0.99;speed::FullBurstBehavior::step(runtime);s.draw.gauge=s.draw_config.capacity;speed::FullBurstBehavior::step(runtime);}
         return reply(true);
     }
     if (kind=="meta") {
@@ -191,13 +190,10 @@ Dictionary SpeedRunCore::development_lab_command(const String &command,const Dic
         c.lab_pinned=p["value"];c.lab_pin=at;if (c.lab_pinned) {s.ship.pos=s.ship_pos=at;s.ship.vel=Vector2();}return reply(true);
     }
     if (kind=="ship") {
-        Vector2 at;double gauge;if (!keys(p,{"position","velocity","gauge","fuel","capacity"}) || !point(p,"position",at) || !scalar(p,"gauge",s.draw.fuel/speed::FuelSystem::maximum(s),gauge) || gauge<0) return reply(false);
+        Vector2 at;double gauge;if (!keys(p,{"position","velocity","gauge","capacity"}) || !point(p,"position",at) || !scalar(p,"gauge",s.draw.gauge,gauge) || gauge<0) return reply(false);
         Vector2 velocity;if (p.has("velocity") && !point(p,"velocity",velocity)) return reply(false);
         double capacity;if (!scalar(p,"capacity",s.draw_config.capacity,capacity) || capacity<=0 || (p.has("capacity") && !c.lab_mode)) return reply(false);
-        double fuel=s.draw.fuel;
-        if (p.has("fuel") && (p.has("gauge") || !scalar(p,"fuel",fuel,fuel) || fuel<0)) return reply(false);
-        s.ship.pos=s.ship_pos=at;s.ship.vel=velocity;s.draw_config.capacity=capacity;
-        speed::FuelSystem::set(runtime,p.has("gauge")?speed::FuelSystem::maximum(s)*gauge:fuel);return reply(true);
+        s.ship.pos=s.ship_pos=at;s.ship.vel=velocity;s.draw.gauge=gauge;s.draw_config.capacity=capacity;return reply(true);
     }
     if (kind=="time" || kind=="level") {
         double value;if (p.size()!=1 || !scalar(p,"value",0,value) || value<(kind=="level"?1:0) || (kind=="level" && value>1000)) return reply(false);

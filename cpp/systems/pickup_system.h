@@ -21,6 +21,5 @@ public:
     static uint64_t supply(RunRuntime &,godot::Vector2,uint8_t kind);
     static bool release_crystal(RunRuntime &,size_t row,CrystalRemoval);
     static void drop_enemy(RunRuntime &,const Corpse &);
-    static void drop_boss_damage(RunRuntime &,EnemyHandle,double applied);
 };
 }

@@ -1,6 +1,5 @@
 #include "progression.h"
 #include "equipment.h"
-#include "fuel.h"
 #include "../api/run_core.h"
 #include "../behaviors/weapons/forward.h"
 #include "../state/loadout_state.h"
@@ -26,7 +25,10 @@ double baseline(const RunRuntime &r,const std::string &id) {
     if (id=="crit_mult") return c.combat_crit_mult;
     if (id=="pickup_radius") return s.pickup_config.coin_radius;
     if (id=="line_length") return s.draw_config.length*s.draw_config.length_mult/(1+ProgressionSystem::post_amount(r,id));
-    if (id=="charge_time") return p.fuel_gain_profile_factor;
+    if (id=="charge_time") {
+        double bonus=0;for (const auto &v:p.traits) for (const auto &n:r.content->numeric_traits) if (n.equipment==v.definition && n.level==v.level) bonus+=n.charge_bonus;
+        return c.draw_config_charge_time*p.charge_profile_factor/(1+bonus);
+    }
     if (id=="xp_gain") return s.pickup_config.xp_mult*p.xp_profile_factor;
     if (id=="acceleration") return c.ship_config_acceleration;
     if (id=="turn_rate") return c.ship_config_turn_rate;
@@ -40,7 +42,7 @@ bool has_baseline(const std::string &id) {
 }
 double current_value(const RunRuntime &r,const std::string &id,uint64_t extra) {
     const double effect=ProgressionSystem::post_effect(r,id,extra),base=baseline(r,id);
-    if (id=="charge_time") return (base+effect)*100;
+    if (id=="charge_time") return effect;
     if (id=="max_hp" || id=="crit_chance" || id=="crit_mult" || id=="invulnerability" || id=="repair") return (base+effect)*(id=="crit_chance" || id=="repair"?100:1);
     return base*(1+effect);
 }
@@ -51,8 +53,8 @@ Dictionary post_info(const RunRuntime &r,uint32_t effect) {
     out["has_current"]=has_baseline(id);out["current_before"]=current_value(r,id,0);out["current_after"]=current_value(r,id,1);
     out["hp_before"]=r.state.ship.hp;out["hp_after"]=std::min(r.state.ship_config.max_hp,r.state.ship.hp+r.state.ship_config.max_hp*d.increment);
     const bool fixed=id=="max_hp" || id=="crit_mult" || id=="invulnerability";
-    out["total_before"]=fixed?a:a*100;
-    out["total_after"]=fixed?b:b*100;
+    out["total_before"]=fixed?a:id=="charge_time"?(1-a/baseline(r,id))*100:a*100;
+    out["total_after"]=fixed?b:id=="charge_time"?(1-b/baseline(r,id))*100:b*100;
     out["unit"]=id=="max_hp"?"HP":id=="crit_mult"?"×":id=="invulnerability"?"s":"%";
     Array intervals,targets;
     for (const auto &weapon:r.state.loadout->weapons) {
@@ -102,7 +104,7 @@ double ProgressionSystem::post_effect(const RunRuntime &r,const std::string &id,
     if (id=="crit_chance") {const auto &crit=r.content->post_crit;const double cap=std::min(1.0,crit.trait_maximum);return std::min(std::max(0.0,cap-std::min(cap,r.content->config.combat_crit_chance+crit.trained_bonus)),amount);}
     if (id=="invulnerability" || id=="repair") return std::min(std::max(0.0,d->maximum-baseline(r,id)),amount);
     if (id=="weapon_interval") return std::min(1-d->minimum_ratio,amount);
-    if (id=="charge_time") return std::min(std::max(0.0,r.state.draw_config.fuel_gain_max-std::max(0.0,r.state.loadout->fuel_gain_profile_factor-1.0)),amount);
+    if (id=="charge_time") return post_reduced(r,id,baseline(r,id),extra);
     return amount;
 }
 bool ProgressionSystem::normal_complete(const RunRuntime &r) {
@@ -244,10 +246,9 @@ bool ProgressionSystem::development(SpeedRunCore &core,const String &kind,const 
     return false;
 }
 void ProgressionSystem::initialize(RunRuntime &run,bool initial) {
-    auto &p=*run.state.loadout;const auto meta_levels=p.meta_levels;const double hp_add=p.hp_profile_add,xp_factor=p.xp_profile_factor,reroll_add=p.reroll_profile_add;const double charge_factor=p.fuel_gain_profile_factor,speed_factor=p.speed_profile_factor,attack_factor=p.attack_profile_factor,pickup_factor=p.pickup_profile_factor,length_factor=p.length_profile_factor;p={};p.fuel_gain_profile_factor=charge_factor;p.speed_profile_factor=speed_factor;p.attack_profile_factor=attack_factor;p.pickup_profile_factor=pickup_factor;p.length_profile_factor=length_factor;p.meta_levels=meta_levels;p.hp_profile_add=hp_add;p.xp_profile_factor=xp_factor;p.reroll_profile_add=reroll_add;p.ready=true;p.rerolls=run.content->progression.reroll_count+int64_t(std::llround(reroll_add));
+    auto &p=*run.state.loadout;const auto meta_levels=p.meta_levels;const double hp_add=p.hp_profile_add,xp_factor=p.xp_profile_factor,reroll_add=p.reroll_profile_add;const double charge_factor=p.charge_profile_factor,speed_factor=p.speed_profile_factor,attack_factor=p.attack_profile_factor,pickup_factor=p.pickup_profile_factor,length_factor=p.length_profile_factor;p={};p.charge_profile_factor=charge_factor;p.speed_profile_factor=speed_factor;p.attack_profile_factor=attack_factor;p.pickup_profile_factor=pickup_factor;p.length_profile_factor=length_factor;p.meta_levels=meta_levels;p.hp_profile_add=hp_add;p.xp_profile_factor=xp_factor;p.reroll_profile_add=reroll_add;p.ready=true;p.rerolls=run.content->progression.reroll_count+int64_t(std::llround(reroll_add));
     if (!initial) p.weapons.push_back({1,1});else run.state.forward.ready=false;
     EquipmentSystem::refresh_effects(run);
-    FuelSystem::set(run,FuelSystem::maximum(run.state),true);
     run.resource_workspace.requests.clear();
 }
 double ProgressionSystem::next_xp(const RunRuntime &run) {

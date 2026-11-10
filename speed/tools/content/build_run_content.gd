@@ -1682,7 +1682,6 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 				"shot_bonus":trait_def.stack_bonus(level) if id=="T35" else 0.0,
 				"full_gauge_rate":float(trait_def.params.rate_base)+float(trait_def.params.rate_per)*level if id=="T36" else 0.0,
 				"charge_bonus":trait_def.stack_bonus(level) if id=="T07" else 0.0,
-				"cruise_drain_ratio":float(trait_def.params.get("cruise_drain_ratio",1.0)) if id=="T07" and level==config.trait_max_stacks else 1.0,
 				"capacity_bonus":trait_def.stack_bonus(level) if id=="T08" else 0.0,
 				"crit_bonus":trait_def.stack_bonus(level) if id=="T09" else 0.0,
 				"speed_bonus":trait_def.stack_bonus(level) if id=="T10" else 0.0,
@@ -1827,7 +1826,7 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 	for level in knockback.level_steps.size():
 		data.KnockbackDefinition.append({"id":level+1,"weapon":knockback_id,"level":level+1,"chance":float(knockback.params.chance_by_level[level]),"chain_limit":int(knockback.params.chain_limit_by_level[level]),"speed":float(knockback.params.speed),"life":float(knockback.params.life),"base_damage":config.hull_debris_damage,"base_attack":config.base_attack,"base_knock":config.hull_debris_knock,"base_life":config.hull_debris_life,"projectile_increment":float(config.post_max.increments.get("projectile_speed",0.0)) if knockback_target.has("projectile") else 0.0,"duration_increment":float(config.post_max.increments.get("duration",0.0)) if knockback_target.has("duration") else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if knockback_target.has("knockback") else 0.0,"area_increment":float(config.post_max.increments.get("area",0.0)) if knockback_target.has("area") else 0.0})
 	if config.post_max==null: return {}
-	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0))}]
+	data.PostMaxChargeDefinition = [{"id":1,"increment":float(config.post_max.increments.get("charge_time",0.0)),"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_time":config.post_max.minimum_charge_time}]
 	for comet_id in _catalog().table(&"weapons"):
 		var comet_entry: ContentEntry = _catalog().find(&"weapons",StringName(comet_id))
 		if not comet_entry.comet_only: continue

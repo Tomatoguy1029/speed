@@ -10,8 +10,8 @@
 namespace speed {
 RouteContext RouteConstraints::context(const RunRuntime &run) {
     const auto &s=run.state;const auto &d=s.draw_config;const auto &ship=s.ship_config;RouteContext c;
-    c.ship_radius=ship.ship_radius;c.field_radius=ship.field_radius;c.point_step=d.point_step;c.zoom=s.control.camera_zoom;c.ship_position=s.ship.pos;c.fuel=s.draw.fuel;c.fuel_max=d.fuel_capacity*d.capacity;c.fuel_capacity=d.fuel_capacity;c.boost_min_cost=d.boost_min_cost;c.boost_min_q=d.boost_min_q;
-    c.draw_length=d.length;c.boost_cost_ratio=d.boost_cost_ratio;c.max_speed=ship.max_speed;c.base_speed=ship.base_max_speed;c.length_mult=d.length_mult;c.confirm_delay=d.confirm_delay;c.run_time=d.run_time;c.hitstop_cap=s.combat_config.kill_hitstop_cap;
+    c.ship_radius=ship.ship_radius;c.field_radius=ship.field_radius;c.point_step=d.point_step;c.zoom=s.control.camera_zoom;c.gauge=s.draw.gauge;c.capacity=d.capacity;c.min_charge=d.min_charge;
+    c.draw_length=d.length;c.max_speed=ship.max_speed;c.base_speed=ship.base_max_speed;c.length_mult=d.length_mult;c.confirm_delay=d.confirm_delay;c.run_time=d.run_time;c.hitstop_cap=s.combat_config.kill_hitstop_cap;
     c.time_scale=d.time_scale;c.scale_min=d.scale_min;c.pending_world=s.control.world_dt_accum;c.attack=CombatResolver::attack_power(run);
     c.window_attack=s.combat_config.base_attack*s.combat_config.atk_scale*std::min(1.0,s.combat_config.attack_mult)*std::min(1.0,s.loadout->effects.burst_power);
     c.body_speed=s.field.body_speed_max;c.comet_time=s.field.ready?s.field.comet_t:std::numeric_limits<double>::infinity();c.rock_count=s.field.rocks.size();c.well_count=s.field.wells.size();
@@ -43,7 +43,7 @@ double RouteConstraints::distance(godot::Vector2 p,const std::vector<godot::Vect
 }
 RouteResult RouteConstraints::validate(const RouteContext &c,const std::vector<godot::Vector2> &path,const RouteOptions &o) {
     RouteResult r;r.radius=c.ship_radius+std::max(0.0,o.margin)+c.point_step+2.5/std::max(c.zoom,0.01);
-    r.budget=c.draw_length*(c.fuel/c.fuel_capacity)*(c.max_speed/c.base_speed)*c.length_mult/c.boost_cost_ratio;
+    r.budget=c.draw_length*(c.gauge*c.capacity)*(c.max_speed/c.base_speed)*c.length_mult;
     r.horizon=(std::max(0.0,o.window)+std::max(o.draw_seconds,c.confirm_delay)+c.run_time+c.hitstop_cap)*std::max(1.0,std::max(c.time_scale,c.scale_min))+c.pending_world;
     if (path.size()<2) return r;
     for (size_t n=1;n<path.size();++n) r.length+=path[n-1].distance_to(path[n]);
@@ -51,10 +51,7 @@ RouteResult RouteConstraints::validate(const RouteContext &c,const std::vector<g
     const auto near=[&](godot::Vector2 p) {return std::min(distance(p,path),double(p.distance_to(end))-exit);};
     const auto block=[&](RouteReason reason,godot::Vector2 at,int64_t id=0){r.blockers.push_back({reason,at,id});};
     const auto unknown=[&](RouteReason reason,int64_t id=0){r.unsupported.push_back({reason,{},id});};
-    if (c.fuel<c.boost_min_cost) block(RouteReason::LowFuel,path.front());
-    const double connection=c.ship_position.distance_to(path.front());
-    if (connection>=r.budget) block(RouteReason::LinkTooFar,path.front());
-    r.budget=std::max(0.0,r.budget-connection);
+    if (c.gauge*c.capacity<c.min_charge) block(RouteReason::LowCharge,path.front());
     if (end.length()+r.radius+exit>=c.field_radius) block(RouteReason::FieldEdge,end);
     if (r.length>r.budget+0.01) block(RouteReason::OverBudget,end);
     for (auto point:path) if (point.length()+r.radius>=c.field_radius) block(RouteReason::FieldEdge,point);

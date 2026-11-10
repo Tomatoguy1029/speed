@@ -20,7 +20,7 @@ static func info(values: Dictionary) -> Dictionary:
 			for row: Dictionary in values.intervals:
 				var entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(row.weapon))
 				text += "\n%s %s: %.3f → %.3fs (−%s → −%s%%)" % [entry.get_display_name(),TranslationServer.translate("postmax.interval."+row.parameter),row.before,row.after,number(row.reduction_before),number(row.reduction_after)]
-		"charge_time": summary = TranslationServer.translate("postmax.summary.charge").format({"n":number(float(values.change)*100.0)})
+		"charge_time": summary = TranslationServer.translate("postmax.summary.charge").format({"n":number(-float(values.change))})
 		"max_hp":
 			summary = "+%s HP" % number(values.change)
 			text += "\n"+TranslationServer.translate("postmax.keep_hp")

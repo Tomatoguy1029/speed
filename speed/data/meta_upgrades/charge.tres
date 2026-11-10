@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-stat = &"fuel_gain"
+stat = &"charge_time"
 per_level = 0.05
 costs = PackedInt32Array(20, 40, 70, 110, 160)
 id = &"charge"

@@ -215,7 +215,7 @@ extends Resource
 ## 単位：毎秒の減衰率
 @export var overcap_decay: float
 ## 突進の強さ
-## なぞりの速さ ＝ 最高速度 × この値 × 開始時の燃料から求める量 q ＋ 同じ向きの今の速さ × 速さの引き継ぎ。
+## なぞりの速さ ＝ 最高速度 × この値 × 使ったゲージの量 ＋ 同じ向きの今の速さ × 速さの引き継ぎ。
 ## 単位：倍
 @export var launch_ratio: float
 ## 速さの引き継ぎ
@@ -247,42 +247,18 @@ extends Resource
 ## 単位：単位/秒
 @export var pivot_speed: float
 
-## 通常飛行とブーストで使う燃料、線の描き方
-@export_group("燃料と描画")
-## 基本の燃料容量
-@export var fuel_capacity: float
-## 通常飛行で世界秒ごとに使う燃料
-@export var cruise_drain: float
-## 世界秒ごとの燃料の時間回復
-@export var regen_rate: float
-## 燃料による減速を始める量
-@export var fuel_low: float
-## 燃料0のときの巡航速度の割合
-@export var fuel_speed_min: float
-## 燃料による減速の時定数（世界秒）
-@export var fuel_slow_time: float
-## 基準距離を描いたときに使う開始時燃料の割合。描ける上限は基準距離をこの割合で割った長さ。
-@export var boost_cost_ratio: float
-## ブーストの最低消費量
-@export var boost_min_cost: float
-## 突進の速さを求める充填量の下限。描ける長さは残燃料に比例する。
-@export var boost_min_q: float
-## 水色・紫・黄色の結晶1個を拾ったときの給油量。給油倍率を掛ける前の量。
-@export var fuel_crystal_low: float
-@export var fuel_crystal_mid: float
-@export var fuel_crystal_high: float
-## ボス・部位・頭・複製が結晶を1個落とす実ダメージ。端数は個体ごとに持ち越す。
-@export var boss_crystal_damage: float = 2.5
-## ダメージで落とす結晶の種類。水色0・紫1・黄色2。
-@export_range(0, 2) var boss_crystal_kind: int = 0
-## エンドホールが戻す基本容量の割合
-@export var fuel_hole_ratio: float
-## 給油倍率の増加の上限
-@export var fuel_gain_max: float
-## 満タン通知を再び出せる燃料の割合
-@export var fuel_notify_reset: float
-## 描線の基準距離
-## 充填量1・基本の最高速度での基準。実効基準距離に燃料÷基本容量・最高速度・軌跡延長を掛け、ブースト消費率で割って描ける上限を求める。
+## ゲージの溜まり方、線の描き方、なぞりの速さと攻撃
+@export_group("ゲージと描画")
+## ゲージの充填時間
+## ゲージが空から満タンになるまでの時間（容量1のとき）。特性・強化で短くなる。
+## 単位：実秒
+@export var dash_charge_time: float
+## 描き始められるゲージ
+## 溜まっている量（容量 × 充填率）がこれ以上なら、容量に関係なく線を描き始められる。
+## 単位：容量1に対する割合（0〜1）
+@export var draw_min_charge: float
+## 描ける長さ
+## 満タン・容量1・基本の最高速度のときに描ける線の長さ。ゲージの量・容量・最高速度に比例して変わる。
 ## 単位：単位（距離）
 @export var draw_length: float
 ## 描画中の世界の速さ

@@ -98,16 +98,13 @@ struct RunState {
         double max_hp, max_speed, turn_rate, acceleration, glide_duration_mult, invulnerability;
     } ship_config{};
     struct DrawConfig {
-        double length, point_step, confirm_delay, run_time, time_scale, slow_ref, scale_min;
-        double boost_duration, carry, launch_ratio, glide_ratio, capacity, length_mult;
-        double fuel_capacity, cruise_drain, regen_rate, fuel_low, fuel_speed_min, fuel_slow_time, boost_cost_ratio, boost_min_cost, boost_min_q, fuel_hole_ratio, fuel_gain_max, fuel_notify_reset;
-        double regen_mult=1, drain_mult=1, fuel_gain_mult=1;
+        double min_charge, length, point_step, confirm_delay, run_time, time_scale, slow_ref, scale_min;
+        double boost_duration, carry, launch_ratio, glide_ratio, capacity, charge_time, length_mult;
     } draw_config{};
     struct Draw {
-        double fuel = 0, start_fuel = 0, connection = 0, amount = 0, limit = 0, length = 0, before_speed = 0;
-        bool full_notified = true, burst_notified = true;
+        double gauge = 1, start_charge = 0, amount = 0, limit = 0, connection = 0, length = 0, before_speed = 0;
         double speed = 0, rate = 0, seg_pos = 0, total = 0, progress = 0;
-        bool drawing = false, started = false, blocked = false, tracing = false;
+        bool drawing = false, started = false, blocked = false, full_charge = false, tracing = false;
         int64_t first_msec = 0, dash_id = 0, segment = 0;
         std::unordered_map<int64_t, size_t> inside;
         std::unordered_map<int64_t, int64_t> passes;
@@ -144,9 +141,6 @@ struct RunState {
         int64_t gem_draw_max = 0;
         bool fixed_rewards=false;
         double strong_gold_chance=0;
-        double fuel_crystal_low=0, fuel_crystal_mid=0, fuel_crystal_high=0;
-        double boss_crystal_damage=2.5;
-        uint32_t boss_crystal_kind=0;
         double drop_base = 0, drop_max = 0, drop_power = 0, shift_time = 0, xp_bonus = 1, xp_mult = 1;
         double xp_radius = 0, coin_radius = 0, speed_mult = 1;
         double repair_fraction=0,pickup_life=0;

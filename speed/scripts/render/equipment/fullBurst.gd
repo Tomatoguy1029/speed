@@ -14,19 +14,17 @@ func setup_frame(parent: Node2D, pixel: float) -> void:
 func frame_event(ev: Dictionary, pos: Vector2, heading: Vector2, scale: float) -> void:
 	if ev.type==&"full_burst_ready": _burst(pos+heading*16.0*1.82*scale)
 
-func frame_tick(dt: float, nose_pos: Vector2, strength: float, clock: float, enabled: bool) -> void:
+func frame_tick(dt: float, nose_pos: Vector2, ready: bool, clock: float, enabled: bool) -> void:
 	var p: PixelPainter = _painter
 	p.begin()
 	if enabled:
 		sparks.draw(p,dt)
-		if strength>0.0:
+		if ready:
 			var nose := p.cell(nose_pos)
 			var phase := int(clock*10.0)
 			for k in 10:
 				if (k+phase)&1: continue
 				var a := k/10.0*TAU
 				var r := 3.0+k%3
-				var color := Color("#7fd8ff") if k%2 else Color("#d8f6ff")
-				color.a *= strength
-				p.fill(nose.x+cos(a)*r,nose.y+sin(a)*r,color)
+				p.fill(nose.x+cos(a)*r,nose.y+sin(a)*r,Color("#7fd8ff") if k%2 else Color("#d8f6ff"))
 	p.end()

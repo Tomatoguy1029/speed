@@ -7,7 +7,7 @@ static func append(data: Dictionary, config: GameConfig, definition_source: Call
 	data.PostMaxTarget = []
 	data.PostMaxInterval = []
 	for key: String in post.increments:
-		var row := {"id":data.PostMaxDefinition.size()+1,"external_id":key,"increment":float(post.increments[key]),"minimum_ratio":post.minimum_time_ratio,"minimum_time":post.minimum_interval,"maximum":post.maximum_invulnerability if key=="invulnerability" else post.maximum_repair_fraction if key=="repair" else 0.0}
+		var row := {"id":data.PostMaxDefinition.size()+1,"external_id":key,"increment":float(post.increments[key]),"minimum_ratio":post.minimum_time_ratio,"minimum_time":post.minimum_charge_time if key=="charge_time" else post.minimum_interval,"maximum":post.maximum_invulnerability if key=="invulnerability" else post.maximum_repair_fraction if key=="repair" else 0.0}
 		data.PostMaxDefinition.append(row)
 		for equipment: Dictionary in data.LoadoutDefinition:
 			if equipment.kind!=0: continue

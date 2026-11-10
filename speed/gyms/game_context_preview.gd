@@ -11,7 +11,7 @@ const GAUGE := preload("res://scripts/ui/boost_gauge_visual.gd")
 const BUILDER := preload("res://tools/content/build_run_content.gd")
 const LIVE_VISUALS := preload("res://tools/content/visual_transforms.gd")
 const EFFECTS := preload("res://data/visuals/effect_settings.tres")
-const OPERATION_MODE := 3
+const OPERATION_MODE := 5
 
 var preview_paused := false
 var _active := false
@@ -110,7 +110,7 @@ func _ready() -> void:
 	_enemy_row.add_child(_pump)
 	_pump.value_changed.connect(func(_value: float): _apply_pump())
 	add_child(_boost_row)
-	for caption in ["通常", "燃料不足", "経路描画中", "操作する"]: _boost.add_item(caption)
+	for caption in ["通常", "不足", "経路描画中", "使用可能の波紋", "満タンの閃き", "操作する"]: _boost.add_item(caption)
 	_boost.select(OPERATION_MODE)
 	_boost_row.add_child(_boost)
 	_boost.item_selected.connect(func(_index: int):

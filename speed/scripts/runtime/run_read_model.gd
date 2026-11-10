@@ -15,12 +15,12 @@ class Values extends RefCounted:
 		"aquila": ["dash", "zone"], "cross": ["beam"], "dolphin": ["wave"], "cepheus": ["aimed"], "soldier": ["aimed"]}
 	var data := {}
 	func _get(key: StringName): return data.get(key)
-	func gauge_amount() -> float: return float(data.get("fuel",0.0))
+	func gauge_amount() -> float: return float(data.get("gauge",0.0))*float(data.get("stats",{}).get("capacity",1.0))
 	func body_gap(at: Vector2, radius: float) -> float:
 		var gap := INF
 		for body in data.get("bodies",[]): gap = minf(gap,at.distance_to(body.pos)-body.r-radius)
 		return gap
-	func budget(fuel: float) -> float: return float(data.get("base_length",0.0))*(fuel/float(data.get("fuel_capacity",1.0)))*float(data.get("length_mult",1.0))*float(data.get("speed_ratio",1.0))/float(data.get("boost_cost_ratio",1.0))
+	func budget(amount: float) -> float: return float(data.get("base_length",0.0))*amount*float(data.get("length_mult",1.0))
 	func attack_power() -> float: return data.get("attack_power",0.0)
 	func count() -> int:
 		var t: Dictionary = data.get("table",{})
@@ -85,7 +85,7 @@ func refresh(snapshot: Dictionary, ui: Dictionary) -> void:
 	enemies.data.table = table
 	field.data = {"bodies":snapshot.bodies,"rocks":[],"wells":[]}
 	combat.data = {"attack_power":snapshot.attack_power}
-	draw.data = {"base_length":cfg.draw_length,"boost_cost_ratio":cfg.boost_cost_ratio,"length_mult":snapshot.length_mult,"fuel_capacity":cfg.fuel_capacity,"boost_min_q":cfg.boost_min_q,"speed_ratio":snapshot.max_speed/cfg.base_max_speed}
+	draw.data = {"base_length":cfg.draw_length,"length_mult":snapshot.length_mult}
 	var director := Values.new()
 	var groups := {}
 	for group: Dictionary in snapshot.director.groups:

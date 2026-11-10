@@ -1,4 +1,3 @@
-#include "../systems/fuel.h"
 #include "metrics_builder.h"
 #include "frame_builder.h"
 #include "recording_builder.h"
@@ -188,12 +187,12 @@ godot::Dictionary MetricsBuilder::recording(const RunRuntime &run,bool initial) 
         Dictionary conditions,stats,profile,mult,add,reduce;
         stats["max_speed"]=s.ship_config.max_speed;stats["max_hp"]=s.ship_config.max_hp;
         stats["attack_mult"]=s.combat_config.attack_mult;stats["crit_chance"]=s.combat_config.crit_chance;stats["crit_mult"]=s.combat_config.crit_mult;
-        stats["pickup_radius"]=s.pickup_config.coin_radius;stats["xp_pickup_radius"]=s.pickup_config.xp_radius;stats["fuel"]=s.draw.fuel;stats["fuel_max"]=FuelSystem::maximum(s);stats["regen_rate"]=s.draw_config.regen_rate*s.draw_config.regen_mult;stats["fuel_gain_mult"]=s.draw_config.fuel_gain_mult;
+        stats["pickup_radius"]=s.pickup_config.coin_radius;stats["xp_pickup_radius"]=s.pickup_config.xp_radius;stats["charge_time"]=s.draw_config.charge_time;
         stats["capacity"]=s.draw_config.capacity;stats["length_mult"]=s.draw_config.length_mult;stats["glide_duration_mult"]=s.ship_config.glide_duration_mult;
         stats["xp_mult"]=s.pickup_config.xp_mult;stats["xp_gain_mult"]=s.loadout->xp_gain_mult;stats["acceleration"]=s.ship_config.acceleration;
         stats["turn_rate"]=s.ship_config.turn_rate;stats["invulnerability"]=s.ship_config.invulnerability;stats["repair_fraction"]=s.pickup_config.repair_fraction;stats["pickup_speed_mult"]=s.pickup_config.speed_mult;
         const auto &l=*s.loadout;mult["max_speed"]=l.speed_profile_factor;mult["attack"]=l.attack_profile_factor;mult["pickup"]=l.pickup_profile_factor;mult["length"]=l.length_profile_factor;mult["xp"]=l.xp_profile_factor;
-        add["max_hp"]=l.hp_profile_add;add["reroll"]=l.reroll_profile_add;mult["fuel_gain"]=l.fuel_gain_profile_factor;profile["mult"]=mult;profile["add"]=add;profile["reduce"]=reduce;
+        add["max_hp"]=l.hp_profile_add;add["reroll"]=l.reroll_profile_add;reduce["charge_time"]=l.charge_profile_factor;profile["mult"]=mult;profile["add"]=add;profile["reduce"]=reduce;
         conditions["config"]=config_snapshot(c.config);conditions["stats"]=stats;conditions["profile"]=profile;
         conditions["rng_state"]=String::num_uint64(s.control.rng.get_state());conditions["rng_algorithm"]="pcg32";
         PackedFloat64Array rank_hitstop;for (double multiplier:s.debug_rank_hitstop) rank_hitstop.push_back(multiplier);conditions["debug_rank_hitstop"]=rank_hitstop;

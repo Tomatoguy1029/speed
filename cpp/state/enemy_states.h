@@ -52,8 +52,6 @@ struct Enemy {
     EnemyMode mode = EnemyMode::Move;
     double timer = 0, charge = 0;
     bool alive = false, dead = false, elite = false, is_boss = false, hull_scattered = false;
-    double boss_crystal_damage = 0;
-    bool boss_clone = false;
     double guard = 0;
     speed::EnemyHandle picaro_owner;
     uint32_t source_definition=0;

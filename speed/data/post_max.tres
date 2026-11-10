@@ -143,5 +143,6 @@ targets = {
 }
 minimum_time_ratio = 0.2
 minimum_interval = 0.05
+minimum_charge_time = 0.25
 maximum_invulnerability = 2.0
 maximum_repair_fraction = 1.0

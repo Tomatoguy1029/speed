@@ -19,7 +19,7 @@ bool options(const Dictionary &d,speed::RouteOptions &out) {
 }
 const char *reason_key(speed::RouteReason reason) {
     using R=speed::RouteReason;switch(reason) {
-    case R::InvalidPath:return "lab.message_7474db4292";case R::OverBudget:return "lab.message_ace1dcf08b";case R::LowFuel:return "lab.low_charge";case R::LinkTooFar:return "lab.link_too_far";case R::FieldEdge:return "lab.message_fdee8bc433";
+    case R::InvalidPath:return "lab.message_7474db4292";case R::OverBudget:return "lab.message_ace1dcf08b";case R::LowCharge:return "lab.low_charge";case R::FieldEdge:return "lab.message_fdee8bc433";
     case R::Body:return "lab.message_409189caf0";case R::Gate:return "lab.message_416deae061";case R::Strong:return "lab.message_676b643ad5";case R::Equipment:return "lab.message_eaf4530ecf";
     case R::FutureTerrain:return "lab.message_feb890132f";case R::Bullet:return "lab.message_8e84357015";case R::Hazard:return "lab.message_c977ed9a15";default:return "";
     }
@@ -44,11 +44,11 @@ bool context(const Dictionary &d,speed::RouteContext &c) {
     if (!keys(d,{"values","tick","history_hz","equipment_count","well_count","rock_count","hero","auto_spawn","bodies","enemies","bullets","hazards"}) || d.size()!=12 || d["values"].get_type()!=Variant::DICTIONARY) return false;
     const Dictionary v=d["values"];
     const std::pair<const char *,double *> values[]={
-        {"ship_radius",&c.ship_radius},{"field_radius",&c.field_radius},{"point_step",&c.point_step},{"zoom",&c.zoom},{"fuel",&c.fuel},{"fuel_max",&c.fuel_max},{"fuel_capacity",&c.fuel_capacity},{"boost_min_cost",&c.boost_min_cost},{"boost_min_q",&c.boost_min_q},
-        {"draw_length",&c.draw_length},{"boost_cost_ratio",&c.boost_cost_ratio},{"max_speed",&c.max_speed},{"base_speed",&c.base_speed},{"length_mult",&c.length_mult},{"confirm_delay",&c.confirm_delay},{"run_time",&c.run_time},{"hitstop_cap",&c.hitstop_cap},
+        {"ship_radius",&c.ship_radius},{"field_radius",&c.field_radius},{"point_step",&c.point_step},{"zoom",&c.zoom},{"gauge",&c.gauge},{"capacity",&c.capacity},{"min_charge",&c.min_charge},
+        {"draw_length",&c.draw_length},{"max_speed",&c.max_speed},{"base_speed",&c.base_speed},{"length_mult",&c.length_mult},{"confirm_delay",&c.confirm_delay},{"run_time",&c.run_time},{"hitstop_cap",&c.hitstop_cap},
         {"time_scale",&c.time_scale},{"scale_min",&c.scale_min},{"pending_world",&c.pending_world},{"attack",&c.attack},{"window_attack",&c.window_attack},{"body_speed",&c.body_speed},{"comet_time",&c.comet_time},{"gravity_time",&c.gravity_time}};
-    if (v.size()!=26 || !point(v,"ship_position",c.ship_position)) return false;for (auto [key,value]:values) if (!scalar(v,key,*value,value==&c.comet_time || value==&c.gravity_time) || *value<0) return false;
-    if (c.base_speed<=0 || c.fuel_capacity<=0 || c.fuel_max<=0 || c.field_radius<=0 || c.boost_cost_ratio<=0 || c.boost_cost_ratio>1) return false;
+    if (v.size()!=22) return false;for (auto [key,value]:values) if (!scalar(v,key,*value,value==&c.comet_time || value==&c.gravity_time) || *value<0) return false;
+    if (c.base_speed<=0 || c.capacity<=0 || c.field_radius<=0) return false;
     if (!integer(d,"tick",c.tick) || !integer(d,"history_hz",c.history_hz) || c.history_hz<=0 || !integer(d,"equipment_count",c.equipment_count) || !integer(d,"well_count",c.well_count) || !integer(d,"rock_count",c.rock_count) || !flag(d,"hero",c.hero) || !flag(d,"auto_spawn",c.auto_spawn)) return false;
     for (auto key:{"bodies","enemies","bullets","hazards"}) if (d[key].get_type()!=Variant::ARRAY) return false;
     const Array bodies=d["bodies"],enemies=d["enemies"],bullets=d["bullets"],hazards=d["hazards"];

@@ -192,6 +192,13 @@
           "config": "invuln_time"
         },
         {
+          "name": "draw_config_min_charge",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.min_charge",
+          "config": "draw_min_charge"
+        },
+        {
           "name": "draw_config_length",
           "type": "f64",
           "min": 0,
@@ -274,6 +281,13 @@
           "min": 0,
           "runtime": "draw_config.capacity",
           "value": 1.0
+        },
+        {
+          "name": "draw_config_charge_time",
+          "type": "f64",
+          "min": 0,
+          "runtime": "draw_config.charge_time",
+          "config": "dash_charge_time"
         },
         {
           "name": "draw_config_length_mult",
@@ -652,128 +666,9 @@
           "type": "f64",
           "min": 0,
           "runtime": "control.boss_touch_damage"
-        },
-        {
-          "name": "draw_config_fuel_capacity",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_capacity",
-          "config": "fuel_capacity"
-        },
-        {
-          "name": "draw_config_cruise_drain",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.cruise_drain",
-          "config": "cruise_drain"
-        },
-        {
-          "name": "draw_config_regen_rate",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.regen_rate",
-          "config": "regen_rate"
-        },
-        {
-          "name": "draw_config_fuel_low",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_low",
-          "config": "fuel_low"
-        },
-        {
-          "name": "draw_config_fuel_speed_min",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_speed_min",
-          "config": "fuel_speed_min"
-        },
-        {
-          "name": "draw_config_fuel_slow_time",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_slow_time",
-          "config": "fuel_slow_time"
-        },
-        {
-          "name": "draw_config_boost_cost_ratio",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.boost_cost_ratio",
-          "config": "boost_cost_ratio"
-        },
-        {
-          "name": "draw_config_boost_min_cost",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.boost_min_cost",
-          "config": "boost_min_cost"
-        },
-        {
-          "name": "draw_config_boost_min_q",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.boost_min_q",
-          "config": "boost_min_q"
-        },
-        {
-          "name": "fuel_crystal_low",
-          "type": "f64",
-          "min": 0,
-          "runtime": "pickup_config.fuel_crystal_low",
-          "config": "fuel_crystal_low"
-        },
-        {
-          "name": "fuel_crystal_mid",
-          "type": "f64",
-          "min": 0,
-          "runtime": "pickup_config.fuel_crystal_mid",
-          "config": "fuel_crystal_mid"
-        },
-        {
-          "name": "fuel_crystal_high",
-          "type": "f64",
-          "min": 0,
-          "runtime": "pickup_config.fuel_crystal_high",
-          "config": "fuel_crystal_high"
-        },
-        {
-          "name": "boss_crystal_damage",
-          "type": "f64",
-          "min": 1e-06,
-          "runtime": "pickup_config.boss_crystal_damage",
-          "config": "boss_crystal_damage"
-        },
-        {
-          "name": "boss_crystal_kind",
-          "type": "u32",
-          "max": 2,
-          "runtime": "pickup_config.boss_crystal_kind",
-          "config": "boss_crystal_kind"
-        },
-        {
-          "name": "draw_config_fuel_hole_ratio",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_hole_ratio",
-          "config": "fuel_hole_ratio"
-        },
-        {
-          "name": "draw_config_fuel_gain_max",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_gain_max",
-          "config": "fuel_gain_max"
-        },
-        {
-          "name": "draw_config_fuel_notify_reset",
-          "type": "f64",
-          "min": 0,
-          "runtime": "draw_config.fuel_notify_reset",
-          "config": "fuel_notify_reset"
         }
       ],
-      "version": 18
+      "version": 19
     },
     {
       "name": "StringEntry",
@@ -1056,7 +951,7 @@
           "value": 0.0
         }
       ],
-      "version": 4
+      "version": 5
     },
     {
       "name": "LoadoutDefinition",
@@ -2325,10 +2220,6 @@
       {
         "name": "DebugRankHitstopChanged",
         "value": "debug_rank_hitstop_changed"
-      },
-      {
-        "name": "DrawRejected",
-        "value": "draw_rejected"
       }
     ],
     "ResultKind": [
@@ -3415,9 +3306,6 @@
     "debug_rank_hitstop_changed": [
       "rank",
       "multiplier"
-    ],
-    "draw_rejected": [
-      "reason_key"
     ]
   },
   "includes": [

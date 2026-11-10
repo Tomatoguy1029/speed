@@ -127,7 +127,7 @@ func _ready() -> void:
 		"window":str(DisplayServer.window_get_size()),"logical_size":str(get_viewport().get_visible_rect().size),
 		"renderer":RenderingServer.get_current_rendering_method(),"adapter":RenderingServer.get_video_adapter_name(),
 		"processor":OS.get_processor_name(),"max_fps":Engine.max_fps,"vsync":DisplayServer.window_get_vsync_mode(),
-		"ready_ms":(ready_us-startup_us)/1000.0,"generation_before_measurement":true,"drive_input":"カーソル（描線の入力中だけtouch）","boost_min_cost_unit":"燃料の絶対量",
+		"ready_ms":(ready_us-startup_us)/1000.0,"generation_before_measurement":true,"drive_input":"カーソル（描線の入力中だけtouch）","draw_min_charge_unit":"gauge × capacity。W01のみでcapacity=1",
 		"copy_bytes_scope":"RenderFrameのPacked配列の内容量。参照カウントだけの受渡しを実コピー量としない",
 		"timing_scope":"sim/output_buildはGDExtension呼出しを囲み、ABI通過を含む。bridge_copyは明示的な辞書の複製・UI合成。表示内訳はCPUで、種類ごとのGPU時間は未分離"}
 	await get_tree().create_timer(float(options.get("warmup","10"))).timeout
@@ -179,7 +179,7 @@ func _physics_process(_dt: float) -> void:
 	var relative: Vector2 = state.ship_pos-drive_center
 	var ahead: Vector2 = relative.normalized().rotated(0.5) if relative.length()>1.0 else Vector2.RIGHT
 	input.cursor = drive_center+ahead*ENTRY.DRIVE_RADIUS
-	if stroke_index<0 and Time.get_ticks_usec()>=next_draw_us and not draw.drawing and not draw.tracing and draw.fuel>=config.boost_min_cost:
+	if stroke_index<0 and Time.get_ticks_usec()>=next_draw_us and not draw.drawing and not draw.tracing and draw.gauge>=config.draw_min_charge:
 		stroke.clear()
 		var heading: Vector2 = state.ship_heading
 		var side := heading.orthogonal()

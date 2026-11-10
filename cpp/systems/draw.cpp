@@ -10,7 +10,6 @@
 #include "../behaviors/weapons/flashSlash.h"
 #include "../behaviors/weapons/afterimage.h"
 #include "field.h"
-#include "fuel.h"
 #include "../behaviors/traits/fullCharge.h"
 #include "../behaviors/traits/rampage.h"
 #include "../behaviors/traits/killSonic.h"
@@ -28,28 +27,19 @@ using namespace godot;
 bool SpeedRunCore::configure_draw(const Dictionary &config, const Dictionary &stats) {
     if (runtime.state.started || runtime.state.closed) return false;
     DrawConfig c{};
-    const char *keys[] = {"draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "capacity", "length_mult"};
-    double *fields[] = {&c.length, &c.point_step, &c.confirm_delay, &c.run_time, &c.time_scale, &c.slow_ref, &c.scale_min, &c.boost_duration, &c.carry, &c.launch_ratio, &c.glide_ratio, &c.capacity, &c.length_mult};
-    for (int i = 0; i < 13; ++i) {
-        const Dictionary &source = i < 11 ? config : stats;
+    const char *keys[] = {"draw_min_charge", "draw_length", "draw_step", "draw_confirm_delay", "draw_run_time", "draw_time_scale", "draw_run_slow_ref", "draw_run_scale_min", "boost_duration", "carry", "launch_ratio", "glide_speed_ratio", "capacity", "charge_time", "length_mult"};
+    double *fields[] = {&c.min_charge, &c.length, &c.point_step, &c.confirm_delay, &c.run_time, &c.time_scale, &c.slow_ref, &c.scale_min, &c.boost_duration, &c.carry, &c.launch_ratio, &c.glide_ratio, &c.capacity, &c.charge_time, &c.length_mult};
+    for (int i = 0; i < 15; ++i) {
+        const Dictionary &source = i < 12 ? config : stats;
         if (!source.has(keys[i])) return false;
         const Variant value = source[keys[i]];
         if (value.get_type() != Variant::INT && value.get_type() != Variant::FLOAT) return false;
         *fields[i] = double(value);
         if (!std::isfinite(*fields[i]) || *fields[i] < 0) return false;
     }
-    if (c.length <= 0 || c.run_time <= 0 || c.capacity <= 0 || c.length_mult <= 0 || c.scale_min > 1) return false;
-    const char *fuel_keys[]={"fuel_capacity","cruise_drain","regen_rate","fuel_low","fuel_speed_min","fuel_slow_time","boost_cost_ratio","boost_min_cost","boost_min_q","fuel_hole_ratio","fuel_gain_max","fuel_notify_reset"};
-    double *fuel_fields[]={&c.fuel_capacity,&c.cruise_drain,&c.regen_rate,&c.fuel_low,&c.fuel_speed_min,&c.fuel_slow_time,&c.boost_cost_ratio,&c.boost_min_cost,&c.boost_min_q,&c.fuel_hole_ratio,&c.fuel_gain_max,&c.fuel_notify_reset};
-    for (int i=0;i<12;++i) {
-        const auto value=config.get(fuel_keys[i],Variant());
-        if (value.get_type()!=Variant::INT && value.get_type()!=Variant::FLOAT) return false;
-        *fuel_fields[i]=double(value);
-    }
-    RunState candidate;candidate.draw_config=c;if (!speed::FuelSystem::valid(candidate)) return false;
+    if (c.length <= 0 || c.run_time <= 0 || c.capacity <= 0 || c.charge_time <= 0 || c.length_mult <= 0 || c.scale_min > 1) return false;
     runtime.state.draw_config = c;
     runtime.state.draw = Draw();
-    speed::FuelSystem::set(runtime,speed::FuelSystem::maximum(runtime.state),true);
     runtime.state.draw_ready = true;
     return true;
 }
@@ -66,13 +56,14 @@ void SpeedRunCore::begin_draw(bool press, Vector2 pen, int64_t clock_msec) {
     runtime.state.draw.drawing = true;
     runtime.state.draw.started = press;
     runtime.state.draw.blocked = false;
-    runtime.state.draw.start_fuel = runtime.state.draw.fuel;
-    runtime.state.draw.amount = speed::FuelSystem::amount(runtime.state);
-    runtime.state.draw.connection = 0;
-    runtime.state.draw.limit = speed::FuelSystem::draw_limit(runtime.state);
+    runtime.state.draw.full_charge = runtime.state.draw.gauge >= 1.0 - 1e-6;
+    runtime.state.draw.start_charge = runtime.state.draw.gauge;
+    runtime.state.draw.amount = runtime.state.draw_config.capacity * runtime.state.draw.gauge;
+    runtime.state.draw.limit = runtime.state.draw_config.length * runtime.state.draw.amount * (runtime.state.ship_config.max_speed / runtime.state.ship_config.base_max_speed) * runtime.state.draw_config.length_mult;
+    runtime.state.draw.connection = press?runtime.state.ship.pos.distance_to(pen):0;
     runtime.state.draw.length = 0;
     runtime.state.draw.points.clear();
-    if (press) { runtime.state.draw.connection=runtime.state.ship.pos.distance_to(pen);runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
+    if (press) { runtime.state.draw.points.append(pen); runtime.state.draw.first_msec = clock_msec; }
     emit_event("draw_start");
 }
 
@@ -106,8 +97,11 @@ void SpeedRunCore::extend_draw(Vector2 pen, double camera_zoom) {
 
 void SpeedRunCore::commit_draw() {
     if (runtime.state.draw.points.size() < 2) { runtime.state.draw.drawing = false; runtime.state.draw.points.clear(); return; }
-    const double cost=speed::FuelSystem::draw_cost(runtime.state);
-    speed::FuelSystem::set(runtime,runtime.state.draw.fuel-cost);
+    const auto &draw=runtime.state.draw;
+    const double used=draw.connection+draw.length;
+    const bool at_limit=!draw.blocked && draw.limit-used<runtime.state.draw_config.point_step;
+    runtime.state.draw.gauge = std::max(0.0, draw.gauge - draw.start_charge * (at_limit?1.0:std::min(1.0,used/draw.limit)));
+    if (runtime.state.control.bonus_remaining>0) runtime.state.draw.gauge=1;
     auto points = runtime.state.draw.points;
     if (runtime.state.ship.pos.distance_to(points[0]) > 1) points.insert(0, runtime.state.ship.pos);
     const Vector2 dir = (points[1] - points[0]).normalized();
@@ -117,7 +111,7 @@ void SpeedRunCore::commit_draw() {
     const double carried = sp * runtime.state.draw_config.carry * along;
     const double thrust = runtime.state.ship_config.max_speed * runtime.state.draw_config.launch_ratio * runtime.state.draw.amount;
     const double limit = runtime.state.ship_config.max_speed * std::max(1.0, runtime.state.draw.amount);
-    runtime.state.draw.speed = std::max(std::max(std::min(carried + thrust, limit), sp * along), runtime.state.ship_config.max_speed*runtime.state.ship_config.steer_cruise);
+    runtime.state.draw.speed = std::max(std::max(std::min(carried + thrust, limit), sp * along), 1.0);
     runtime.state.ship.vel = dir * runtime.state.draw.speed;
     runtime.state.ship.boost_t = runtime.state.draw_config.boost_duration;
     runtime.state.ship.fade_t = 0;
@@ -170,10 +164,10 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
     if (!runtime.state.draw.drawing && !runtime.state.draw.tracing) {
         // しし座の獅子の間は、なぞり（ブースト）を始められない
         if (speed::LeoBehavior::active(runtime)) return true;
-        if ((press || alt) && runtime.state.draw.fuel >= runtime.state.draw_config.boost_min_cost) {
-            const double limit=speed::FuelSystem::draw_limit(runtime.state);
-            if (press && runtime.state.ship.pos.distance_to(pen)>=limit) {Dictionary event;event["reason_key"]="lab.link_too_far";emit_event("draw_rejected",event);}
-            else begin_draw(press,pen,clock_msec);
+        if ((press || alt) && runtime.state.draw_config.capacity * runtime.state.draw.gauge >= runtime.state.draw_config.min_charge) {
+            const auto &s=runtime.state;const auto &d=s.draw_config;
+            const double limit=d.length*d.capacity*s.draw.gauge*(s.ship_config.max_speed/s.ship_config.base_max_speed)*d.length_mult;
+            if (!press || s.ship.pos.distance_to(pen)<limit) begin_draw(press,pen,clock_msec);
         }
         return true;
     }
@@ -185,7 +179,7 @@ bool SpeedRunCore::handle_draw_input(const speed::InputFrame &input, int64_t clo
     }
     if (bool(input.has_cursor)) extend_draw(pen, camera_zoom);
     if (touch && (release || alt)) commit_draw();
-    else if (runtime.state.draw.limit-runtime.state.draw.connection-runtime.state.draw.length < runtime.state.draw_config.point_step || runtime.state.draw.blocked) commit_draw();
+    else if (runtime.state.draw.limit-runtime.state.draw.connection-runtime.state.draw.length<runtime.state.draw_config.point_step || runtime.state.draw.blocked) commit_draw();
     else if (press && clock_msec - runtime.state.draw.first_msec >= runtime.state.draw_config.confirm_delay * 1000.0 && runtime.state.draw.points.size() >= 2) commit_draw();
     return true;
 }
@@ -217,7 +211,7 @@ void SpeedRunCore::end_trace(bool completed) {
     if (completed) {
         runtime.state.ship.glide = true;
         runtime.state.ship.glide_t = 0;
-        runtime.state.ship.glide_speed = std::max(speed * runtime.state.draw_config.glide_ratio, runtime.state.ship_config.max_speed * runtime.state.ship_config.steer_cruise * speed::FuelSystem::speed_ratio(runtime.state));
+        runtime.state.ship.glide_speed = std::max(speed * runtime.state.draw_config.glide_ratio, runtime.state.ship_config.max_speed * runtime.state.ship_config.steer_cruise);
         runtime.state.ship.vel = direction * runtime.state.ship.glide_speed;
         runtime.state.ship.boost_t = runtime.state.draw_config.boost_duration;
     }
@@ -243,6 +237,11 @@ bool SpeedRunCore::step_draw(double real_dt) {
     // ふたご座の影の体当たりは、機体の体当たりと同じ処理で解決する（影の位置・経路・中にいる敵の一覧は GeminiBehavior が差し替える）
     const speed::GeminiBehavior::Collide twin_collide=[&](Vector2 from) {leave_inside(runtime,from);return runtime.state.combat_ready && collide_ship(from,runtime.state.trace_radius);};
     if (!runtime.state.draw.tracing) {
+        if (!runtime.state.draw.drawing) {
+            const double before = runtime.state.draw.gauge;
+            runtime.state.draw.gauge = std::min(1.0, runtime.state.draw.gauge + real_dt / (runtime.state.draw_config.charge_time * runtime.state.draw_config.capacity));
+            if (before < 1 && runtime.state.draw.gauge >= 1) emit_event("gauge_full");
+        }
         speed::GeminiBehavior::step(runtime,real_dt,twin_collide);
         return true;
     }
@@ -285,12 +284,10 @@ bool SpeedRunCore::step_draw(double real_dt) {
 Dictionary SpeedRunCore::draw_snapshot() const {
     Dictionary out;
     if (!runtime.state.draw_ready || runtime.state.closed) return out;
-    out["fuel"] = runtime.state.draw.fuel;out["fuel_max"]=speed::FuelSystem::maximum(runtime.state);out["boost_min_cost"]=runtime.state.draw_config.boost_min_cost;
-    out["fuel_preview"]=runtime.state.draw.drawing?std::max(0.0,runtime.state.draw.fuel-speed::FuelSystem::draw_cost(runtime.state)):runtime.state.draw.fuel;
-    out["gauge"] = runtime.state.draw.fuel/speed::FuelSystem::maximum(runtime.state); out["drawing"] = runtime.state.draw.drawing; out["draw_started"] = runtime.state.draw.started;
-    out["draw_blocked"] = runtime.state.draw.blocked;
-    out["draw_start_fuel"] = runtime.state.draw.start_fuel;out["draw_connection"] = runtime.state.draw.connection; out["draw_gauge"] = runtime.state.draw.amount;
-    out["draw_limit"] = runtime.state.draw.limit; out["draw_length"] = runtime.state.draw.length; out["draw_points"] = runtime.state.draw.points;
+    out["gauge"] = runtime.state.draw.gauge; out["drawing"] = runtime.state.draw.drawing; out["draw_started"] = runtime.state.draw.started;
+    out["draw_blocked"] = runtime.state.draw.blocked; out["trace_full_charge"] = runtime.state.draw.full_charge;
+    out["draw_start_charge"] = runtime.state.draw.start_charge; out["draw_gauge"] = runtime.state.draw.amount;
+    out["draw_limit"] = runtime.state.draw.limit; out["draw_length"] = runtime.state.draw.length; out["draw_connection"] = runtime.state.draw.connection; out["draw_points"] = runtime.state.draw.points;
     out["tracing"] = runtime.state.draw.tracing; out["dash_id"] = runtime.state.draw.dash_id; out["trace_path"] = runtime.state.draw.path;
     out["trace_lengths"] = runtime.state.draw.lengths; out["trace_total"] = runtime.state.draw.total; out["trace_progress"] = runtime.state.draw.progress;
     return out;

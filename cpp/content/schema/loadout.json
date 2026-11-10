@@ -74,14 +74,9 @@
           "name": "glide_bonus",
           "type": "f64",
           "min": 0
-        },
-        {
-          "name": "cruise_drain_ratio",
-          "type": "f64",
-          "min": 0
         }
       ],
-      "version": 10
+      "version": 9
     },
     {
       "name": "PostMaxChargeDefinition",
@@ -96,9 +91,19 @@
           "name": "increment",
           "type": "f64",
           "min": 0
+        },
+        {
+          "name": "minimum_ratio",
+          "type": "f64",
+          "min": 0,
+          "max": 1
+        },
+        {
+          "name": "minimum_time",
+          "type": "f64",
+          "min": 0
         }
-      ],
-      "version": 2
+      ]
     },
     {
       "name": "PostMaxCritDefinition",

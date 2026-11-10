@@ -1,4 +1,3 @@
-#include "../traits/fullBurst.h"
 #include "scatter.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/equipment.h"
@@ -15,7 +14,7 @@ void ScatterBehavior::step(RunRuntime &run,double dt) {
     weapon.recoil=remaining_time(weapon.recoil,dt);
     if (state.draw.drawing || state.draw.tracing) return;
     const auto &loadout=*state.loadout;const auto &effects=loadout.effects;const auto &post=run.content->scatter_post;
-    const double rate=FullBurstBehavior::rate(run);
+    const double rate=state.draw.gauge<1?1:1+effects.full_gauge_rate*state.draw.gauge;
     const double floor=std::min(weapon.base_interval,std::max(post.minimum_interval,weapon.base_interval*post.minimum_ratio));
     const double interval=std::max(floor,weapon.base_interval*(1-post.interval_increment*double(loadout.post_weapon_interval_stacks)))/rate;
     // Sourceは経過時間を加算してからfmodする。残り時間の減算へ変換すると境界tickがずれる。
