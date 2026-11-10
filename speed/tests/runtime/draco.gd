@@ -6,6 +6,9 @@ func check(ok: bool, label: String) -> void:
 		failed += 1
 		push_error(label)
 func _ready() -> void:
+	if "--cpp-draco-shake" in OS.get_cmdline_user_args():
+		call_deferred("native_shake")
+		return
 	if "--cpp-draco-finish" in OS.get_cmdline_user_args():
 		call_deferred("native_finish")
 		return
@@ -641,4 +644,56 @@ func native_finish() -> void:
 			print("[cpp_draco_finish] 最終通知=",f.captured.filter(func(e):return e.type in ["boss_defeated","clear_banner","run_finished"]))
 			bridge.dispose()
 	print("[cpp_draco_finish] group=",group," failures=",failed)
+	get_tree().quit(1 if failed else 0)
+
+## 通知の検証失敗で入力取得とフレーム配信が止まらないことを確認する。
+func native_shake() -> void:
+	var index=JSON.parse_string(FileAccess.get_file_as_string("res://.content/run/stage_5.json"))
+	if not index is Dictionary:
+		check(false,"生成済みステージ5の索引を読む");get_tree().quit(1);return
+	var bridge=load("res://scripts/runtime/run_bridge.gd").new()
+	var configured: Dictionary=bridge.configure(FileAccess.get_file_as_bytes(index.binary),{"api_version":1,"run_id":194,"mode":1,"stage_id":"5","profile":{},"settings":{"hitstop":false}})
+	check(configured.ok,"ステージ5の正規生成データを読む")
+	if not configured.ok:bridge.dispose();get_tree().quit(1);return
+	check(bridge.start(105,{"position":Vector2(700,0),"lab_mode":true}).ok,"ステージ5のランを開始する")
+	bridge.command("dev_set_scenario",{"kind":"lab","params":{"empty":true,"invincible":true,"auto_spawn":false,"auto_boss":false}})
+	var spawned: Dictionary=bridge.command("dev_spawn_boss",{"definition":1,"position":Vector2.ZERO,"entrance":false})
+	check(spawned.ok,"ステージ5のボスを出す")
+	if not spawned.ok:bridge.dispose();get_tree().quit(1);return
+	check(bridge.boss_trial(spawned.value,"prepare",{"phase":1,"origin":Vector2.ZERO,"target":Vector2(700,0),"selection":false,"steering_locked":false,"guard":1.0,"logical_size":Vector2(800,450)}).ok,"尻尾振りの試行条件を準備する")
+	check(bridge.boss_trial(spawned.value,"start",{"technique":"tail_sweep"}).ok,"尻尾振りを開始する")
+	var captured: Array=[]
+	bridge.subscribe("揺れ通知",func(frame):captured.append_array(frame.events);return true)
+	var polls: Array=[]
+	var packets: Array=[]
+	bridge.subscribe("揺れ後の画面更新",func(frame):packets.append(frame);return true)
+	var provider:=func() -> Intent:
+		polls.append(true)
+		var intent:=Intent.new()
+		intent.has_cursor=true
+		intent.cursor=Vector2(700,-1000)
+		return intent
+	var received:=false
+	for tick in 900:
+		var result: Dictionary=bridge.poll_and_step(1.0/120.0,provider,Vector2(800,450))
+		if not result.ok or (not bridge.delivery_error.is_empty() and not bridge.delivery_error.ok):
+			check(false,"尻尾振りの通知を含む更新を受理する: "+str(bridge.delivery_error if result.ok else result))
+			break
+		received=captured.any(func(event):return event.type==&"draco_shake")
+		if received:break
+	check(received,"尻尾振りの揺れ通知を配信する")
+	if received:
+		var shake: Dictionary=captured.filter(func(event):return event.type==&"draco_shake")[0]
+		check(shake.payload.has("amount") and is_finite(shake.payload.amount),"揺れの強さamountを配信する")
+		check(bridge.command("dev_ship_motion",{"position":Vector2(700,0),"velocity":Vector2(120,0)}).ok,"静止させた実験機を操舵できる速さへ戻す")
+		var before: Dictionary=bridge.read_frame().value
+		polls.clear();packets.clear()
+		for tick in 30:
+			check(bridge.poll_and_step(1.0/120.0,provider,Vector2(800,450)).ok,"揺れ後の更新を受理する")
+		var after: Dictionary=bridge.read_frame().value
+		check(polls.size()==30 and packets.size()==30,"揺れ後も30回すべて入力を取得し画面へ配信する")
+		check(after.ui.ship_vel.y<0,"揺れ後の上向き入力で機体が旋回する: velocity=%s/%s"%[before.ui.ship_vel,after.ui.ship_vel])
+		check(after.tick==before.tick+30 and after.camera.center!=before.camera.center,"揺れ後も時計とカメラを更新する: ticks=%s/%s camera=%s/%s"%[before.tick,after.tick,before.camera.center,after.camera.center])
+	bridge.dispose()
+	print("[cpp_draco_shake] failures=",failed)
 	get_tree().quit(1 if failed else 0)
