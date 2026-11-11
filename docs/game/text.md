@@ -1061,6 +1061,12 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | review.guide.pause | Escで一時停止すると「カスタム設定」を開けます。武器・特性とそのレベル、英雄の力、機体強化の変更、無敵の切り替え、ボス戦への移動ができます。変更は今回のプレイだけに適用されます。 | Escで一時停止すると「カスタム設定」を開けます。武器・特性とそのレベル、英雄の力、機体強化の変更、無敵の切り替え、ボス戦への移動ができます。変更は今回のプレイだけに適用されます。 |
 | review.guide.next | 閉じる | 閉じる |
 | review.guide.skip | 案内をスキップ | 案内をスキップ |
+| review.equipment | 武器・特性 | 武器・特性 |
+| review.helpers | 補助機能 | 補助機能 |
+| review.target | 装備 | 装備 |
+| review.slot | 追加先・入れ替える所持装備 | 追加先・入れ替える所持装備 |
+| review.current | 所持中：{items} | 所持中：{items} |
+| review.entry | 審査版<br>カスタム設定 | 審査版<br>カスタム設定 |
 | review.title | カスタム設定（審査版のみ） | Custom settings (review build) |
 | review.run_only | 変更はこのプレイだけに適用します。次のプレイは通常の設定で始まります。 | Changes apply to this run only. The next run uses normal settings. |
 | review.unlock_all | 全ステージ解放 | Unlock all stages |
@@ -1071,8 +1077,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | review.slots | 所持枠 {used} / {max} | Slots {used} / {max} |
 | review.add | 追加（空き枠を使用） | Add (use an empty slot) |
 | review.level | 適用するレベル | Target level |
-| review.apply_equipment | 選択した装備・レベルを適用 | Apply equipment and level |
-| review.remove | 選択した所持装備を削除 | Remove selected owned equipment |
+| review.apply_equipment | 変更を適用 | Apply equipment and level |
+| review.remove | 所持装備を削除 | Remove selected owned equipment |
 | review.none | なし | None |
 | review.apply | 適用 | Apply |
 | review.invincible | 無敵 | Invincible |
