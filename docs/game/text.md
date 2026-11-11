@@ -101,7 +101,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | tutorial.goal.gauge | 全ての敵を倒す　残り{n} | Defeat all enemies: {n} left |
 | tutorial.goal.xp | 星のかけらを拾ってレベルアップ | Collect star shards to level up |
 | tutorial.goal.cards | 武器・特性を1枚選ぶ | Pick one weapon or trait |
-| tutorial.goal.done | チュートリアルはメニュー(esc)からもみることができます | You can review the tutorial from the menu (Esc) |
+| tutorial.end.title | チュートリアル終了 | Tutorial Complete |
+| tutorial.end.body | ここからが本番です。最初の武器を選んで出撃します。<br>チュートリアルはメニュー(esc)からもみることができます。 | The real run starts here. Pick your first weapon and launch.<br>You can review the tutorial from the menu (Esc). |
 | menu.start | ゲームスタート | Start Game |
 | menu.settings | 設定 | Settings |
 | menu.quit | 終了 | Quit |

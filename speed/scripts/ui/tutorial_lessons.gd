@@ -14,5 +14,8 @@ const LESSONS := [
 	{"key": "cards", "frames": 42},
 ]
 
+## 練習の最後に出す区切り。動く絵を持たない。
+const END := {"key": "end", "frames": 1}
+
 static func clip_path(key: String) -> String:
 	return "res://assets/ui/tutorial/%s.png" % key

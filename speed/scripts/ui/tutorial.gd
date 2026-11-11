@@ -10,7 +10,7 @@ const MARKERS := preload("res://scripts/ui/tutorial_markers.gd")
 const DESIGN := Vector2(640, 360)
 const ENEMY := "biter"
 const GATES := 3
-enum Step { MOVE, BOOST, GAUGE, XP, CARDS, DONE }
+enum Step { MOVE, BOOST, GAUGE, XP, CARDS, END, DONE }
 
 var hud: Control
 var bridge: RefCounted
@@ -31,7 +31,6 @@ var _gates_left := GATES
 var _boosted := false
 var _enemies := 0
 var _start_level := 0
-var _done_time := 0.0
 ## 敵を置いた場所（置いた順）
 var _spots: Array[PackedVector2Array] = []
 
@@ -106,14 +105,7 @@ func _process(delta: float) -> void:
 	var events := _events
 	_events = []
 	if _step == Step.DONE:
-		# 最初の武器を選び終えてから5秒かけて消す。
-		var playing: bool = int(_ui.phase) == Phase.Play and not hud.reward_active()
-		_caption_box.visible = playing
-		if playing:
-			_done_time += delta
-		_caption_box.modulate.a = clampf(5.0 - _done_time, 0.0, 1.0)
-		if _done_time >= 5.0:
-			queue_free()
+		queue_free()
 		return
 	if _prompt != null:
 		return
@@ -161,7 +153,10 @@ func _process(delta: float) -> void:
 				_advance(Step.CARDS, 0.0)
 		Step.CARDS:
 			if phase == Phase.Play and int(_ui.level) > _start_level and not hud.reward_active():
-				_finish()
+				_advance(Step.END, 0.4)
+		Step.END:
+			# 終了の説明を閉じたら、最初の武器の選択へ進む。
+			_finish()
 	_refresh()
 
 func _advance(next: int, delay := 0.7) -> void:
@@ -172,7 +167,7 @@ func _advance(next: int, delay := 0.7) -> void:
 
 ## 段の準備をして説明を開く。ランは説明を閉じるまで止まる。
 func _open(step: int) -> void:
-	var prompt := PROMPT.new(LESSONS.LESSONS[step])
+	var prompt := PROMPT.new(LESSONS.END if step == Step.END else LESSONS.LESSONS[step])
 	if not hud.show_menu_overlay(prompt):
 		prompt.free()
 		return
@@ -261,10 +256,9 @@ func _refresh() -> void:
 		Step.GAUGE: text = tr("tutorial.goal.gauge").format({"n": _enemies})
 		Step.XP: text = tr("tutorial.goal.xp")
 		Step.CARDS: text = tr("tutorial.goal.cards")
-		Step.DONE: text = tr("tutorial.goal.done")
 	_caption.text = text
 	var playing := phase == Phase.Play or (_step == Step.CARDS and phase == Phase.Levelup)
-	_caption_box.visible = _prompt == null and _step == _next_step and text != "" and (playing or _step == Step.DONE) and not (_step == Step.CARDS and hud.reward_active())
+	_caption_box.visible = _prompt == null and _step == _next_step and text != "" and playing and not (_step == Step.CARDS and hud.reward_active())
 	_strip.visible = _caption_box.visible and _step in [Step.BOOST, Step.GAUGE] and phase == Phase.Play
 	if _strip.visible:
 		var draw: Dictionary = _ui.draw
