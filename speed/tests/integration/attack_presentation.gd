@@ -1689,7 +1689,7 @@ func check_cpp_corona() -> bool:
 	await get_tree().process_frame
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(200,0),"velocity":Vector2.ZERO})
 	cpp_core.step(0.1)
-	check(cpp_core.ship_snapshot().ship_vel.x<0.0,"低速の機体へ敵更新内で距離減衰した吸引を加える")
+	check(cpp_core.ship_snapshot().ship_vel==Vector2.ZERO and cpp_core.ship_snapshot().ship_pos==cpp_origin+Vector2(200,0),"渦の範囲内でも低速の機体の速度と位置を保つ")
 	cpp_bridge.command("dev_ship_motion",{"position":cpp_origin+Vector2(200,0),"velocity":Vector2(3000,0)})
 	cpp_core.step(0.1)
 	check(cpp_core.ship_snapshot().ship_vel==Vector2(3000,0),"高速の機体には吸引を加えない")

@@ -71,7 +71,6 @@ void CoronaVortex::tick(RunRuntime &r,double dt,const std::vector<EnemyHandle> &
     for (auto h:owners) {
         if (!live(r,h)) continue;auto &e=s.enemies[h.slot];auto &o=std::get<CoronaState>(e.behavior_state);const auto &p=r.content->coronas[r.content->definitions[e.definition].corona_definition-1];if (!o.ready) {o.ready=true;o.center=e.pos;}
         if (e.stone>0) {cancel(r,h,o);o.center=e.pos;continue;}
-        const bool fast=s.draw.tracing || s.ship.glide || s.ship.vel.length()>=s.ship_config.max_speed*s.combat_config.ram_speed_ratio;const auto delta=e.pos-s.ship_pos;const double dist=delta.length();if (!fast && dist<p.pull_radius && dist>=1) s.ship.vel+=delta/dist*(p.pull*dt)*(1.0-dist/p.pull_radius);
         o.capture_t-=dt;if (o.capture_t<=0) {o.capture_t=std::max(p.capture_interval,dt);capture(r,h,o,p);}e.fire_t=std::max(0.0,e.fire_t-dt);
         const auto owner_key=AttackBudgetSystem::owner(s,e.id,e.attack_group);AttackBudgetSystem budget(r);
         if (e.pos.distance_to(s.ship_pos)<=p.ring+s.ship_config.ship_radius || !o.count) cancel(r,h,o);
