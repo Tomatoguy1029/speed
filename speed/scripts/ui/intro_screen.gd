@@ -17,7 +17,6 @@ var _picture: Control
 var _text: Label
 var _next: Button
 var _auto_play: Button
-var _hint: Label
 var _stars: Array[TextureRect] = []
 var _transition: Tween
 var _transitioning := false
@@ -42,14 +41,14 @@ func _ready() -> void:
 	frame.z_index = 1
 	var panel := ColorRect.new()
 	panel.position = Vector2(64, 248)
-	panel.size = Vector2(512, 100)
+	panel.size = Vector2(512, 104)
 	panel.color = Color(0.02, 0.025, 0.05, 0.9)
 	panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.z_index = 1
 	_canvas.add_child(panel)
 	_text = Label.new()
 	_text.position = Vector2(82, 258)
-	_text.size = Vector2(476, 66)
+	_text.size = Vector2(476, 44)
 	_text.add_theme_font_override("font", preload("res://assets/ui/aseprite_font.tres"))
 	_text.add_theme_font_size_override("font_size", 14)
 	_text.add_theme_color_override("font_color", Color("e6f1f6"))
@@ -57,16 +56,13 @@ func _ready() -> void:
 	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_sibling(_text)
 	_text.z_index = 2
-	_hint = Label.new()
-	_hint.position = Vector2(82, 328)
-	_hint.add_theme_font_size_override("font_size", 9)
-	_hint.modulate = Color("92a7b3")
-	_hint.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_hint.z_index = 2
-	_canvas.add_child(_hint)
-	_next = _button("NextIntro", tr("intro.next"), Vector2(492, 325), Vector2(66, 20))
+	_next = _button("NextIntro", ">>", Vector2(514, 318), Vector2(44, 32))
+	_next.add_theme_font_size_override("font_size", 20)
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		_next.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+	_next.tooltip_text = tr("intro.next")
 	_next.pressed.connect(advance)
-	_auto_play = _button("AutoPlayIntro", "", Vector2(378, 325), Vector2(106, 20))
+	_auto_play = _button("AutoPlayIntro", "", Vector2(12, 10), Vector2(106, 23))
 	_auto_play.toggle_mode = true
 	_auto_play.set_pressed_no_signal(bool(SaveManager.settings.get("intro_auto_advance", false)))
 	_auto_play.toggled.connect(_set_auto_play)
@@ -103,7 +99,6 @@ func _set_auto_play(enabled: bool) -> void:
 
 func _update_playback_labels() -> void:
 	_auto_play.text = tr("intro.auto_on" if _auto_play.button_pressed else "intro.auto_off")
-	_hint.text = tr("intro.auto_hint" if _auto_play.button_pressed else "intro.continue")
 
 func _layout() -> void:
 	if _canvas == null:
@@ -166,7 +161,7 @@ func _begin_paragraph() -> void:
 	_text.text = tr(STORY.SCENES[scene_index].text[paragraph_index])
 	_text.visible_characters = 0
 	_next.disabled = false
-	_next.text = tr("intro.reveal")
+	_next.tooltip_text = tr("intro.reveal")
 
 func _process(delta: float) -> void:
 	if _transitioning or _ending or _text == null:
@@ -176,7 +171,7 @@ func _process(delta: float) -> void:
 		_characters += delta * characters_per_second
 		_text.visible_characters = mini(int(_characters), total)
 		if _text.visible_characters == total:
-			_next.text = tr("intro.next")
+			_next.tooltip_text = tr("intro.next")
 	elif _auto_play.button_pressed:
 		_hold += delta
 		if _hold >= text_hold_seconds:
@@ -189,7 +184,7 @@ func advance() -> void:
 	if _text.visible_characters < total:
 		_characters = total
 		_text.visible_characters = total
-		_next.text = tr("intro.next")
+		_next.tooltip_text = tr("intro.next")
 		_hold = 0.0
 		return
 	if paragraph_index + 1 < STORY.SCENES[scene_index].text.size():
