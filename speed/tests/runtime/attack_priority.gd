@@ -20,6 +20,7 @@ func check_cpp_sniper() -> void:
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
 	stage.index = 80
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["telescope"])
 	var output := "res://.content/dev/run_sniper"
@@ -67,7 +68,9 @@ func check_cpp_sniper() -> void:
 		core.step(0.1)
 		var motion: Dictionary = core.enemy_motion_snapshot().filter(func(item): return item.id==id)[0]
 		if tick==0: check(motion.charge==0.0 and core.attack_budget_snapshot().groups.is_empty(),"予算0では照準の進行と表示を始めない")
-		if tick==4: check(motion.charge==0.0 and core.enemy_motion_snapshot()[0].charge==0.0,"岩陰で照準と未発射の予約を取り消す")
+		if tick==4:
+			core.advance_attack_budget(float(core.inspect().world_time))
+			check(motion.charge>0.0 and motion.charge<0.34 and motion.mode==RunIds.EnemyModeId.Move and core.attack_budget_snapshot().groups.is_empty(),"岩陰では発射予約を解除し照準量を徐々に戻す")
 		if motion.mode==RunIds.EnemyModeId.Windup and pending.is_empty():
 			pending = bridge.checkpoint()
 			pending_motion = core.enemy_motion_snapshot()
@@ -75,8 +78,13 @@ func check_cpp_sniper() -> void:
 			var shown := false
 			for batch: Dictionary in frame.batches:
 				if batch.has("sniper"): shown = batch.sniper.size()==59
+			var offscreen: Dictionary = bridge.read_render(Rect2(target-Vector2(100,100),Vector2(200,200))).value
+			check(offscreen.telescope_actors.size()==1 and offscreen.telescope_actors[0].windup,"画面外の望遠鏡座も発射予告を表示する")
 			var presentation: RunPresentation = session.view.get_node("RunPresentation")
 			check(shown and presentation.frame_view.apply_frame(frame),"狭まる48光線と溜めの光を通常画面へ表示する")
+			presentation._present_cpp(0.0)
+			await get_tree().process_frame
+			check(presentation.frame_view.apply_frame(offscreen),"画面外の発射予告を描画へ渡す")
 			presentation._present_cpp(0.0)
 			await get_tree().process_frame
 		elif not pending.is_empty() and next_motion.is_empty(): next_motion = core.enemy_motion_snapshot()
@@ -97,6 +105,26 @@ func check_cpp_sniper() -> void:
 		check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==pending_motion,"照準の48光線と溜めを値から復帰する")
 		core.step(0.1)
 		check(core.enemy_motion_snapshot()==next_motion,"復帰後に同じ照準へ進み保持元へ変更を漏らさない")
+		bridge.restore(pending.value)
+		core.set_motion_context(target+Vector2(2200,0),target,Vector2(640,360))
+		core.step(0.1)
+		var escaped: Dictionary = core.enemy_motion_snapshot().filter(func(item): return item.id==id)[0]
+		check(escaped.mode==RunIds.EnemyModeId.Move and escaped.timer==0.0 and escaped.charge>0.0 and escaped.charge<1.0 and core.hazards_snapshot().is_empty(),"射程外に逃げると溜めを中断して照準を減らす")
+		core.set_motion_context(target,target,Vector2(640,360))
+		core.set_enemy_motion(id,{"facing":(target-position).angle()})
+		core.advance_attack_budget(float(core.inspect().world_time)+0.1)
+		core.step(0.1)
+		var reacquired: Dictionary = core.enemy_motion_snapshot().filter(func(item): return item.id==id)[0]
+		check(reacquired.mode==RunIds.EnemyModeId.Windup and reacquired.timer>=0.49 and core.hazards_snapshot().is_empty(),"再捕捉では発射前の予告時間を最初から取り直す")
+		bridge.restore(pending.value)
+		core.set_enemy_motion(id,{"facing":PI})
+		core.step(0.1)
+		var turned: Dictionary = core.enemy_motion_snapshot().filter(func(item): return item.id==id)[0]
+		check(turned.mode==RunIds.EnemyModeId.Move and turned.charge>0.0 and turned.charge<1.0 and core.hazards_snapshot().is_empty(),"光の帯の外でも発射準備を解除し照準を減らす")
+		core.set_motion_context(target+Vector2(2200,0),target,Vector2(640,360))
+		for decay_tick in 20: core.step(0.1)
+		var decayed: Dictionary = core.enemy_motion_snapshot().filter(func(item): return item.id==id)[0]
+		check(decayed.charge==0.0 and core.hazards_snapshot().is_empty(),"見失った照準はゼロまで戻り発射しない")
 		bridge.restore(pending.value)
 		bridge.command("dev_kill",{"entity_id":id,"cause":"bullet"})
 		core.step(0.6)
