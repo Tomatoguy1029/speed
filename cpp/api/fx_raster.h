@@ -68,6 +68,7 @@ public:
     int corona_vortex(PackedFloat64Array owners,PackedColorArray palette,double fade);
     int density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette,double fade,double light_strength);
     int sweep_wake(PackedVector2Array tails,PackedVector2Array roots,PackedFloat64Array ages,PackedFloat32Array reach,PackedFloat32Array fine,PackedColorArray palette,double time,double fade);
+    int monoceros_crescent(Array points,double head,double tail,double width,PackedColorArray ramp,double age,double radius_scale,double fade,double light_strength);
     void dim(double amount,double flash);
     void breath(PackedVector2Array fan,double elapsed,double active,double axis,double sweep,double half_angle,double reach,double fan_angle);
     void light_mask_reset();

@@ -401,7 +401,9 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             Dictionary fx;fx["order"]=record->id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);telescope_beams.push_back(fx);continue;
         }
         if (kind==EnemyDefinition::Kind::Cross && beam->style==uint32_t(BeamStyle::Plain)) {
-            Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=h.pos;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);cross_beams.push_back(fx);continue;
+            auto position=h.pos;const auto owner=record->spec.owner.live_source;
+            if (record->spec.owner.attached && state.enemy_handles.contains(owner)) {const auto &e=state.enemies[owner.slot];position=interpolate(previous,{e.id,e.pos,e.facing},owner.slot,false,alpha).position;}
+            Dictionary fx;fx["order"]=record->id;fx["owner_id"]=record->spec.owner.source_id;fx["pos"]=position;fx["angle"]=double(beam->angle);fx["length"]=double(beam->length);fx["half_width"]=double(beam->half_width);fx["time"]=double(h.time);fx["delay"]=double(h.delay);fx["active"]=double(h.duration);cross_beams.push_back(fx);continue;
         }
         if (kind!=EnemyDefinition::Kind::Beamer || beam->style!=uint32_t(BeamStyle::Guide)) continue;
         const auto owner=record->spec.owner.live_source;

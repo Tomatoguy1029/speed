@@ -46,6 +46,7 @@ Color cmix(Color a,Color b,double k) {return a.lerp(b,float(k));}
 struct Ramp {Color v[5];explicit Ramp(Color c) {const auto mk=[&](double l,double w) {return Color(float(std::min(1.0,c.r*l+w*(1-c.r*l))),float(std::min(1.0,c.g*l+w*(1-c.g*l))),float(std::min(1.0,c.b*l+w*(1-c.b*l))));};v[0]=mk(0.35,0);v[1]=mk(0.6,0);v[2]=mk(1,0);v[3]=mk(1,0.45);v[4]=Color(1,1,1);}};
 }
 void SpeedFxRaster::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("monoceros_crescent","points","head","tail","width","ramp","age","radius_scale","fade","light_strength"),&SpeedFxRaster::monoceros_crescent);
     ClassDB::bind_method(D_METHOD("ruler_beam","a","b","width","time","color","alpha","fade","light_strength"),&SpeedFxRaster::ruler_beam);
     ClassDB::bind_method(D_METHOD("auriga_trail","points","strengths","width","palette","clock","fade","light_strength"),&SpeedFxRaster::auriga_trail);
     ClassDB::bind_method(D_METHOD("lynx_scratch","origin","angle","side","size","span","cut","palette","settings","fade","light_strength"),&SpeedFxRaster::lynx_scratch);

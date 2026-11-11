@@ -1,6 +1,7 @@
 ## 角の実軌道に沿う薙ぎの面。元 monoceros_fx.js の monoSlashCrescent / monoSweepSlash。
 ## 軌道と粒子は戦闘時の固定更新で保持し、この部品は面と光だけを描く。
 extends RefCounted
+static var _raster := SpeedFxRaster.new()
 
 static func _ramp(base: Color) -> Array[Color]:
 	var result: Array[Color] = []
@@ -20,6 +21,18 @@ static func _progress_at(points: Array, time: float) -> float:
 	return float(points.back().v)
 
 static func _crescent(canvas, points: Array, head: float, tail: float, width: float, ramp: Array[Color], age: float, radius_scale := 1.0) -> void:
+	var p = canvas.front
+	if p.tx != 0.0 or p.ty != 0.0 or p.fx != 1.0 or p.cs != 1.0 or p.sn != 0.0:
+		_crescent_transformed(canvas, points, head, tail, width, ramp, age, radius_scale)
+		return
+	_raster.begin_painter(p, canvas.world_scale, canvas._camera_position, true, true)
+	var flags := _raster.monoceros_crescent(points, head, tail, width, PackedColorArray(ramp), age, radius_scale, p.fade, p.light_strength)
+	p.colors = _raster.take_colors()
+	p.lights = _raster.take_lights()
+	p.has_color = p.has_color or (flags & 1) != 0
+	p.has_light = p.has_light or (flags & 2) != 0
+
+static func _crescent_transformed(canvas, points: Array, head: float, tail: float, width: float, ramp: Array[Color], age: float, radius_scale := 1.0) -> void:
 	if head-tail<0.005 or width<0.3: return
 	var center: Vector2 = points[0].center
 	var logical_center: Vector2 = canvas.to_logical(center)

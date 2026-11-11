@@ -34,6 +34,9 @@ bool AttackSystem::step_hazards(RunRuntime &run,double dt) {
         const auto owner=record->spec.owner.live_source;
         const bool owner_ended=record->spec.owner.attached && (!state.enemy_handles.contains(owner) || state.enemies[owner.slot].dead || state.enemy_handles.contains(state.enemies[owner.slot].pump_owner));
         if (time>=delay+life || owner_ended) {end(state,handle,owner_ended?AttackEndReason::ParticipantEnd:AttackEndReason::Lifetime);EventBuilder::flush_combat(run);continue;}
+        // 十字の中心は本体に付く。押し出しなどで動いた場合も予告・照射・接触判定をそろえる。
+        if (record->spec.owner.attached && state.enemy_handles.contains(owner) && std::holds_alternative<BeamHazard>(hazard.shape) &&
+            run.content->definitions[state.enemies[owner.slot].definition].kind==EnemyDefinition::Kind::Cross) hazard.pos=state.enemies[owner.slot].pos;
         if (time>=delay && std::holds_alternative<WaveHazard>(hazard.shape)) {
             if (owner.generation && std::get<WaveHazard>(hazard.shape).style==uint32_t(WaveStyle::Pulser)) {
                 auto &spec=state.attacks.records[handle.slot].spec;spec.owner.live_source={};spec.owner.attached=false;
