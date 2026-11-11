@@ -121,7 +121,7 @@ static func warm_resources(parent: Node, scope: ContentResourceScope) -> void:
 
 func _ready_cpp() -> void:
 	_camera = get_node(camera_path) as Camera2D
-	var snapshot: Dictionary = bridge.latest_frame()
+	var snapshot: Dictionary = bridge.latest_frame(false)
 	if not snapshot.ok: return
 	frame_view = load("res://scripts/render/run_frame_view.gd").new()
 	get_node(world_path).add_child(frame_view)
@@ -131,7 +131,7 @@ func _ready_cpp() -> void:
 	cpp_background.z_index = -10
 	frame_view.add_child(cpp_background)
 	cpp_background.setup(cpp_scope,cpp_resources,snapshot.value.ui.ship.ship_pos)
-	bridge.subscribe("presentation",frame_view.receive_frame,["world_time","boss_bodies"])
+	bridge.subscribe_presentation("presentation",frame_view.receive_owned_frame,["world_time","boss_bodies"],frame_view.presentation_event_types())
 	pipeline = RenderPipeline.new()
 	add_child(pipeline)
 	var layer_count: int = cpp_resources.visuals.size()-3
@@ -161,7 +161,7 @@ func sync_canvas_layers() -> void:
 
 func _present_cpp(delta: float) -> void:
 	if frame_view==null: return
-	var snapshot: Dictionary = bridge.latest_frame()
+	var snapshot: Dictionary = bridge.latest_frame(false)
 	if not snapshot.ok:
 		frame_view.hide()
 		return

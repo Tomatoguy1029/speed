@@ -14,8 +14,8 @@ var _flashes := {}
 var _bodies := {}
 var _impacts: Array[Dictionary] = []
 var _last_clock := -1.0
-var _raster := SpeedFxRaster.new()
 var _noise = JET.new()
+var _raster := SpeedFxRaster.new()
 var _edges: Dictionary = EDGES.get_meta("edges")
 
 func setup(parent: Node2D, scope: ContentResourceScope, visuals: Dictionary) -> void:
@@ -34,11 +34,7 @@ func render(owners: PackedFloat64Array, selected: Array, thrown: Array, events: 
 		var age := clock-float(impact.time)
 		if age>=0.35: _impacts.erase(impact)
 		elif age>=0.0: FX.sparks(canvas.front,canvas.to_logical(impact.pos),age,40+int(impact.id),10,Color(_settings.color),40,0.35)
-	if not owners.is_empty():
-		_raster.begin(canvas.back.colors, PackedByteArray(), canvas.back.width, canvas.back.height, canvas.world_scale, canvas._camera_position)
-		var flags := _raster.corona_vortex(owners, PackedColorArray(FX.ramp(Color("b6a2db"))), canvas.back.fade)
-		canvas.back.colors = _raster.take_colors()
-		canvas.back.has_color = canvas.back.has_color or (flags & 1) != 0
+	_draw_vortices(owners, canvas)
 	var present := {}
 	var palette := FX.ramp(Color(_settings.color))
 	for row: Dictionary in selected:
@@ -47,14 +43,9 @@ func render(owners: PackedFloat64Array, selected: Array, thrown: Array, events: 
 		var k := float(row.charge)
 		var a: Vector2 = canvas.to_logical(row["from"])
 		var b: Vector2 = canvas.to_logical(row.pos)
-		var delta := b-a
-		var normal := Vector2(-delta.y,delta.x)/maxf(delta.length(),0.000001)
-		for i in range(14):
-			var f := fposmod(FX.hash_value(i*3.1)+clock*2.6,1.0)
-			var wave := (FX.hash_value(i*7.7)-0.5)*10.0*sin(PI*f)
-			var point := a+delta*f+normal*wave
-			canvas.front.dot(point.x,point.y,palette[4] if f>0.7 else palette[3],k*(0.4+0.6*f))
-		canvas.front.glow(b.x,b.y,float(row.radius)*canvas.world_scale*1.4,palette[2],0.4*k*float(_settings.intensity))
+		_raster.begin_painter(canvas.front, float(canvas.world_scale), canvas._camera_position, true, true)
+		_raster.corona_selection(a, b, k, float(row.radius) * canvas.world_scale * 1.4, float(_settings.intensity), PackedColorArray(palette), clock)
+		_finish_raster(canvas.front)
 		_flash(row,k*(0.35+0.35*sin(clock*30.0)))
 	for id in _flashes.keys():
 		if not present.has(id):
@@ -69,55 +60,31 @@ func render(owners: PackedFloat64Array, selected: Array, thrown: Array, events: 
 			_bodies[id].queue_free()
 			_bodies.erase(id)
 
+func _draw_vortices(owners: PackedFloat64Array, canvas) -> void:
+	if owners.is_empty(): return
+	_raster.begin_painter(canvas.back, float(canvas.world_scale), canvas._camera_position, true, false)
+	_raster.corona_vortex(owners, PackedColorArray(FX.ramp(Color("b6a2db"))), canvas.back.fade)
+	canvas.back.colors = _raster.take_colors()
+	canvas.back.has_color = canvas.back.has_color or _raster.has_color()
+
+func _finish_raster(painter) -> void:
+	painter.colors = _raster.take_colors()
+	painter.lights = _raster.take_lights()
+	painter.has_color = painter.has_color or _raster.has_color()
+	painter.has_light = painter.has_light or _raster.has_light()
+
 func _draw_thrown(row: Dictionary, canvas, clock: float) -> void:
 	var velocity: Vector2 = row.velocity
 	if velocity.length_squared() <= 0.000001: return
 	var direction := velocity.normalized()
-	var normal := Vector2(-direction.y,direction.x)
 	var age := float(row.age)
 	var fade := 1.0
 	var center: Vector2 = canvas.to_logical(row.pos)
 	var trail: float = minf(age*velocity.length(),260.0)*canvas.world_scale
-	var frame := floori(clock*30.0)
 	var colors: Array[Color] = [Color("2a0a0a"),Color("5a1414"),Color(_settings.color),Color("ff7a2e"),Color("ffb347"),Color("ffd77a"),Color("fff1b0"),Color.WHITE]
-	var d := 0.0
-	while d <= trail:
-		var q := d/maxf(trail,1.0)
-		var heat: float = 1.0-pow(d/maxf(trail,1.0),0.8)+_noise._noise(d*0.12-clock*40.0,3,int(float(row.seed_angle)*9))*0.12
-		var width := (0.6+2.6*pow(1.0-minf(1.0,q/0.35),1.4))*(1.0 if q<0.35 else 0.5)
-		var point := center-direction*d
-		if q <= 0.55 or FX.hash_value(floorf(d/3.0)*7.1+frame) >= (q-0.55)*1.6:
-			var w := -width
-			while w <= width:
-				var edge := absf(w)/maxf(width,0.01)
-				var color: Color
-				if edge < 0.38:
-					color = colors[7] if heat>0.8 else (colors[6] if heat>0.6 else (colors[4] if heat>0.42 else (colors[3] if heat>0.25 else colors[2])))
-				else:
-					color = colors[5] if heat>0.6 else (colors[3] if heat>0.35 else colors[2])
-				var at := point+normal*w
-				canvas.front.dot(at.x,at.y,color,fade*(1.0 if q<0.85 else (1.0-q)/0.15))
-				w += 0.5
-		d += 0.5
-	var end := center-direction*trail*0.45
-	canvas.front.glow_line(center.x,center.y,end.x,end.y,6,colors[4],0.35*fade)
-	end = center-direction*trail*0.2
-	canvas.front.glow_line(center.x,center.y,end.x,end.y,3,colors[7],0.3*fade)
-	var seed := int(23.0+float(row.seed_angle)*10.0)
-	for i in range(16):
-		var g = JET.Rng.new(_noise._hash([seed,i,911]))
-		var born: float = g.next()*0.4
-		var lifetime: float = g.between(0.1,0.28)
-		var elapsed := fposmod(age-born,0.4)
-		while elapsed < lifetime:
-			var r = JET.Rng.new(_noise._hash([seed,i]))
-			var k := elapsed/lifetime
-			var back: float = r.between(4,trail*0.5)
-			var side: float = r.between(-1,1)*30.0*elapsed
-			var point: Vector2 = center-direction*(back+40.0*elapsed*canvas.world_scale)+normal*side
-			var start := point+direction*2.0
-			canvas.front.line(start.x,start.y,point.x,point.y,func(u: float): return colors[7] if u>0.5 else colors[4],(1.0-k)*fade)
-			elapsed += 0.4
+	_raster.begin_painter(canvas.front, float(canvas.world_scale), canvas._camera_position, true, true)
+	_raster.corona_trail(center, direction, trail, age, clock, float(row.seed_angle), PackedColorArray(colors))
+	_finish_raster(canvas.front)
 	_draw_body(row,fade,canvas,clock,direction,center,colors)
 	canvas.front.glow(center.x,center.y,float(row.radius)*canvas.world_scale*2.0,colors[4],0.5*fade*float(_settings.intensity))
 

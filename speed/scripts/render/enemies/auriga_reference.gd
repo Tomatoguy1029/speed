@@ -18,7 +18,7 @@ func render(rows: Array, canvas, clock: float) -> void:
 			var middle: Vector2 = (row["from"] + row["to"]) * 0.5
 			FX.sparks(canvas.front, canvas.to_logical(middle), fposmod(fade_time - left, 0.4), (clock - float(row.age)) * 7, 2, Color("ffe6b0"), 20, 0.4, -PI / 2.0, 0.8)
 	if groups.is_empty(): return
-	_raster.begin(canvas.back.colors, canvas.back.lights, canvas.back.width, canvas.back.height, canvas.world_scale, canvas._camera_position)
+	_raster.begin_painter(canvas.back, canvas.world_scale, canvas._camera_position, true, true)
 	var flags := 0
 	for group: Array in groups.values():
 		group.sort_custom(func(a: Dictionary, b: Dictionary): return int(a.order) < int(b.order))

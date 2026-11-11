@@ -37,7 +37,7 @@ void SpeedFxRaster::reference_dot(Vector2 p,Color color,double alpha,double fade
     q[1]=uint8_t(std::clamp(double(color.g),0.0,1.0)*255*k);
     q[2]=uint8_t(std::clamp(double(color.b),0.0,1.0)*255*k);
     q[3]=k!=1?255:uint8_t(std::clamp(double(color.a),0.0,1.0)*255);
-    if (q[3]) reference_flags_|=1;
+    if (q[3]) {reference_flags_|=1;color_used_=true;}
 }
 void SpeedFxRaster::reference_light(Vector2 p,Color color,double strength) {
     if (strength<=0.004) return;
@@ -47,7 +47,7 @@ void SpeedFxRaster::reference_light(Vector2 p,Color color,double strength) {
     q[0]=uint8_t(std::min(255,int(q[0]+int(double(color.r)*255)*strength)));
     q[1]=uint8_t(std::min(255,int(q[1]+int(double(color.g)*255)*strength)));
     q[2]=uint8_t(std::min(255,int(q[2]+int(double(color.b)*255)*strength)));
-    if (q[0] || q[1] || q[2]) reference_flags_|=2;
+    if (q[0] || q[1] || q[2]) {reference_flags_|=2;light_used_=true;}
 }
 void SpeedFxRaster::reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength) {
     if (radius<1 || strength<=0.004) return;

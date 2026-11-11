@@ -98,44 +98,11 @@ func _clump(p: PixelPainter) -> void:
 	var count := mini(int(_frame.visible), n)
 	var spacing := float(_frame.clump_spacing)
 	var center := ship_pos - u * (70.0 + spacing * sqrt(float(count)) * 0.6 + recoil * p.px)
-	# 熱：中心は明るい橙、外は暗い橙を市松で。縁はノイズで崩す。広さは見えている船体の数で決める
-	var radius := 4.0 + 3.0 * sqrt(float(count))
-	var c := p.cell(center).round()
-	var flicker := int(clock * 10.0)
-	var big := ceili(radius)
-	for y in range(-big, big + 1):
-		for x in range(-big, big + 1):
-			var d := sqrt(float(x * x + y * y)) / radius
-			if d > 1.0: continue
-			var nz := PixelPainter.vnoise((c.x + x) * 0.25, (c.y + y) * 0.25, clock * 3.0)
-			if d + 0.35 * (nz - 0.5) > 0.85: continue
-			if (x + y + flicker) & 1 and d > 0.45: continue
-			_under.fill(c.x + x, c.y + y, Color("#ffbe65", 0.55) if d < 0.45 else Color("#c86a1e", 0.4))
-	# 鎖：房の船体を、すでに並んだ中でいちばん近い船体（先頭は機体の後ろ）と短くつなぐ。撃ち出しを待つ間は明るく光る
-	var link := Color("#fff2c0") if cargo[0].ready else Color("#ffbe65")
-	for j in count:
-		var hull: Vector2 = cargo[j].pos
-		var near: Vector2 = ship_pos - u * 12.0 * p.px
-		var near_r := 0.0
-		for i in j:
-			var other: Vector2 = cargo[i].pos
-			if other.distance_squared_to(hull) < near.distance_squared_to(hull):
-				near = other
-				near_r = cargo[i].r * 0.7
-		# 船体の縁から縁へつなぐ
-		var dir := (hull - near).normalized()
-		_chain(p, near + dir * near_r, hull - dir * float(cargo[j].r) * 0.7, link, j)
-
-## 鎖の1区間：4ドットおきの輪（2ドット）を、細い線でつなぐ。輪は機体のほうへ流れる。
-func _chain(p: PixelPainter, a: Vector2, b: Vector2, color: Color, seed: int) -> void:
-	var cells := a.distance_to(b) / p.px
-	if cells < 1.0: return
-	p.line(a, b, Color(color, 0.35))
-	var shift := fposmod((_frame_time) * 12.0 + seed * 1.7, 4.0)
-	var k := shift
-	while k < cells:
-		p.dot(b.lerp(a, k / cells), color, 2)
-		k += 4.0
+	# 熱と鎖は同じ画素の順序で一括生成する。位置・半径・時刻は現在のフレームを使う。
+	_under.geometry_begin().mass_tow_heat(p.cell(center).round(), count, clock)
+	_under.geometry_end()
+	p.geometry_begin().mass_tow_chains(cargo, ship_pos, u, count, clock)
+	p.geometry_end()
 
 ## 撃った船体：焼けた色と輪（白→橙）と、後ろへ引くピクセルの炎。
 func _hulls(p: PixelPainter, dt: float) -> void:
@@ -143,20 +110,11 @@ func _hulls(p: PixelPainter, dt: float) -> void:
 	_trail_clock += dt
 	var emit := floori(_trail_clock / TRAIL_EVERY)
 	_trail_clock -= emit * TRAIL_EVERY
+	p.geometry_begin().mass_tow_hulls(shots)
+	p.geometry_end()
 	for shot: Dictionary in shots:
 		var pos: Vector2 = shot.pos
 		var cells: float = shot.r / p.px
-		var hot: float = shot.age
-		# 焼けた色：白 → 薄い橙 → 橙。冷めても橙の網目を重ねたまま飛ぶ
-		var heat := Color(1, 1, 1, 0.85) if hot < 0.08 else Color("#ffd27a", 0.75) if hot < 0.18 else Color("#ff9a3c", 0.55)
-		var c := p.cell(pos).round()
-		var big := ceili(cells)
-		for y in range(-big, big + 1):
-			for x in range(-big, big + 1):
-				if x * x + y * y > cells * cells: continue
-				if hot >= 0.18 and (int(c.x) + x + int(c.y) + y) & 1: continue
-				p.fill(c.x + x, c.y + y, heat)
-		p.ring(pos, cells + (1.0 if hot < 0.18 else 0.0), Color.WHITE if hot < 0.18 else Color("#ffd27a"))
 		var u: Vector2 = shot.vel.normalized()
 		for k in emit:
 			var back := pos - u * cells * p.px + u.orthogonal() * (randf() - 0.5) * cells * p.px

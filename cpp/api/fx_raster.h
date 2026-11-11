@@ -1,13 +1,16 @@
 #pragma once
 #include <vector>
-#include <godot_cpp/variant/packed_float64_array.hpp>
-#include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/classes/ref_counted.hpp>
 #include <godot_cpp/variant/color.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_vector2_array.hpp>
-#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/packed_float64_array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
+#include <godot_cpp/variant/array.hpp>
+#include <godot_cpp/variant/vector2.hpp>
+#include <godot_cpp/variant/vector2i.hpp>
 namespace godot {
 // 論理画素の層へ、粒や画素の多いエフェクトを描く。層の形式は fx_reference_canvas.gd の Painter と同じ。
 // 炎の部品は pixelFX fire/_lib.js の式（Sprite Fusion、MIT、Hugo Duprez）。
@@ -19,13 +22,16 @@ class SpeedFxRaster : public RefCounted {
     double wl_=1;
     Vector2 camera_;
     std::vector<float> mask_;
-    std::vector<float> density_;
     Vector2 mask_camera_;
     int reference_flags_=0;
     void reference_dot(Vector2 p,Color color,double alpha,double fade);
     void reference_light(Vector2 p,Color color,double strength);
     void reference_glow(Vector2 p,double radius,Color color,double strength,double fade=1,double light_strength=1);
     void reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength);
+    bool color_used_=false,light_used_=false;
+    std::vector<float> density_;
+    void reference_dot(double x,double y,Color c,double alpha);
+    void reference_add(int x,int y,Color c,double strength);
     void put(int x,int y,Color c);
     void blend(float x,float y,Color c,double a);
     void add(int x,int y,Color c,double k);
@@ -43,8 +49,15 @@ protected:
     static void _bind_methods();
 public:
     void begin(PackedByteArray colors,PackedByteArray lights,int width,int height,double world_scale,Vector2 camera);
+    void begin_painter(Object *painter,double world_scale,Vector2 camera,bool colors,bool lights);
     PackedByteArray take_colors();
     PackedByteArray take_lights();
+    bool has_color() const {return color_used_;}
+    bool has_light() const {return light_used_;}
+    void nova_field(PackedByteArray alpha,PackedFloat32Array emission,Dictionary state,bool front);
+    void reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,Dictionary settings);
+    void corona_selection(Vector2 from,Vector2 to,double charge,double radius,double intensity,PackedColorArray palette,double clock);
+    void corona_trail(Vector2 center,Vector2 direction,double trail,double age,double clock,double seed_angle,PackedColorArray palette);
     int ruler_beam(Vector2 a,Vector2 b,double width,double time,Color color,double alpha,double fade,double light_strength);
     int ruler_rail(Vector2 a,Vector2 b,Dictionary options,double fade,double light_strength);
     int auriga_trail(PackedVector2Array points,PackedFloat64Array strengths,double width,PackedColorArray palette,double clock,double fade,double light_strength);

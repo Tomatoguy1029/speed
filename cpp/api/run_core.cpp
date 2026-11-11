@@ -55,9 +55,12 @@
 #include <godot_cpp/core/class_db.hpp>
 #include <cmath>
 #include <algorithm>
+#include <unordered_set>
 #include <godot_cpp/core/math.hpp>
 #include <godot_cpp/variant/packed_byte_array.hpp>
 #include <godot_cpp/variant/packed_int32_array.hpp>
+#include <godot_cpp/variant/packed_string_array.hpp>
+#include <godot_cpp/variant/packed_float32_array.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_vector3_array.hpp>
 #include <godot_cpp/variant/packed_vector4_array.hpp>
@@ -93,10 +96,85 @@ int64_t packed_payload_bytes_inner(const Variant &value, unsigned depth) {
     }
 }
 int64_t packed_payload_bytes(const Variant &value) {return packed_payload_bytes_inner(value,0);}
+
+bool packed_floats_finite(const Variant &value) {
+    if (value.get_type()==Variant::PACKED_FLOAT32_ARRAY) {
+        const PackedFloat32Array values=value;const float *data=values.ptr();
+        for (int64_t i=0;i<values.size();++i) if (!std::isfinite(data[i])) return false;
+        return true;
+    }
+    if (value.get_type()==Variant::PACKED_FLOAT64_ARRAY) {
+        const PackedFloat64Array values=value;const double *data=values.ptr();
+        for (int64_t i=0;i<values.size();++i) if (!std::isfinite(data[i])) return false;
+        return true;
+    }
+    return false;
+}
+
+// 窓口が所有する新規snapshot内で翻訳するための部分参照。公開・配信時の複製より前だけで使う。
+Array frame_format_events(const Array &events) {
+    Array selected;const StringName text("text");
+    for (int64_t i=0;i<events.size();++i) {
+        const Dictionary event=events[i];
+        const Dictionary payload=event["payload"];
+        const StringName type=event["type"];
+        if (type==text || payload.has("card")) selected.push_back(event);
+    }
+    return selected;
+}
+
+// 選択は窓口内の値だけを読み、返却時に必ず購読者専用の深いコピーを作る。
+Dictionary copy_frame_delivery(const Dictionary &frame,const Variant &ui_fields,const Variant &event_types,bool presentation) {
+    if (ui_fields.get_type()==Variant::NIL && event_types.get_type()==Variant::NIL && !presentation) return frame.duplicate(true);
+    Dictionary source=frame.duplicate();
+    const Dictionary ui=frame["ui"];
+    if (ui_fields.get_type()!=Variant::NIL) {
+        Dictionary selected;
+        const PackedStringArray fields=ui_fields;
+        for (int64_t i=0;i<fields.size();++i) if (ui.has(fields[i])) selected[fields[i]]=ui[fields[i]];
+        source["ui"]=selected;
+    }
+    if (event_types.get_type()!=Variant::NIL || presentation) {
+        const bool all_types=event_types.get_type()==Variant::NIL;
+        const Dictionary types=all_types?Dictionary():Dictionary(event_types);
+        Array selected;
+        if (all_types || !types.is_empty()) {
+            std::unordered_set<int64_t> boss_targets;
+            if (presentation) {
+                // receive_frameが使う本体/複製を全種類残す。通常敵のdamageだけを複製前に除く。
+                const Array bodies=ui.get("boss_bodies",Array());
+                for (int64_t i=0;i<bodies.size();++i) {
+                    const Dictionary body=bodies[i];
+                    boss_targets.insert(int64_t(body.get("actor",0)));
+                    const Array clones=body.get("clones",Array());
+                    for (int64_t j=0;j<clones.size();++j) boss_targets.insert(int64_t(Dictionary(clones[j]).get("id",0)));
+                }
+            }
+            const StringName combat_damage("combat_damage");
+            const Array events=frame["events"];
+            for (int64_t i=0;i<events.size();++i) {
+                const Dictionary event=events[i];
+                const StringName type=event["type"];
+                if (!all_types && !types.has(type)) continue;
+                if (presentation && type==combat_damage) {
+                    const Dictionary payload=event["payload"];
+                    if (String(payload.get("target",String()))!="enemy" || double(payload.get("applied",0.0))<=0.0 ||
+                        !boss_targets.count(int64_t(payload.get("target_id",0)))) continue;
+                }
+                selected.push_back(event);
+            }
+        }
+        source["events"]=selected;
+    }
+    return source.duplicate(true);
+}
 }
 
 void SpeedRunCore::_bind_methods() {
     ClassDB::bind_static_method(get_class_static(),D_METHOD("packed_payload_bytes","value"),&packed_payload_bytes);
+    ClassDB::bind_static_method(get_class_static(),D_METHOD("packed_floats_finite","value"),&packed_floats_finite);
+    ClassDB::bind_static_method(get_class_static(),D_METHOD("frame_format_events","events"),&frame_format_events);
+    ClassDB::bind_static_method(get_class_static(),D_METHOD("copy_frame_delivery","frame","ui_fields","event_types","presentation"),&copy_frame_delivery);
     ClassDB::bind_method(D_METHOD("configure_run", "bytes", "options"), &SpeedRunCore::configure_run);
     ClassDB::bind_method(D_METHOD("start_run", "seed", "options"), &SpeedRunCore::start_run);
     ClassDB::bind_method(D_METHOD("step_run", "dt", "input", "viewport"), &SpeedRunCore::step_run);

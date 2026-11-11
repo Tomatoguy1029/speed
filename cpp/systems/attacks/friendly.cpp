@@ -20,6 +20,7 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
     struct Hit { double time; size_t row; };
     struct Earlier { bool operator()(const Hit &a, const Hit &b) const { return a.time < b.time; } };
     std::vector<Hit> hits;
+    std::vector<size_t> candidates;
     // 命中で末尾へ増えた弾は同じ更新で進め、既に通った空き行は次回に進める。
     for (size_t i = 0; i < runtime.state.friends.size(); ++i) {
         auto &shot = runtime.state.friends[i];
@@ -40,14 +41,19 @@ bool AttackSystem::step_friendly(RunRuntime &runtime,double world_dt) {
         const double padding = double(shot.radius) + std::max(runtime.state.combat_config.max_enemy_radius, runtime.state.grid.max_radius);
         const Vector2 pad(padding, padding);
         hits.clear();
-        for (size_t row : CollisionQuery::enemy_rows(runtime.state,from.min(to) - pad, from.max(to) + pad)) {
-            const auto &enemy = runtime.state.enemies[row];
-            const auto target=CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));
-            if (!runtime.state.enemy_handles.contains(target) || shot.hit_ids.count(runtime.state.enemy_handles.entity_id(target))) continue;
-            const double t = speed::CollisionQuery::segment_circle_t(from, to, enemy.pos, double(shot.radius) + enemy.radius);
-            if (t >= 0) hits.push_back({t, row});
+        // 寿命が尽きた弾はこの後の命中ループでも全件skipになる。壁・軌跡・終了処理は保つ。
+        if (!(life<=0)) {
+            const PreparedSegment segment(from,to);
+            CollisionQuery::enemy_rows_into(runtime.state,from.min(to) - pad,from.max(to) + pad,candidates);
+            for (size_t row : candidates) {
+                const auto &enemy = runtime.state.enemies[row];
+                const auto target=CombatResolver::damage_target(runtime,runtime.state.enemy_handles.at(uint32_t(row)));
+                if (!runtime.state.enemy_handles.contains(target) || shot.hit_ids.count(runtime.state.enemy_handles.entity_id(target))) continue;
+                const double t = CollisionQuery::segment_circle_t(segment,enemy.pos,double(shot.radius) + enemy.radius);
+                if (t >= 0) hits.push_back({t, row});
+            }
+            SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
         }
-        SortArray<Hit, Earlier>().sort(hits.data(), hits.size());
         const double speed = vel.length();
         for (const auto &hit : hits) {
             const auto &enemy = runtime.state.enemies[hit.row];

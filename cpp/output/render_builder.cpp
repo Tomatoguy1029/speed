@@ -44,14 +44,26 @@ using namespace godot;
 Dictionary RenderBatchBuffer::value() {
     ids.resize(instances.size());transforms.resize(instances.size()*6);colors.resize(instances.size());flags.resize(instances.size());
     auto *t=transforms.ptrw();auto *id=ids.ptrw();auto *color=colors.ptrw();auto *flag=flags.ptrw();
+    bool deformed=false;
     for (size_t i=0;i<instances.size();++i) {
         const auto &v=instances[i];const float c=std::cos(v.angle)*v.radius,s=std::sin(v.angle)*v.radius;
+        deformed=deformed || v.amount>0;
         id[i]=v.id;flag[i]=v.flags;color[i]=v.color;
         godot::Vector2 x(c,s),y(-s,c);
         if (v.deformation.length_squared()>0.0001) {const auto n=v.deformation.normalized(),side=godot::Vector2(-n.y,n.x);x=n*x.dot(n)*(1-0.5*v.amount)+side*x.dot(side)*(1+0.6*v.amount);y=n*y.dot(n)*(1-0.5*v.amount)+side*y.dot(side)*(1+0.6*v.amount);}
         t[i*6]=x.x;t[i*6+1]=x.y;t[i*6+2]=y.x;t[i*6+3]=y.y;t[i*6+4]=v.at.x;t[i*6+5]=v.at.y;
     }
-    PackedFloat32Array deformations;bool deformed=false;for (const auto &v:instances) {deformed=deformed || v.amount>0;for (float value:{float(v.radius),float(v.angle),v.deformation.x,v.deformation.y,float(v.amount)}) deformations.push_back(value);}
+    // 変形がなければ返さない配列は作らない。返す場合は全instanceの元の5要素順を保つ。
+    PackedFloat32Array deformations;
+    if (deformed) {
+        deformations.resize(instances.size()*5);
+        float *values=deformations.ptrw();
+        for (size_t i=0;i<instances.size();++i) {
+            const auto &v=instances[i];
+            values[i*5]=float(v.radius);values[i*5+1]=float(v.angle);
+            values[i*5+2]=v.deformation.x;values[i*5+3]=v.deformation.y;values[i*5+4]=float(v.amount);
+        }
+    }
     Dictionary out;if (deformed) out["deformations"]=deformations;out["visual_id"]=visual;out["layer"]=layer;out["order"]=order;out["ids"]=ids;
     out["transforms"]=transforms;out["colors"]=colors;out["flags"]=flags;
     if (!reference_bite_indices.is_empty()) out["reference_bite_indices"]=reference_bite_indices;

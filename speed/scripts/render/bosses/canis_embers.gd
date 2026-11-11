@@ -4,43 +4,10 @@ extends RefCounted
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const H := [Color("#ffffff"),Color("#f2fbff"),Color("#d8f1ff"),Color("#a9dcff"),Color("#6fb8f2"),Color("#3f8ce0"),Color("#2a66c4"),Color("#1d479b"),Color("#13306a")]
 const SOOT := [Color("#0c1420"),Color("#142238")]
-const MASK := 0xffffffff
 
 static func _hash(n: float) -> float:
 	var value := sin(n*127.1+311.7)*43758.5453
 	return value-floorf(value)
-
-static func _key(x: int,y: int) -> int:
-	return ((x&MASK)<<32)|(y&MASK)
-
-static func _splat(field: PackedFloat32Array, width: int, height: int, origin: Vector2i, point: Vector2, radius: float, channel: int) -> void:
-	if radius<0.3: return
-	var x0 := maxi(0,floori(point.x-radius-origin.x))
-	var x1 := mini(width-1,ceili(point.x+radius-origin.x))
-	var y0 := maxi(0,floori(point.y-radius-origin.y))
-	var y1 := mini(height-1,ceili(point.y+radius-origin.y))
-	for y in range(y0,y1+1):
-		for x in range(x0,x1+1):
-			var dx := (x+origin.x+0.5-point.x)/radius
-			var dy := (y+origin.y+0.5-point.y)/radius
-			var d2 := dx*dx+dy*dy
-			if d2>=1.0: continue
-			var i := (y*width+x)*3+channel
-			field[i]+=exp(-d2*3.2)*(1.0-smoothstep(0.72,1.0,sqrt(d2)))
-
-static func _read(field: PackedFloat32Array, width: int, height: int, x: float, y: float, channel: int) -> float:
-	var i := clampi(floori(x+0.5),0,width-1)
-	var j := clampi(floori(y+0.5),0,height-1)
-	return field[(j*width+i)*3+channel]
-
-static func _visible(canvas, point: Vector2, masks: Array) -> bool:
-	if masks.is_empty(): return true
-	for mask: Dictionary in masks:
-		var cell := float(mask.cell)
-		if cell<=0.0: continue
-		var world: Vector2 = mask.origin+(point-mask.logical_origin)/float(canvas.world_scale)
-		if mask.keys.has(_key(floori(world.x/cell),floori(world.y/cell))): return true
-	return false
 
 static func draw(canvas, rows: Array, clock: float, logical_pixel: float) -> void:
 	var groups := {}
@@ -133,9 +100,9 @@ static func _draw_group(canvas, rows: Array, clock: float, logical_pixel: float,
 ## 動く粒の入力をまとめて渡し、密度領域の保存場所は再利用する。
 static func _draw_density(canvas, painter, points: PackedVector2Array, radii: PackedFloat64Array, layers: PackedByteArray, origin: Vector2i, width: int, height: int, display: Dictionary, palette: PackedColorArray) -> void:
 	var raster: SpeedFxRaster = canvas.get_density_raster()
-	raster.begin(painter.colors, painter.lights, painter.width, painter.height, float(canvas.world_scale), canvas._camera_position)
-	var flags := raster.density_field(points, radii, layers, origin, width, height, display, palette, painter.fade, painter.light_strength)
+	raster.begin_painter(painter, float(canvas.world_scale), canvas._camera_position, true, true)
+	raster.density_field(points, radii, layers, origin, width, height, display, palette, painter.fade, painter.light_strength)
 	painter.colors = raster.take_colors()
 	painter.lights = raster.take_lights()
-	painter.has_color = painter.has_color or (flags & 1) != 0
-	painter.has_light = painter.has_light or (flags & 2) != 0
+	painter.has_color = painter.has_color or raster.has_color()
+	painter.has_light = painter.has_light or raster.has_light()

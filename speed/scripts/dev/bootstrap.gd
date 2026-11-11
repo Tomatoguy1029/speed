@@ -5,7 +5,7 @@ const DEBUG_PANEL := preload("res://scripts/dev/debug_panel.gd")
 const PERF_OVERLAY := preload("res://scripts/dev/perf_overlay.gd")
 const ENEMY_TUNING := preload("res://scripts/dev/stage_enemy_overlay.gd")
 func _ready() -> void:
-	if not OS.is_debug_build(): return
+	if not OS.is_debug_build() or SaveManager.is_review_build(): return
 	GameManager.extension_screens[GameManager.Screen.ENEMY_LAB] = "res://gyms/enemy_lab/enemy_lab.tscn"
 	GameManager.extension_screens[GameManager.Screen.BACKGROUND_LAB] = "res://gyms/background_lab/background_lab.tscn"
 	GameManager.screen_ready.connect(_on_screen_ready)

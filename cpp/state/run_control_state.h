@@ -17,6 +17,8 @@ struct RunControlState {
     int64_t world_steps=0, world_tick_div=1, world_updates=0;
     bool lab_mode=false;
     bool lab_enemy_ai=true;
+    // 初回の操作練習。出現・ボス・時計・敵と地形の動きを止め、tutorial命令だけで進める。
+    bool tutorial=false, tutorial_pickups=false, tutorial_start_pending=false;
     double boss_at=-1;
     // G10の停止と出口移動を値として保持し、復帰後も一度だけ適用する。
     double boss_ram_hitstop=0;

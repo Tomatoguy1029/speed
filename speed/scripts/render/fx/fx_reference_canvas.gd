@@ -45,7 +45,7 @@ class Painter:
 		else:
 			color_image.set_data(width, height, false, Image.FORMAT_RGBA8, colors)
 			light_image.set_data(width, height, false, Image.FORMAT_RGBA8, lights)
-		# 合成シェーダーが使う光のRGBを保ち、参照されないαの全画素更新を省く。
+		# 合成シェーダーは光の RGB だけを読む。αの全画素更新は不要。
 
 	func place(x: float, y: float, flip := false, angle := 0.0) -> void:
 		tx = x
@@ -275,17 +275,7 @@ class Painter:
 		var delta := b-a
 		var l2 := maxf(delta.length_squared(),0.000000001)
 		for sy in range(maxi(0,floori(minf(a.y,b.y)-r)),mini(height-1,ceili(maxf(a.y,b.y)+r))+1):
-			# この行から半径内にある線分だけで横幅を求める。斜めの長い光を囲む矩形全体は走査しない。
-			var from := 0.0
-			var to := 1.0
-			if absf(delta.y) > 0.000001:
-				var t0 := (sy + 0.5 - r - a.y) / delta.y
-				var t1 := (sy + 0.5 + r - a.y) / delta.y
-				from = clampf(minf(t0,t1),0.0,1.0)
-				to = clampf(maxf(t0,t1),0.0,1.0)
-			var left := minf(a.x + delta.x * from,a.x + delta.x * to) - r - 1.0
-			var right := maxf(a.x + delta.x * from,a.x + delta.x * to) + r + 1.0
-			for sx in range(maxi(0,floori(left)),mini(width-1,ceili(right))+1):
+			for sx in range(maxi(0,floori(minf(a.x,b.x)-r)),mini(width-1,ceili(maxf(a.x,b.x)+r))+1):
 				var p := Vector2(sx+0.5,sy+0.5)
 				var u := clampf((p-a).dot(delta)/l2,0.0,1.0)
 				var d := p.distance_to(a+delta*u)/r
@@ -304,11 +294,17 @@ var back := Painter.new()
 var mid := Painter.new()
 var mid_landing := Painter.new()
 var front := Painter.new()
+var _density_raster: SpeedFxRaster
 var world_scale := 1.0
 var _camera_position := Vector2.ZERO
 var _logical_size := Vector2i.ZERO
 var logical_size: Vector2i:
 	get: return _logical_size
+
+## 動的な密度場の保存場所はこの描画面の寿命に合わせる。
+func get_density_raster() -> SpeedFxRaster:
+	if _density_raster == null: _density_raster = SpeedFxRaster.new()
+	return _density_raster
 
 ## world_to_screen_scale はカメラの基準倍率と現在のズームを掛けた実効値。
 func begin_frame(view_size: Vector2, camera_position: Vector2, world_to_screen_scale: float) -> void:
@@ -329,9 +325,3 @@ func end_frame() -> void:
 	mid.finish()
 	mid_landing.finish()
 	front.finish()
-
-var _density_raster: SpeedFxRaster
-
-func get_density_raster() -> SpeedFxRaster:
-	if _density_raster == null: _density_raster = SpeedFxRaster.new()
-	return _density_raster

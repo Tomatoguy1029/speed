@@ -18,7 +18,7 @@ func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 	canvas.front.place(0, 0)
 	var flags := 0
 	if not shots.is_empty():
-		_raster.begin(canvas.front.colors, canvas.front.lights, canvas.front.width, canvas.front.height, canvas.world_scale, canvas._camera_position)
+		_raster.begin_painter(canvas.front, canvas.world_scale, canvas._camera_position, true, true)
 	for shot: Dictionary in shots:
 		var age := float(shot.age)
 		var fraction := clampf(age / grow, 0.0, 1.0)

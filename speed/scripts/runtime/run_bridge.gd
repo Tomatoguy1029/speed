@@ -20,6 +20,7 @@ var delivery_error: Dictionary = {}
 var _metrics_record := {}
 var _metrics_bytes := 0
 var _latest_bytes := 0
+var _latest_view_bytes := -1
 var _delivery_bytes := 0
 var _delivery_sizes := {}
 var _resource_wait_started := 0
@@ -36,7 +37,7 @@ func configure(bytes: PackedByteArray, options: Dictionary) -> Dictionary:
 	if _core == null:
 		if not ClassDB.class_exists(&"SpeedRunCore"): return _error(2,"extension","C++拡張を読み込めません")
 		_core = ClassDB.instantiate(&"SpeedRunCore")
-	if not _core.has_method(&"frame_snapshot_run"):
+	if not _core.has_method(&"frame_snapshot_run") or not _core.has_method(&"copy_frame_delivery") or not _core.has_method(&"frame_format_events") or not _core.has_method(&"packed_floats_finite"):
 		_core = null
 		return _error(2,"extension","C++拡張を現在のコードでビルドしてください")
 	_busy = true
@@ -226,6 +227,7 @@ func restore(id: int) -> Dictionary:
 	_ui = {}
 	_latest = {}
 	_latest_bytes = 0
+	_latest_view_bytes = -1
 	_delivery_bytes = 0
 	_delivery_sizes = {}
 	_delivery = {}
@@ -255,6 +257,7 @@ func dispose() -> Dictionary:
 		_subscribers.clear()
 		_latest = {}
 		_latest_bytes = 0
+		_latest_view_bytes = -1
 		_delivery_bytes = 0
 		_delivery_sizes = {}
 		_ui = {}
@@ -269,8 +272,10 @@ func _read_locked(public_copy := true) -> Dictionary:
 	perf.since(&"output_build",began)
 	began = Time.get_ticks_usec() if perf.active else 0
 	if not result.ok: return result
-	preload("res://scripts/runtime/post_max_card_view.gd").format_frame(result.value)
-	for event: Dictionary in result.value.events:
+	# 翻訳対象だけを選び、窓口所有のsnapshot内で更新してから外へ複製する。
+	var format_events: Array = _core.frame_format_events(result.value.events)
+	preload("res://scripts/runtime/post_max_card_view.gd").format_frame({"ui":result.value.ui,"events":format_events})
+	for event: Dictionary in format_events:
 		if event.type=="text":
 			var entry: ContentEntry = ContentManager.catalog.find(&"weapons",StringName(event.payload.get("text","")))
 			if entry!=null: event.payload.text = entry.get_display_name()
@@ -281,21 +286,33 @@ func _read_locked(public_copy := true) -> Dictionary:
 	_latest = result.value
 	_latest.ui = _ui
 	_latest_bytes = _packed_bytes(_latest)
+	_latest_view_bytes = -1
 	perf.since(&"bridge_copy",began)
 	return _copy_latest() if public_copy else _ok(_latest)
 
-func _copy_latest() -> Dictionary:
+func _copy_latest(include_events := true) -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
-	var snapshot := _ok(_latest.duplicate(true))
-	_metrics_bytes += _latest_bytes
+	var source := _latest
+	var copied_bytes := _latest_bytes
+	if not include_events:
+		# 表示の更新は通知購読を使うので、同じ通知列をsnapshotでもう一度複製しない。
+		source = _latest.duplicate()
+		source.events = []
+		if _latest_view_bytes<0: _latest_view_bytes = _packed_bytes(source)
+		copied_bytes = _latest_view_bytes
+	var snapshot := _ok(source.duplicate(true))
+	_metrics_bytes += copied_bytes
 	perf.since(&"bridge_copy",began)
 	return snapshot
 
-func latest_frame() -> Dictionary:
+func latest_frame(include_events := true) -> Dictionary:
 	if _busy: return _error(7,"latest_frame","配信中は読めません")
 	if _core==null: return _error(4,"latest_frame","破棄済みです")
-	if _latest.is_empty(): return read_frame()
-	return _copy_latest()
+	if _latest.is_empty():
+		if include_events: return read_frame()
+		var result := _read_locked(false)
+		if not result.ok: return result
+	return _copy_latest(include_events)
 
 func read_metrics(reader: StringName = &"") -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")
@@ -345,8 +362,19 @@ func subscribe(name: String, consumer: Callable, ui_fields: Variant = null, even
 				if str(key).is_empty(): return false
 				if str(key) not in fields: fields.append(str(key))
 		selections.append(fields)
-	_subscribers[name] = {"consumer":consumer,"ui_fields":selections[0],"event_types":selections[1],"epoch":0,"sequence":0,"revision":-1}
+	var event_types_set: Variant = null
+	if selections[1]!=null:
+		event_types_set = {}
+		for event_type: String in selections[1]: event_types_set[StringName(event_type)] = true
+	_subscribers[name] = {"consumer":consumer,"ui_fields":selections[0],"event_types":event_types_set,"presentation":false,"epoch":0,"sequence":0,"revision":-1}
 	_delivery_sizes.erase(name)
+	return true
+
+## 演出が読まない通常敵のdamage通知は、購読者用に複製する前に除く。
+## 音・録画・公開読取は通常のsubscribeと元の通知列を使い、受領番号も変えない。
+func subscribe_presentation(name: String, consumer: Callable, ui_fields: Variant, event_types: Variant) -> bool:
+	if not subscribe(name,consumer,ui_fields,event_types): return false
+	_subscribers[name].presentation = true
 	return true
 
 func unsubscribe(name: String) -> bool:
@@ -364,24 +392,11 @@ func collect_frame() -> Dictionary:
 	return result
 
 ## コピーする前にUIと通知を選ぶ。通知の順序と、結果・資源要求を含む共通の封筒を保つ。
-func _copy_delivery(fields: Variant, event_types: Variant) -> Dictionary:
-	if fields==null and event_types==null: return _delivery.duplicate(true)
-	var source: Dictionary=_delivery.duplicate()
-	if fields!=null:
-		var selected := {}
-		for key: String in fields:
-			if _delivery.ui.has(key): selected[key]=_delivery.ui[key]
-		source.ui=selected
-	if event_types!=null:
-		var selected_events := []
-		if not event_types.is_empty():
-			for event: Dictionary in _delivery.events:
-				if str(event.type) in event_types: selected_events.append(event)
-		source.events=selected_events
-	return source.duplicate(true)
+func _copy_delivery(fields: Variant, event_types: Variant, presentation := false) -> Dictionary:
+	return _core.copy_frame_delivery(_delivery,fields,event_types,presentation)
 
 func _delivery_size(name: String, receiver: Dictionary, packet: Dictionary) -> int:
-	if receiver.ui_fields==null and receiver.event_types==null: return _delivery_bytes
+	if receiver.ui_fields==null and receiver.event_types==null and not receiver.presentation: return _delivery_bytes
 	if not _delivery_sizes.has(name): _delivery_sizes[name]=_packed_bytes(packet)
 	return int(_delivery_sizes[name])
 
@@ -391,7 +406,7 @@ func _deliver_locked() -> Dictionary:
 		var receiver: Dictionary = _subscribers[name]
 		if receiver.epoch==_delivery.epoch and receiver.sequence>=sequence and receiver.revision>=_delivery.state_revision: continue
 		var began := Time.get_ticks_usec() if perf.active else 0
-		var packet: Dictionary = _copy_delivery(receiver.ui_fields,receiver.event_types)
+		var packet: Dictionary = _copy_delivery(receiver.ui_fields,receiver.event_types,receiver.presentation)
 		_metrics_bytes += _delivery_size(name,receiver,packet)
 		perf.since(&"bridge_copy",began)
 		if not receiver.consumer.is_valid() or receiver.consumer.call(packet)!=true:

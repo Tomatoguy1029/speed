@@ -8,6 +8,7 @@
 #include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
+#include <utility>
 namespace speed {
 const char *combat_reason_name(CombatReason reason) {
     switch(reason) {
@@ -44,7 +45,7 @@ CombatEvent event_for(RunRuntime &run,const DamageRequest &request,EnemyHandle t
     }
     event.impact=request.has_impact?request.impact:event.pos;return event;
 }
-void append(RunRuntime &run,const char *type,godot::Dictionary data) {FrameBuilder::append(run,godot::StringName(type),data);}
+void append(RunRuntime &run,const char *type,godot::Dictionary &&data) {FrameBuilder::append_owned(run,godot::StringName(type),std::move(data));}
 }
 void EventBuilder::budget_started(RunRuntime &run,const std::string &owner,int64_t id,uint32_t row,const std::vector<AttackCategory> &categories,int64_t token) {
     RecordingBuilder::budget(run);
@@ -121,6 +122,7 @@ void EventBuilder::player_damage(RunRuntime &run,const ShipDamageRequest &reques
 }
 void EventBuilder::flush_combat(RunRuntime &run) {
     for (const auto &e:run.state.combat_events) {
+        // CombatEventはnative値だけを持つ。dとdeath_visualもここで新しく作り、通知後は編集しない。
         godot::Dictionary d;d["pos"]=e.pos;
         if (run.api_configured) {d["t"]=e.time;d["world_t"]=e.world_time;}
         const godot::StringName cause(symbol_name(e.cause));
@@ -128,23 +130,23 @@ void EventBuilder::flush_combat(RunRuntime &run) {
         case CombatEventKind::AttackRetired: {
             static const char *reasons[]={"lifetime","technique_cancel","technique_end","participant_end","boss_clear","bonus_clear","hit","relocate","barrier"};
             d["id"]=e.target_id;d["source_id"]=e.source_entity_id;d["reason"]=reasons[uint8_t(e.attack_end_reason)];
-            d["t"]=e.time;d["world_t"]=e.world_time;append(run,"attack_retired",d);
+            d["t"]=e.time;d["world_t"]=e.world_time;append(run,"attack_retired",std::move(d));
             if (e.flood.ready) FloodSystem::end_visual(run,e.flood,e.target_id);
             if (e.zone_definition && (e.attack_end_reason==AttackEndReason::Lifetime || e.attack_end_reason==AttackEndReason::ParticipantEnd || e.attack_end_reason==AttackEndReason::TechniqueCancel || e.attack_end_reason==AttackEndReason::TechniqueEnd)) ZoneSystem::end_visual(run,e.zone_definition,false,e.pos);
             if (e.circle_hazard && run.state.bite_zone_config.fade &&
                 (e.attack_end_reason==AttackEndReason::Lifetime || e.attack_end_reason==AttackEndReason::ParticipantEnd || e.attack_end_reason==AttackEndReason::TechniqueCancel || e.attack_end_reason==AttackEndReason::TechniqueEnd)) {
-                godot::Dictionary visual;if (run.state.bite_zone_config.visual_key) visual["visual_key"]=run.state.bite_zone_config.visual_key;else visual["scene"]=run.state.bite_zone_config.scene;visual["phase"]="Fade";visual["pos"]=e.pos;append(run,"attack_visual_end",visual);
+                godot::Dictionary visual;if (run.state.bite_zone_config.visual_key) visual["visual_key"]=run.state.bite_zone_config.visual_key;else visual["scene"]=run.state.bite_zone_config.scene;visual["phase"]="Fade";visual["pos"]=e.pos;append(run,"attack_visual_end",std::move(visual));
             }break;
         }
         case CombatEventKind::EnemyDamage:
             d["target"]="enemy";d["struck_id"]=e.struck_id;d["target_id"]=e.target_id;d["cause"]=cause;d["weapon_id"]=e.weapon_id;
             d["requested"]=e.requested;d["resolved"]=e.resolved;d["applied"]=e.applied;d["overkill"]=e.overkill;
             d["discarded"]=std::max(0.0,e.resolved-e.applied);d["hp_before"]=e.hp_before;d["hp_after"]=e.hp_after;
-            d["reason"]=combat_reason_name(e.reason);d["impact"]=e.impact;d["shatter_depth"]=e.shatter_depth;append(run,"combat_damage",d);break;
+            d["reason"]=combat_reason_name(e.reason);d["impact"]=e.impact;d["shatter_depth"]=e.shatter_depth;append(run,"combat_damage",std::move(d));break;
         case CombatEventKind::Hit:
-            d["crit"]=e.crit;d["dmg"]=e.resolved;d["cause"]=cause;d["id"]=e.target_id;append(run,"hit",d);break;
+            d["crit"]=e.crit;d["dmg"]=e.resolved;d["cause"]=cause;d["id"]=e.target_id;append(run,"hit",std::move(d));break;
         case CombatEventKind::CriticalHit:
-            d["pos"]=e.impact;d["enemy_pos"]=e.pos;d["r"]=e.radius;d["dir"]=e.direction;append(run,"critical_hit",d);break;
+            d["pos"]=e.impact;d["enemy_pos"]=e.pos;d["r"]=e.radius;d["dir"]=e.direction;append(run,"critical_hit",std::move(d));break;
         case CombatEventKind::Kill:
             d["id"]=e.target_id;d["r"]=e.radius;d["crit"]=e.crit;d["t"]=e.time;d["world_t"]=e.world_time;
             d["enemy_type"]=definition_name(run,e.definition);d["meteor_index"]=e.meteor_index;d["facing"]=e.facing;
@@ -157,11 +159,11 @@ void EventBuilder::flush_combat(RunRuntime &run) {
                 pose["pump_scale"]=v.pump_scale;pose["pump_full"]=v.pump_full;pose["pump_stored"]=v.pump_stored;
                 d["death_visual"]=pose;
             }
-            append(run,"kill",d);break;
-        case CombatEventKind::ShieldBlock:append(run,"shield_block",d);break;
+            append(run,"kill",std::move(d));break;
+        case CombatEventKind::ShieldBlock:append(run,"shield_block",std::move(d));break;
         case CombatEventKind::Hurt:
             d["amount"]=e.resolved;d["cause"]=cause;d["source"]=e.cause==Cause::FinalStrike?godot::StringName("boss"):definition_name(run,e.source);d["t"]=e.time;
-            d["world_t"]=e.world_time;d["hp_after"]=e.hp_after;d["dir"]=e.direction;append(run,"hurt",d);break;
+            d["world_t"]=e.world_time;d["hp_after"]=e.hp_after;d["dir"]=e.direction;append(run,"hurt",std::move(d));break;
         case CombatEventKind::ShipDamage:
             if (e.borrowed_technique && e.borrowed_technique<=run.content->boss_techniques.size()) {
                 const auto &borrowed=run.content->boss_techniques[e.borrowed_technique-1];
@@ -176,10 +178,10 @@ void EventBuilder::flush_combat(RunRuntime &run) {
             }
             d["observation_id"]=e.observation_id;d["effect_id"]=e.effect_id;d["requested"]=e.requested;
             d["amount"]=e.resolved;d["accepted"]=e.accepted;d["reason"]=combat_reason_name(e.reason);d["hp_before"]=e.hp_before;
-            d["hp_after"]=e.hp_after;d["t"]=e.time;d["world_t"]=e.world_time;append(run,"combat_player_damage",d);break;
+            d["hp_after"]=e.hp_after;d["t"]=e.time;d["world_t"]=e.world_time;append(run,"combat_player_damage",std::move(d));break;
         case CombatEventKind::Retire:
             if (run.api_configured) {d["spawn_origin"]=int64_t(e.origin);d["spawn_role"]=int64_t(e.role);}
-            d["id"]=e.target_id;d["reason"]=int(e.retire_reason);d["enemy_type"]=definition_name(run,e.definition);append(run,"enemy_retire",d);break;
+            d["id"]=e.target_id;d["reason"]=int(e.retire_reason);d["enemy_type"]=definition_name(run,e.definition);append(run,"enemy_retire",std::move(d));break;
         }
     }
     run.state.combat_events.clear();
@@ -203,13 +205,14 @@ godot::Dictionary crystal_origin(const RunRuntime &run,const CrystalState &cryst
 }
 }
 void EventBuilder::crystal_drop(RunRuntime &run,const CrystalState &gem,bool new_supply,int64_t carrier_id) {
+    // CrystalStateはnative値だけを持つ。eventとcrystal_originの辞書は新規で、通知後は保持しない。
     godot::Dictionary event;event["id"]=int64_t(gem.id);event["kind"]=godot::StringName(gem.kind==0?"low":gem.kind==1?"mid":"high");
     event["origin"]=crystal_origin(run,gem);event["xp"]=gem.value;
     const auto &origin=gem.origin;
     event["base_xp"]=gem.value;event["source"]=godot::StringName(!new_supply?"crow_carry":origin.source==CrystalSource::Enemy?"enemy":origin.source==CrystalSource::StrongGold?"strong_gold":"direct");
     event["enemy"]=definition_name(run,origin.definition);event["enemy_id"]=origin.enemy_id;
     event["spawn_t"]=origin.run_time;event["spawn_world_t"]=origin.world_time;event["pos"]=gem.pos;event["new_supply"]=new_supply;event["carrier_id"]=carrier_id;event["ground_count"]=run.state.pickups.live_gems;
-    FrameBuilder::append(run,"xp_drop",event);
+    FrameBuilder::append_owned(run,"xp_drop",std::move(event));
 }
 void EventBuilder::crystal_gold_roll(RunRuntime &run,const Corpse &enemy,bool won) {
     godot::Dictionary event;event["enemy"]=definition_name(run,enemy.definition);event["enemy_id"]=enemy.id;event["chance"]=run.state.pickup_config.strong_gold_chance;event["won"]=won;
