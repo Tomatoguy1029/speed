@@ -186,5 +186,5 @@ func _configure_lighting(parent: Node) -> void:
 		_configure_lighting(child)
 
 func _open_editor_if_main() -> void:
-	if get_tree().current_scene == self:
+	if OS.has_feature("editor") and get_tree().current_scene == self:
 		get_tree().change_scene_to_file("res://scenes/bosses/centaurus_parts_preview.tscn")

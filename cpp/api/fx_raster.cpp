@@ -30,6 +30,10 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("begin","colors","lights","width","height","world_scale","camera"),&SpeedFxRaster::begin);
     ClassDB::bind_method(D_METHOD("take_colors"),&SpeedFxRaster::take_colors);
     ClassDB::bind_method(D_METHOD("take_lights"),&SpeedFxRaster::take_lights);
+    ClassDB::bind_method(D_METHOD("ruler_beam","a","b","width","time","color","alpha","fade","light_strength"),&SpeedFxRaster::ruler_beam);
+    ClassDB::bind_method(D_METHOD("auriga_trail","points","strengths","width","palette","clock","fade","light_strength"),&SpeedFxRaster::auriga_trail);
+    ClassDB::bind_method(D_METHOD("lynx_scratch","origin","angle","side","size","span","cut","palette","settings","fade","light_strength"),&SpeedFxRaster::lynx_scratch);
+    ClassDB::bind_method(D_METHOD("ruler_rail","a","b","options","fade","light_strength"),&SpeedFxRaster::ruler_rail);
     ClassDB::bind_method(D_METHOD("dim","amount","flash"),&SpeedFxRaster::dim);
     ClassDB::bind_method(D_METHOD("breath","fan","elapsed","active","axis","sweep","half_angle","reach","fan_angle"),&SpeedFxRaster::breath);
     ClassDB::bind_method(D_METHOD("light_mask_reset"),&SpeedFxRaster::light_mask_reset);
