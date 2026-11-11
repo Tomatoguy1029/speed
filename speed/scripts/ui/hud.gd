@@ -1,10 +1,10 @@
 ## ラン中の HUD（仕様書 17）。状態を読んで表示するだけで、選んだ結果はRunBridgeに命令として渡す。
 ##
-## 時間・経験値バー・状態の文字・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
+## 進行バー・経験値バー・状態の文字・装備一覧・ゲージのリング・3択・ボスの表示・ポーズ・
 ## 「描く」ボタン（タッチ）・CLEAR! と GAME OVER。
 extends Control
 
-const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "world_scale", "xp"]
+const CPP_UI_FIELDS := ["attack_power", "bonus_remaining", "boss_bodies", "boss_finish", "capacity", "cards", "cinematic_bars", "coins", "draw", "final_modules", "full_burst", "glide", "hero", "hp", "input_enabled", "kills", "lab_mode", "level", "max_hp", "max_speed", "min_charge", "minimap", "next_xp", "phase", "presentation_frozen", "rare_comets", "rerolls_left", "run_time", "stage_clock", "ship", "ship_boost_t", "ship_vel", "steer_cruise", "tracing", "trait_levels", "view_center", "view_half", "weapon_levels", "world_scale", "xp"]
 
 ## 描けるようになったときに広がる輪の時間（実秒）
 const PickupKind := preload("res://scripts/data_types/generated/run_ids.gd").ENUMS.PickupKind
@@ -39,6 +39,7 @@ const SLOTS := preload(ART + "combat_ui_components.png")
 const COMET_SLOT_FRAME := preload(ART + "comet_slot_frame.gdshader")
 const CARDS := preload(ART + "combat_ui_boxes.png")
 const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
+const RUN_PROGRESS := preload("res://scripts/ui/run_progress.gd")
 const SPEED_INDICATOR := preload("res://scripts/ui/speed_indicator.gd")
 const ICONS := preload(ART + "icons.png")
 const ICON_IDS := preload("res://scripts/ui/module_icons.gd").IDS
@@ -123,6 +124,7 @@ var _ring_amount := 1.0
 var _pause_after_reward := false
 var _menu_overlay: Control
 var _overlay_focus: WeakRef
+var _stage_progress: RUN_PROGRESS
 var _speed_indicator: SPEED_INDICATOR
 
 func _ready() -> void:
@@ -223,6 +225,7 @@ func _process(delta: float) -> void:
 	_update_speed_indicator(delta)
 	_update_cpp_finish()
 	_update_cpp_cinematic()
+	if _stage_progress!=null:_stage_progress.apply_snapshot(_cpp_ui,show_status)
 	if not _cpp_ui.is_empty() and not _cpp_ui.get("presentation_frozen",true):
 		_ring_pulse_t = maxf(0.0,_ring_pulse_t-delta)
 		_ring_flash_t = maxf(0.0,_ring_flash_t-delta)
@@ -729,6 +732,11 @@ func _ready_cpp() -> void:
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
 	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
 	_font = get_theme_default_font()
+	_stage_progress=RUN_PROGRESS.new()
+	_stage_progress.font=_font
+	_stage_progress.mouse_filter=Control.MOUSE_FILTER_IGNORE
+	add_child(_stage_progress)
+	_stage_progress.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_bold_font = FontVariation.new()
 	_bold_font.base_font = _font
 	_bold_font.variation_embolden = 0.6
@@ -842,8 +850,6 @@ func _draw_cpp() -> void:
 	draw_string(_font,Vector2(7,40),"%d/%d" % [ceili(maxf(0.0,float(_cpp_ui.hp))),roundi(float(_cpp_ui.max_hp))],HORIZONTAL_ALIGNMENT_LEFT,-1,14,CYAN)
 	draw_string(_font,Vector2(7,52),"ATK %.1f  %s  Lv %d  %s" % [float(_cpp_ui.get("attack_power",0.0)),tr("hud.kills").format({n=int(_cpp_ui.get("kills",0))}),int(_cpp_ui.get("level",1)),tr("common.parts").format({n=int(_cpp_ui.get("coins",0))})],HORIZONTAL_ALIGNMENT_LEFT,260,8,CYAN)
 	_draw_bar(EXPERIENCE,_experience_fill,float(_cpp_ui.get("xp",0.0))/maxf(1.0,float(_cpp_ui.get("next_xp",1.0))),Color("#b8a0ff"))
-	var seconds := int(_cpp_ui.run_time)
-	draw_string(_font,Vector2(280,23),"%d:%02d" % [seconds/60,seconds%60],HORIZONTAL_ALIGNMENT_CENTER,80,15,CYAN)
 	if float(_cpp_ui.get("bonus_remaining",0.0))>0.0:
 		# 明るいボーナス背景の上でも読めるよう、ほかのHUDと同じ書体を太らせて金色で描く。
 		var bonus_text: String = tr("hud.bonus").format({n=ceili(float(_cpp_ui.bonus_remaining))})
@@ -861,19 +867,19 @@ func _draw_cpp() -> void:
 	if not hero.is_empty() and hero.guidance and hero.revealed and hero.captive:
 		_draw_edge_arrow_values(hero.center,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	if _hero_notice_t>0.0 and hero.get("guidance",false):
-		draw_string(_font,Vector2(12,110),tr("hud.hero_discovered"),HORIZONTAL_ALIGNMENT_CENTER,size.x-24,18,Color(1.0,0.91,0.63,minf(1.0,_hero_notice_t/0.4)))
+		draw_set_transform((size-ART_SIZE*factor)*0.5,0.0,Vector2.ONE*factor)
+		draw_string(_font,Vector2(12,104),tr("hud.hero_discovered"),HORIZONTAL_ALIGNMENT_CENTER,616,9,Color(1.0,0.91,0.63,minf(1.0,_hero_notice_t/0.4)))
+		draw_set_transform(Vector2.ZERO)
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		if body.mode>=4 or not body.has("hp"): continue
-		var width := minf(520.0,size.x*0.6)
-		var left := size.x*0.5-width*0.5
-		draw_rect(Rect2(left,60,width,10),Color(0,0,0,0.6))
-		draw_rect(Rect2(left,60,width*clampf(float(body.hp)/maxf(1.0,float(body.max_hp)),0.0,1.0),10),Color("#ff526e"))
 		_draw_edge_arrow_values(body.position,Color("#ff526e"),_cpp_ui.view_center,_cpp_ui.view_half)
 		break
 	for comet in _cpp_ui.get("rare_comets",PackedVector2Array()): _draw_edge_arrow_values(comet,Color("#ffd24a"),_cpp_ui.view_center,_cpp_ui.view_half)
 	_draw_cpp_gauge_ring()
 	if _warning_t>0.0 and fmod(_warning_t,0.5)<0.3:
-		draw_string(_font,Vector2(size.x*0.5-160,120),tr("hud.warning"),HORIZONTAL_ALIGNMENT_CENTER,320,48,Color("#ff526e"))
+		draw_set_transform((size-ART_SIZE*factor)*0.5,0.0,Vector2.ONE*factor)
+		draw_string(_font,Vector2(160,136),tr("hud.warning"),HORIZONTAL_ALIGNMENT_CENTER,320,24,Color("#ff526e"))
+		draw_set_transform(Vector2.ZERO)
 	_draw_banner()
 
 func _cpp_card_visibility() -> void:

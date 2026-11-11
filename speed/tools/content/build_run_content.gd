@@ -1962,7 +1962,7 @@ static func _chase_package(definition: EnemyDef, config: GameConfig, stage: Runt
 	data.BarrierPostDefinition = [{"id":1,"interval_increment":float(config.post_max.increments.get("weapon_interval",0.0)) if barrier_target.has("interval") else 0.0,"knockback_increment":float(config.post_max.increments.get("knockback",0.0)) if barrier_target.has("knockback") else 0.0,"minimum_ratio":config.post_max.minimum_time_ratio,"minimum_interval":config.post_max.minimum_interval}]
 	data.PostMaxPickupDefinition = [{"id":1,"xp_radius_increment":float(config.post_max.increments.get("pickup_radius",0.0))}]
 	data.PostMaxDrawDefinition = [{"id":1,"line_length_increment":float(config.post_max.increments.get("line_length",0.0))}]
-	data.LifecycleDefinition = [{"id":1,"death_freeze_time":config.death_freeze_time,"death_explosion_time":config.death_explosion_time,"death_game_over_time":config.death_game_over_time,"clear_bonus":config.clear_bonus,"legendary":String(stage.legendary_module_id) if stage!=null else "","death_world_dim":config.death_world_dim}]
+	data.LifecycleDefinition = [{"id":1,"death_freeze_time":config.death_freeze_time,"death_explosion_time":config.death_explosion_time,"death_game_over_time":config.death_game_over_time,"clear_bonus":stage.clear_bonus if stage!=null else config.clear_bonus,"legendary":String(stage.legendary_module_id) if stage!=null else "","death_world_dim":config.death_world_dim}]
 	data.ProgressionDefinition = [{"id":1}]
 	for field in Schema.SCHEMA.records:
 		if field.name == "ProgressionDefinition":

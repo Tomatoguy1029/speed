@@ -196,6 +196,9 @@ inline bool read(BinaryReader &input, RunConfig &out) {
     if (out.fx_monoceros_lance_timing < 0) return false;
     if (!input.read_f64(out.fx_boss_touch_damage)) return false;
     if (out.fx_boss_touch_damage < 0) return false;
+    if (!input.read_u32(out.coin_gain_percent)) return false;
+    if (out.coin_gain_percent < 0) return false;
+    if (out.coin_gain_percent > 100) return false;
     return true;
 }
 inline bool read(BinaryReader &input, StringEntry &out) {
@@ -4918,8 +4921,8 @@ inline bool read(BinaryReader &input, DracoFlowGateDefinition &out) {
 inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, BinaryReader &input, ContentRecords &out) {
     switch(kind) {
     case 1: {
-        if (version != 19) return false;
-        if (count > input.remaining()/736) return false;
+        if (version != 20) return false;
+        if (count > input.remaining()/740) return false;
         for (uint32_t i=0; i<count; ++i) { RunConfig row; if (!read(input,row)) return false; out.RunConfig_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }
@@ -7204,6 +7207,7 @@ inline void apply_config(const RunConfig &config, godot::RunState &state) {
     state.trace_radius=config.trace_radius;
     state.control.boss_ram_hitstop=config.fx_boss_ram_hitstop;
     state.control.boss_touch_damage=config.fx_boss_touch_damage;
+    state.pickup_config.coin_gain_percent=config.coin_gain_percent;
 }
 inline godot::Dictionary config_snapshot(const RunConfig &config) {
     godot::Dictionary out;
@@ -7306,6 +7310,7 @@ inline godot::Dictionary config_snapshot(const RunConfig &config) {
     out["fx_monoceros_kick_life"]=config.fx_monoceros_kick_life;
     out["fx_monoceros_lance_timing"]=config.fx_monoceros_lance_timing;
     out["fx_boss_touch_damage"]=config.fx_boss_touch_damage;
+    out["coin_gain_percent"]=config.coin_gain_percent;
     return out;
 }
 inline EnemyDefinition to_enemy(const EnemyRecord &row, const godot::StringName &id) {

@@ -14,6 +14,7 @@ struct RunResult {
     ShipDamageRequest last_request;ShipDamageResult last_damage;bool has_damage=false;
 };
 struct LifecycleState {
+    uint32_t coin_hundredths=0;
     int64_t coins=0;
     bool endless=false;
     std::optional<RunResult> result;

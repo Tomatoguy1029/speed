@@ -6,6 +6,6 @@
 script = ExtResource("1")
 stat = &"max_hp"
 per_level = 20.0
-costs = PackedInt32Array(20, 40, 70, 110, 160)
+costs = PackedInt32Array(20, 40, 70, 110, 300)
 id = &"hp"
 order = 2

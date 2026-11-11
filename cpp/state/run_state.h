@@ -137,6 +137,7 @@ struct RunState {
     std::vector<speed::CombatEvent> combat_events;
     bool boss_dead=false;
     struct PickupConfig {
+        uint32_t coin_gain_percent = 100;
         int64_t gem_max = 0;
         int64_t gem_draw_max = 0;
         bool fixed_rewards=false;

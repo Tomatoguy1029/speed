@@ -7,6 +7,14 @@ func check(ok: bool, message: String) -> void:
 		failed += 1
 		push_error(message)
 func _ready() -> void:
+	if "--cpp-coins" in OS.get_cmdline_user_args():
+		check(check_cpp_coins(100),"部品の即時獲得を最後まで確認する")
+		check(check_cpp_coins(6),"6%の端数蓄積を確認する")
+		check(check_stage_clear_rewards(),"全ステージの反復クリア報酬を確認する")
+		check(check_cpp_meteor_coins(),"隕石の部品抽選を最後まで確認する")
+		print("[cpp_coins] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-visible" in OS.get_cmdline_user_args():
 		check(check_cpp_visible(),"描画上限の確認を最後まで実施する")
 		print("[cpp_visible] failed=%d" % failed)
@@ -137,6 +145,7 @@ func check_cpp_reward() -> void:
 		var actual: EnemyDef = load("res://data/enemies/splitter.tres")
 		# AIの移植前も同じ報酬経路を使い、実データの散乱・輪の有無を固定場面で確認する。
 		var probe: EnemyDef = base.duplicate(true)
+		probe.behavior = &"chase"
 		probe.id = id
 		probe.rank = actual.rank
 		probe.params = actual.params.duplicate(true)
@@ -179,6 +188,7 @@ func check_cpp_reward_view() -> bool:
 	for id in [&"splitter",&"splitling"]:
 		var actual: EnemyDef = load("res://data/enemies/splitter.tres")
 		var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
+		definition.behavior = &"chase"
 		definition.id = id
 		definition.rank = actual.rank
 		definition.params = actual.params.duplicate(true)
@@ -488,6 +498,7 @@ func check_cpp_pickups() -> bool:
 
 func check_cpp_pickups_tail() -> bool:
 	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.coin_gain_percent = 100
 	config.planet_radius = 0.0
 	config.moon_count = 0
 	config.xp_base = 1000.0
@@ -626,3 +637,137 @@ func check_cpp_visible() -> bool:
 	check(base_total(after.xp_statistics.lost)==0.0,"描画制限でXPを失わない")
 	bridge.dispose()
 	return true
+
+func check_cpp_coins(percent: int) -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.coin_gain_percent = percent
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var definition: EnemyDef = ContentManager.enemies[&"splitling"].duplicate(true)
+	definition.xp_reward_counts = PackedInt32Array([0,0,0])
+	definition.behavior = &"chase"
+	definition.params = {}
+	var bridge = reward_bridge(definition,config)
+	if bridge==null: return false
+	bridge.collect_frame()
+	var records: Array = []
+	bridge.subscribe("coins",func(frame):
+		records.append_array(frame.events)
+		return true)
+	for elite in [false,true]:
+		var before: int = bridge._ui.coins
+		for i in (4 if elite else 128):
+			var id: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":elite})
+			var killed: Dictionary = bridge.command("dev_kill",{"entity_id":id,"cause":"shot"})
+			check(killed.ok and killed.value.killed,"離れた敵を実際の撃破入口で倒す")
+		var snapshot: Dictionary = bridge._core.pickups_snapshot()
+		check(bridge._ui.coins==int((24 if elite else 4)*percent/100.0),"固定乱数での通常敵3%・エリート3〜6個の抽選数を維持する")
+		check(bridge._core.random_state()==(-7232949288372105844 if elite else -3329702314789444196),"部品の散布を省いても後続の乱数列を維持する")
+		check(snapshot.coins.is_empty(),"撃破した敵の部品を地面に残さない")
+		check(bridge._ui.coins>=before,"回収範囲に関係なく撃破時に部品を加算する")
+	var amount: int = bridge._ui.coins
+	check(records.filter(func(event): return event.type==&"pickup" and event.payload.kind==&"coin").size()==amount,"部品1個ごとの既存取得通知を維持する")
+	var saved: Dictionary = bridge.checkpoint()
+	var enemy: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true})
+	bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"})
+	var after: int = bridge._ui.coins
+	var rng = bridge._core.random_state()
+	bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"})
+	check(bridge._ui.coins==after,"同じ敵を重複撃破しても部品を二重加算しない")
+	check(bridge.restore(saved.value).ok,"部品取得前の保持点へ復帰する")
+	bridge.collect_frame()
+	check(bridge._ui.coins==amount,"取得した部品をチェックポイントから復帰する")
+	enemy = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true})
+	bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"})
+	check(bridge._ui.coins==after and bridge._core.random_state()==rng,"復帰後の部品数と次の抽選を再現する")
+	bridge.release_checkpoint(saved.value)
+	var boss: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true,"is_boss":true})
+	bridge.command("dev_kill",{"entity_id":boss,"cause":"shot"})
+	var removed: int = bridge._core.spawn_enemy(definition.id,Vector2(9000,500),{"elite":true})
+	bridge.command("dev_remove",{"entity_id":removed})
+	check(bridge._ui.coins==after,"ボス本体の専用決着と非撃破の退場を部品の通常抽選へ混ぜない")
+	bridge._core.step_pickups(0.1)
+	bridge.collect_frame()
+	check(bridge._ui.coins==after,"後続の回収更新で部品を重複加算しない")
+	check(bridge.command("dev_finish",{"cleared":false}).ok,"部品獲得済みのランを終了する")
+	check(bridge.read_frame().value.result.coins==after,"自動獲得した部品を結果・保存用の獲得数へ引き継ぐ")
+	# 新しいランでは端数を引き継がず、50回の基準部品を正確に3個へ変換する。
+	if percent==6:
+		bridge.dispose()
+		bridge = reward_bridge(definition,config)
+		if bridge==null: return false
+		for i in 16: collect_test_coin(bridge)
+		var fraction: Dictionary = bridge.checkpoint()
+		collect_test_coin(bridge)
+		bridge.collect_frame()
+		check(bridge._ui.coins==1,"端数が1個へ到達した時だけ加算する")
+		check(bridge.restore(fraction.value).ok,"96/100個の端数を復帰する")
+		collect_test_coin(bridge)
+		bridge.collect_frame()
+		check(bridge._ui.coins==1,"復帰後も同じ獲得境界を再現する")
+		bridge.release_checkpoint(fraction.value)
+		for i in 33: collect_test_coin(bridge)
+		bridge.collect_frame()
+		check(bridge._ui.coins==3,"基準部品50個から丸め誤差なく3個を獲得する")
+	bridge.dispose()
+	return true
+
+func check_cpp_meteor_coins() -> bool:
+	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.coin_gain_percent = 100
+	config.planet_radius = 0.0
+	config.moon_count = 0
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	for chance: float in [0.0,1.0]:
+		var data: Dictionary = builder.chase_records(ContentManager.enemies[&"meteor"],config).duplicate(true)
+		var terrain := {"id":1,"meteor_count":0,"iron_count":0,"saw_count":0,"planet_radius":0.0,
+			"meteor_coin_chance":chance,"meteor_heal_chance":1.0,"meteor_magnet_chance":1.0,
+			"saw_speed":0.0,"saw_power":0.0,"saw_life":0.0,"meteor":1,"iron":1,"saw":1,
+			"meteor_radius_0":16.0,"meteor_radius_1":16.0}
+		for i in 6: terrain["meteor_visual_%d" % i] = 1
+		data.RockFieldDefinition = [terrain]
+		var bytes: PackedByteArray = schema.write_content(data,schema.sha256("隕石の部品抽選".to_utf8_buffer()))
+		var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+		if not bridge.configure(bytes,{"api_version":1,"run_id":93,"mode":1,"stage_id":"meteor_coins","profile":{},"settings":{}}).ok:
+			check(false,"隕石の実データと固有報酬の定義を生成する")
+			return false
+		check(bridge.start(933,{"position":Vector2(-3000,0)}).ok,"隕石の抽選場面を開始する")
+		bridge.collect_frame()
+		var total := 0
+		for i in 8:
+			var id: int = bridge._core.spawn_enemy(&"meteor",Vector2(9000,500))
+			check(bridge.command("dev_kill",{"entity_id":id,"cause":"shot"}).ok,"隕石を共通の撃破入口で破壊する")
+			var amount: int = bridge._ui.coins-total
+			check((amount>=1 and amount<=3) if chance==1.0 else amount==0,"隕石固有の確率と1〜3個の部品数を維持する")
+			total = bridge._ui.coins
+		var snapshot: Dictionary = bridge._core.pickups_snapshot()
+		check(snapshot.coins.is_empty() and snapshot.gems.size()==8 and snapshot.capsules.size()==16,"隕石の部品だけを即時獲得し、固定星のかけらと回復・回収カプセルを維持する")
+		bridge.dispose()
+	return true
+
+func check_stage_clear_rewards() -> bool:
+	var builder = load("res://tools/content/build_run_content.gd")
+	var schema = load("res://tools/content/generated/run_schema.gd")
+	var expected := [100,300,500,700,900]
+	for index in range(1,6):
+		var source: StageDef = load("res://data/stages/stage_%d.tres" % index)
+		var stage := RuntimeStage.new()
+		stage.index = source.index
+		stage.clear_bonus = source.clear_bonus
+		var data: Dictionary = builder.chase_records(ContentManager.enemies[&"splitling"],ContentManager.base,stage)
+		check(data.LifecycleDefinition[0].clear_bonus==expected[index-1],"ステージ別報酬を戦闘データへ生成する")
+		var bytes: PackedByteArray = schema.write_content(data,schema.sha256("ステージ報酬".to_utf8_buffer()))
+		for repeat in 2:
+			var bridge = load("res://scripts/runtime/run_bridge.gd").new()
+			if not bridge.configure(bytes,{"api_version":1,"run_id":100+index*2+repeat,"mode":1,"stage_id":str(index),"profile":{},"settings":{}}).ok: return false
+			if not bridge.start(931,{}).ok: return false
+			check(bridge.command("dev_finish",{"cleared":true}).ok,"クリアを確定する")
+			check(bridge.read_frame().value.result.coins==expected[index-1],"初回も再クリアも同じ報酬を得る")
+			check(not bridge.command("dev_finish",{"cleared":true}).ok,"同じ結果の報酬を二重加算しない")
+			bridge.dispose()
+	return true
+
+func collect_test_coin(bridge) -> void:
+	check(bridge.command("dev_spawn_pickup",{"kind":"coin","position":bridge._core.ship_snapshot().ship_pos}).ok,"検証用部品を機体の位置へ置く")
+	bridge._core.step_pickups(0.001)

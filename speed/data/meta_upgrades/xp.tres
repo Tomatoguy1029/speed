@@ -6,6 +6,6 @@
 script = ExtResource("1")
 stat = &"xp"
 per_level = 0.08
-costs = PackedInt32Array(25, 50, 90, 140, 210)
+costs = PackedInt32Array(25, 50, 90, 140, 450)
 id = &"xp"
 order = 6
