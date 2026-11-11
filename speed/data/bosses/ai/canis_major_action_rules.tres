@@ -80,7 +80,8 @@ costs = {
 }
 condition_groups = {
 "choose_harass": {"title": "牽制", "nodes": ["pounce", "command", "sirius", "sirius_flame"]},
-"choose_pressure": {"title": "圧力", "nodes": ["stream", "bay", "hunt_pounce", "hunt", "blaze", "relay"]},
+"choose_pressure": {"title": "圧力", "category": "normal", "nodes": ["stream", "bay", "blaze", "relay"]},
+"choose_combo": {"title": "連携", "category": "combo", "nodes": ["hunt_pounce", "hunt"]},
 "choose_major": {"title": "大技", "nodes": ["howl", "nova"]}
 }
 layout = {
@@ -94,6 +95,7 @@ layout = {
 "command": Vector2(540, 436),
 "sirius": Vector2(540, 756),
 "choose_pressure": Vector2(1120, 116),
+"choose_combo": Vector2(1120, 756),
 "stream": Vector2(1620, 116),
 "bay": Vector2(1620, 436),
 "hunt_pounce": Vector2(1620, 756),

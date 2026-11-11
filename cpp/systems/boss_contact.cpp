@@ -18,19 +18,6 @@
 #include <algorithm>
 namespace speed {
 namespace {
-void push(RunRuntime &r,EnemyHandle actor,godot::Vector2 from,godot::Vector2 to) {
-    auto &s=r.state;if (!s.enemy_handles.contains(actor)) return;
-    auto normal=from-s.enemies[actor.slot].pos;
-    if (normal.length_squared()<0.0001) normal=to-s.enemies[actor.slot].pos;
-    if (normal.length_squared()<0.0001) normal=-s.ship.vel;
-    if (normal.length_squared()<0.0001) normal=godot::Vector2(1,0);
-    normal=normal.normalized();s.ship.pos=from;
-    if (s.draw.tracing) s.boss_contact_interrupt_trace=true;
-    const double inward=s.ship.vel.dot(normal);if (inward<0) s.ship.vel-=normal*2.0*inward;
-    s.ship.vel*=s.combat_config.bounce_keep;
-    if (s.ship.vel.length()<s.combat_config.bounce_min_speed) s.ship.vel=normal*s.combat_config.bounce_min_speed;
-    s.ship.glide=false;s.ship.boost_t=0;s.ship_pos=s.ship.pos;
-}
 ShipDamageResult hit(RunRuntime &r,EnemyHandle actor,uint32_t definition,int64_t observation,Cause cause) {
     ShipDamageRequest request;request.observation_id=observation;request.amount=r.content->boss_techniques[definition-1].damage;
     request.scale=DamageScale::AtkScale;request.cause=cause;request.source=r.state.enemies[actor.slot].definition+1;request.technique=definition;
@@ -75,20 +62,16 @@ void BossContactSystem::register_landing(RunRuntime &r,EnemyHandle actor,godot::
     // なぞり中も着地の時点で判定する。通常移動時の後続判定と二重に当てない。
     auto &entry=r.state.boss_landings.back();
     if (CollisionQuery::touches(PointCircle{center,radius},{r.state.ship.pos,r.state.ship.pos,r.state.ship_config.ship_radius},{true,false})) {
-        entry.attempted=true;hit(r,actor,technique,observation,Cause::Pounce);push(r,actor,r.state.ship.pos,r.state.ship.pos);
+        entry.attempted=true;hit(r,actor,technique,observation,Cause::Pounce);
     }
 }
 void BossContactSystem::clear_landings(RunRuntime &r) {r.state.boss_landings.clear();}
-void BossContactSystem::knock_back(RunRuntime &r,EnemyHandle actor) {push(r,actor,r.state.ship.pos,r.state.ship.pos);}
 void BossContactSystem::normal_contact(RunRuntime &r,EnemyHandle actor,godot::Vector2 impact) {
     if (!r.state.enemy_handles.contains(actor)) return;
     ShipDamageRequest request;request.amount=r.state.control.boss_touch_damage;request.cause=Cause::Touch;
     request.source=r.state.enemies[actor.slot].definition+1;request.scale=DamageScale::None;
     CombatResolver::ship_damage(r,request);EventBuilder::flush_combat(r);
-    push(r,actor,impact,impact);
-    // 重なったままだと次のコマも同じ接触点へ戻されて動けなくなるので、体の外まで押し出す。
-    auto &s=r.state;const auto &e=s.enemies[actor.slot];auto normal=s.ship.pos-e.pos;if (normal.length_squared()<0.0001) normal=godot::Vector2(1,0);const double reach=e.radius+s.ship_config.ship_radius+1;
-    if (normal.length()<reach) {s.ship.pos=e.pos+normal.normalized()*reach;s.ship_pos=s.ship.pos;}
+
 }
 bool boss_contact_white(const RunRuntime &r) {
     const auto &s=r.state;
@@ -104,7 +87,6 @@ bool BossContactSystem::resolve(RunRuntime &r,godot::Vector2 from,godot::Vector2
     for (auto &entry:r.state.boss_landings) {
         if (!alive(r,entry.actor,entry.technique) || !CollisionQuery::touches(PointCircle{entry.center,entry.radius},motion,{true,true})) continue;
         if (!entry.attempted) {entry.attempted=true;hit(r,entry.actor,entry.technique,entry.observation,Cause::Pounce);}
-        push(r,entry.actor,from,to);return true;
     }
     for (auto &t:r.state.bosses->techniques) {
         if (!alive(r,t.actor,t.definition)) continue;
@@ -115,7 +97,6 @@ bool BossContactSystem::resolve(RunRuntime &r,godot::Vector2 from,godot::Vector2
             const auto result=hit(r,t.actor,t.definition,t.observation_id,cause);
             if (cause!=Cause::Stomp || result.accepted) t.hit=true;
         }
-        push(r,t.actor,from,to);return true;
     }
     return false;
 }
