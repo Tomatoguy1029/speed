@@ -505,6 +505,7 @@ points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 
 [resource]
 script = ExtResource("stage")
 index = 5
+clear_bonus = 900
 scene_path = "res://scenes/stages/stage_5.tscn"
 phases = [SubResource("Phase0"), SubResource("Phase1"), SubResource("Phase2"), SubResource("Phase3"), SubResource("Phase4"), SubResource("Phase5"), SubResource("Phase6"), SubResource("Phase7"), SubResource("Phase8"), SubResource("Phase9"), SubResource("Phase10"), SubResource("Resource_tpwl5")]
 enemies = Array[StringName]([&"biter", &"splitter", &"splitling", &"bomber", &"pump", &"crab", &"cross", &"auriga", &"dolphin", &"crow", &"cepheus", &"cepheus_soldier", &"aquila", &"telescope"])

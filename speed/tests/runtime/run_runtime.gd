@@ -1240,6 +1240,8 @@ func check_run_lifecycle(display_only := false) -> bool:
 	config.death_game_over_time = 0.02
 	var stage := RuntimeStage.new()
 	stage.index = 1
+	stage.clear_bonus = config.clear_bonus
+	stage.boss_enabled = false
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["splitling"])
 	var builder = load("res://tools/content/build_run_content.gd")
@@ -1258,6 +1260,11 @@ func check_run_lifecycle(display_only := false) -> bool:
 		session.auto_step = false
 		if session.bridge==null: return false
 		var bridge = session.bridge
+		for i in 50:
+			check(bridge.command("dev_spawn_pickup",{"kind":"coin","position":bridge._core.ship_snapshot().ship_pos}).ok,"機体の位置へ検証用部品を置く")
+			bridge._core.step_pickups(0.001)
+		bridge.collect_frame()
+		check(bridge._ui.coins==3,"50個分の基準部品を6%で獲得する")
 		check(session.id>previous_id,"連続出撃で新しいランIDを使う")
 		previous_id = session.id
 		var terminal: Array = []
@@ -1294,7 +1301,7 @@ func check_run_lifecycle(display_only := false) -> bool:
 		GameManager.finish_cpp_run(result)
 		check(int(SaveManager.data.best.runs)==runs and SaveManager.coins()==coins,"同じ結果をGameManagerへ再通知しても報酬を増やさない")
 		if kind=="Abort":
-			check(not SaveManager.record_run(result) and runs==initial_runs+1 and coins==initial_coins,"中断は保存と報酬の対象にしない")
+			check(not SaveManager.record_run(result) and runs==initial_runs+1 and coins==initial_coins+3,"中断は保存と報酬の対象にしない")
 		else:
 			check(not SaveManager.record_run(GameManager.last_result),"SaveManagerも同じResultIdを二重記録しない")
 			var screen = load("res://scenes/app/result.tscn").instantiate()
@@ -1311,7 +1318,7 @@ func check_run_lifecycle(display_only := false) -> bool:
 		check(closed==[true] and root_scope.cancelled and RunManager.session(disposed_id)==null,"受付停止と記録終端を資源解放より先に届け、最後に登録解除する")
 		check(not bridge.read_frame().ok and bridge.dispose().ok,"解放後の旧窓口を使わせず繰返し解放も安全にする")
 	check(int(SaveManager.data.best.runs)==initial_runs+2 and int(SaveManager.data.best.clears)==initial_clears+1,"3出撃のうち敗北とクリアだけ保存する")
-	check(SaveManager.coins()==initial_coins+config.clear_bonus,"クリアの報酬を一度だけ保存する")
+	check(SaveManager.coins()==initial_coins+6+stage.clear_bonus,"クリアの報酬を一度だけ保存する")
 	var disk: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(SaveManager.SAVE_PATH))
 	check(int(disk.best.runs)==initial_runs+2 and int(disk.coins)==SaveManager.coins(),"独立セーブのファイルにも同じ結果を書き込む")
 	return true

@@ -13,6 +13,8 @@ const EDITOR_ORDER := 5
 ## ステージの番号。
 ## 単位：番号
 @export var index: int
+## クリアごとに獲得部品へ加える報酬。
+@export var clear_bonus: int
 ## 星と背景素材の背後に描く、ステージ全体の地色。
 @export var background_color: Color = Color(0.02, 0.03, 0.07)
 ## 開始地点を基準に置く背景。配列の後ろほど手前に重ねる。

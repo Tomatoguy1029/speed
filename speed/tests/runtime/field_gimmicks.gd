@@ -249,6 +249,7 @@ func rock_snapshot(bridge) -> Array:
 
 func check_cpp_rocks() -> void:
 	var config: GameConfig = ContentManager.base.duplicate(true)
+	config.coin_gain_percent = 100
 	config.planet_radius = 100.0
 	config.moon_count = 0
 	config.meteor_count = 1

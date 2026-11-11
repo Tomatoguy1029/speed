@@ -410,6 +410,7 @@ display_name = "3回目の山"
 [resource]
 script = ExtResource("1")
 index = 2
+clear_bonus = 300
 scene_path = "res://scenes/stages/stage_2.tscn"
 phases = [SubResource("Phase_stage2_build1"), SubResource("Phase_stage2_pressure"), SubResource("Phase_stage2_build2"), SubResource("Phase_stage2_rampage"), SubResource("Phase_stage2_tension"), SubResource("Phase_stage2_escape"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq"), SubResource("Resource_vp438")]
 enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])

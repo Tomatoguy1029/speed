@@ -666,9 +666,17 @@
           "type": "f64",
           "min": 0,
           "runtime": "control.boss_touch_damage"
+        },
+        {
+          "name": "coin_gain_percent",
+          "type": "u32",
+          "min": 0,
+          "max": 100,
+          "config": "coin_gain_percent",
+          "runtime": "pickup_config.coin_gain_percent"
         }
       ],
-      "version": 19
+      "version": 20
     },
     {
       "name": "StringEntry",
