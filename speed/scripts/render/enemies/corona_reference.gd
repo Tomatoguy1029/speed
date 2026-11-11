@@ -14,6 +14,7 @@ var _flashes := {}
 var _bodies := {}
 var _impacts: Array[Dictionary] = []
 var _last_clock := -1.0
+var _raster := SpeedFxRaster.new()
 var _noise = JET.new()
 var _edges: Dictionary = EDGES.get_meta("edges")
 
@@ -33,16 +34,11 @@ func render(owners: PackedFloat64Array, selected: Array, thrown: Array, events: 
 		var age := clock-float(impact.time)
 		if age>=0.35: _impacts.erase(impact)
 		elif age>=0.0: FX.sparks(canvas.front,canvas.to_logical(impact.pos),age,40+int(impact.id),10,Color(_settings.color),40,0.35)
-	var vortex := FX.ramp(Color("b6a2db"))
-	for i in range(0, owners.size(), 7):
-		var center: Vector2 = canvas.to_logical(Vector2(owners[i],owners[i+1]))
-		var radius: float = owners[i+2]*canvas.world_scale
-		var rotation: float = owners[i+3]
-		for particle in range(70):
-			var r := radius*(0.55+0.6*FX.hash_value(particle))
-			var angle := rotation*(0.8+0.4*FX.hash_value(particle+9))+FX.hash_value(particle*3)*TAU
-			for s in range(4):
-				canvas.back.dot(center.x+cos(angle-s*0.08)*r,center.y+sin(angle-s*0.08)*r,vortex[3] if s<1 else vortex[2],0.55-0.12*s)
+	if not owners.is_empty():
+		_raster.begin(canvas.back.colors, PackedByteArray(), canvas.back.width, canvas.back.height, canvas.world_scale, canvas._camera_position)
+		var flags := _raster.corona_vortex(owners, PackedColorArray(FX.ramp(Color("b6a2db"))), canvas.back.fade)
+		canvas.back.colors = _raster.take_colors()
+		canvas.back.has_color = canvas.back.has_color or (flags & 1) != 0
 	var present := {}
 	var palette := FX.ramp(Color(_settings.color))
 	for row: Dictionary in selected:

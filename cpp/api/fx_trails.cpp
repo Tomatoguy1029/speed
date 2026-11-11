@@ -9,12 +9,12 @@ double mix1(double a,double b,double t) {return a+(b-a)*t;}
 double smooth(double a,double b,double x) {const double t=std::clamp((x-a)/(b-a),0.0,1.0);return t*t*(3-2*t);}
 double hash1(double x) {const double v=std::sin(x*127.1+311.7)*43758.5453;return v-std::floor(v);}
 }
-void SpeedFxRaster::reference_glow(Vector2 center,double radius,Color color,double strength) {
+void SpeedFxRaster::reference_glow(Vector2 center,double radius,Color color,double strength,double fade,double light_strength) {
     if (radius<1 || strength<=0.004) return;
     for (int y=std::max(0,int(std::floor(center.y-radius)));y<=std::min(h_-1,int(std::ceil(center.y+radius)));++y) {
         for (int x=std::max(0,int(std::floor(center.x-radius)));x<=std::min(w_-1,int(std::ceil(center.x+radius)));++x) {
             const double d=Vector2(x+0.5,y+0.5).distance_to(center)/radius;
-            if (d<1) reference_light(Vector2(x,y),color,(1-d)*(1-d)*strength);
+            if (d<1) reference_light(Vector2(x,y),color,(1-d)*(1-d)*strength*fade*light_strength);
         }
     }
 }

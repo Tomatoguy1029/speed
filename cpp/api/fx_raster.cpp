@@ -33,6 +33,12 @@ void SpeedFxRaster::_bind_methods() {
     ClassDB::bind_method(D_METHOD("ruler_beam","a","b","width","time","color","alpha","fade","light_strength"),&SpeedFxRaster::ruler_beam);
     ClassDB::bind_method(D_METHOD("auriga_trail","points","strengths","width","palette","clock","fade","light_strength"),&SpeedFxRaster::auriga_trail);
     ClassDB::bind_method(D_METHOD("lynx_scratch","origin","angle","side","size","span","cut","palette","settings","fade","light_strength"),&SpeedFxRaster::lynx_scratch);
+    ClassDB::bind_method(D_METHOD("dolphin_band","center","radius","a0","a1","width","palette","alpha","dissolve","fade"),&SpeedFxRaster::dolphin_band);
+    ClassDB::bind_method(D_METHOD("dolphin_arc","center","radius","a0","a1","color","alpha","fade"),&SpeedFxRaster::dolphin_arc);
+    ClassDB::bind_method(D_METHOD("canvas_glow","center","radius","color","strength","fade","light_strength"),&SpeedFxRaster::canvas_glow);
+    ClassDB::bind_method(D_METHOD("corona_vortex","owners","palette","fade"),&SpeedFxRaster::corona_vortex);
+    ClassDB::bind_method(D_METHOD("density_field","points","radii","layers","origin","width","height","settings","palette","fade","light_strength"),&SpeedFxRaster::density_field);
+    ClassDB::bind_method(D_METHOD("sweep_wake","tails","roots","ages","reach","fine","palette","time","fade"),&SpeedFxRaster::sweep_wake);
     ClassDB::bind_method(D_METHOD("ruler_rail","a","b","options","fade","light_strength"),&SpeedFxRaster::ruler_rail);
     ClassDB::bind_method(D_METHOD("dim","amount","flash"),&SpeedFxRaster::dim);
     ClassDB::bind_method(D_METHOD("breath","fan","elapsed","active","axis","sweep","half_angle","reach","fan_angle"),&SpeedFxRaster::breath);

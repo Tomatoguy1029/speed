@@ -496,7 +496,11 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 ### 10.2 層・資源・画面効果
 
-じょうぎ座の予告線とレーザーは `ruler_reference.gd` が動的な発射位置・時間・幅を `SpeedFxRaster` へ渡し、`cpp/api/fx_ruler.cpp` が論理画素の色と光をまとめて更新する。色の段階・ディザ・描画順を共通描画とそろえ、戦闘の判定はC++ランが保持する。ぎょしゃ座の車輪跡とやまねこ座の爪も `cpp/api/fx_trails.cpp` へ動的な点列・強さ・成長率を渡して画素を更新する。描画バッファは表示の寿命に合わせて所有する。共通の論理画素面はImageを再利用し、描くものがある前後の面だけを画像へ転送する。光の合成はRGBを使う。
+じょうぎ座の予告線とレーザーは `ruler_reference.gd` が動的な発射位置・時間・幅を `SpeedFxRaster` へ渡し、`cpp/api/fx_ruler.cpp` が論理画素の色と光をまとめて更新する。色の段階・ディザ・描画順を共通描画とそろえ、戦闘の判定はC++ランが保持する。ぎょしゃ座の車輪跡とやまねこ座の爪は `cpp/api/fx_trails.cpp`、いるか座の音波は `cpp/api/fx_dolphin.cpp` へ動的な位置・強さ・成長率を渡して画素を更新する。みなみのかんむり座の渦は `cpp/api/fx_corona.cpp` で動く粒をまとめて描く。描画バッファは表示の寿命に合わせて所有する。共通の論理画素面はImageを再利用し、描くものがある前後の面だけを画像へ転送する。光の合成はRGBを使う。共通の円形の光は、画素の多い円を `cpp/api/fx_glow.cpp` でまとめて計算し、小さい円はPainterで描く。
+
+おおいぬ座の残り火は、動く粒と足跡の範囲を `cpp/api/fx_density.cpp` へ渡し、再利用する3層の密度配列から色と光を描く。りゅう座の尾が通った跡は、時刻付きの点列を `cpp/api/fx_wake.cpp` へ渡し、元の順番で画素を重ねる。固定の素材は生成時に用意し、現在位置・時刻に依存する画素計算は表示の更新で行う。
+
+`InstanceBatch` はRenderFrameの変換・色・変形と、生成済み外観が持つ部位の支点を `SpeedInstanceBuffer` へ渡し、MultiMeshの配列へまとめて書く。敵の部位は顎の角度とじょうぎ座の上下を同じ描画順で反映する。配列は表示が所有して再利用し、同じ姿勢の本体と装甲で共有する。
 
 体当たりのクリティカルは `critical_hit` イベントから専用の短い表示へ渡す。`tools/art/critical_hit_source.mjs` を編集元とし、制作時の `bake_critical_hit.mjs` が固定版pixelfxの描画部品から `assets/effects/critical_hit/critical_hit.png` と `data/visuals/critical_hit.tres` を書き出す。コマ・文字・火花の合成は制作工程に置く。PNGは専用アート素材として保持し、通常の画像importとResource依存で配布する。Resourceは原点・寸法・再生値・入力と画像のハッシュ・MITのLICENSEとNOTICEを持つ。RunResourcesはRunPresentationの依存から素材を準備し、表示開始時に専用の再生処理がResourceを取得して表示の寿命で保持する。実行時は上限付きの出来事ごとに経過時間・位置・向きを保持し、既存の前面層でコマを描き、寿命が尽きた出来事を解放する。ポーズ・選択中は既存の演出時計とともに停止する。
 
