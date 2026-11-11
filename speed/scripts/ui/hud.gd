@@ -79,6 +79,8 @@ var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var input_router: InputRouter
+## 初回の操作練習を付けて始めるか。RunSession が表示を木へ入れる前に決める
+var tutorial_requested := false
 var bridge: RefCounted
 var _cpp_ui: Dictionary = {}
 var cpp_scope: ContentResourceScope
@@ -420,6 +422,12 @@ func _build_pause() -> void:
 	codex.custom_minimum_size = Vector2(320, 52)
 	codex.pressed.connect(_open_codex.bind(codex))
 	_pause_box.add_child(codex)
+	var guide := Button.new()
+	guide.name = "GuideButton"
+	guide.text = "tutorial.guide"
+	guide.custom_minimum_size = Vector2(320, 52)
+	guide.pressed.connect(_open_guide.bind(guide))
+	_pause_box.add_child(guide)
 	var quit := Button.new()
 	quit.name = "QuitButton"
 	quit.text = "hud.quit_run"
@@ -439,6 +447,23 @@ func _open_codex(from: Button) -> void:
 		page.queue_free()
 	add_child(page)
 	AudioManager.play(&"ui.common.confirm")
+
+## ポーズ中に操作ガイドを重ねて開く。
+func _open_guide(from: Button) -> void:
+	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
+	var page: UiScreen = preload("res://scripts/ui/tutorial_guide.gd").new()
+	from.grab_focus()
+	show_menu_overlay(page)
+	page.close_fn = func():
+		page.set_process_unhandled_input(false)
+		close_menu_overlay(page)
+		page.queue_free()
+	add_child(page)
+	AudioManager.play(&"ui.common.confirm")
+
+## カード選びのあとの継続演出など、報酬の表示が続いているか。
+func reward_active() -> bool:
+	return _rewards != null and _rewards.is_active()
 
 func _confirm_abort() -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
@@ -738,6 +763,13 @@ func _ready_cpp() -> void:
 	_cards_box.add_child(_cpp_cancel)
 	resized.connect(_layout_cpp_art)
 	_layout_cpp_art()
+	if tutorial_requested:
+		var tutorial: Control = preload("res://scripts/ui/tutorial.gd").new()
+		tutorial.name = "Tutorial"
+		tutorial.hud = self
+		tutorial.bridge = bridge
+		tutorial.world = input_router.get_parent()
+		add_child(tutorial)
 
 func _prepare_cpp_finish() -> void:
 	_finish_skip = Button.new()

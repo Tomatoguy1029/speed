@@ -45,6 +45,7 @@ func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"intro_seen": false,
+		"tutorial_done": false,
 		"coins": 0,
 		"meta": {},
 		"cleared_stage": 0,
@@ -69,6 +70,15 @@ func has_seen_intro() -> bool:
 func mark_intro_seen() -> void:
 	if not has_seen_intro():
 		data.intro_seen = true
+		save()
+
+## 操作練習は最後まで終えたときに保存し、途中でやめた場合は次の出撃でもう一度出す。
+func has_done_tutorial() -> bool:
+	return bool(data.get("tutorial_done", false))
+
+func mark_tutorial_done() -> void:
+	if not has_done_tutorial():
+		data.tutorial_done = true
 		save()
 
 func coins() -> int:

@@ -108,7 +108,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (control.bonus_remaining>0) {
         control.bonus_remaining-=dt;
         if (control.bonus_remaining<=0) leave_bonus(core);
-    } else state.time+=dt;
+    } else if (!control.tutorial) state.time+=dt;
     if (!control.time_limit_reached && control.time_limit>=0 && state.time>=control.time_limit) {
         control.time_limit_reached=true;godot::Dictionary event;event["t"]=state.time;core.emit_event("time_limit_reached",event);
     }
@@ -120,7 +120,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
         control.world_real_accum=control.world_dt_accum=0;control.world_steps=0;
         control.last_world_real_dt=wr;control.last_world_dt=wd;++control.world_updates;
         if (state.world.attack_budget.frame_enabled || core.runtime.content->encounter.active) {core.sync_attack_budget();if (!timed("attack_budget",[&]{return core.advance_attack_budget(state.world_time);})) return false;}
-        if (control.lab_enemy_ai || !control.lab_mode) {
+        if (!control.tutorial && (control.lab_enemy_ai || !control.lab_mode)) {
             timed("field.update",[&]{FieldSystem::update(core.runtime);});
             timed("field.comets",[&]{FieldSystem::step_comets(core.runtime,wd);});
             timed("field.rocks",[&]{FieldSystem::stream_rocks(core.runtime,wd);});
@@ -137,7 +137,7 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (!timed("ship",[&]{return core.step_ship_input(dt,world_dt,input);})) return false;
     BossContactSystem::clear_landings(core.runtime);
     BossFinish::record_approach(core.runtime);
-    if (control.lab_enemy_ai || !control.lab_mode) {
+    if (!control.tutorial && (control.lab_enemy_ai || !control.lab_mode)) {
         if (input.hero_press) HeroesSystem::activate(core.runtime);
         timed("heroes",[&]{HeroesSystem::step(core.runtime,dt,world_dt);});
     }
@@ -200,19 +200,22 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     auto dead_rows=std::move(state.dead_rows);state.dead_rows.clear();
     for (size_t row:dead_rows) if (state.enemies[row].alive && state.enemies[row].dead) core.remove_enemy(state.enemies[row].id);
     if (state.pickups_ready) timed("pickup_prune",[&]{PickupSystem::prune(core.runtime);});
-    if (world_step && (control.lab_enemy_ai || !control.lab_mode)) {
+    if (world_step && control.tutorial) {
+        if (control.tutorial_pickups && state.pickups_ready && !timed("pickups",[&]{return core.step_pickups(wd);})) return false;
+    } else if (world_step && (control.lab_enemy_ai || !control.lab_mode)) {
         if (!timed("encounters",[&]{return EncounterSystem::advance(core.runtime);})) return false;
         if (state.population.frame_enabled && !state.population.blocked && !core.attack_guard_active() && !timed("population",[&]{return core.step_population(wd,control.bonus_remaining>0);})) return false;
         if (state.pickups_ready && !timed("pickups",[&]{return core.step_pickups(wd);})) return false;
     }
     state.ship_pos=state.ship.pos;
-    if ((control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
+    if (!control.tutorial && (control.lab_enemy_ai || !control.lab_mode) && state.phase==Phase::Play && control.bonus_remaining<=0 && FieldSystem::take_warp(core.runtime)) enter_bonus(core);
     camera(core,dt,size);
     BossImageSystem::refresh(core.runtime);
     if (world_step && state.phase==Phase::Play)
         for (auto &body:state.bosses->bodies) {CanisNova::field_tick(core.runtime,body);CanisFireVisualSystem::tick(core.runtime,body);}
     if (!core.check_run_end()) {
-        if (state.loadout->ready) timed("progression",[&]{ProgressionSystem::open(core);});
+        if (control.tutorial_start_pending) {if (ProgressionSystem::open(core,true)) control.tutorial_start_pending=false;}
+        else if (state.loadout->ready) timed("progression",[&]{ProgressionSystem::open(core);});
         else if (state.legacy_progression.ready) core.open_cards(false);
     }
     return true;

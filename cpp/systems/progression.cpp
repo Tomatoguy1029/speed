@@ -156,6 +156,8 @@ std::vector<CardCandidate> roll(RunRuntime &run,bool initial) {
         const bool weapon=d.kind==0;const auto &owned=weapon?state.weapons:state.traits;
         if ((initial && !weapon) || (weapon && d.comet_only)) continue;
         const auto level=level_of(owned,d.id),slots=weapon?config.weapon_slots:config.trait_slots;
+        // 操作練習の後に開く最初の選択は、練習中に取った武器を候補から外す。
+        if (initial && level) continue;
         if (!initial && (level>=d.maximum_level || (!level && owned.size()>=slots))) continue;
         pool.push_back({{0,weapon?CardKind::Weapon:CardKind::Trait,d.id,initial?1:level+1},level?config.owned_card_bias:1.0});
     }

@@ -131,9 +131,10 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
 Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options) {
     if (runtime.busy) return failure(7,"start","更新中は再入できません");Guard guard(runtime.busy);
     if (!runtime.api_configured || runtime.state.started || runtime.state.closed) return failure(4,"start","設定済みの新しいランだけを開始できます");
-    if (seed.get_type()!=Variant::INT || !keys(options,{"start_time","equipment","position","start_kind","scenario","endless","lab_mode"}) ||
+    if (seed.get_type()!=Variant::INT || !keys(options,{"start_time","equipment","position","start_kind","scenario","endless","lab_mode","tutorial"}) ||
         (options.has("lab_mode") && (!is(options,"lab_mode",Variant::BOOL) || (bool(options["lab_mode"]) && !runtime.api_development))) ||
         (options.has("endless") && !is(options,"endless",Variant::BOOL)) ||
+        (options.has("tutorial") && !is(options,"tutorial",Variant::BOOL)) ||
         (options.has("position") && (!is(options,"position",Variant::VECTOR2) || !Vector2(options["position"]).is_finite()))) return failure(1,"start","開始入力が不正です");
     const Variant time=options.get("start_time",0.0);
     if ((time.get_type()!=Variant::FLOAT && time.get_type()!=Variant::INT) || !std::isfinite(double(time)) || double(time)!=0 ||
@@ -156,6 +157,9 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.control.lab_mode=options.get("lab_mode",false);
     state.population.frame_enabled=state.population.ready && !state.control.lab_mode;
     if (state.control.lab_mode) state.world.boss_spawned=true;
+    // 操作練習は装備の最初の選択を練習の後へ回し、終了命令で通常の出現とボスを戻す。
+    state.control.tutorial=!state.control.lab_mode && bool(options.get("tutorial",false));
+    if (state.control.tutorial) {state.population.frame_enabled=false;state.world.boss_spawned=true;}
     state.frame_ready=true;
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
@@ -163,7 +167,8 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     speed::FieldSystem::initialize(runtime);
     speed::HeroesSystem::initialize(runtime);
     speed::ProgressionSystem::initialize(runtime,options.has("equipment"));
-    if (options.has("equipment")) speed::ProgressionSystem::open(*this,true);
+    if (state.control.tutorial) state.invincible=true;
+    else if (options.has("equipment")) speed::ProgressionSystem::open(*this,true);
     ++state.control.revision;return success(progress(runtime));
 }
 Dictionary SpeedRunCore::step_run(const Variant &delta,const Dictionary &data,const Dictionary &viewport) {
@@ -204,6 +209,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
     const String kind=envelope["kind"];const Dictionary payload=envelope["payload"];Dictionary response;
     if (runtime.state.control.revision==INT64_MAX) return failure(9,"state_revision","状態番号が上限です");
     if (kind.begins_with("review_")) response=review_command(kind,payload);
+    else if (kind=="tutorial") response=tutorial_command(payload);
     else if (kind=="pause" && payload.size()==1 && is(payload,"paused",Variant::BOOL)) {
         if (runtime.state.phase==Phase::Ended) response=failure(4,"phase","終了したランは停止できません");
         else {
@@ -436,7 +442,7 @@ Dictionary SpeedRunCore::read_frame_value(bool full_snapshot) {
     if (runtime.frame_workspace.invalid) return failure(8,"events","通知の型・項目・番号が不正です");
     const auto &control=runtime.state.control;Dictionary camera;camera["center"]=control.camera_center;camera["zoom"]=control.camera_zoom;camera["half"]=runtime.state.view_half;
     Dictionary value=progress(runtime);value["run_id"]=runtime.api_run_id;value["camera"]=camera;
-    Dictionary ui;ui["hero"]=speed::HeroesSystem::snapshot(runtime);ui["boss_finish"]=speed::BossFinish::snapshot(runtime);ui["boss_bodies"]=speed::PhaseController::snapshot(runtime);ui["input_enabled"]=runtime.state.phase==Phase::Play && !runtime.state.controls_locked && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["invincible"]=runtime.state.invincible;ui["max_hp"]=runtime.state.ship_config.max_hp;
+    Dictionary ui;ui["hero"]=speed::HeroesSystem::snapshot(runtime);ui["boss_finish"]=speed::BossFinish::snapshot(runtime);ui["boss_bodies"]=speed::PhaseController::snapshot(runtime);ui["input_enabled"]=runtime.state.phase==Phase::Play && !runtime.state.controls_locked && !control.ui_overlay && !control.ui_reward;ui["ship"]=ship_snapshot();ui["draw"]=draw_snapshot();ui["tutorial"]=control.tutorial;ui["phase"]=int(runtime.state.phase);ui["hp"]=runtime.state.ship.hp;ui["coins"]=runtime.state.lifecycle.coins;ui["invincible"]=runtime.state.invincible;ui["max_hp"]=runtime.state.ship_config.max_hp;
     const auto shield_source=runtime.state.ship.shield_source_definition;
     ui["ship_shield_visual"]=shield_source?runtime.content->definitions[shield_source-1].visual_id:0;
     ui["ship_radius"]=runtime.state.ship_config.ship_radius;

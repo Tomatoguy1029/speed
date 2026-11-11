@@ -79,6 +79,27 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | intro.touch | 「描く」を押し、お手本の線をなぞる | Tap Draw, then follow the example path |
 | intro.touch&#95;draw | 描く | Draw |
 | intro.motive | 何か異変が起きている。あの星々も救わねば。 | Something is happening. I must save those stars too. |
+|  | ■ 操作練習 |  |
+| tutorial.guide | 操作ガイド | Controls Guide |
+| tutorial.next | クリックで進む | Click to continue |
+| tutorial.strip.click | クリック | Click |
+| tutorial.strip.move | 動かす | Move |
+| tutorial.move.title | 移動 | Movement |
+| tutorial.move.body | 機体はマウスカーソルの方へ進み続けます。<br>カーソルを動かして、進行方向を決めます。 | The ship keeps flying toward the mouse cursor.<br>Move the cursor to choose its heading. |
+| tutorial.boost.title | ブースト | Boost |
+| tutorial.boost.body | ブースト攻撃で敵に攻撃することができます。<br>① クリックで描き始める<br>② ボタンを離したまま動かして線を引く<br>③ もう一度クリックするか、ゲージ切れでブースト開始 | Boost attacks damage enemies.<br>1. Click to start drawing<br>2. Move with the button released to draw a line<br>3. Click again, or run out of gauge, to boost |
+| tutorial.gauge.title | ゲージ | Gauge |
+| tutorial.gauge.body | カーソルの横のリングがゲージです。<br>線を長く描くほど多く消費し、時間経過で回復します。 | The ring beside the cursor is the gauge.<br>Longer lines use more of it, and it refills over time. |
+| tutorial.xp.title | 経験値とレベルアップ | Experience and Level Up |
+| tutorial.xp.body | 敵を倒すと星のかけらが落ちます。<br>星のかけらを一定数拾うと、レベルアップします。 | Defeated enemies drop star shards.<br>Collect enough star shards to level up. |
+| tutorial.cards.title | 武器と特性 | Weapons and Traits |
+| tutorial.cards.body | レベルアップのたびに、武器か特性を1枚選びます。<br>同じものを選ぶとそのレベルが上がり、最大レベル5まで強化することができます。 | Each level up lets you pick one weapon or trait.<br>Picking the same one again raises its level, up to level 5. |
+| tutorial.goal.move | 光る輪へ移動　残り{n} | Fly to the glowing ring: {n} left |
+| tutorial.goal.boost | 線をなぞるようにブースト | Boost along the line |
+| tutorial.goal.gauge | 全ての敵を倒す　残り{n} | Defeat all enemies: {n} left |
+| tutorial.goal.xp | 星のかけらを拾ってレベルアップ | Collect star shards to level up |
+| tutorial.goal.cards | 武器・特性を1枚選ぶ | Pick one weapon or trait |
+| tutorial.goal.done | チュートリアルはメニュー(esc)からもみることができます | You can review the tutorial from the menu (Esc) |
 | menu.start | ゲームスタート | Start Game |
 | menu.settings | 設定 | Settings |
 | menu.quit | 終了 | Quit |
