@@ -36,13 +36,15 @@ std::optional<double> LightArrowSystem::contact(RunRuntime &run,AttackHandle han
     return result.touching?std::optional<double>(arrival):std::nullopt;
 }
 void LightArrowSystem::render(const RunRuntime &run,uint32_t row,godot::Rect2 view,godot::Array &out) {
-    using namespace godot;const auto &s=run.state.hostiles[row];if (!s.alive || !s.arrow.definition || !view.has_point(s.pos) || s.kind==int64_t(HostileKind::CosmicArrow)) return;
+    using namespace godot;const auto &s=run.state.hostiles[row];if (!s.alive || !s.arrow.definition || !view.has_point(s.pos)) return;
     const auto *record=AttackSystem::get(run.state,s.attack);if (!record) return;const auto &d=run.content->light_arrows[s.arrow.definition-1];
+    const auto technique=record->spec.source_technique;
+    // りゅうの闇の矢だけは専用の描画へ渡す。強弓と通常のコズミック矢はここで描く。
+    if (technique && technique<=run.content->boss_techniques.size() && run.content->boss_techniques[technique-1].kind==106) return;
     Dictionary shape;shape["kind"]=int32_t(RenderShapeKind::LightArrow);shape["layer"]=10;shape["order"]=int32_t(row);shape["owner_id"]=record->id;
     PackedVector2Array points;points.push_back(s.pos);PackedInt32Array offsets;offsets.push_back(0);offsets.push_back(1);PackedFloat32Array widths;widths.push_back(s.radius*d.flight_scale);PackedColorArray colors;colors.push_back(Color(d.tint_r,d.tint_g,d.tint_b,d.tint_a));
     shape["points"]=points;shape["offsets"]=offsets;shape["widths"]=widths;shape["colors"]=colors;
     shape["petrified_radius"]=s.stone>0?double(s.radius)*1.3:0.0;
-    const auto technique=record->spec.source_technique;
     const bool power_shot=technique && technique<=run.content->boss_techniques.size() && run.content->boss_techniques[technique-1].kind==11;
     shape["angle"]=double(s.vel.angle());shape["length"]=s.arrow.length*d.flight_scale;shape["world_time"]=run.state.world_time;shape["cosmic"]=d.cosmic && !power_shot;
     shape["shot_length_scale"]=d.shot_length_scale;shape["shot_width_scale"]=d.shot_width_scale;shape["core_width"]=d.core_width;shape["cosmic_speed"]=d.cosmic_speed;shape["cosmic_star_count"]=int64_t(d.cosmic_star_count);

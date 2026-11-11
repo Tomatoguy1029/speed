@@ -6,7 +6,6 @@ const REFERENCE_CUT := preload("res://scripts/render/bosses/centaurus_reference_
 @export var pixel_size := 3.0
 @export var sail_star_scale := 1.0
 @export var sail_star_color := Color("#fff6c8")
-@export var open_color := Color("#9fe8ff")
 const PARTS = preload("res://scenes/bosses/centaurus_parts.tscn")
 var _shower_visual: Node2D
 var _rain_visual: Node2D
@@ -293,10 +292,6 @@ func _draw() -> void:
 	if technique.get("tint", Color.WHITE) != Color.WHITE: tint = technique.tint
 	modulate = tint
 	_draw_sail(sail_fraction())
-	# 攻めどき（射終わりの硬直）は縁を光らせる。
-	if _mode() == &"recovery" and (_reference_canvas==null or technique.get("technique","") not in ["power_shot","volley","rain","stomp"]):
-		var a := 0.45 + sin(float(state.clock) * 14.0) * 0.25
-		draw_arc(Vector2(-6, 0), 96.0, 0.0, TAU, 32, Color(open_color, a), pixel_size * 2.0)
 	# 帆を広げる間は、帆のまわりへ光の輪を広げる。
 	if _mode() == &"phase":
 		var grow := sail_fraction()
