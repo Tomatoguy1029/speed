@@ -34,6 +34,7 @@ var _commands: RefCounted
 var _content_edit: RefCounted
 var _hud: Control
 var _module: OptionButton
+var _ult: OptionButton
 var _levels: SpinBox
 var _enemy_count: SpinBox
 var _sliders: Dictionary = {}
@@ -147,6 +148,21 @@ func _ready() -> void:
 	reset_loadout.text = "装備をリセット"
 	reset_loadout.pressed.connect(_command.bind(&"debug_reset_loadout", {}))
 	box.add_child(reset_loadout)
+	box.add_child(_heading("獲得するULT（英雄の力）"))
+	var ult_row := HBoxContainer.new()
+	_ult = OptionButton.new()
+	_ult.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	for entry: ContentEntry in ContentManager.sorted(ContentManager.catalog.table(&"heroes")):
+		_ult.add_item(entry.get_display_name())
+		_ult.set_item_metadata(_ult.item_count - 1, String(entry.id))
+	ult_row.add_child(_ult)
+	var grant_ult := Button.new()
+	grant_ult.text = "ULTを獲得"
+	grant_ult.disabled = _ult.item_count == 0
+	grant_ult.tooltip_text = "このランの英雄の力を選んだULTに切り替えます。クールダウンは引き継ぎます。"
+	grant_ult.pressed.connect(_grant_ult)
+	ult_row.add_child(grant_ult)
+	box.add_child(ult_row)
 	box.add_child(_heading("調整値（このランの間だけ。.tres は変えない）"))
 	for sdef in SLIDERS:
 		var r := HBoxContainer.new()
@@ -301,6 +317,10 @@ func _grant() -> void:
 	var id: StringName = _module.get_item_metadata(_module.selected)
 	var kind := &"weapon" if String(id).begins_with("W") else &"trait"
 	_command(&"debug_grant", {"kind": kind, "id": id, "levels": int(_levels.value)})
+
+func _grant_ult() -> void:
+	if _ult.selected < 0: return
+	await _command(&"debug_ult", {"id": String(_ult.get_selected_metadata())})
 
 func _spawn_enemies() -> void:
 	_enemy_count.apply()
