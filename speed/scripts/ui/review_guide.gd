@@ -3,8 +3,12 @@ extends Node
 const SPOTLIGHT := preload("res://scripts/ui/review_spotlight.gd")
 var _notice: Control
 var _hud: Control
+var _pause_hud: Control
 
 func _process(_delta: float) -> void:
+	if is_instance_valid(_pause_hud) and not _pause_hud._pause_box.visible:
+		queue_free()
+		return
 	if has_meta("title_screen"):
 		var main := get_tree().current_scene
 		if main == null or not main.get("startup_complete"): return
@@ -51,3 +55,12 @@ func map(screen: Control) -> void:
 func run(hud: Control) -> void:
 	_hud = hud
 	_show("run", null, "review.guide.pause")
+
+func pause_menu(hud: Control) -> void:
+	_pause_hud = hud
+	await get_tree().process_frame
+	if not hud._pause_box.visible:
+		queue_free()
+		return
+	_show("pause", hud._review_entry, "review.guide.custom")
+	if is_instance_valid(_notice): _notice.top_aligned = true

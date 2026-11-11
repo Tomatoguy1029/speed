@@ -106,7 +106,7 @@ var _music_started := false
 var _health_fill: AtlasTexture
 var _experience_fill: AtlasTexture
 var _pause_box: VBoxContainer
-var _review_pause_row: HBoxContainer
+var _review_pause_guide: Node
 var _review_entry: Button
 var _draw_button: Button
 var _banner := ""
@@ -218,13 +218,19 @@ func _notification(what: int) -> void:
 		bridge.command("pause",{"paused":true})
 
 func _process(delta: float) -> void:
-	if _review_pause_row != null:
-		_review_pause_row.visible = _pause_box.visible
-		if _review_pause_row.visible:
-			_review_pause_row.size = _review_pause_row.get_combined_minimum_size()
-			var fit := minf(1.0, minf((size.x - 48) / _review_pause_row.size.x, (size.y - 48) / _review_pause_row.size.y))
-			_review_pause_row.scale = Vector2.ONE * fit
-			_review_pause_row.position = (size - _review_pause_row.size * fit) * 0.5
+	if _review_entry != null:
+		_review_entry.visible = _pause_box.visible
+		if _review_entry.visible:
+			_review_entry.size = _review_entry.get_combined_minimum_size()
+			var right := _pause_box.position.x + _pause_box.size.x + 24
+			var fit := clampf((size.x - right - 16) / _review_entry.size.x, 0.1, 1.0)
+			_review_entry.scale = Vector2.ONE * fit
+			_review_entry.position = Vector2(right, _pause_box.position.y + (_pause_box.size.y - _review_entry.size.y * fit) * 0.5)
+			if SaveManager.has_done_tutorial() and not SaveManager.settings.get("review_guide_pause", false) and not is_instance_valid(_review_pause_guide):
+				_review_pause_guide = preload("res://scripts/ui/review_guide.gd").new()
+				add_child(_review_pause_guide)
+				_review_pause_guide.pause_menu.call_deferred(self)
+
 	if not _banner.is_empty():
 		_banner_t += delta
 	_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
@@ -437,11 +443,8 @@ func _build_pause() -> void:
 	quit.custom_minimum_size = Vector2(320, 52)
 	quit.pressed.connect(_confirm_abort)
 	_pause_box.add_child(quit)
+	add_child(_pause_box)
 	if SaveManager.is_review_build():
-		_review_pause_row = HBoxContainer.new()
-		_review_pause_row.add_theme_constant_override("separation", 40)
-		add_child(_review_pause_row)
-		_review_pause_row.add_child(_pause_box)
 		_review_entry = Button.new()
 		_review_entry.name = "ReviewSettingsButton"
 		_review_entry.custom_minimum_size = Vector2(300, 180)
@@ -457,9 +460,8 @@ func _build_pause() -> void:
 			_review_entry.add_theme_stylebox_override(state, style)
 		_review_entry.add_theme_color_override("font_color", Color("fff1dd"))
 		_review_entry.pressed.connect(_open_review_settings)
-		_review_pause_row.add_child(_review_entry)
-	else:
-		add_child(_pause_box)
+		_review_entry.hide()
+		add_child(_review_entry)
 
 func _open_codex(from: Button) -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return

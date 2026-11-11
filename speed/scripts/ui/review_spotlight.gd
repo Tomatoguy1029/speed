@@ -3,6 +3,7 @@ extends Control
 signal finished
 var target: Control
 var message := ""
+var top_aligned := false
 var _box: PanelContainer
 var _hole := Rect2()
 var _skip_button: Button
@@ -49,10 +50,12 @@ func _process(_delta: float) -> void:
 	if is_instance_valid(target) and target.is_visible_in_tree():
 		var transform := get_screen_transform().affine_inverse() * target.get_screen_transform()
 		_hole = (transform * Rect2(Vector2.ZERO, target.size)).grow(10)
-	_box.size = Vector2(minf(540, size.x - 32), 0)
+	_box.size = Vector2(minf(760 if top_aligned else 540, size.x - 32), 0)
 	var edge := Vector2(16, 16)
 	var limit := size - _box.size - Vector2(16, 80)
-	if _hole.size == Vector2.ZERO:
+	if top_aligned:
+		_box.position = Vector2((size.x - _box.size.x) * 0.5, 16)
+	elif _hole.size == Vector2.ZERO:
 		_box.position = (size - _box.size) * 0.5
 	elif _hole.end.x + 24 + _box.size.x <= size.x - 16:
 		_box.position = Vector2(_hole.end.x + 24, clampf(_hole.position.y, 16, maxf(16, limit.y)))
