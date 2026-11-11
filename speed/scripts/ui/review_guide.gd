@@ -1,84 +1,53 @@
+## その画面に必要な説明を一度だけ表示する。画面移動や操作を制限しない。
 extends Node
 const SPOTLIGHT := preload("res://scripts/ui/review_spotlight.gd")
-var _skip := false
+var _notice: Control
+var _hud: Control
 
 func _process(_delta: float) -> void:
-	if not has_meta("title_screen"): return
-	var main := get_tree().current_scene
-	if main == null or not main.get("startup_complete"): return
-	var screen: Control = get_meta("title_screen")
-	remove_meta("title_screen")
-	title(screen)
+	if has_meta("title_screen"):
+		var main := get_tree().current_scene
+		if main == null or not main.get("startup_complete"): return
+		remove_meta("title_screen")
+		if GameManager.screen == GameManager.Screen.TITLE:
+			_show("title", null, "review.guide.welcome")
+		else:
+			queue_free()
+	if is_instance_valid(_hud) and is_instance_valid(_notice):
+		if int(_hud._cpp_ui.get("phase", -1)) == 2:
+			queue_free()
 
-
-func show_step(target: Control, key: String, action := false) -> void:
-	if _skip: return
+func _show(section: String, target: Control, message: String) -> void:
+	var key := "review_guide_" + section
+	if not SaveManager.is_review_build() or SaveManager.settings.get(key, false):
+		queue_free()
+		return
 	var layer := CanvasLayer.new()
 	layer.layer = 110
 	preload("res://scripts/ui/canvas_order.gd").register(layer, 1)
 	add_child(layer)
-	var overlay := SPOTLIGHT.new()
-	overlay.target = target
-	overlay.message = key
-	overlay.action = action
-	layer.add_child(overlay)
-	await overlay.finished
-	_skip = overlay.get_meta("skipped", false)
-	layer.queue_free()
-	await get_tree().process_frame
-
-func _done(key: String) -> void:
+	_notice = SPOTLIGHT.new()
+	_notice.target = target
+	_notice.message = message
+	layer.add_child(_notice)
+	_notice.finished.connect(queue_free)
+	GameManager.screen_changed.connect(_leave_screen)
 	SaveManager.settings[key] = true
 	SaveManager._save_settings()
+
+func _leave_screen(_screen: int) -> void:
 	queue_free()
 
-func title(screen: Control) -> void:
-	if not SaveManager.is_review_build() or SaveManager.settings.get("review_guide_title", false):
-		queue_free()
-		return
-	await get_tree().process_frame
-	await show_step(null, "review.guide.welcome")
-	await show_step(screen.get_node("%SettingsButton"), "review.guide.settings")
-	if screen.get_node("%QuitButton").visible:
-		await show_step(screen.get_node("%QuitButton"), "review.guide.quit")
-	await show_step(screen.get_node("%StartButton"), "review.guide.start", true)
-	if not _skip:
-		for button in screen._menu_options.get_children():
-			if button != screen._stage_button:
-				await show_step(button, "review.guide.upgrade" if button.get_index() == 1 else "review.guide.codex")
-	await show_step(screen._stage_button, "review.guide.stage", true)
-	_done("review_guide_title")
-
 func map(screen: Control) -> void:
-	if not SaveManager.is_review_build() or SaveManager.settings.get("review_guide_map", false):
+	if not SaveManager.is_review_build():
 		queue_free()
 		return
 	await get_tree().create_timer(1.4).timeout
-	await show_step(screen._debug_unlock, "review.guide.unlock")
-	await show_step(screen._launch, "review.guide.launch", true)
-	_done("review_guide_map")
+	if GameManager.screen != GameManager.Screen.STAGE_SELECT:
+		queue_free()
+		return
+	_show("map", screen._debug_unlock, "review.guide.unlock")
 
 func run(hud: Control) -> void:
-	if not SaveManager.is_review_build() or SaveManager.settings.get("review_guide_run", false):
-		queue_free()
-		return
-	# 操作練習が終了した直後の、通常プレイへ戻る境目で停止する。
-	hud.bridge.command("pause", {"paused": true})
-	await show_step(null, "review.guide.pause", true)
-	await get_tree().process_frame
-	await show_step(hud.find_child("ReviewSettingsButton", true, false), "review.guide.custom", true)
-	_done("review_guide_run")
-
-func settings(panel: Control) -> void:
-	if not SaveManager.is_review_build() or SaveManager.settings.get("review_guide_settings", false):
-		queue_free()
-		return
-	await get_tree().process_frame
-	for key: String in ["weapon", "trait", "hero", "meta", "invincible", "boss"]:
-		var target: Control = panel.get_meta("guide_" + key, null)
-		if target != null:
-			panel.get_meta("guide_scroll").ensure_control_visible(target)
-			await get_tree().process_frame
-			await show_step(target, "review.guide." + key)
-	await show_step(null, "review.guide.finish")
-	_done("review_guide_settings")
+	_hud = hud
+	_show("run", null, "review.guide.pause")

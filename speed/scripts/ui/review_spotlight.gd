@@ -3,14 +3,13 @@ extends Control
 signal finished
 var target: Control
 var message := ""
-var action := false
 var _box: PanelContainer
 var _hole := Rect2()
 var _skip_button: Button
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	mouse_filter = Control.MOUSE_FILTER_STOP
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_box = PanelContainer.new()
 	add_child(_box)
 	var style := StyleBoxFlat.new()
@@ -36,19 +35,13 @@ func _ready() -> void:
 	column.add_child(row)
 	var next := Button.new()
 	next.text = tr("review.guide.next")
-	next.visible = not action
 	next.pressed.connect(_finish)
 	row.add_child(next)
 	var skip := Button.new()
 	skip.text = tr("review.guide.skip")
-	skip.pressed.connect(func():
-		set_meta("skipped", true)
-		_finish())
+	skip.pressed.connect(_finish)
 	add_child(skip)
 	_skip_button = skip
-	if not action: next.grab_focus()
-	if action and target is Button:
-		target.pressed.connect(_finish, CONNECT_ONE_SHOT)
 
 func _process(_delta: float) -> void:
 	_hole = Rect2()
@@ -60,7 +53,7 @@ func _process(_delta: float) -> void:
 	var edge := Vector2(16, 16)
 	var limit := size - _box.size - Vector2(16, 80)
 	if _hole.size == Vector2.ZERO:
-		_box.position = (size - _box.size) * 0.5
+		_box.position = Vector2(maxf(16, size.x - _box.size.x - 24), 100)
 	elif _hole.end.x + 24 + _box.size.x <= size.x - 16:
 		_box.position = Vector2(_hole.end.x + 24, clampf(_hole.position.y, 16, maxf(16, limit.y)))
 	elif _hole.position.x - 24 - _box.size.x >= 16:
@@ -74,7 +67,6 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	var shade := Color(0, 0, 0, 0.67)
 	if _hole.size == Vector2.ZERO:
-		draw_rect(Rect2(Vector2.ZERO, size), shade)
 		return
 	draw_rect(Rect2(0, 0, size.x, maxf(0, _hole.position.y)), shade)
 	draw_rect(Rect2(0, _hole.end.y, size.x, maxf(0, size.y - _hole.end.y)), shade)
@@ -86,22 +78,6 @@ func _draw() -> void:
 	outline.set_border_width_all(2)
 	outline.set_corner_radius_all(10)
 	draw_style_box(outline, _hole)
-
-func _has_point(point: Vector2) -> bool:
-	return not (action and _hole.has_point(point))
-
-func _input(event: InputEvent) -> void:
-	if event is InputEventKey and event.pressed:
-		if action and event.is_action_pressed("pause") and target == null:
-			_finish()
-		elif not action and event.is_action_pressed("ui_accept"):
-			_finish()
-		elif action and target is Button and event.is_action_pressed("ui_accept"):
-			target.pressed.emit()
-		elif event.is_action_pressed("ui_cancel"):
-			set_meta("skipped", true)
-			_finish()
-		get_viewport().set_input_as_handled()
 
 func _finish() -> void:
 	finished.emit()
