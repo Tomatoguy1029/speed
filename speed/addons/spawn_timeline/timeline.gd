@@ -14,6 +14,7 @@ var stage: Resource = null
 var canvas: Control
 var _playhead_label: Label
 var _info: Button
+var _cut_button: Button
 var _details: RichTextLabel
 var _edit_feedback := ""
 ## 組み合わせのシーンのパス → 中に置いた敵の種類の一覧
@@ -45,6 +46,7 @@ func _init() -> void:
 			["終了", func() -> void: canvas.clocks.toggle_pin("time_limit")],
 			["-", func() -> void: canvas.zoom(0.8)], ["+", func() -> void: canvas.zoom(1.25)], ["最大", func() -> void: canvas.fit()],
 			["再生", _launch_here],
+			["区間を削除", _show_cut_dialog],
 			["？", _show_help]]:
 		var b := Button.new()
 		b.text = spec[0]
@@ -74,6 +76,10 @@ func _init() -> void:
 		elif spec[0] == "再生":
 			_set_button_icon(b, "play", ui)
 			b.tooltip_text = "再生位置からステージを起動"
+		elif spec[0] == "区間を削除":
+			_cut_button = b
+			b.disabled = true
+			b.tooltip_text = "指定した時間の区間を削除し、後ろの配置と進行時刻を前へ詰めます。"
 		elif spec[0] == "？":
 			b.tooltip_text = "操作方法"
 			b.custom_minimum_size = Vector2.ONE * 36.0 * ui
@@ -129,6 +135,9 @@ func _notification(what: int) -> void:
 		refresh()
 
 func set_stage(value: Resource) -> void:
+	var cut_dialog := get_node_or_null("CutRange")
+	if cut_dialog != null:
+		cut_dialog.queue_free()
 	if stage != value:
 		canvas._clipboard = []
 	stage = value
@@ -144,6 +153,7 @@ func refresh() -> void:
 
 ## ドラッグ中は表示だけ追従し、全検証と詳細表示は確定時に更新する。
 func refresh_view() -> void:
+	_cut_button.disabled = stage == null
 	for prop in _pin_buttons:
 		var button: Button = _pin_buttons[prop]
 		var exists: bool = stage != null and canvas.clocks.value(prop) >= 0.0
@@ -397,6 +407,125 @@ func _remove_phase(index: int) -> void:
 	after.remove_at(index)
 	stage.set("phases", after)
 	commit("時間帯を削除", [[stage, "phases", before, after]])
+
+## 時刻の指定だけで区間を切り取り、後ろを詰める。
+func _show_cut_dialog() -> void:
+	if stage == null or get_node_or_null("CutRange") != null:
+		return
+	var target := stage
+	var dialog := ConfirmationDialog.new()
+	dialog.name = "CutRange"
+	dialog.title = "区間を削除して後ろを詰める"
+	dialog.ok_button_text = "削除して詰める"
+	dialog.cancel_button_text = "キャンセル"
+	var box := VBoxContainer.new()
+	dialog.add_child(box)
+	var description := Label.new()
+	description.text = "指定区間の内容を削除し、後ろを前へ詰めます。\n雑魚の曲線・強敵・時間帯・ボス・終了時刻が対象です。\n1回の「元に戻す」で全て戻せます。"
+	box.add_child(description)
+	var fields := HBoxContainer.new()
+	box.add_child(fields)
+	var inputs: Array[LineEdit] = []
+	for spec in [["開始", "StartTime"], ["終了", "EndTime"]]:
+		var label := Label.new()
+		label.text = spec[0]
+		fields.add_child(label)
+		var input := LineEdit.new()
+		input.name = spec[1]
+		input.placeholder_text = "分:秒 または秒"
+		input.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		fields.add_child(input)
+		inputs.append(input)
+	inputs[0].text = Canvas.clock(canvas.playhead)
+	var feedback := Label.new()
+	box.add_child(feedback)
+	var update := func(_text: String) -> void:
+		var from: float = canvas.clocks._seconds(inputs[0].text)
+		var to: float = canvas.clocks._seconds(inputs[1].text)
+		var valid: bool = from >= 0.0 and to > from and to <= canvas._end_time()
+		dialog.get_ok_button().disabled = not valid
+		feedback.text = "後ろを %.1f 秒前へ詰めます。" % (to - from) if valid else "開始より後の終了時刻を入力してください（表示範囲内）。"
+	for input in inputs:
+		input.text_changed.connect(update)
+	dialog.confirmed.connect(func() -> void:
+		if stage == target:
+			_cut_range(canvas.clocks._seconds(inputs[0].text), canvas.clocks._seconds(inputs[1].text)))
+	dialog.canceled.connect(dialog.queue_free)
+	dialog.confirmed.connect(dialog.queue_free)
+	add_child(dialog)
+	update.call("")
+	dialog.popup_centered()
+	inputs[1].grab_focus()
+
+static func _cut_time(time: float, from: float, to: float) -> float:
+	return time if time < from else maxf(from, time - (to - from))
+
+func _cut_change(changes: Array, target: Resource, property: String, after: Variant) -> void:
+	var before = target.get(property)
+	if before != after:
+		changes.append([target, property, before, after])
+		target.set(property, after)
+
+func _cut_range(from: float, to: float) -> void:
+	if stage == null or not is_finite(from) or not is_finite(to) or from < 0.0 or to <= from or to > canvas._end_time():
+		return
+	var changes := []
+	var kept_clips := clips().duplicate()
+	for index in clips().size():
+		var clip: Resource = clips()[index]
+		var start := _cut_time(float(clip.get("time")), from, to)
+		var finish := _cut_time(Canvas._clip_end(clip), from, to)
+		if finish <= start:
+			kept_clips.erase(clip)
+			continue
+		# 配列から消しても、暗黙のトラック番号が詰まらないよう固定する。
+		if int(clip.get("track")) < 0:
+			_cut_change(changes, clip, "track", index)
+		_cut_change(changes, clip, "time", start)
+		_cut_change(changes, clip, "length", finish - start)
+	_cut_change(changes, stage, "clips", kept_clips)
+	for curve: Resource in curves():
+		var points: PackedVector2Array = curve.get("points")
+		if points.is_empty():
+			continue
+		var after := PackedVector2Array()
+		for point in points:
+			if point.x < from:
+				after.append(point)
+		# 継ぎ目は削除終了時点の数を使う。先頭を削っても曲線を空にしない。
+		after.append(Vector2(from, curve.call("value_at", to)))
+		for point in points:
+			if point.x > to:
+				after.append(Vector2(point.x - (to - from), point.y))
+		_cut_change(changes, curve, "points", after)
+	var kept_phases := phases().duplicate()
+	var at_end: Resource = null
+	for phase: Resource in phases():
+		if float(phase.get("start")) <= to:
+			at_end = phase
+	var flags = stage.get("surge_phases")
+	var kept_flags: Dictionary = flags.duplicate() if flags is Dictionary else {}
+	for phase: Resource in phases():
+		var start := float(phase.get("start"))
+		if start >= from and start < to and phase != at_end:
+			kept_phases.erase(phase)
+			kept_flags.erase(String(phase.get("id")))
+		else:
+			_cut_change(changes, phase, "start", _cut_time(start, from, to))
+	_cut_change(changes, stage, "phases", kept_phases)
+	if flags is Dictionary:
+		_cut_change(changes, stage, "surge_phases", kept_flags)
+	for property in ["boss_time", "time_limit", "surge_start", "surge_end"]:
+		var stored = stage.get(property)
+		if stored == null:
+			continue
+		# 共通設定から継承した有効な時刻も、ステージ固有の時刻として前へ詰める。
+		var time: float = float(stored) if float(stored) >= 0.0 else canvas.clocks.value(property)
+		if time >= from:
+			_cut_change(changes, stage, property, _cut_time(time, from, to))
+	canvas.playhead = _cut_time(canvas.playhead, from, to)
+	canvas._select_hit({})
+	commit("区間を削除して後ろを詰める", changes)
 
 func _add_clip(row := -1, at := -1.0) -> void:
 	if stage == null:
