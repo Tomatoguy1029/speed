@@ -8,13 +8,13 @@ var _icons: Array[TextureRect] = []
 var _clock := 0.0
 var _active := -1
 
-func _init(font_size := 22, icon_scale := 2.0) -> void:
+func _init(font_size := 10, icon_scale := 1.0) -> void:
 	alignment = BoxContainer.ALIGNMENT_CENTER
-	add_theme_constant_override("separation", 14)
+	add_theme_constant_override("separation", 7)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	for i in 3:
 		var item := HBoxContainer.new()
-		item.add_theme_constant_override("separation", 8)
+		item.add_theme_constant_override("separation", 4)
 		item.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var icon := TextureRect.new()
 		icon.texture = _frame(0)

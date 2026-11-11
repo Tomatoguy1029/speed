@@ -42,6 +42,8 @@ intro.motive,何か異変が起きている。あの星々も救わねば。,Som
 ,■ 操作練習,
 tutorial.guide,操作ガイド,Controls Guide
 tutorial.next,クリックで進む,Click to continue
+tutorial.guide.prev,前へ,Previous
+tutorial.guide.next,次へ,Next
 tutorial.strip.click,クリック,Click
 tutorial.strip.move,動かす,Move
 tutorial.move.title,移動,Movement

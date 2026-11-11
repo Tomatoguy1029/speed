@@ -345,7 +345,8 @@ void ProgressionSystem::poll(SpeedRunCore &core) {
     if (!initial) {
         Dictionary event;event["card"]=chosen_value;core.emit_event("upgrade",event);
         int bonus_count=0;
-        if (card.kind==CardKind::Weapon || card.kind==CardKind::Trait) for (double chance:{run.content->progression.levelup_bonus_chance,run.content->progression.levelup_bonus_more,run.content->progression.levelup_bonus_last}) {
+        // 操作練習の間は連続強化を抽選しない。
+        if (!run.state.control.tutorial && (card.kind==CardKind::Weapon || card.kind==CardKind::Trait)) for (double chance:{run.content->progression.levelup_bonus_chance,run.content->progression.levelup_bonus_more,run.content->progression.levelup_bonus_last}) {
             if (run.state.control.rng.randf()>=chance) break;
             std::vector<CardCandidate> targets;
             for (const auto *owned:{&p.weapons,&p.traits}) for (const auto &e:*owned) {const auto *d=definition(run,e.definition);if (e.level<d->maximum_level) targets.push_back({0,d->kind==0?CardKind::Weapon:CardKind::Trait,e.definition,e.level+1});}

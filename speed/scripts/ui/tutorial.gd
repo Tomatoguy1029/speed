@@ -7,7 +7,7 @@ const LESSONS := preload("res://scripts/ui/tutorial_lessons.gd")
 const PROMPT := preload("res://scripts/ui/tutorial_prompt.gd")
 const STRIP := preload("res://scripts/ui/tutorial_strip.gd")
 const MARKERS := preload("res://scripts/ui/tutorial_markers.gd")
-const DESIGN := Vector2(1280, 720)
+const DESIGN := Vector2(640, 360)
 const ENEMY := "biter"
 const GATES := 3
 enum Step { MOVE, BOOST, GAUGE, XP, CARDS, DONE }
@@ -41,12 +41,13 @@ func _ready() -> void:
 	_canvas = Control.new()
 	_canvas.size = DESIGN
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(_canvas)
 	var column := VBoxContainer.new()
-	column.position = Vector2(0, 560)
-	column.size = Vector2(DESIGN.x, 130)
+	column.position = Vector2(0, 280)
+	column.size = Vector2(DESIGN.x, 65)
 	column.alignment = BoxContainer.ALIGNMENT_END
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 4)
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.add_child(column)
 	_caption_box = PanelContainer.new()
@@ -55,15 +56,15 @@ func _ready() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.04, 0.06, 0.13, 0.85)
 	style.border_color = Color("2f4466")
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(22)
-	style.content_margin_left = 26.0
-	style.content_margin_right = 26.0
-	style.content_margin_top = 8.0
-	style.content_margin_bottom = 8.0
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(9)
+	style.content_margin_left = 12.0
+	style.content_margin_right = 12.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
 	_caption_box.add_theme_stylebox_override("panel", style)
 	_caption = Label.new()
-	_caption.add_theme_font_size_override("font_size", 24)
+	_caption.add_theme_font_size_override("font_size", 10)
 	_caption_box.add_child(_caption)
 	column.add_child(_caption_box)
 	_strip = STRIP.new()

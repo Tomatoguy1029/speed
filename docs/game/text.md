@@ -82,6 +82,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 |  | ■ 操作練習 |  |
 | tutorial.guide | 操作ガイド | Controls Guide |
 | tutorial.next | クリックで進む | Click to continue |
+| tutorial.guide.prev | 前へ | Previous |
+| tutorial.guide.next | 次へ | Next |
 | tutorial.strip.click | クリック | Click |
 | tutorial.strip.move | 動かす | Move |
 | tutorial.move.title | 移動 | Movement |
