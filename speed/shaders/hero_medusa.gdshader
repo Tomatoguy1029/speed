@@ -3,7 +3,7 @@
 // 数コマ止まって勢いよく見開く。
 // 開ききった瞬間に虹彩の奥が鈍く光る（このとき画面全体へオーラが広がり、敵が石になる）。瞳孔は真ん中が少しふくらんだ蛇の目で、
 // 眼球（虹彩と瞳孔）は目の中でわずかに動く。
-// 色は暗く沈んだ緑で、縁は闇へ溶ける。長さはドット単位で、四角の中心が機体。目は機体の手前に重なる。
+// 色は濃い毒緑で、縁は闇へ溶ける。長さはドット単位で、四角の中心が機体。目は機体の手前に重なる。
 shader_type canvas_item;
 render_mode unshaded;
 
@@ -20,13 +20,13 @@ uniform float line_to = 0.5;
 uniform float open_from = 0.6;
 uniform float open_to = 2.0;
 group_uniforms tuning;
-uniform vec4 abyss = vec4(0.020, 0.035, 0.035, 1.0);
-uniform vec4 murk = vec4(0.071, 0.125, 0.110, 1.0);
-uniform vec4 moss = vec4(0.149, 0.247, 0.200, 1.0);
-uniform vec4 venom = vec4(0.294, 0.459, 0.353, 1.0);
-uniform vec4 pale = vec4(0.580, 0.741, 0.604, 1.0);
+uniform vec4 abyss = vec4(0.000910581, 0.008568126, 0.004024717, 1.0);
+uniform vec4 murk = vec4(0.005181517, 0.059511238, 0.023153366, 1.0);
+uniform vec4 moss = vec4(0.008023193, 0.274677312, 0.072271851, 1.0);
+uniform vec4 venom = vec4(0.039546235, 0.708375780, 0.124771818, 1.0);
+uniform vec4 pale = vec4(0.434153636, 1.000000000, 0.191201683, 1.0);
 uniform float eye_size : hint_range(8.0, 80.0, 1.0) = 42.0;
-uniform float opacity : hint_range(0.2, 1.0, 0.05) = 0.85;
+uniform float opacity : hint_range(0.2, 1.0, 0.05) = 1.0;
 group_uniforms;
 
 varying vec2 v_cell;
