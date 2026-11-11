@@ -56,6 +56,10 @@ func _ready() -> void:
 		show_screen(GameManager.Screen.STAGE_SELECT)
 	else:
 		show_screen(GameManager.screen, false)
+	if GameManager.screen == GameManager.Screen.TITLE:
+		var guide := preload("res://scripts/ui/review_guide.gd").new()
+		add_child(guide)
+		guide.set_meta("title_screen", self)
 	if get_meta("morph_from_upgrade", false):
 		_transition_from_upgrade()
 
@@ -199,6 +203,10 @@ func show_start_panel(open: bool) -> void:
 
 func show_screen(screen: GameManager.Screen, animate := true) -> void:
 	var mapping := screen == GameManager.Screen.STAGE_SELECT
+	if mapping:
+		var guide := preload("res://scripts/ui/review_guide.gd").new()
+		add_child(guide)
+		guide.map.call_deferred(_map)
 	var returning_from_map := animate and not mapping and _map_progress > 0.0
 	if mapping:
 		_set_increments_alpha(0.0)

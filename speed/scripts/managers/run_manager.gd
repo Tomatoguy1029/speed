@@ -31,7 +31,7 @@ func create_run(overrides := {}) -> RunSession:
 		"cpp_start":{"equipment":[],"lab_mode":false}}
 	if OS.is_debug_build() and overrides.get("seed") is int: options.seed = overrides.seed
 	# 操作練習は、ステージ1の通常の出撃で、まだ終えていないときだけ付ける。
-	if not timeline and GameManager.run_stage == 1 and not GameManager.run_endless and not SaveManager.is_review_build() and not SaveManager.has_done_tutorial():
+	if not timeline and GameManager.run_stage == 1 and not GameManager.run_endless and not SaveManager.has_done_tutorial():
 		options.cpp_start.tutorial = true
 	if timeline: options.cpp_start.scenario = {"kind":"timeline","params":{"time":start_time}}
 	var session := _register(RunSession.new(),options)

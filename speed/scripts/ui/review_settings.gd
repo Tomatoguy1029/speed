@@ -27,6 +27,7 @@ func _ready() -> void:
 	hint.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	column.add_child(hint)
 	var scroll := ScrollContainer.new()
+	set_meta("guide_scroll", scroll)
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	column.add_child(scroll)
@@ -44,6 +45,9 @@ func _ready() -> void:
 	column.add_child(back)
 	_rebuild()
 	back.grab_focus()
+	var guide := preload("res://scripts/ui/review_guide.gd").new()
+	add_child(guide)
+	guide.settings.call_deferred(self)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed(&"pause") or event.is_action_pressed(&"ui_cancel"):
@@ -55,6 +59,7 @@ func _heading(key: String) -> void:
 	label.text = tr(key)
 	label.add_theme_font_size_override("font_size", 22)
 	_body.add_child(label)
+	set_meta("guide_" + key.trim_prefix("review."), label)
 
 func _button(parent: Node, key: String, action: Callable) -> Button:
 	var button := Button.new()
@@ -159,7 +164,8 @@ func _rebuild() -> void:
 	invincible.button_pressed = bool(ui.get("invincible", false))
 	invincible.toggled.connect(func(value: bool): _command("review_invincible", {"value": value}))
 	_body.add_child(invincible)
-	_button(_body, "review.boss", func(): _command("review_boss", {}))
+	set_meta("guide_invincible", invincible)
+	set_meta("guide_boss", _button(_body, "review.boss", func(): _command("review_boss", {})))
 
 func _equipment(kind: String, id: String, level: int, replace: String) -> void:
 	if _busy: return
