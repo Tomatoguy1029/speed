@@ -5105,7 +5105,40 @@ func native_hydra_pincer() -> void:
 	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"自然終了は長い寿命が残ったビームも消す");bridge.dispose()
 	await get_tree().process_frame;print("[cpp_hydra_pincer] failures=",failed);get_tree().quit(1 if failed else 0)
 
+func check_hydra_tornado_feed_direction() -> void:
+	# 渦が瓦礫首を包む近距離配置も、投入中の岩は口から渦中心側へ進む。
+	var c := hydra_major_case("tornado",{"warning_time":0.1,"performance_time":3.4,"tornado_charge":1.2,"tornado_width":1600.0},true)
+	if c.is_empty(): return
+	var bridge = c.bridge
+	var samples := 0
+	var overlapping := false
+	var old_reverse := 0
+	for tick in 150:
+		bridge._core.step(0.01)
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		var charge: Array = body.effects.filter(func(e): return e.kind=="tornado_charge")
+		if charge.is_empty(): continue
+		var heads: Array = body.necks.filter(func(n): return n.mode=="tornado" and n.kind=="debris")
+		if heads.is_empty(): continue
+		var mouth: Vector2 = heads[0].strike_from+Vector2.from_angle(heads[0].angle)*40.0
+		var inward: Vector2 = charge[0].points[0]-mouth
+		var rocks: Array = body.get("tornado_rocks",[])
+		for index in rocks.size():
+			var rock: Dictionary = rocks[index]
+			if rock.progress<=0.0 or rock.progress>=1.0: continue
+			samples += 1
+			var ring: float = float(body.tornado_radius)*[0.86,0.62,0.42,0.74,0.54][index]
+			overlapping = overlapping or ring>inward.length()
+			var old_entry: Vector2 = charge[0].points[0]-inward.normalized()*ring
+			if (old_entry-mouth).dot(inward)<-0.001: old_reverse += 1
+			check((Vector2(rock.position)-mouth).dot(inward)>=-0.001,"渦が口を包んでも投入瓦礫が逆走しない")
+			check(Vector2.from_angle(rock.aim).dot(inward)>=-0.001,"瓦礫の尾も投入方向と同じ向きを使う")
+	check(samples>0 and overlapping and old_reverse>0,"渦が口を包む投入フレームを実際に検査する")
+	print("[hydra_tornado_feed] samples=%d old_reverse=%d" % [samples,old_reverse])
+	bridge.dispose()
+
 func native_hydra_tornado() -> void:
+	check_hydra_tornado_feed_direction()
 	var c := hydra_major_case("tornado",{"warning_time":0.15,"performance_time":0.65,"tornado_charge":0.2,"tornado_life":0.3,"tornado_speed":400.0,"tornado_width":120.0,"lump_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})
