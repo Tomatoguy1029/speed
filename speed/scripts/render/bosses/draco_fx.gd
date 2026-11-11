@@ -1,6 +1,7 @@
 ## りゅうの技の光・闇・土ぼこり。戦闘の状態を読むだけで、論理画素の前後の層へ描く。
 ## 炎の部品は pixelFX fire/_lib.js の式（Sprite Fusion、MIT、Hugo Duprez）。
 extends RefCounted
+static var _wake_raster := SpeedFxRaster.new()
 const PRIM := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 const BASE := Color("#ab9cff")
 const EYE_FORWARD := 77.0
@@ -442,35 +443,17 @@ static func sweep_wake(canvas, wake: Array, time: float) -> void:
 		var v := m/95.0
 		reach.append(clampf(0.5+0.42*(1.0-v)+0.3*_noise(v*7.0,37.0)+0.08*_noise(v*26.0,19.0),0.0,1.0))
 		fine.append(0.5+0.5*_noise(m/95.0*30.0,53.0))
-	for i in range(1,list.size()):
-		var q0: Dictionary = list[i-1]
-		var q1: Dictionary = list[i]
-		var f := (time-float(q1.t))/life
-		var A0: Vector2 = canvas.to_logical(q0.a)
-		var A1: Vector2 = canvas.to_logical(q1.a)
-		var B0: Vector2 = canvas.to_logical(q0.b)
-		var B1: Vector2 = canvas.to_logical(q1.b)
-		var steps := ceili(maxf(A0.distance_to(A1),B0.distance_to(B1))+1.0)
-		var span := ceili(A1.distance_to(B1)+1.0)
-		for n in steps+1:
-			var u := float(n)/steps
-			var A := A0.lerp(A1,u)
-			var B := B0.lerp(B1,u)
-			var bend := sin(i*0.22+time*1.5)*0.02
-			for m in span+1:
-				var v := clampf(float(m)/span+bend,0.0,1.0)
-				var slot := roundi(v*95.0)
-				var k := f/reach[slot]
-				if k>=1.0: continue
-				var end := smoothstep(0.62,1.0,k)
-				var thin := lerpf(1.0,fine[slot]*1.5,end)
-				var heat := clampf(1.0-v*0.8-k*0.45,0.0,1.0)
-				var level := lerpf(5.6,1.4,heat)
-				var ci := mini(6,floori(level))
-				var a := 0.82*(1.0-v*v*0.8)*(1.0-end)*minf(1.0,thin+(1.0-end))
-				if a>0.02:
-					var at := A.lerp(B,float(m)/span)
-					canvas.back.blend(at.x,at.y,FLAME[ci].lerp(FLAME[ci+1],level-ci),a)
+	var tails := PackedVector2Array()
+	var roots := PackedVector2Array()
+	var ages := PackedFloat64Array()
+	for row: Dictionary in list:
+		tails.append(canvas.to_logical(row.a))
+		roots.append(canvas.to_logical(row.b))
+		ages.append((time-float(row.t))/life)
+	_wake_raster.begin(canvas.back.colors, PackedByteArray(), canvas.back.width, canvas.back.height, 1.0, Vector2.ZERO)
+	var flags := _wake_raster.sweep_wake(tails, roots, ages, reach, fine, PackedColorArray(FLAME), time, canvas.back.fade)
+	canvas.back.colors = _wake_raster.take_colors()
+	canvas.back.has_color = canvas.back.has_color or (flags & 1) != 0
 	var tip: Vector2 = canvas.to_logical(list[-1].a)
 	canvas.front.glow(tip.x,tip.y,10.0,FLAME[3],0.5)
 

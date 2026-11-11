@@ -3,8 +3,8 @@ extends RefCounted
 
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
-var _settings: Dictionary = SETTINGS.for_id("G12-auriga")
 var _raster := SpeedFxRaster.new()
+var _settings: Dictionary = SETTINGS.for_id("G12-auriga")
 
 func render(rows: Array, canvas, clock: float) -> void:
 	var groups := {}
@@ -18,17 +18,17 @@ func render(rows: Array, canvas, clock: float) -> void:
 			var middle: Vector2 = (row["from"] + row["to"]) * 0.5
 			FX.sparks(canvas.front, canvas.to_logical(middle), fposmod(fade_time - left, 0.4), (clock - float(row.age)) * 7, 2, Color("ffe6b0"), 20, 0.4, -PI / 2.0, 0.8)
 	if groups.is_empty(): return
-	var painter = canvas.back
-	_raster.begin_painter(painter, float(canvas.world_scale), canvas._camera_position, true, true)
+	_raster.begin_painter(canvas.back, canvas.world_scale, canvas._camera_position, true, true)
+	var flags := 0
 	for group: Array in groups.values():
 		group.sort_custom(func(a: Dictionary, b: Dictionary): return int(a.order) < int(b.order))
-		_draw_trail(group, canvas, clock)
-	painter.colors = _raster.take_colors()
-	painter.lights = _raster.take_lights()
-	painter.has_color = painter.has_color or _raster.has_color()
-	painter.has_light = painter.has_light or _raster.has_light()
+		flags |= _draw_trail(group, canvas, clock)
+	canvas.back.colors = _raster.take_colors()
+	canvas.back.lights = _raster.take_lights()
+	canvas.back.has_color = canvas.back.has_color or (flags & 1) != 0
+	canvas.back.has_light = canvas.back.has_light or (flags & 2) != 0
 
-func _draw_trail(rows: Array, canvas, clock: float) -> void:
+func _draw_trail(rows: Array, canvas, clock: float) -> int:
 	var points := PackedVector2Array()
 	var strengths := PackedFloat64Array()
 	var intensity := minf(1.0, float(_settings.intensity))
@@ -42,6 +42,5 @@ func _draw_trail(rows: Array, canvas, clock: float) -> void:
 			strengths.append(k)
 		points.append(canvas.to_logical(row["to"]))
 		strengths.append(k)
-	if points.size() < 2: return
 	var width: float = float(rows[0].width) * 0.5 * canvas.world_scale * float(_settings.size)
-	_raster.auriga_trail(points, strengths, width, PackedColorArray(FX.ramp(Color(_settings.color))), clock)
+	return _raster.auriga_trail(points, strengths, width, PackedColorArray(FX.ramp(Color(_settings.color))), clock, canvas.back.fade, canvas.back.light_strength)

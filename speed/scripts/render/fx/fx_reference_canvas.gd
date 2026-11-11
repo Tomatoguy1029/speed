@@ -22,6 +22,7 @@ class Painter:
 	var fx := 1.0
 	var cs := 1.0
 	var sn := 0.0
+	var _glow_raster: SpeedFxRaster
 
 	func clear(w: int, h: int) -> void:
 		width = w
@@ -254,6 +255,14 @@ class Painter:
 	func glow(x: float, y: float, r: float, c: Color, strength := 0.5) -> void:
 		if r < 1.0 or strength <= 0.004: return
 		var center := _to(x,y)
+		# 小さい光はその場で描き、画素の多い円だけまとめて計算する。
+		if r >= 8.0:
+			if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
+			_glow_raster.begin(PackedByteArray(), lights, width, height, 1.0, Vector2.ZERO)
+			var flags := _glow_raster.canvas_glow(center, r, c, strength, fade, light_strength)
+			lights = _glow_raster.take_lights()
+			has_light = has_light or (flags & 2) != 0
+			return
 		for sy in range(maxi(0,floori(center.y-r)),mini(height-1,ceili(center.y+r))+1):
 			for sx in range(maxi(0,floori(center.x-r)),mini(width-1,ceili(center.x+r))+1):
 				var d := Vector2(sx+0.5,sy+0.5).distance_to(center)/r

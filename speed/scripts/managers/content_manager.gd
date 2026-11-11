@@ -304,6 +304,8 @@ func _plain_data(path: String) -> bool:
 
 func _finish_composites(scope: ContentResourceScope, budget_us := 4000) -> bool:
 	if scope.cancelled: return true
+	# 起動時は画面を更新しつつまとめて読む。プレイ中の追加取得は短い予算を保つ。
+	if scope == _startup_resources and budget_us > 0: budget_us = 12000
 	for path in scope.pending:
 		if not path in scope.composites: return false
 	# 同時に別の版を準備しても、このScopeの依存を親のpreloadへ渡す。

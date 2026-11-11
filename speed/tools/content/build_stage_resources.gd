@@ -5,6 +5,8 @@ extends RefCounted
 const BEHAVIOR_ATTACKS := {"aquarius": ["flood"], "aquila": ["zone"], "auriga": ["wall"], "beamer": ["beam", "cross"], "biter": ["zone"], "cepheus": ["bolt"], "clock": ["wall"], "crab": ["zone"], "cross": ["cross"], "dolphin": ["wave"], "enemy_behavior": ["enemy", "zone"], "lynx": ["slash"], "missile": ["enemy"], "phoenix": ["zone"], "pulser": ["wave"], "pump": ["shell"], "ruler": ["wall"], "saw": ["saw"], "sniper": ["beam"], "triangle": ["wall"]}
 const BEHAVIOR_ENEMIES := {"beamer": ["cross"], "biter": ["biter"], "cepheus": ["cepheus_soldier"], "corona_vortex": ["corona"], "marlin": ["marlin"], "missile": ["missile"], "soldier": ["cepheus"], "split": ["splitling"], "triangle": ["triangle_star"]}
 static func _add(paths: Dictionary, path: String) -> void:
+	# パーツ単体のF6から開く制作画面は、通常ランの表示依存から外す。
+	if path == "res://scenes/bosses/centaurus_parts_preview.tscn": return
 	if paths.has(path) or not ResourceLoader.exists(path): return
 	paths[path] = true
 	for dependency in ResourceLoader.get_dependencies(path):

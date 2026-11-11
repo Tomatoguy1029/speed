@@ -28,7 +28,10 @@ func _export_begin(_features: PackedStringArray, _is_debug: bool, _path: String,
 	var stamp: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(stamp_path))
 	stamp.outputs = stamp.outputs.filter(func(output):return not String(output).begins_with(BUILD.ROOT.path_join("dev/")))
 	add_file(stamp_path, JSON.stringify(stamp).to_utf8_buffer(), false)
-	_add_runtime_files(BUILD.ROOT.path_join("run"))
+	# 内容ハッシュ別の旧世代は開発用キャッシュとして残る。現在の出力一覧だけを配布する。
+	for output: String in stamp.outputs:
+		if output.begins_with(BUILD.ROOT.path_join("run/")):
+			add_file(output, FileAccess.get_file_as_bytes(output), false)
 	add_file("res://licenses/run/GODOT.txt", Engine.get_license_text().to_utf8_buffer(), false)
 	var notices := PackedStringArray()
 	for component in Engine.get_copyright_info():
@@ -39,16 +42,6 @@ func _export_begin(_features: PackedStringArray, _is_debug: bool, _path: String,
 			notices.append("\n".join(part.files))
 	notices.append(JSON.stringify(Engine.get_license_info(), "\t"))
 	add_file("res://licenses/run/GODOT-THIRD-PARTY.txt", "\n\n".join(notices).to_utf8_buffer(), false)
-
-func _add_runtime_files(directory: String) -> void:
-	if not DirAccess.dir_exists_absolute(directory): return
-	for file in DirAccess.get_files_at(directory):
-		if file.ends_with(".pending.json"): continue
-		if file.get_extension() in ["json", "bin", "tres", "res"]:
-			var path := directory.path_join(file)
-			add_file(path, FileAccess.get_file_as_bytes(path), false)
-	for child in DirAccess.get_directories_at(directory):
-		_add_runtime_files(directory.path_join(child))
 
 func _export_end() -> void:
 	for key: String in _development_settings:

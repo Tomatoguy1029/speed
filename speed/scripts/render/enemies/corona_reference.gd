@@ -63,7 +63,7 @@ func render(owners: PackedFloat64Array, selected: Array, thrown: Array, events: 
 func _draw_vortices(owners: PackedFloat64Array, canvas) -> void:
 	if owners.is_empty(): return
 	_raster.begin_painter(canvas.back, float(canvas.world_scale), canvas._camera_position, true, false)
-	_raster.corona_vortices(owners, PackedColorArray(FX.ramp(Color("b6a2db"))))
+	_raster.corona_vortex(owners, PackedColorArray(FX.ramp(Color("b6a2db"))), canvas.back.fade)
 	canvas.back.colors = _raster.take_colors()
 	canvas.back.has_color = canvas.back.has_color or _raster.has_color()
 

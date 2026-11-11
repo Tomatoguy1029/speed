@@ -21,6 +21,8 @@ func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
 		_field=preload("res://scripts/render/bosses/hydra.gd").new()
 		add_child(_field);_field.top_level=true
 	_field.setup_effects(scope,entries)
+var _rift_image: Polygon2D
+var _rift_material: ShaderMaterial
 var _parts: Node2D
 var _reference_canvas
 var _pose := {}
@@ -43,6 +45,13 @@ func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
 func _ready() -> void:
 	z_index = 1
+	_rift_image = Polygon2D.new()
+	_rift_image.show_behind_parent = true
+	_rift_material = ShaderMaterial.new()
+	_rift_material.shader = preload("res://shaders/draco_rift_post.gdshader")
+	_rift_material.set_shader_parameter("noise_tex",preload("res://assets/fx/water_noise.png"))
+	_rift_image.material = _rift_material
+	add_child(_rift_image)
 	_parts = preload("res://scripts/bosses/draco_parts.gd").new()
 	add_child(_parts)
 	_fire = preload("res://scripts/render/bosses/draco_meteor_fire.gd").new()
@@ -57,8 +66,7 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	rotation = body.facing
 	visible = body.mode<4
 	var intro: Dictionary = body.get("intro",{})
-	var intro_active: bool = intro.get("active",false)
-	_parts.visible = not intro_active or intro.time>=float(body.get("entrance_quiet",2.5))
+	_update_entrance_rift(intro)
 	var feedback := {"white":0.0,"offset":Vector2.ZERO,"angle":0.0}
 	if hit_feedback!=null: feedback=hit_feedback.sample(int(body.actor))
 	hit = float(feedback.white)
@@ -70,7 +78,8 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	points = FINALE_VIEW.kink(points,finale)
 	_parts.set_finale_tone(finale_view.tone() if finale_view!=null and finale_view.visible else {})
 	_parts.arm_turns = _pose.arms
-	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha)*smoothstep(0.0,1.0,float(intro.emerged)) if intro_active else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
+	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
+	_parts.entrance(intro,to_local(intro.get("rift_center",body.position)),float(body.get("entrance_quiet",2.5)))
 	_parts.position = Vector2(feedback.offset).rotated(-float(body.facing))
 	_parts.rotation = float(feedback.angle)
 	var live := {}
@@ -98,7 +107,6 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	queue_redraw()
 func _draw() -> void:
 	if state.is_empty() or not visible: return
-	_draw_rift()
 	var cycle: Dictionary = state.get("cycle",{})
 	if cycle.get("stage",0)==2:
 		for j in 16:
@@ -516,23 +524,27 @@ func _cracks(seed: float, radius: float) -> Array:
 		_crack_rows[seed] = FX.cracks(seed,radius)
 	return _crack_rows[seed]
 
-func _draw_rift() -> void:
-	var intro: Dictionary = state.get("intro",{})
-	if not intro.get("active",false) or intro.rift<=0.0: return
-	var opening: float = intro.rift
+## 攻撃と同じ裂け目shaderを竜より奥へ置く。画面座標への変換も攻撃と揃える。
+func _update_entrance_rift(intro: Dictionary) -> void:
+	_rift_image.visible = intro.get("active",false) and float(intro.get("rift",0.0))>0.0
+	if not _rift_image.visible: return
+	var size := get_viewport_rect().size
+	var pixel := size.y/225.0
+	var transform := get_global_transform_with_canvas()
+	var inverse := transform.affine_inverse()
+	_rift_image.polygon = PackedVector2Array([inverse*Vector2.ZERO,inverse*Vector2(size.x,0),inverse*size,inverse*Vector2(0,size.y)])
 	var center: Vector2 = intro.rift_center
-	var axis := Vector2.DOWN
-	var line := PackedVector2Array()
-	for j in 19:
-		var along := float(j-9)*55.0*opening
-		var side := (sin(j*2.3)*24.0+sin(j*4.9)*12.0)*opening
-		line.append(to_local(center+axis*along+axis.orthogonal()*side))
-	draw_polyline(line,Color(0.41,0.25,0.88,0.22),160.0*opening,false)
-	draw_polyline(line,rift_color,105.0*opening,false)
-	draw_polyline(line,Color("#050612"),88.0*opening,false)
-	if intro.eyes>0.0 and intro.emerged<0.4:
-		for side in [-1,1]:
-			var at: Vector2 = to_local(center+axis.orthogonal()*side*65.0)
-			var offset := axis.rotated(-rotation)*12.0
-			draw_line(at-offset,at+offset,Color(1.0,0.1,0.3,float(intro.eyes)),8.0,false)
-
+	var opening := float(intro.rift)
+	var a := transform*to_local(center+Vector2(0,-430)) / pixel
+	var b := transform*to_local(center+Vector2(0,430)) / pixel
+	var zoom := transform.x.length()
+	var ends := PackedVector4Array([Vector4(a.x,a.y,b.x,b.y)])
+	var shapes := PackedVector4Array([Vector4(230.0*zoom/pixel*opening,opening,opening,17.0)])
+	ends.resize(12)
+	shapes.resize(12)
+	_rift_material.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
+	_rift_material.set_shader_parameter("viewport_size",size)
+	_rift_material.set_shader_parameter("time",float(state.clock))
+	_rift_material.set_shader_parameter("count",1)
+	_rift_material.set_shader_parameter("ends",ends)
+	_rift_material.set_shader_parameter("shape",shapes)

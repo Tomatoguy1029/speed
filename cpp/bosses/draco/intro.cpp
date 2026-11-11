@@ -26,7 +26,7 @@ void DracoIntro::begin(RunRuntime &r,BossBodyState &b) {
     DracoBody::update(r,b);
 }
 bool DracoIntro::tick(RunRuntime &r,BossBodyState &b,double dt) {
-    auto &v=b.draco->intro;if (!v.active) return false;v.time+=dt;const double quiet=DracoBody::rule(r,b).entrance_quiet,reveal=quiet+1.35,confront=reveal+2,handoff=confront+1.4,finish=handoff+0.8;
+    auto &v=b.draco->intro;if (!v.active) return false;v.time+=dt;const double quiet=DracoBody::rule(r,b).entrance_quiet,reveal=quiet+2.0,confront=reveal+4.5,handoff=confront+1.4,finish=handoff+0.8;
     v.emerged=smooth(reveal,confront,v.time);v.rift=smooth(quiet,quiet+1,v.time)*(1-smooth(confront,confront+0.7,v.time));v.eyes=smooth(quiet+0.55,reveal,v.time)*(1-smooth(confront,confront+0.5,v.time));v.chest=smooth(reveal+0.3,confront,v.time);v.stage=v.time<quiet?0:v.time<reveal?1:v.time<confront?2:v.time<handoff?3:4;auto &e=r.state.enemies[b.actor.slot];e.pos=v.center+godot::Vector2(0,-120)*(1-v.emerged);e.facing=1.5707963267948966;e.vel={};const auto filmed=v.ship.lerp(v.center,0.45);const double move=smooth(0,1.5,v.time),restore=smooth(handoff,finish,v.time);DracoCinematic::frame(r,v.camera.lerp(filmed,move).lerp(v.camera,restore),v.zoom*(1-0.15*move*(1-restore)));r.state.control.cinematic_bars=1-restore;DracoBody::update(r,b);if (v.time>=finish) end(r,b);return v.active;
 }
 void DracoIntro::end(RunRuntime &r,BossBodyState &b,bool interrupted) {
