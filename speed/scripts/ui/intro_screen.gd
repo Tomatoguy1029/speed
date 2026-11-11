@@ -56,7 +56,10 @@ func _ready() -> void:
 	_text.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	panel.add_sibling(_text)
 	_text.z_index = 2
-	_next = _button("NextIntro", ">>", Vector2(522, 328), Vector2(36, 22))
+	_next = _button("NextIntro", ">>", Vector2(514, 318), Vector2(44, 32))
+	_next.add_theme_font_size_override("font_size", 20)
+	for state in ["normal", "hover", "pressed", "disabled", "focus"]:
+		_next.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	_next.tooltip_text = tr("intro.next")
 	_next.pressed.connect(advance)
 	_auto_play = _button("AutoPlayIntro", "", Vector2(12, 10), Vector2(106, 23))
