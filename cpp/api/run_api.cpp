@@ -164,6 +164,8 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     if (!start(int64_t(seed))) return failure(8,"start","ランを初期化できません");
     if (!rebuild_enemy_grid(state.frame_grid_cell)) return failure(8,"grid","検索索引を準備できません");
     if (timeline_start) speed::apply_timeline_scenario(runtime,timeline);
+    // 初回の武器選択で固定更新が止まっても、原点の惑星ではなく出撃位置を映す。
+    state.control.camera_center=state.view_center=state.ship.pos;
     speed::FieldSystem::initialize(runtime);
     speed::HeroesSystem::initialize(runtime);
     speed::ProgressionSystem::initialize(runtime,options.has("equipment"));

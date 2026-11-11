@@ -67,6 +67,8 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     auto timed=[&](const char *name,auto &&action) {MetricsDetailTimer measured(core.runtime.frame_workspace.metrics,name);return action();};
     using Phase=godot::RunState::Phase;
     BossRamSystem::cancel_invalid(core.runtime);
+    // 論理画面サイズは最初のtickで届く。選択中でも初回の画角だけは確定する。
+    if (!control.camera_ready) camera(core,0,size);
     // UIの入口判定を通過するまで、入力も時計も消費しない。
     if (control.ui_overlay || (control.ui_reward && state.phase!=Phase::Finishing)) return true;
     if (state.phase==Phase::LevelUp) {ProgressionSystem::poll(core);return true;}
