@@ -53,7 +53,7 @@ func _process(_delta: float) -> void:
 	var edge := Vector2(16, 16)
 	var limit := size - _box.size - Vector2(16, 80)
 	if _hole.size == Vector2.ZERO:
-		_box.position = Vector2(maxf(16, size.x - _box.size.x - 24), 100)
+		_box.position = (size - _box.size) * 0.5
 	elif _hole.end.x + 24 + _box.size.x <= size.x - 16:
 		_box.position = Vector2(_hole.end.x + 24, clampf(_hole.position.y, 16, maxf(16, limit.y)))
 	elif _hole.position.x - 24 - _box.size.x >= 16:
