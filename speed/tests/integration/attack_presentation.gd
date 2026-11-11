@@ -18,6 +18,11 @@ func check(ok: bool, message: String) -> void:
 		push_error(message)
 
 func _ready() -> void:
+	if "--cpp-field-boundary" in OS.get_cmdline_user_args():
+		await check_cpp_field_boundary()
+		print("[cpp_field_boundary] failed=%d" % failed)
+		get_tree().quit(1 if failed else 0)
+		return
 	if "--cpp-visual-contracts" in OS.get_cmdline_user_args() or "--cpp-visual-health" in OS.get_cmdline_user_args():
 		await check_cpp_visual_contracts()
 		print("[cpp_visual_contracts] failed=%d" % failed)
@@ -1886,4 +1891,32 @@ func check_cpp_visual_contracts() -> void:
 	mono.frame_event({"type":&"combat_damage"})
 	check(is_equal_approx(mono.hit,0.18) and mono.material.get_shader_parameter("boss_hit_white")>0.0 and mono.horn.frame>0 and is_equal_approx(mono._neck_facing,PI/4.0),"一角獣の命中反応・形態の角・連続技の頭向きを読み取る")
 	mono.free()
+	cpp_session.free()
+
+func check_cpp_field_boundary() -> void:
+	if not await prepare_cpp_attack(115,"pump",PackedStringArray(["pump","splitling"]),{"pump":{"speed":0.0},"splitling":{"speed":0.0}}): return
+	cpp_bridge.command("dev_remove_weapon",{"id":"W01"})
+	cpp_bridge.command("dev_spawn",{"definition_id":"pump","position":cpp_origin})
+	cpp_bridge.command("dev_spawn",{"definition_id":"splitling","position":cpp_origin+Vector2(200,0)})
+	var at := cpp_origin+Vector2(0,200)
+	cpp_bridge.command("dev_ship_motion",{"position":at,"velocity":Vector2.ZERO})
+	cpp_core.step(0.1)
+	check(cpp_core.ship_snapshot().ship_pos==at and cpp_core.ship_snapshot().ship_vel==Vector2.ZERO,"ポンプの吸引範囲内でも自機の位置と速度を変えない")
+	cpp_bridge.collect_frame()
+	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
+	var radius: float = cpp_bridge.latest_frame().value.ui.hero.field_radius
+	for zoom in [0.5,1.0,1.5]:
+		presentation.view_override = {"center":Vector2(radius,0),"zoom":zoom}
+		presentation._present_cpp(0.0)
+		check(presentation._field_boundary.visible and presentation._field_radius==radius and presentation._field_boundary.global_position==Vector2.ZERO and presentation.cam_zoom==zoom,"外周は実際の半径・世界原点を保ち、カメラ倍率%sで表示する" % zoom)
+	presentation._update_field_boundary(radius,[{"arena":Rect2(-100,-100,200,200)}])
+	check(not presentation._field_boundary.visible,"専用闘技場では通常外周を隠す")
+	presentation._update_field_boundary(radius,[])
+	check(presentation._field_boundary.visible,"闘技場終了後に通常外周を戻す")
+	presentation.view_override = {"center":Vector2(radius,0),"zoom":1.0}
+	presentation._present_cpp(0.0)
+	if "--boundary-capture" in OS.get_cmdline_user_args():
+		await get_tree().process_frame
+		await RenderingServer.frame_post_draw
+		get_viewport().get_texture().get_image().save_png("/tmp/speed-field-boundary.png")
 	cpp_session.free()
