@@ -568,7 +568,7 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 - 操作練習（仕様書 4.3）は `scripts/ui/tutorial.gd` が進める。HUDの子として段・説明・進む条件の表示を持ち、世界座標の目印は `tutorial_markers.gd` をWorldへ置いて描く。お手本の線は本番の描線と同じ `route_visual.gd` を使う。
   - C++は開始オプション `tutorial` で練習中の状態（`RunControlState.tutorial`）に入り、時計・出現・ボス・敵と地形の更新・英雄・ワープを止め、機体を無敵にする。星のかけらの回収は `tutorial_pickups` が有効な間だけ進める。
-  - 練習の進行は通常版でも受け付ける `tutorial` 命令で行う。`status` は残りの敵と星のかけらの数・最寄りの位置、`spawn` は指定位置への敵の配置、`pickups` は回収の許可と経験値の補充、`finish` は練習の終了と最初の武器の選択の予約を担う。
+  - 練習の進行は通常版でも受け付ける `tutorial` 命令で行う。`status` は残りの敵と星のかけらの数・最寄りの位置、`spawn` は指定位置への敵の配置、`refill` はゲージの補充、`pickups` は回収の許可と経験値の補充、`finish` は練習の終了と最初の武器の選択の予約を担う。
   - 説明は `tutorial_prompt.gd` が `show_menu_overlay()` で重ね、閉じるまでランを止める。パネルの中身は `tutorial_panel.gd`、一覧は `tutorial_lessons.gd` が持ち、ポーズメニューの操作ガイド（`tutorial_guide.gd`）と共用する。
   - パネルの動く絵は、実際のランを録画したコマを格子状に並べた `assets/ui/tutorial/*.png`。制作時に作って固定資源として置き、パネルを開くときに読み込んで、パネルの寿命で保持する。コマの数と手順表示の時刻は `tutorial_lessons.gd` に持つ。
 - すべての UI は `Control` で作り、アンカーとコンテナで画面の大きさに合わせる。座標を決め打ちしない。

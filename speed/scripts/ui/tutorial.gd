@@ -182,6 +182,8 @@ func _open(step: int) -> void:
 			_markers.gate_radius = reach * 0.16
 			_place_gate()
 		Step.BOOST:
+			# 前の段でブーストを使っていても、お手本の線を描ける長さを確保する。
+			bridge.command("tutorial", {"action": "refill"})
 			var path := _guide_path(reach)
 			_markers.show_path(path, ContentManager.cfg.trace_radius)
 			var spots := PackedVector2Array()
@@ -221,7 +223,9 @@ func _guide_path(reach: float) -> PackedVector2Array:
 	if heading.length() < 0.5:
 		heading = Vector2.RIGHT
 	var side := heading.orthogonal()
-	var length := minf(float(_ui.draw.draw_reach) * 0.55, reach * 1.5)
+	# 描ける長さは満タンのときの値で決める。今のゲージの残りには左右させない。
+	var full_reach := float(_ui.draw.draw_reach) / clampf(float(_ui.draw.gauge), 0.05, 1.0)
+	var length := minf(full_reach * 0.55, reach * 1.5)
 	var start := _ship() + heading * reach * 0.3 - side * length * 0.42
 	var finish := start + side * length * 0.84
 	var control := (start + finish) * 0.5 + heading * length * 0.62
