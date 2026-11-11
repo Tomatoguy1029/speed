@@ -3,7 +3,7 @@ extends Control
 
 signal closed
 const PANEL := preload("res://scripts/ui/tutorial_panel.gd")
-const DESIGN := Vector2(1280, 720)
+const DESIGN := Vector2(640, 360)
 var _canvas: Control
 var _hint: Label
 var _clock := 0.0
@@ -20,20 +20,21 @@ func _init(lesson: Dictionary) -> void:
 	_canvas = Control.new()
 	_canvas.size = DESIGN
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(_canvas)
 	var center := CenterContainer.new()
 	center.size = DESIGN
 	center.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.add_child(center)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 16)
+	column.add_theme_constant_override("separation", 5)
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	center.add_child(column)
 	column.add_child(PANEL.new(lesson))
 	_hint = Label.new()
 	_hint.text = tr("tutorial.next")
 	_hint.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_hint.add_theme_font_size_override("font_size", 20)
+	_hint.add_theme_font_size_override("font_size", 9)
 	_hint.add_theme_color_override("font_color", Color("5fe3ff"))
 	column.add_child(_hint)
 	resized.connect(_layout)

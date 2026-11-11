@@ -26,7 +26,7 @@ static func base_value(definition: EnemyDef, key: String, cfg: GameConfig) -> fl
 
 static func label(key: String) -> String:
 	if key=="rank": return "星の数"
-	if key.begins_with("xp_reward_counts."): return ["青い結晶の数","緑の結晶の数","黄色い結晶の数"][REWARD_KINDS.find(key.get_slice(".",1))]
+	if key.begins_with("xp_reward_counts."): return ["青い星のかけらの数","緑の星のかけらの数","黄色い星のかけらの数"][REWARD_KINDS.find(key.get_slice(".",1))]
 	if LABELS.has(key): return LABELS[key]
 	var name := key.trim_prefix("params.")
 	return "%s (%s)" % [EnemyDef.PARAMS_DOCS[name][0], name] if EnemyDef.PARAMS_DOCS.has(name) else name
@@ -47,7 +47,7 @@ static func error_for(definition: EnemyDef, values: Dictionary) -> String:
 		if typeof(value) not in [TYPE_INT, TYPE_FLOAT] or not is_finite(float(value)) or float(value) < minimum(key) or float(value) > 100000.0:
 			return "範囲外の数値: %s" % key
 		if (key=="rank" or key.begins_with("xp_reward_counts.")) and (float(value)!=floorf(float(value)) or (key=="rank" and float(value)>10.0)):
-			return "星の数と結晶の数は範囲内の整数で指定してください。"
+			return "星の数と星のかけらの数は範囲内の整数で指定してください。"
 		if key.begins_with("params.") and definition.params[key.trim_prefix("params.")] is int and float(value) != floorf(float(value)):
 			return "整数で指定する項目: %s" % key
 	return ""

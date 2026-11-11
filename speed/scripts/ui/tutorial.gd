@@ -7,10 +7,10 @@ const LESSONS := preload("res://scripts/ui/tutorial_lessons.gd")
 const PROMPT := preload("res://scripts/ui/tutorial_prompt.gd")
 const STRIP := preload("res://scripts/ui/tutorial_strip.gd")
 const MARKERS := preload("res://scripts/ui/tutorial_markers.gd")
-const DESIGN := Vector2(1280, 720)
+const DESIGN := Vector2(640, 360)
 const ENEMY := "biter"
 const GATES := 3
-enum Step { MOVE, BOOST, GAUGE, XP, CARDS, DONE }
+enum Step { MOVE, BOOST, GAUGE, XP, CARDS, END, DONE }
 
 var hud: Control
 var bridge: RefCounted
@@ -31,7 +31,6 @@ var _gates_left := GATES
 var _boosted := false
 var _enemies := 0
 var _start_level := 0
-var _done_time := 0.0
 ## 敵を置いた場所（置いた順）
 var _spots: Array[PackedVector2Array] = []
 
@@ -41,12 +40,13 @@ func _ready() -> void:
 	_canvas = Control.new()
 	_canvas.size = DESIGN
 	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	add_child(_canvas)
 	var column := VBoxContainer.new()
-	column.position = Vector2(0, 560)
-	column.size = Vector2(DESIGN.x, 130)
+	column.position = Vector2(0, 280)
+	column.size = Vector2(DESIGN.x, 65)
 	column.alignment = BoxContainer.ALIGNMENT_END
-	column.add_theme_constant_override("separation", 10)
+	column.add_theme_constant_override("separation", 4)
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_canvas.add_child(column)
 	_caption_box = PanelContainer.new()
@@ -55,15 +55,15 @@ func _ready() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0.04, 0.06, 0.13, 0.85)
 	style.border_color = Color("2f4466")
-	style.set_border_width_all(2)
-	style.set_corner_radius_all(22)
-	style.content_margin_left = 26.0
-	style.content_margin_right = 26.0
-	style.content_margin_top = 8.0
-	style.content_margin_bottom = 8.0
+	style.set_border_width_all(1)
+	style.set_corner_radius_all(9)
+	style.content_margin_left = 12.0
+	style.content_margin_right = 12.0
+	style.content_margin_top = 3.0
+	style.content_margin_bottom = 3.0
 	_caption_box.add_theme_stylebox_override("panel", style)
 	_caption = Label.new()
-	_caption.add_theme_font_size_override("font_size", 24)
+	_caption.add_theme_font_size_override("font_size", 10)
 	_caption_box.add_child(_caption)
 	column.add_child(_caption_box)
 	_strip = STRIP.new()
@@ -105,10 +105,7 @@ func _process(delta: float) -> void:
 	var events := _events
 	_events = []
 	if _step == Step.DONE:
-		_done_time += delta
-		_caption_box.modulate.a = clampf(5.0 - _done_time, 0.0, 1.0)
-		if _done_time >= 5.0:
-			queue_free()
+		queue_free()
 		return
 	if _prompt != null:
 		return
@@ -156,7 +153,10 @@ func _process(delta: float) -> void:
 				_advance(Step.CARDS, 0.0)
 		Step.CARDS:
 			if phase == Phase.Play and int(_ui.level) > _start_level and not hud.reward_active():
-				_finish()
+				_advance(Step.END, 0.4)
+		Step.END:
+			# 終了の説明を閉じたら、最初の武器の選択へ進む。
+			_finish()
 	_refresh()
 
 func _advance(next: int, delay := 0.7) -> void:
@@ -167,7 +167,7 @@ func _advance(next: int, delay := 0.7) -> void:
 
 ## 段の準備をして説明を開く。ランは説明を閉じるまで止まる。
 func _open(step: int) -> void:
-	var prompt := PROMPT.new(LESSONS.LESSONS[step])
+	var prompt := PROMPT.new(LESSONS.END if step == Step.END else LESSONS.LESSONS[step])
 	if not hud.show_menu_overlay(prompt):
 		prompt.free()
 		return
@@ -182,6 +182,8 @@ func _open(step: int) -> void:
 			_markers.gate_radius = reach * 0.16
 			_place_gate()
 		Step.BOOST:
+			# 前の段でブーストを使っていても、お手本の線を描ける長さを確保する。
+			bridge.command("tutorial", {"action": "refill"})
 			var path := _guide_path(reach)
 			_markers.show_path(path, ContentManager.cfg.trace_radius)
 			var spots := PackedVector2Array()
@@ -221,7 +223,9 @@ func _guide_path(reach: float) -> PackedVector2Array:
 	if heading.length() < 0.5:
 		heading = Vector2.RIGHT
 	var side := heading.orthogonal()
-	var length := minf(float(_ui.draw.draw_reach) * 0.55, reach * 1.5)
+	# 描ける長さは満タンのときの値で決める。今のゲージの残りには左右させない。
+	var full_reach := float(_ui.draw.draw_reach) / clampf(float(_ui.draw.gauge), 0.05, 1.0)
+	var length := minf(full_reach * 0.55, reach * 1.5)
 	var start := _ship() + heading * reach * 0.3 - side * length * 0.42
 	var finish := start + side * length * 0.84
 	var control := (start + finish) * 0.5 + heading * length * 0.62
@@ -259,10 +263,9 @@ func _refresh() -> void:
 		Step.GAUGE: text = tr("tutorial.goal.gauge").format({"n": _enemies})
 		Step.XP: text = tr("tutorial.goal.xp")
 		Step.CARDS: text = tr("tutorial.goal.cards")
-		Step.DONE: text = tr("tutorial.goal.done")
 	_caption.text = text
 	var playing := phase == Phase.Play or (_step == Step.CARDS and phase == Phase.Levelup)
-	_caption_box.visible = _prompt == null and _step == _next_step and text != "" and (playing or _step == Step.DONE) and not (_step == Step.CARDS and hud.reward_active())
+	_caption_box.visible = _prompt == null and _step == _next_step and text != "" and playing and not (_step == Step.CARDS and hud.reward_active())
 	_strip.visible = _caption_box.visible and _step in [Step.BOOST, Step.GAUGE] and phase == Phase.Play
 	if _strip.visible:
 		var draw: Dictionary = _ui.draw

@@ -71,7 +71,8 @@ func _point(at: Vector2, label: String, on: bool) -> void:
 	var pulse := 0.5 + 0.5 * sin(_clock * 5.0)
 	var color := CYAN if on else Color(1, 1, 1, 0.4)
 	draw_arc(at, (11.0 + (pulse * 3.0 if on else 0.0)) * pixel, 0.0, TAU, 40, color, 1.5 * pixel, false)
-	var font := ThemeDB.fallback_font
+	var theme_font := ThemeDB.get_project_theme().default_font if ThemeDB.get_project_theme() != null else null
+	var font: Font = theme_font if theme_font != null else ThemeDB.fallback_font
 	var font_size := 16
 	var scale_factor := pixel * 0.75
 	draw_set_transform(at, 0.0, Vector2.ONE * scale_factor)

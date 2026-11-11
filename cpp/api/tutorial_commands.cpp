@@ -51,6 +51,11 @@ Dictionary SpeedRunCore::tutorial_command(const Dictionary &p) {
         }
         return reply(true);
     }
+    if (action=="refill" && p.size()==1) {
+        // お手本の線を描ける長さを保証するため、ゲージを満タンへ戻す。
+        if (s.draw.drawing || s.draw.tracing) return reply(false);
+        s.draw.gauge=1;return reply(true);
+    }
     if (action=="finish" && p.size()==1) {
         c.tutorial=false;c.tutorial_pickups=false;c.tutorial_start_pending=true;
         s.invincible=false;s.world.boss_spawned=false;
