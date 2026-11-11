@@ -477,7 +477,7 @@ func _flush_cpp_performance() -> void:
 	_cpp_perf_frames = 0
 	_cpp_perf_elapsed_us = 0
 
-## 定期記録では集計だけを読み、個々の結晶は途中開始時に一度だけ写す。
+## 定期記録では集計だけを読み、個々の星のかけらは途中開始時に一度だけ写す。
 func _cpp_sample() -> void:
 	if _session==null or _session.bridge==null: return
 	var response: Dictionary = _session.bridge.read_recording()

@@ -8,7 +8,7 @@ const GROUPS := {
 	"移動": ["速度・旋回", "距離・隊列"],
 	"攻撃": ["威力・効果", "予告・頻度", "照準・追尾", "範囲・形状", "弾速・軌道"],
 	"固有行動": ["分裂・召喚", "捕捉・投擲", "その他の行動"],
-	"報酬": ["星と結晶"],
+	"報酬": ["星と星のかけら"],
 }
 const BASICS := {
 	"hitstop_multiplier": ["ヒットストップ時間倍率", "一撃撃破・体当たりクリティカルの停止実時間に掛ける。1で共通時間、0で停止なし。共通の累積上限内で停止。", "倍"],
@@ -28,7 +28,7 @@ static func docs(key: String) -> Array:
 	return EnemyDef.PARAMS_DOCS.get(name, [name, "敵固有の行動が参照する値。", "—"])
 
 static func category(key: String) -> String:
-	if key=="rank" or key.begins_with("xp_reward_counts."): return "星と結晶"
+	if key=="rank" or key.begins_with("xp_reward_counts."): return "星と星のかけら"
 	if key == "hitstop_multiplier": return "ヒットストップ"
 	if key in ["hp", "armor"]: return "耐久・装甲"
 	if key == "weak_arc" or key == "params.front_arc": return "弱点"

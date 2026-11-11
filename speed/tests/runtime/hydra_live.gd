@@ -97,7 +97,7 @@ func check_environment() -> void:
 	var moved := enemy(core,wall_enemy)
 	check(moved.pos[0]<1800.0 and moved.pos[0]>0.0,"囲いの設置で壁に埋まる敵を内側へ移す")
 	var gems: Array = core.pickups_snapshot().gems.filter(func(value): return value.id==gem)
-	check(gems.size()==1 and gems[0].pos.x<1800.0 and gems[0].value==cfg.xp_crystal_values[RunIds.GemKind.Mid] and gems[0].kind==RunIds.GemKind.Mid,"囲いの設置で結晶の種類と経験値を保って内側へ移す")
+	check(gems.size()==1 and gems[0].pos.x<1800.0 and gems[0].value==cfg.xp_crystal_values[RunIds.GemKind.Mid] and gems[0].kind==RunIds.GemKind.Mid,"囲いの設置で星のかけらの種類と経験値を保って内側へ移す")
 	bridge.command("dev_stream_rocks",{"center":Vector2(400,0),"half":Vector2(2400,1800),"dt":0.02})
 	var rocks: Array = bridge.command("dev_field_query",{"action":"rocks"}).value
 	check(rocks.size()==1 and rocks[0].position.x<1800.0 and rocks[0].enemy_id>0 and enemy(core,rocks[0].enemy_id).pos[0]<1800.0,"岩の生成元と表示用の個体が同じ囲いの内側に残る")

@@ -698,7 +698,7 @@ func check_run_render(enemies_only := false) -> bool:
 	if DisplayServer.get_name()!="headless":
 		await RenderingServer.frame_post_draw
 		get_viewport().get_texture().get_image().save_png("/tmp/speed-cpp-r04-scene.png")
-	check(presentation.frame_view.batches.has(3),"撃破後の結晶を通常画面へ渡す")
+	check(presentation.frame_view.batches.has(3),"撃破後の星のかけらを通常画面へ渡す")
 	print("[run_render] build_us=%d submit_us=%d" % [presentation.frame_view.build_us,presentation.frame_view.submit_us])
 	var world: WeakRef = weakref(session.view.get_node("World"))
 	session.free()

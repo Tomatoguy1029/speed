@@ -111,7 +111,7 @@ func check_cpp_planet() -> void:
 	for batch: Dictionary in render.batches:
 		if batch.visual_id==visual_id:
 			displayed = batch.layer==2 and batch.ids.size()==1 and is_equal_approx(batch.transforms[0],config.planet_radius) and Vector2(batch.transforms[4],batch.transforms[5])==Vector2.ZERO
-	check(displayed,"惑星の表示が判定と同じ位置・半径を使い、敵・結晶より奥へ出る")
+	check(displayed,"惑星の表示が判定と同じ位置・半径を使い、敵・星のかけらより奥へ出る")
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	presentation._present_cpp(0.0)
 	check(presentation.frame_view.batches.has(visual_id),"通常の表示へ惑星の資源キーを届ける")
@@ -326,7 +326,7 @@ func check_cpp_rocks() -> void:
 	var killed: Dictionary = bridge.command("dev_kill",{"entity_id":target,"cause":"ram"})
 	check(killed.ok and killed.value.killed,"隕石の撃破を共通の撃破・報酬へ通す")
 	var drops: Dictionary = bridge._core.pickups_snapshot()
-	check(not drops.gems.is_empty() and drops.coins.size()>=1 and drops.coins.size()<=3 and drops.capsules.size()==2,"隕石の固定結晶・固有の部品数・回復/マグネットを出す")
+	check(not drops.gems.is_empty() and drops.coins.size()>=1 and drops.coins.size()<=3 and drops.capsules.size()==2,"隕石の固定星のかけら・固有の部品数・回復/マグネットを出す")
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
 	presentation._present_cpp(0.0)
 	check(not presentation.frame_view._meteor_shards.is_empty(),"隕石の撃破から既存の画像片を表示する")

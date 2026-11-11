@@ -8,7 +8,8 @@ var _atlas: AtlasTexture
 var _strip: HBoxContainer
 var _clock := 0.0
 
-func _init(lesson: Dictionary, picture_width := 480.0, title_size := 30, body_size := 20) -> void:
+## compact は操作ガイドの一覧用。余白を詰め、手順表示を省く。
+func _init(lesson: Dictionary, picture_width := 540.0, title_size := 30, body_size := 19, compact := false) -> void:
 	_lesson = lesson
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style := StyleBoxFlat.new()
@@ -16,10 +17,10 @@ func _init(lesson: Dictionary, picture_width := 480.0, title_size := 30, body_si
 	style.border_color = Color("2f4466")
 	style.set_border_width_all(2)
 	style.set_corner_radius_all(8)
-	style.set_content_margin_all(22.0)
+	style.set_content_margin_all(10.0 if compact else 22.0)
 	add_theme_stylebox_override("panel", style)
 	var column := VBoxContainer.new()
-	column.add_theme_constant_override("separation", 14)
+	column.add_theme_constant_override("separation", 8 if compact else 14)
 	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(column)
 	var title := Label.new()
@@ -41,14 +42,14 @@ func _init(lesson: Dictionary, picture_width := 480.0, title_size := 30, body_si
 		picture.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		column.add_child(picture)
 		_show_frame(0)
-	if lesson.has("strip"):
+	if lesson.has("strip") and not compact:
 		_strip = STRIP.new(maxi(12, body_size - 2), maxf(1.0, body_size / 12.0))
 		column.add_child(_strip)
 	var body := Label.new()
 	body.text = tr("tutorial.%s.body" % lesson.key)
 	body.add_theme_font_size_override("font_size", body_size)
-	body.add_theme_constant_override("line_spacing", 6)
-	body.autowrap_mode = TextServer.AUTOWRAP_ARBITRARY
+	body.add_theme_constant_override("line_spacing", 2 if compact else 6)
+	body.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	body.custom_minimum_size.x = picture_width
 	body.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	column.add_child(body)

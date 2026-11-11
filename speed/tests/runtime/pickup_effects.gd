@@ -37,7 +37,7 @@ func _ready() -> void:
 	if "--cpp-cargo" in OS.get_cmdline_user_args():
 		var finished: bool = await check_cpp_cargo()
 		if finished: finished = check_cpp_crow_index()
-		check(finished,"結晶の運搬の確認を最後まで実施する")
+		check(finished,"星のかけらの運搬の確認を最後まで実施する")
 		print("[cpp_cargo] failed=%d" % failed)
 		get_tree().quit(1 if failed else 0)
 		return
@@ -109,11 +109,11 @@ func check_cpp_reward() -> void:
 			check(reward_counts(gems)==expected,"星数・上書きの固定報酬は通常/エリートで同じ Rank%d" % definition.rank)
 			for gem: Dictionary in gems:
 				check(gem.id>0 and gem.base_xp==float(config.xp_crystal_values[gem.kind]),"大きさ・機体倍率やエリートを基準XPへ掛けない")
-				check(gem.origin.enemy==definition.id and gem.origin.spawn_t==0.0 and gem.origin.spawn_world_t==0.0,"結晶の出所と生成時の時計を残す")
+				check(gem.origin.enemy==definition.id and gem.origin.spawn_t==0.0 and gem.origin.spawn_world_t==0.0,"星のかけらの出所と生成時の時計を残す")
 			var rolls: int = snapshot.xp_statistics.gold_rolls
 			check(rolls==(2 if elite else 1) if reward.gold_eligible else rolls==0,"対象の敵1体につき追加黄色を1回だけ抽選する")
 			var dropped: int = records.filter(func(event): return event.type==&"xp_drop" and event.payload.enemy_id==id).size()
-			check(dropped==gems.size(),"結晶の供給を同じ通知列へ1個ずつ記録する")
+			check(dropped==gems.size(),"星のかけらの供給を同じ通知列へ1個ずつ記録する")
 			if not gems.is_empty():
 				var kill_index := -1
 				var drop_index := -1
@@ -122,7 +122,7 @@ func check_cpp_reward() -> void:
 					if records[n].type==&"xp_drop" and records[n].payload.enemy_id==id:
 						drop_index=n
 						break
-				check(kill_index>=0 and kill_index<drop_index,"撃破の通知を結晶の供給より先に出す")
+				check(kill_index>=0 and kill_index<drop_index,"撃破の通知を星のかけらの供給より先に出す")
 			bridge.command("dev_kill",{"entity_id":id,"cause":"shot"})
 			check(bridge._core.pickups_snapshot()==snapshot,"同じ敵の二度目の撃破は供給も抽選もしない")
 		# ボス本体と退場は通常報酬の入口へ流さない。
@@ -156,7 +156,7 @@ func check_cpp_reward() -> void:
 		bridge._core.step_pickups(0.1)
 		var after: Dictionary = bridge._core.pickups_snapshot()
 		for n in after.gems.size():
-			check(after.gems[n].pos.distance_to(before.gems[n].pos+before.gems[n].velocity*0.1)<=0.0001,"結晶を実際に放射方向へ動かす")
+			check(after.gems[n].pos.distance_to(before.gems[n].pos+before.gems[n].velocity*0.1)<=0.0001,"星のかけらを実際に放射方向へ動かす")
 			check(is_equal_approx(after.gems[n].wait,0.25) and after.gems[n].velocity.length()<before.gems[n].velocity.length(),"散乱中は減速し、待ち時間後に回収を許可する")
 		var bursts: int = records.filter(func(event): return event.type==&"gem_burst").size()
 		check(bursts==(0 if id==&"splitter" else 1),"splitterでは散らすだけにし、黄色い輪を追加しない")
@@ -214,7 +214,7 @@ func check_cpp_reward_view() -> bool:
 
 func supply_crystal(bridge,position: Vector2,kind: int) -> int:
 	var result: Dictionary = bridge.command("dev_drop_crystal",{"position":position,"kind":kind})
-	check(result.ok,"実際の共通供給で結晶を置く")
+	check(result.ok,"実際の共通供給で星のかけらを置く")
 	return int(result.value) if result.ok else 0
 
 func base_total(rows: Array) -> float:
@@ -241,7 +241,7 @@ func check_cpp_cap() -> bool:
 	check(bridge.command("dev_kill",{"entity_id":enemy,"cause":"shot"}).ok,"満杯で6個の固定報酬を供給する")
 	var full: Dictionary = bridge._core.pickups_snapshot()
 	check(full.gems.size()==8 and full.absorber_id==0 and reward_counts(full.gems)==[6,2,0],"既存の6枠を先に確保し、同じ撃破の新しい6個を残す")
-	check(full.gems.filter(func(gem): return gem.kind==0).all(func(gem): return gem.pos.distance_to(Vector2(-1000,500))<9.0),"満杯でも撃破現場へ新結晶を置く")
+	check(full.gems.filter(func(gem): return gem.kind==0).all(func(gem): return gem.pos.distance_to(Vector2(-1000,500))<9.0),"満杯でも撃破現場へ新しい星のかけらを置く")
 	check(is_equal_approx(base_total(full.xp_statistics.lost),6*config.xp_crystal_values[1]),"取り除いた保持XPを消失へ一度だけ数える")
 	check(records.filter(func(event): return event.type==&"xp_lost" and event.payload.reason==&"capacity").size()==6,"上限による消失を記録する")
 	check(not records.any(func(event): return event.type in [&"xp_absorb",&"xp_absorber",&"xp_collect"]),"上限で集約・自動取得を発生させない")
@@ -309,13 +309,13 @@ func check_cpp_cap() -> bool:
 	ids.append(supply_crystal(bridge,at+Vector2(220,0),0))
 	var outside: int = supply_crystal(bridge,at+Vector2(240,0),2)
 	var stationary: Dictionary = bridge._core.pickups_snapshot()
-	check(bridge._core.step_pickups(0.5) and bridge._core.pickups_snapshot().gems==stationary.gems,"画面外の静止結晶を移動・自動取得せず保持する")
+	check(bridge._core.step_pickups(0.5) and bridge._core.pickups_snapshot().gems==stationary.gems,"画面外の静止した星のかけらを移動・自動取得せず保持する")
 	var rendered: Dictionary = bridge.read_render(Rect2(at-Vector2(100,100),Vector2(200,200)),1.0).value
 	var crystals: Array = rendered.batches.filter(func(batch): return batch.visual_id==3)
-	check(crystals.size()==1,"結晶を共通の描画バッチへ渡す")
+	check(crystals.size()==1,"星のかけらを共通の描画バッチへ渡す")
 	if crystals.size()==1:
 		var batch: Dictionary = crystals[0]
-		check(batch.layer==6 and batch.ids.size()==4 and not batch.ids.has(outside) and ids.all(func(id): return batch.ids.has(id)),"描画上限未満ならカメラ+128pxの全結晶を敵の背面に描き、それ以外を除外する")
+		check(batch.layer==6 and batch.ids.size()==4 and not batch.ids.has(outside) and ids.all(func(id): return batch.ids.has(id)),"描画上限未満ならカメラ+128pxの全ての星のかけらを敵の背面に描き、それ以外を除外する")
 		check(batch.colors[0]==Color("08DEFF") and batch.colors[1]==Color("945CFF") and batch.colors[2]==Color("FFB609"),"3種類の色を保持する")
 		check(batch.transforms[0]==batch.transforms[6] and batch.transforms[0]==batch.transforms[12],"種類によらず同じ寸法にする")
 	bridge.dispose()
@@ -340,13 +340,13 @@ func check_cpp_cargo() -> bool:
 	supply_crystal(bridge,Vector2(-1500,500),1)
 	var before: Dictionary = bridge._core.pickups_snapshot()
 	var original: Dictionary = before.gems.filter(func(gem): return gem.id==crystal)[0]
-	check(bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal}).ok,"黄色結晶を共通運搬へ渡す")
+	check(bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":crystal}).ok,"黄色の星のかけらを共通運搬へ渡す")
 	var carried: Dictionary = bridge._core.pickups_snapshot()
 	check(carried.gems.size()==1 and carried.absorber_id==0 and carried.cargo.size()==1,"地面から外し運搬表へ移す")
 	var cargo: Dictionary = carried.cargo[0].crystals[0]
 	check(cargo.id==crystal and cargo.kind==2 and cargo.base_xp==original.base_xp and cargo.origin==original.origin,"色・実保持量・ID・出所を丸ごと保持する")
 	check(base_total(carried.xp_statistics.supplied)==base_total(before.xp_statistics.supplied),"運搬を新規供給へ数えない")
-	check(records.any(func(event): return event.type==&"xp_transfer" and event.payload.id==crystal and not event.payload.was_absorber),"通常の結晶を運んだことを記録する")
+	check(records.any(func(event): return event.type==&"xp_transfer" and event.payload.id==crystal and not event.payload.was_absorber),"通常の星のかけらを運んだことを記録する")
 	var saved: Dictionary = bridge.checkpoint()
 	supply_crystal(bridge,Vector2(-500,500),2)
 	check(bridge.restore(saved.value).ok and bridge._core.pickups_snapshot()==carried,"運搬表と供給量を保持して復帰する")
@@ -373,7 +373,7 @@ func check_cpp_cargo() -> bool:
 	bridge.command("dev_kill",{"entity_id":carrier,"cause":"shot"})
 	dropped = bridge._core.pickups_snapshot()
 	var returned: Dictionary = dropped.gems.filter(func(gem): return gem.id==crystal)[0]
-	check(returned.ground_order>original.ground_order and returned.kind==original.kind and returned.base_xp==original.base_xp and returned.origin==original.origin,"再配置だけ新しい順を付け、結晶の意味を変えない")
+	check(returned.ground_order>original.ground_order and returned.kind==original.kind and returned.base_xp==original.base_xp and returned.origin==original.origin,"再配置だけ新しい順を付け、星のかけらの意味を変えない")
 	bridge.dispose()
 	# 退却・解放・一括消去は撃破報酬にせず、保存した量をlostへ移す。
 	bridge = reward_bridge(definition,config)
@@ -425,7 +425,7 @@ func check_cpp_cargo_record() -> bool:
 	bridge.command("dev_carry_crystal",{"entity_id":loss_carrier,"crystal_id":crystal})
 	bridge.command("dev_remove",{"entity_id":loss_carrier})
 	var related: Array = records.filter(func(event): return event.type in [&"xp_drop",&"xp_transfer",&"xp_lost"] and event.payload.id==crystal)
-	check(related.size()==5,"供給・運搬・再配置・再運搬・喪失を同じ結晶IDで記録する")
+	check(related.size()==5,"供給・運搬・再配置・再運搬・喪失を同じ星のかけらのIDで記録する")
 	check(related.all(func(event): return event.payload.origin==origin and event.payload.xp==config.xp_crystal_values[1]),"運搬者が変わっても元の供給元・個体・時刻と基準XPを保つ: expected=%s actual=%s" % [var_to_str(origin),var_to_str(related.map(func(event): return event.payload.origin))])
 	bridge.dispose()
 	return true
@@ -437,7 +437,7 @@ func pickups_bridge(config: GameConfig):
 	var bytes: PackedByteArray = schema.write_content(data,schema.sha256("固定色の取得入口".to_utf8_buffer()))
 	var bridge = load("res://scripts/runtime/run_bridge.gd").new()
 	if not bridge.configure(bytes,{"api_version":1,"run_id":92,"mode":1,"stage_id":"pickups","profile":{},"settings":{}}).ok:
-		check(false,"取得用の結晶・カプセル定義を生成する")
+		check(false,"取得用の星のかけら・カプセル定義を生成する")
 		return null
 	check(bridge.start(932,{"position":Vector2(-3000,0)}).ok,"共通回収の固定場面を開始する")
 	return bridge
@@ -465,7 +465,7 @@ func check_cpp_pickups() -> bool:
 	var single: Array = records.filter(func(event): return event.type==&"xp_collect")
 	check(single.size()==1 and single[0].payload.method==&"ship" and single[0].payload.multiplier==1.875 and single[0].payload.actual_xp==0.234375,"通常回収で2つの倍率を一度だけ掛け、小数XPを保つ")
 	check(first.xp_statistics.collected_actual_xp==0.234375 and records.any(func(event): return event.type==&"levelup"),"取得でレベルが変わっても基準量と実取得量を分ける")
-	# 画面外・吸引待ちの結晶もビーコンの開始時に一括確定する。
+	# 画面外・吸引待ちの星のかけらもビーコンの開始時に一括確定する。
 	var carried_id: int = supply_crystal(bridge,Vector2(-2000,500),1)
 	var carrier: int = bridge._core.spawn_enemy(&"splitling",Vector2(-2000,500))
 	bridge.command("dev_carry_crystal",{"entity_id":carrier,"crystal_id":carried_id})
@@ -478,7 +478,7 @@ func check_cpp_pickups() -> bool:
 	var after: Dictionary = bridge._core.pickups_snapshot()
 	var batch: Array = records.filter(func(event): return event.type==&"xp_collect")
 	check(beacon.ok and beacon.value==expected and batch.size()==1 and batch[0].payload.count==3 and batch[0].payload.multiplier==1.875,"ビーコンは全対象と倍率を一度決め、まとめたXPで成長する")
-	check(after.gems.is_empty() and after.absorber_id==0 and after.cargo.size()==1,"ビーコンは地面の結晶だけを回収し、運搬中を含めない")
+	check(after.gems.is_empty() and after.absorber_id==0 and after.cargo.size()==1,"ビーコンは地面の星のかけらだけを回収し、運搬中を含めない")
 	check(is_equal_approx(after.xp_statistics.collected_actual_xp-first.xp_statistics.collected_actual_xp,expected),"ビーコンの実取得XPを累計へ一度だけ足す")
 	check(bridge.restore(saved.value).ok and bridge._core.pickups_snapshot()==before,"地面・運搬・基準/実取得の累計と倍率を保持して復帰する")
 	bridge.release_checkpoint(saved.value)
@@ -497,7 +497,7 @@ func check_cpp_pickups_tail() -> bool:
 	var final_xp := 0.0625
 	bridge.command("dev_add_xp",{"amount":final_xp})
 	check(is_equal_approx(bridge._ui.xp,final_xp),"開発用XPへ取得倍率を再適用しない")
-	check(bridge._core.pickups_snapshot().xp_statistics.collected_actual_xp==0.0,"開発用の最終XPを結晶回収へ混ぜない")
+	check(bridge._core.pickups_snapshot().xp_statistics.collected_actual_xp==0.0,"開発用の最終XPを星のかけらの回収へ混ぜない")
 	bridge.dispose()
 	# 回復拒否・寿命・コインと、彗星カプセルの待機IDを実際の更新で確認する。
 	config.xp_base = 1000.0
@@ -557,15 +557,15 @@ func check_cpp_crow_index() -> bool:
 	for kind in 3: ids.append(supply_crystal(bridge,feet,kind))
 	var front: int = supply_crystal(bridge,at+Vector2(100,0),0)
 	var distant: int = supply_crystal(bridge,at+Vector2(2000,0),1)
-	check(bridge._core.step_pickups(0.1),"空間検索から足元の結晶を収集する")
+	check(bridge._core.step_pickups(0.1),"空間検索から足元の星のかけらを収集する")
 	var carried: Dictionary = bridge._core.pickups_snapshot()
 	check(carried.cargo.size()==1 and carried.cargo[0].crystals.size()==3 and carried.cargo[0].crystals.all(func(gem): return gem.id in ids),"索引の近傍検索で3種類をそのまま運搬する")
-	check(carried.gems.size()==2 and carried.gems.all(func(gem): return gem.id==front or gem.id==distant),"前方と探索範囲外の結晶を残す")
+	check(carried.gems.size()==2 and carried.gems.all(func(gem): return gem.id==front or gem.id==distant),"前方と探索範囲外の星のかけらを残す")
 	var moving: int = supply_crystal(bridge,at+Vector2(-90,50),0)
 	var before: Dictionary = bridge._core.pickups_snapshot().gems.filter(func(gem): return gem.id==moving)[0]
 	bridge._core.step_pickups(0.01)
 	var after: Dictionary = bridge._core.pickups_snapshot().gems.filter(func(gem): return gem.id==moving)[0]
-	check(after.pos.distance_to(before.pos)>0.0,"からす座の吸引で地面の結晶を移動する")
+	check(after.pos.distance_to(before.pos)>0.0,"からす座の吸引で地面の星のかけらを移動する")
 	check(bridge._core.pickup_buffer(&"gem",1.0,Color.WHITE,Rect2(after.pos-Vector2.ONE,Vector2.ONE*2)).size()==12,"からす座が動かした位置で索引を照会できる")
 	var saved: Dictionary = bridge.checkpoint()
 	bridge._core.step_pickups(0.02)
@@ -611,17 +611,17 @@ func check_cpp_visible() -> bool:
 	check(bridge._core.pickups_snapshot()==before,"描画制限は保持状態・XPを変更しない")
 	var saved: Dictionary = bridge.checkpoint()
 	bridge.command("dev_ship_motion",{"position":at+Vector2(61,0),"velocity":Vector2.ZERO})
-	check(visible_crystal_ids(bridge,area)==[right,near],"機体の移動に応じて近い結晶を選び直す")
+	check(visible_crystal_ids(bridge,area)==[right,near],"機体の移動に応じて近い星のかけらを選び直す")
 	check(bridge.restore(saved.value).ok,"描画上限付きの保持点を復元する")
 	check(visible_crystal_ids(bridge,area)==expected,"復元後も同じ距離・IDの選択を維持する")
 	bridge.release_checkpoint(saved.value)
 	bridge.command("dev_pickup_rates",{"ship":1.5,"run":1.25})
-	# 隠れた結晶も通常回収対象。全て足元へ移動する代わりに各配置を機体で通る。
+	# 隠れた星のかけらも通常回収対象。全て足元へ移動する代わりに各配置を機体で通る。
 	for gem: Dictionary in before.gems:
 		bridge.command("dev_ship_motion",{"position":gem.pos,"velocity":Vector2.ZERO})
-		check(bridge._core.step_pickups(0.001),"上限を超えた結晶も通常の回収判定を通る")
+		check(bridge._core.step_pickups(0.001),"上限を超えた星のかけらも通常の回収判定を通る")
 	var after: Dictionary = bridge._core.pickups_snapshot()
-	check(after.gems.is_empty(),"描画されなかった結晶も全て回収する")
+	check(after.gems.is_empty(),"描画されなかった星のかけらも全て回収する")
 	check(is_equal_approx(after.xp_statistics.collected_actual_xp,base_total(before.gems)*1.875),"描画数によらず全基準XPへ倍率を一回適用する")
 	check(base_total(after.xp_statistics.lost)==0.0,"描画制限でXPを失わない")
 	bridge.dispose()

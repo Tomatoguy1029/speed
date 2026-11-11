@@ -61,7 +61,7 @@ func _cpp_ready() -> void:
 	_check(is_equal_approx(bridge.read_lab().value.max_hp,105.0) and is_equal_approx(bridge._core.ship_snapshot().ship_hp,40.0),"最大HP+5は現在HPを回復しない")
 	_check(is_equal_approx(bridge._ui.crit_mult,config.crit_mult+0.5),"倍率の加算を反映する")
 	_check(is_equal_approx(bridge._ui.charge_time,config.dash_charge_time*0.85),"充填の短縮を基準から適用する")
-	_check(is_equal_approx(bridge._ui.xp_pickup_radius,bridge._ui.pickup_radius*1.25),"吸引範囲はXP結晶だけへ反映する")
+	_check(is_equal_approx(bridge._ui.xp_pickup_radius,bridge._ui.pickup_radius*1.25),"吸引範囲は星のかけらだけへ反映する")
 	var baseline_attack: float = bridge._ui.attack_power
 	var input: Dictionary = bridge.pack_intent(Intent.new())
 	var viewport := {"logical_size":Vector2(640,480)}

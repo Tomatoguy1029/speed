@@ -20,12 +20,12 @@ func _init() -> void:
 	var column := VBoxContainer.new()
 	column.size = DESIGN
 	column.alignment = BoxContainer.ALIGNMENT_CENTER
-	column.add_theme_constant_override("separation", 12)
+	column.add_theme_constant_override("separation", 10)
 	_canvas.add_child(column)
 	var title := Label.new()
 	title.text = tr("tutorial.guide")
 	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	title.add_theme_font_size_override("font_size", 30)
+	title.add_theme_font_size_override("font_size", 26)
 	column.add_child(title)
 	var grid := GridContainer.new()
 	grid.columns = 3
@@ -34,14 +34,14 @@ func _init() -> void:
 	grid.add_theme_constant_override("v_separation", 12)
 	column.add_child(grid)
 	for lesson: Dictionary in LESSONS.LESSONS:
-		var card := PANEL.new(lesson, 352.0, 20, 14)
+		var card := PANEL.new(lesson, 280.0, 18, 12, true)
 		card.size_flags_vertical = Control.SIZE_FILL
 		grid.add_child(card)
 	var back := Button.new()
 	back.name = "BackButton"
 	back.unique_name_in_owner = true
 	back.text = tr("common.back")
-	back.custom_minimum_size = Vector2(240, 44)
+	back.custom_minimum_size = Vector2(240, 40)
 	back.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	back.pressed.connect(_on_back)
 	column.add_child(back)

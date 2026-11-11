@@ -105,7 +105,11 @@ func _process(delta: float) -> void:
 	var events := _events
 	_events = []
 	if _step == Step.DONE:
-		_done_time += delta
+		# 最初の武器を選び終えてから5秒かけて消す。
+		var playing: bool = int(_ui.phase) == Phase.Play and not hud.reward_active()
+		_caption_box.visible = playing
+		if playing:
+			_done_time += delta
 		_caption_box.modulate.a = clampf(5.0 - _done_time, 0.0, 1.0)
 		if _done_time >= 5.0:
 			queue_free()

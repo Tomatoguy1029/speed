@@ -212,7 +212,7 @@ func verify_cpp_perf() -> bool:
 	var label: String = overlay._label.text
 	for name in ["ゲーム更新","C++の出力構築","窓口の受け渡し","表示の更新","描画命令の構築","資源待ち","未分離","bytes/frame","GPU単独時間：未取得"]:
 		check(label.contains(name),"F3で%sを区別する" % name)
-	check(not label.contains("処理ごと（世界側") and label.contains("結晶 %d" % cumulative.rows.crystals[0]),"C++の実数で結晶を表示する")
+	check(not label.contains("処理ごと（世界側") and label.contains("星のかけら %d" % cumulative.rows.crystals[0]),"C++の実数で星のかけらを表示する")
 	check(overlay._cpp_window.packed_bytes_per_frame>0.0,"Packed配列の論理量をbytes/frameで表示する")
 	check(cumulative.timings.resource_wait[0]>0,"開始時の資源待ちを独立して記録する")
 	rec._flush_cpp_performance()
@@ -312,7 +312,7 @@ func verify_cpp_metadata_detail() -> bool:
 	overlay._acc = PerfOverlay.REFRESH
 	overlay._process(0.01)
 	var label: String = overlay._label.text
-	for name in ["物理更新","結晶","部品","描画命令","シェーダーのコンパイル","RAM","VRAM","つながっていないノード","表の行"]:
+	for name in ["物理更新","星のかけら","部品","描画命令","シェーダーのコンパイル","RAM","VRAM","つながっていないノード","表の行"]:
 		check(label.contains(name),"F3詳細へ%sの実数を戻す" % name)
 	check(overlay._view_label.visible and overlay._view_label.text.contains("C++処理") and overlay._view_label.text.contains("表示側") and overlay._view_label.text.contains("通常バッチ"),"F3右列へ処理・表示・描画個体数の内訳を戻す")
 	var first: Dictionary = bridge.read_metrics(StringName("recorder:%d" % rec.get_instance_id())).value
@@ -455,7 +455,7 @@ func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recordi
 	core.set_enemy_motion(owner,{"held":true})
 	var carried: int = bridge.command("dev_drop_crystal",{"position":origin+Vector2(500,0),"kind":1}).value
 	var carry_ok: bool = bridge.command("dev_carry_crystal",{"entity_id":owner,"crystal_id":carried}).ok
-	if "--cpp-recording-fix" not in OS.get_cmdline_user_args(): check(carry_ok,"途中開始前の運搬結晶を準備する")
+	if "--cpp-recording-fix" not in OS.get_cmdline_user_args(): check(carry_ok,"途中開始前の運搬中の星のかけらを準備する")
 	for kind in 3: bridge.command("dev_drop_crystal",{"position":origin+Vector2(700,0),"kind":kind})
 	bridge.collect_frame()
 	var before: Dictionary = core.inspect()
@@ -513,7 +513,7 @@ func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recordi
 			check(start.format=="cpp_events_v2" and start.identity.payload_sha256.length()==64 and start.identity.xp_reward_config_sha256.length()==64 and start.identity.implementation_version.begins_with("cpp_api"),"定義署名・報酬署名・実装版と開始条件を残す")
 			check(start.run_start.start.seed=="688" and start.missing_prefix,"開始seedと途中開始を明示する")
 			var existing: Array = rows.filter(func(row):return row.type=="xp_existing")
-			check(existing.size()==1 and existing[0].origin=="unobserved","途中開始の結晶の未観測の出所を推定しない")
+			check(existing.size()==1 and existing[0].origin=="unobserved","途中開始の星のかけらの未観測の出所を推定しない")
 			var ending: Dictionary = rows.back()
 			check(ending.type=="end" and ending.has("xp_cumulative") and ending.has("xp_observed") and ending.has("equipment_progress"),"終了時はラン累計と録画区間を分ける")
 			check(ending.get("combat_summary",{}).get("transport_complete",false) and ending.combat_summary.rate_or_count_dropped==0 and ending.combat_summary.size_dropped==0,"終了までの診断の送出数と欠測の有無を残す")
@@ -526,7 +526,7 @@ func cpp_recording_scenario(recording: bool, combat_detail := 2, restore_recordi
 				check(start.event_sequence_at_start==before_sequence,"開始前の通知番号を区間の欠落として数えない")
 				check(rows.any(func(row):return row.type=="hurt" and row.pos is Array and row.pos.size()==2),"C++通知の座標を既存と同じ数値配列で記録する")
 				check(existing[0].ground.size()==2 and existing[0].carried.size()==1 and existing[0].cap.absorber_id>0,"途中開始の地面・運搬・集約先の基準XPを保存する")
-				check(rows.any(func(row):return row.type in ["xp_drop","xp_absorb"] and row.get("source","")=="crow_carry" and row.id==carried and not row.new_supply),"運搬から戻した結晶を新しい供給と混ぜない")
+				check(rows.any(func(row):return row.type in ["xp_drop","xp_absorb"] and row.get("source","")=="crow_carry" and row.id==carried and not row.new_supply),"運搬から戻した星のかけらを新しい供給と混ぜない")
 				check(rows.any(func(row):return row.type=="combat_player_damage" and row.cause=="slash" and row.accepted) and rows.any(func(row):return row.type=="combat_player_damage" and not row.accepted),"機体の実HP減少と拒否理由を同じ通知経路から記録する")
 				check(ending.xp_observed.collected_actual_xp>0.0 and ending.xp_observed.supplied.high.base_xp>=0.0,"倍率適用後XPと基準XPの区間差を保存する")
 			elif i==paths.size()-1:

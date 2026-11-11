@@ -219,7 +219,7 @@ func _cpp_text() -> String:
 	var pools: Dictionary = current.attack_pools
 	lines.append("敵 %d  敵弾 %d  味方弾 %d  範囲 %d" % [current.enemies,pools.get("1",0),pools.get("0",0),pools.get("2",0)])
 	var rows: Dictionary = current.get("rows",{})
-	lines.append("結晶 %d  部品 %d" % [rows.get("crystals",[0,0])[0],rows.get("coins",[0,0])[0]])
+	lines.append("星のかけら %d  部品 %d" % [rows.get("crystals",[0,0])[0],rows.get("coins",[0,0])[0]])
 	if mode==Mode.DETAIL:
 		lines.append(HEAD % "処理時間（ms/フレーム）")
 		var names := {"sim":"ゲーム更新","output_build":"C++の出力構築","bridge_copy":"窓口の受け渡し","view_update":"表示の更新","view_draw":"描画命令の構築","resource_wait":"資源待ち","engine_gpu_wait":"描画エンジン・GPU・待ち（未分離）"}
@@ -242,7 +242,7 @@ func _cpp_text() -> String:
 		lines.append("RAM %s  VRAM %s" % [_mb(Performance.get_monitor(Performance.MEMORY_STATIC)),_mb(Performance.get_monitor(Performance.RENDER_VIDEO_MEM_USED))])
 		lines.append("オブジェクト %d  ノード %d  つながっていないノード %d" % [Performance.get_monitor(Performance.OBJECT_COUNT),Performance.get_monitor(Performance.OBJECT_NODE_COUNT),Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT)])
 		lines.append(HEAD % "表の行（使用中 / 空きを含む行数）")
-		var pool_names := {"enemies":"敵","hostile":"敵弾","friendly":"味方弾","hazards":"範囲","crystals":"結晶","coins":"部品"}
+		var pool_names := {"enemies":"敵","hostile":"敵弾","friendly":"味方弾","hazards":"範囲","crystals":"星のかけら","coins":"部品"}
 		for key in pool_names:
 			if rows.has(key): lines.append("%s %d/%d" % [pool_names[key],rows[key][0],rows[key][1]])
 		lines.append(HEAD % ("フレーム時間（直近%dフレーム、線は16.7msと33.3ms）" % GRAPH_FRAMES))

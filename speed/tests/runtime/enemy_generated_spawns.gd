@@ -291,7 +291,7 @@ func check_cpp_defender() -> void:
 
 func crow_gem(bridge,at: Vector2,kind: int) -> int:
 	var result: Dictionary = bridge.command("dev_drop_crystal",{"position":at,"kind":kind})
-	check(result.ok,"からす座の回収対象の結晶を供給する")
+	check(result.ok,"からす座の回収対象の星のかけらを供給する")
 	return int(result.value)
 
 func crow_ground(core,id: int) -> Dictionary:
@@ -359,13 +359,13 @@ func check_cpp_crow() -> void:
 	var separation: float = (pickup_ui.ship_radius+14.0+pickup_ui.xp_pickup_radius)*0.5
 	bridge.command("dev_ship_motion",{"position":pulled_pos-Vector2(separation,0),"velocity":Vector2.ZERO})
 	core.step_pickups(0.001)
-	check(not crow_ground(core,pulled).is_empty() and crow_ground(core,pulled).pulled,"機体が吸い寄せ始めた結晶を用意する")
+	check(not crow_ground(core,pulled).is_empty() and crow_ground(core,pulled).pulled,"機体が吸い寄せ始めた星のかけらを用意する")
 	var pulled_at: Vector2 = crow_ground(core,pulled).pos
 	bridge.command("dev_ship_motion",{"position":target,"velocity":Vector2.ZERO})
 	bridge.command("dev_relocate",{"entity_id":carrier,"position":pulled_at+Vector2(radius*0.62,0)})
 	core.set_enemy_motion(carrier,{"facing":0.0})
 	core.step_pickups(0.001)
-	check(not crow_ground(core,pulled).is_empty() and core.pickups_snapshot().cargo.is_empty(),"機体が吸い寄せている結晶は足元でも横取りしない")
+	check(not crow_ground(core,pulled).is_empty() and core.pickups_snapshot().cargo.is_empty(),"機体が吸い寄せている星のかけらは足元でも横取りしない")
 	bridge.command("dev_collect_gems",{})
 	bridge.command("dev_relocate",{"entity_id":carrier,"position":at})
 	core.set_enemy_motion(carrier,{"facing":0.0})
@@ -381,7 +381,7 @@ func check_cpp_crow() -> void:
 	var carried: Dictionary = core.pickups_snapshot()
 	var muted_before := mute_checks
 	mute_checks = false
-	check(carried.cargo.size()==1 and carried.cargo[0].crystals.size()==3 and carried.cargo[0].crystals.map(func(gem): return gem.id)==ids,"横から後ろの結晶を保存した個体IDごと運搬へ移す")
+	check(carried.cargo.size()==1 and carried.cargo[0].crystals.size()==3 and carried.cargo[0].crystals.map(func(gem): return gem.id)==ids,"横から後ろの星のかけらを保存した個体IDごと運搬へ移す")
 	check(not crow_ground(core,front).is_empty() and not crow_ground(core,side).is_empty() and not crow_ground(core,behind).is_empty(),"前方・横幅外・後ろの範囲外を回収しない")
 	mute_checks = muted_before
 	for original: Dictionary in originals:
@@ -391,12 +391,12 @@ func check_cpp_crow() -> void:
 	var moving: int = crow_gem(bridge,at+Vector2(-90,65),0)
 	var from: Vector2 = crow_ground(core,moving).pos
 	core.step_pickups(0.01)
-	check(is_equal_approx(crow_ground(core,moving).pos.distance_to(from),9.0),"回収まで離れた結晶は設定速度で足元へ進める")
+	check(is_equal_approx(crow_ground(core,moving).pos.distance_to(from),9.0),"回収まで離れた星のかけらは設定速度で足元へ進める")
 	var held_gem: int = crow_gem(bridge,feet,0)
 	core.set_enemy_motion(carrier,{"held":true})
 	core.step_pickups(0.02)
 	mute_checks = false
-	check(crow_ground(core,held_gem).is_empty() and split_entity(core,carrier,true).buds==4,"保持中も現行と同じ順で結晶の回収を続ける")
+	check(crow_ground(core,held_gem).is_empty() and split_entity(core,carrier,true).buds==4,"保持中も現行と同じ順で星のかけらの回収を続ける")
 	mute_checks = muted_before
 	core.set_enemy_motion(carrier,{"held":false})
 	var render: Dictionary = bridge.read_render(Rect2(target-Vector2(700,400),Vector2(1400,800))).value
@@ -410,8 +410,8 @@ func check_cpp_crow() -> void:
 	check(dropped.cargo.is_empty(),"撃破時は運搬表を一度だけ空にする")
 	for original: Dictionary in pending.cargo[0].crystals:
 		var returned := crow_ground(core,original.id)
-		check(not returned.is_empty() and returned.kind==original.kind and returned.base_xp==original.base_xp and returned.origin==original.origin,"撃破で保存した結晶を同じ意味のまま地面へ戻す")
-	check(bridge.restore(saved.value).ok and core.pickups_snapshot()==pending,"運搬途中の全結晶と個体の状態へ値から復帰する")
+		check(not returned.is_empty() and returned.kind==original.kind and returned.base_xp==original.base_xp and returned.origin==original.origin,"撃破で保存した星のかけらを同じ意味のまま地面へ戻す")
+	check(bridge.restore(saved.value).ok and core.pickups_snapshot()==pending,"運搬途中の全ての星のかけらと個体の状態へ値から復帰する")
 	core.set_motion_context(target,target,Vector2(640,360))
 	bridge.command("dev_relocate",{"entity_id":carrier,"position":target+Vector2(1160,0)})
 	core.set_enemy_motion(carrier,{"facing":PI})

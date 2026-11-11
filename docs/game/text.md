@@ -745,7 +745,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.field.comet | 彗星 | Comet |
 | lab.field.gravity | 重力 | Gravity well |
 | lab.field.warp | ワープホール | Warp hole |
-| lab.field.gem | 経験値の結晶 | Experience crystals |
+| lab.field.gem | 星のかけら | Experience crystals |
 | lab.ui.class&#95;boss | ボス | Bosses |
 | lab.ui.class&#95;other | 出現から外した敵 | Retired enemies |
 | lab.ui.stars&#95;all | 星：すべて | Stars: all |

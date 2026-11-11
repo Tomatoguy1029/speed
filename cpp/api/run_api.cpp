@@ -311,7 +311,7 @@ Dictionary SpeedRunCore::command_run(const Dictionary &envelope) {
         speed::PickupSystem::lose_all(runtime,speed::CargoLoss::Cleared);response=success();
     } else if (kind=="dev_drop_crystal" && runtime.api_development && payload.size()==2 && is(payload,"position",Variant::VECTOR2) && Vector2(payload["position"]).is_finite() && is(payload,"kind",Variant::INT) && int64_t(payload["kind"])>=0 && int64_t(payload["kind"])<=2) {
         const uint64_t crystal=speed::PickupSystem::supply(runtime,payload["position"],uint8_t(int64_t(payload["kind"])));
-        response=crystal?success(int64_t(crystal)):failure(9,"crystal","結晶を供給できません");
+        response=crystal?success(int64_t(crystal)):failure(9,"crystal","星のかけらを供給できません");
     } else if (kind=="dev_add_xp" && runtime.api_development && payload.size()==1 && (is(payload,"amount",Variant::FLOAT) || is(payload,"amount",Variant::INT))) {
         response=speed::ProgressionSystem::add_experience(*this,payload["amount"])?success():failure(1,"amount","最終取得XPが不正です");
     } else if (kind=="abort" && payload.size()==1 && is(payload,"reason",Variant::INT)) {
