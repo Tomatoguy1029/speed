@@ -19,6 +19,13 @@ uniform float finale_gray = 0.0;
 uniform float finale_lit = 0.0;
 uniform float finale_gap = 0.0;
 uniform vec2 finale_center = vec2(0.0);
+// 登場時だけ、顔の元画像の赤い目を発光させ、奥の部位を裂け目の内側へ隠す。
+uniform bool entrance = false;
+uniform bool entrance_head = false;
+uniform float entrance_depth = 1.0;
+uniform float entrance_eyes = 0.0;
+uniform vec2 entrance_portal = vec2(0.0);
+uniform float entrance_open = 1.0;
 varying vec2 world_at;
 varying vec2 axis_x;
 varying vec2 axis_y;
@@ -66,6 +73,15 @@ void fragment() {
 		vec3 gray = mix(vec3(0.19, 0.24, 0.32), vec3(0.43, 0.47, 0.53), tone);
 		vec3 shadow = mix(vec3(0.02, 0.04, 0.094), gray, finale_gray);
 		result = mix(shadow, result, finale_lit);
+	}
+	if (entrance) {
+		vec2 portal_at = world_at - entrance_portal;
+		float aperture = max(1.0, 190.0 * entrance_open) * sqrt(max(0.0, 1.0 - pow(portal_at.y / 390.0, 2.0)));
+		if (entrance_depth < 0.25 && (abs(portal_at.y) > 390.0 || abs(portal_at.x) > aperture)) { discard; }
+		bool eye = entrance_head && albedo.r > 0.2 && albedo.r > albedo.g * 1.6 && albedo.r > albedo.b * 1.4;
+		if (entrance_depth <= 0.001 && !eye) { discard; }
+		result *= smoothstep(0.0, 0.7, entrance_depth);
+		if (eye) { result = mix(result, vec3(1.0, 0.025, 0.055), entrance_eyes); }
 	}
 	result = mix(result, vec3(1.0), boss_hit_white);
 	COLOR = vec4(srgb_light ? pow(max(result, vec3(0.0)), vec3(2.2)) : result, pixel.a) * vertex_tint;
