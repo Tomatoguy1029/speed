@@ -11,7 +11,7 @@ const LESSONS := [
 	{"key": "boost", "frames": 41, "strip": [[0.0, 0.6, 0], [0.6, 2.6, 1], [2.6, 3.1, 2]]},
 	{"key": "gauge", "frames": 64},
 	{"key": "xp", "frames": 63},
-	{"key": "cards", "frames": 45},
+	{"key": "cards", "frames": 42},
 ]
 
 static func clip_path(key: String) -> String:
