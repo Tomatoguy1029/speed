@@ -41,13 +41,17 @@ var _sliders: Dictionary = {}
 var _meta_boxes: Dictionary = {}
 var _status: Label
 var _hitstop_tab: VBoxContainer
+var _hud_visibility: Node
 
 func _ready() -> void:
 	visible = false
-	if not OS.is_debug_build():
+	if not OS.is_debug_build() or SaveManager.is_review_build():
 		queue_free()
 		return
 	_hud = get_parent().get_node("HudRoot")
+	_hud_visibility = preload("res://scripts/dev/hud_visibility.gd").new()
+	_hud_visibility.hud = _hud
+	add_child(_hud_visibility)
 	if cpp_session!=null:
 		_commands = preload("res://scripts/dev/run_commands.gd").new()
 		_commands.setup_cpp(cpp_session)
@@ -79,6 +83,12 @@ func _ready() -> void:
 	var box := VBoxContainer.new()
 	box.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	scroll.add_child(box)
+	var hide_ui := CheckButton.new()
+	hide_ui.name = "HidePlayUi"
+	hide_ui.text = "プレイ中のUIを非表示（武器獲得は表示）"
+	hide_ui.tooltip_text = "このランだけ。Pで開き直して解除できます。ポーズ・獲得操作は残します。"
+	hide_ui.toggled.connect(_hud_visibility.set_hidden)
+	box.add_child(hide_ui)
 	_status = Label.new()
 	box.add_child(_status)
 	var grid := GridContainer.new()
