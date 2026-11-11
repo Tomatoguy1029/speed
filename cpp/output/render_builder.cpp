@@ -143,6 +143,13 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
             const double time=AquariusBehavior::visual_time(run,uint32_t(i));
             if (time>=0) {const auto fx=AquariusBehavior::visual_pose(run,uint32_t(i),enemy.pos,enemy.facing,time);pose.position=fx.position;pose.angle=fx.facing;}
         }
+        if (definition.kind==EnemyDefinition::Kind::Sniper && SniperBehavior::aiming(run,uint32_t(i))) {
+            const auto &rays=std::get<SniperState>(enemy.behavior_state).rays;
+            if (rays.size()==48) {
+                const auto &p=run.content->snipers[definition.sniper_definition-1];
+                Dictionary fx;fx["id"]=enemy.id;fx["pos"]=pose.position;fx["radius"]=enemy.radius;fx["angle"]=pose.angle;fx["windup"]=enemy.mode==EnemyMode::Windup;fx["charge"]=enemy.charge;fx["timer"]=enemy.timer;fx["laser_charge"]=p.laser_charge;fx["half"]=SniperBehavior::half(run,uint32_t(i));fx["band_narrow"]=p.band_narrow;fx["length"]=p.band_len;fx["seen"]=SniperBehavior::sight(run,uint32_t(i),state.ship_pos)==1;fx["ship_pos"]=state.ship_pos;PackedFloat32Array lengths;for (float v:rays) lengths.push_back(v);fx["rays"]=lengths;telescope_actors.push_back(fx);
+            }
+        }
         const bool meteor=definition.kind==EnemyDefinition::Kind::Meteor;
         const bool iron=definition.kind==EnemyDefinition::Kind::Obstacle && definition.id==StringName("iron");
         if (meteor && state.field.rock_handles.contains(enemy.rock) && state.field.rocks[enemy.rock.slot].kind==RockKind::Comet) {
@@ -222,7 +229,6 @@ Dictionary RenderBuilder::read(const RunRuntime &run,Rect2 view,double alpha) {
                 const auto &p=run.content->snipers[definition.sniper_definition-1];
                 for (float v:{pose.position.x,pose.position.y,float(enemy.radius),float(pose.angle),float(enemy.mode),float(enemy.charge),float(enemy.timer),float(p.laser_charge),float(SniperBehavior::half(run,uint32_t(i))),float(p.band_len),float(SniperBehavior::sight(run,uint32_t(i),state.ship_pos)==1)}) enemy_batch.sniper.push_back(v);
                 for (float v:rays) enemy_batch.sniper.push_back(v);
-                Dictionary fx;fx["id"]=enemy.id;fx["pos"]=pose.position;fx["radius"]=enemy.radius;fx["angle"]=pose.angle;fx["windup"]=enemy.mode==EnemyMode::Windup;fx["charge"]=enemy.charge;fx["timer"]=enemy.timer;fx["laser_charge"]=p.laser_charge;fx["half"]=SniperBehavior::half(run,uint32_t(i));fx["band_narrow"]=p.band_narrow;fx["length"]=p.band_len;fx["seen"]=SniperBehavior::sight(run,uint32_t(i),state.ship_pos)==1;fx["ship_pos"]=state.ship_pos;PackedFloat32Array lengths;for (float v:rays) lengths.push_back(v);fx["rays"]=lengths;telescope_actors.push_back(fx);
             }
         }
         if (definition.kind==EnemyDefinition::Kind::Battleship && (enemy.charge>0 || definition.weak_arc>0)) {

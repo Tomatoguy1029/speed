@@ -1,4 +1,5 @@
 #include "power_shot.h"
+#include "reference_fx.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/attacks/light_arrow.h"
 #include "../../systems/tracking_policy.h"
@@ -39,7 +40,7 @@ void CentaurusPower::command(RunRuntime &r,TechniqueState &t,TechniqueCommand co
     else if (command==TechniqueCommand::ReleaseArrow && (t.stage==TechniqueStage::Windup || t.stage==TechniqueStage::Active)) {
         const auto from=v.alerting?v.origin:mouth(r,t);const auto target=p.track_during_warn?r.state.ship_pos:t.aim;
         const bool locked=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.locked();const double angle=v.alerting?v.angle:locked?e.facing:(target-from).angle();
-        for (uint32_t k=0;k<power.count;++k) {LightArrowParams shot;shot.position=from;shot.angle=angle+(double(k)-double(power.count-1)*0.5)*power.spread;shot.speed=p.speed;shot.radius=power.radius;shot.travel=power.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.cosmic=true;shot.owner=t.actor;shot.definition=power.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));LightArrowSystem::emit(r,shot);++v.released;}
+        for (uint32_t k=0;k<power.count;++k) {LightArrowParams shot;shot.position=from;shot.angle=angle+(double(k)-double(power.count-1)*0.5)*power.spread;shot.speed=p.speed;shot.radius=power.radius;shot.travel=power.travel;shot.damage=p.damage*r.state.combat_config.atk_scale;shot.cosmic=true;shot.owner=t.actor;shot.definition=power.projectile;shot.technique=r.state.bosses->handles.at(uint32_t(&t-r.state.bosses->techniques.data()));LightArrowSystem::emit(r,shot);CentaurusReferenceFx::released(r,t,from,shot.angle);++v.released;}
         t.stage=TechniqueStage::Active;cue(r,t,"released");
     } else if (command==TechniqueCommand::FinishVolley && (t.stage==TechniqueStage::Windup || t.stage==TechniqueStage::Active)) {t.stage=TechniqueStage::Recovery;t.remaining=p.recover;v.alerting=false;cue(r,t,"recovery_started");}
 }

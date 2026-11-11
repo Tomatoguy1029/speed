@@ -2,7 +2,6 @@ extends WeaponVisual
 ## エンドブラスト：pixelfx の plasma-explosion を元にした紫のプラズマの爆発。白く光って十字の光が走り、プラズマの球が
 ## 一気に膨らむ。球は内側から中空の殻になり、渦の向きにねじれた欠片に裂けて消える（plasma_burst）。中心と殻から稲妻が
 ## 走り、光の筋・星屑・きらめきが散る。Lv3からの外周の小さな爆発も同じ見た目を半径に合わせて縮めて描く。
-## 大きい爆発ほど画面が強く揺れる。
 
 const C := [Color("#0e0620"), Color("#2a0a5a"), Color("#5a1eb0"), Color("#8a3ce0"), Color("#b070ff"), Color("#e6d2ff"), Color.WHITE]
 const V := [Color("#1a0838"), Color("#4a1a9c"), Color("#8a4cf0"), Color("#c8a0ff"), Color("#f0e4ff")]
@@ -19,7 +18,6 @@ var booms: Array[Dictionary] = []
 var _plasmas: PlasmaBursts
 var _frame_parent: Node2D
 var _frame_seen := {}
-var frame_shake := 0.0
 
 func _effect_key() -> String: return "weapon/endBlast"
 
@@ -40,9 +38,6 @@ func sync_frame(values: Array) -> void:
 		_step(booms[-1],value.age)
 		_plasmas._items[-1].age = value.age
 	_frame_seen = alive
-
-func frame_event(ev: Dictionary, radius: float, secondary: int) -> void:
-	if claims(ev) and float(ev.radius)>=radius*0.9: frame_shake = maxf(frame_shake,7.0 if secondary>0 else 4.0)
 
 func dispose() -> void:
 	if is_instance_valid(_plasmas): _plasmas.queue_free()

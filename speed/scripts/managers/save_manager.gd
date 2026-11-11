@@ -45,6 +45,8 @@ func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"intro_seen": false,
+		"landmark_guide_seen": false,
+		"hero_guide_seen": false,
 		"tutorial_done": false,
 		"coins": 0,
 		"meta": {},
@@ -215,6 +217,7 @@ func _migrate(loaded: Dictionary, d: Dictionary) -> Dictionary:
 
 func default_settings() -> Dictionary:
 	return {
+		"review_guide_title": false, "review_guide_map": false, "review_guide_run": false, "review_guide_pause": false,
 		"master_volume": 0.8,
 		"sfx_volume": 0.8,
 		"music_volume": 0.5,

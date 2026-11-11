@@ -44,6 +44,9 @@ var _debris_displays: Dictionary = {}
 var _critical_lances: Node2D
 var _lance_flashes: Array = []
 var _lance_hits: Array = []
+# 武器の直接攻撃・破片・追撃による撃破ではカメラを揺らさない。
+const WEAPON_KILL_CAUSES := [&"shot", &"afterimage", &"hullDebris", &"barrier", &"towShot", &"interceptor", &"endBlast", &"mine", &"contactWave", &"sonic", &"contactArc", &"bipolar", &"dashRangeDrone", &"flashSlash"]
+
 var ruler_shake:=0.0
 var _ruler:=PackedFloat64Array()
 var _triangle_star := PackedFloat64Array()
@@ -1295,6 +1298,11 @@ func _update_hound_warnings(rows: Array, world_time: float) -> void:
 	for id in _hound_warning_displays:
 		_hound_warning_displays[id].apply_frame(groups.get(id,[]),world_time)
 
+static func kill_shake(cause: StringName, radius: float) -> float:
+	if cause in WEAPON_KILL_CAUSES: return 0.0
+	if radius > 25.0: return 8.0
+	return 5.0 if cause == &"ram" else 0.0
+
 func update_effects(frame: Dictionary, dt: float) -> void:
 	if authoring_clock >= 0.0:
 		frame = frame.duplicate()
@@ -1549,10 +1557,7 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 				if not event.has("death_visual") and enemy_type != &"pump" and not stone_kill:
 					_burst(event.pos, event.color, 6 + roundi(radius / 3.0), 260.0 + radius * 4.0, event.dir)
 				# 他の揺れと最大値で合成し、カメラ側で設定の強度を掛ける。
-				if radius > 25.0:
-					ruler_shake = maxf(ruler_shake, 8.0)
-				elif event.cause == &"ram":
-					ruler_shake = maxf(ruler_shake, 5.0)
+				ruler_shake = maxf(ruler_shake, kill_shake(event.cause, radius))
 		if event.type==&"combat_damage" and event.get("target","")=="enemy" and float(event.get("applied",0.0))>0.0:
 			for display in _boss_body_displays.values():
 				if display.state.get("kind",-1) in [0,1,2] and display.state.get("actor",0)==event.get("target_id",0): display.frame_event(event)
@@ -1569,12 +1574,9 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 		if _escort_visual!=null: _escort_visual.on_event(event)
 		if _interceptor_visual!=null: _interceptor_visual.on_event(event)
 		if _bipolar_visual!=null: _bipolar_visual.frame_event(event)
-		if event.type==&"beam" and event.get("visual_key","")=="weapon/bipolar": ruler_shake = maxf(ruler_shake,5.0)
 		if _mass_tow_visual!=null and (event.type in [&"anchor_capture",&"anchor_fire"] or event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow"): _mass_tow_visual.frame_event(event)
-		if event.type==&"anchor_fire": ruler_shake = maxf(ruler_shake,3.0)
 		if event.type==&"meteor_impact": ruler_shake = maxf(ruler_shake,5.0)
 		if event.type==&"hero_power" and StringName(event.get("id",&""))==&"hercules": ruler_shake = maxf(ruler_shake,8.0)
-		if event.type==&"shot_hit" and event.get("visual_key","")=="weapon/massTow": ruler_shake = maxf(ruler_shake,4.0)
 		_boss_sword_visual.frame_event(event)
 		if event.type==&"draco_shake": ruler_shake = maxf(ruler_shake,float(event.amount))
 		if event.type==&"draco_roar":
@@ -1666,7 +1668,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			else: _burst(event.pos,finish_settings.get("color",Color("#e2b96b")),int(finish_settings.get("particles",80)),700.0)
 			if pipeline!=null: pipeline.add_wave(event.pos,1600.0,float(finish_settings.get("wave_seconds",0.8)))
 		if event.type==&"ship_explode": _death_burst(event.pos)
-		if equipped_end_blast: _end_blast_visual.frame_event(event,frame.ui.end_blast.radius,frame.ui.end_blast.secondary)
 		if equipped_full_burst: _full_burst_visual.frame_event(event,frame.ui.ship.ship_pos,frame.ui.ship.ship_heading,frame.ui.character_scale)
 		if equipped_duplicator and event.type==&"duplicate": _duplicator_visual.on_event(event)
 		if event.type==&"swallow":

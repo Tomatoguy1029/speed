@@ -224,6 +224,15 @@ bool SpeedRunCore::collide_ship(Vector2 from, double radius) {
             if (hit.image && result.applied>0 && speed::BossRamSystem::begin(runtime,hit.owner.generation?hit.owner:runtime.state.enemy_handles.at(uint32_t(hit.row)),hit.cut,direction,radius)) return true;
             continue;
         }
+        // ボスへの装甲不足の体当たりも、ダメージだけを解決して進路を保つ。
+        if (enemy.is_boss || health.is_boss) {
+            if (gate==speed::GateResult::Allow) damage_enemy(hit.row, attack * 0.25, "bump", crit, direction);
+            health.hit_cd = 0.25;
+            if (runtime.state.draw.tracing) runtime.state.draw.inside[health.id] = target.slot;
+            speed::EquipmentSystem::contact(runtime,runtime.state.enemy_handles.at(uint32_t(hit.row)),position);
+            speed::RunUpBehavior::contact(runtime,position,direction,0);
+            continue;
+        }
         runtime.state.ship.glide = false;
         Vector2 normal = position - enemy.pos;
         normal = normal.length_squared() > 0 ? normal.normalized() : -direction;

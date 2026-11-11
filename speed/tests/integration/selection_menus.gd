@@ -245,14 +245,20 @@ func _operation_runtime() -> void:
 	else:
 		await _operation_runtime_buttons()
 	hud._rewards.ult_acquire_seconds = 0.01
-	hud._rewards.ult_details_seconds = 0.01
 	bridge.command("dev_hero_place",{"id":"perseus"})
 	var hero: Dictionary = bridge.read_frame().value.ui.hero
 	for i in range(0,hero.links.size(),2): bridge.command("dev_hero_pass",{"from":hero.stars[hero.links[i]],"to":hero.stars[hero.links[i+1]],"dash":i})
 	for i in 180:
 		await get_tree().process_frame
-		if not hud._rewards.is_active(): break
-	_check(not hud._rewards.is_active() and not bridge.read_frame().value.ui.presentation_frozen,"英雄の獲得表示が自動で終わり入力を戻す")
+		if hud._rewards._ult_details != null: break
+	_check(hud._rewards._ult_details != null, "英雄の獲得後に説明を表示する")
+	await get_tree().create_timer(0.55).timeout
+	_tap(KEY_SPACE)
+	await get_tree().process_frame
+	bridge.collect_frame()
+	_check(not hud._rewards.is_active() and not bridge.read_frame().value.ui.presentation_frozen,"Spaceで英雄の説明を閉じて入力を戻す")
+	var resumed_input := router.poll()
+	_check(not resumed_input.alt_press and not resumed_input.press, "説明を閉じたSpaceを描線開始へ流さない")
 	_tap(InputActions.key_of(&"hero"))
 	_input_step()
 	_check(float(bridge.read_frame().value.ui.hero.active)>0.0,"ULTキーから本番の入力経路で英雄を発動する")

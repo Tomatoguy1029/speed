@@ -181,6 +181,9 @@ func _ready() -> void:
 	if "--cpp-hydra-body" in OS.get_cmdline_user_args():
 		call_deferred("native_hydra_body")
 		return
+	if "--cpp-centaurus-selection" in OS.get_cmdline_user_args():
+		call_deferred("native_centaurus_selection")
+		return
 	if "--cpp-centaurus-finish" in OS.get_cmdline_user_args():
 		call_deferred("native_centaurus_finish")
 		return
@@ -1012,7 +1015,7 @@ func native_centaurus_power() -> void:
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
-	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/effects/landmark/masks.tres","res://data/visuals/landmark_aura_material.tres","res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/elite_runtime.tres"]: scope.provide(path,load(path))
 	var view = load("res://scripts/render/run_frame_view.gd").new()
 	add_child(view)
 	var entries: Array[Dictionary] = []
@@ -1030,13 +1033,14 @@ func native_centaurus_power() -> void:
 	var positions_ok := shots.size()==3
 	for k in shots.size(): positions_ok = positions_ok and semantics_approx(shots[k].pos,origin,"native_centaurus_power:shots[k].pos") and semantics_approx(shots[k].vel.angle(),(Vector2.from_angle(angle+(k-1)*move.spread)*move.speed).angle(),"native_centaurus_power:shots[k].vel.angle()") and shots[k].kind==builder.Schema.ENUMS.HostileKind.CosmicArrow and semantics_approx(shots[k].life,PackedFloat32Array([move.travel/move.speed])[0],"native_centaurus_power:shots[k].life")
 	check(positions_ok,"固定起点・対称の扇角度・射程÷速さの寿命でコズミック矢を出す")
+	check(bridge.command("dev_boss_body_state").value[0].reference_fx.releases.size()==3,"強弓の3本すべてに弓口の発射演出を渡す")
 	check(bridge.restore(held.value).ok,"警告後の固定起点・向き・未発射状態を復帰する")
 	bridge.command("dev_ship_motion",{"position":Vector2(300,-300),"velocity":Vector2.ZERO})
 	bridge._core.step(0.04)
 	check(bridge.command("dev_boss_state").value[0]==after and bridge._core.hostiles_snapshot()==shots,"復帰後も同じ起点と角度から同じ矢を発射する")
 	bridge.release_checkpoint(held.value)
 	var render: Dictionary = bridge.read_render(Rect2(-2000,-2000,4000,4000)).value
-	check(view.apply_frame(render) and view._boss_body_displays.values()[0]._parts._clip=="shot_release" and render.shapes.filter(func(shape): return shape.kind==builder.Schema.ENUMS.RenderShapeKind.LightArrow and shape.cosmic).size()==3,"弓の解放姿勢と3本のコズミック矢を正式表示する")
+	check(view.apply_frame(render) and view._boss_body_displays.values()[0]._parts._clip=="shot_release" and render.shapes.filter(func(shape): return shape.kind==builder.Schema.ENUMS.RenderShapeKind.LightArrow and not shape.cosmic and shape.widths[0]>0).size()==3,"弓の解放姿勢と3本の太い光の矢を正式表示する")
 	bridge._core.step(0.05)
 	check(bridge.command("dev_boss_state").value[0].stage==2 and not bridge.command("dev_boss_state").value[0].alerting,"発射から0.05秒後に警告を消して硬直へ移る")
 	bridge._core.step(0.05)
@@ -1623,6 +1627,20 @@ func centaurus_shower_case(pattern := "chase") -> Dictionary:
 func native_centaurus_shower() -> void:
 	var builder = load("res://tools/content/build_run_content.gd")
 	for pattern in ["chase","wall","path"]:
+		var launch := centaurus_shower_case(pattern)
+		var launch_bridge = launch.bridge
+		launch_bridge.command("dev_boss_technique",{"entity_id":launch.id,"definition":1})
+		for tick in 11:
+			check(launch_bridge.step(1.0/120.0,launch_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok,"打ち上げ演出を本番の固定更新で進める: "+pattern)
+		var ups: Array = launch_bridge.command("dev_boss_body_state").value[0].reference_fx.ups
+		check(not ups.is_empty() and ups.all(func(row): return sin(float(row.angle))<0.0),"降り注ぐ矢の構えで上向きの打ち上げ演出を出す: "+pattern)
+		var held_launch: Dictionary = launch_bridge.checkpoint()
+		for tick in 4:
+			check(launch_bridge.step(1.0/120.0,launch_bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok,"打ち上げ演出の復帰前に固定更新を進める: "+pattern)
+		check(launch_bridge.restore(held_launch.value).ok and launch_bridge.command("dev_boss_body_state").value[0].reference_fx.ups==ups,"打ち上げ演出の時刻と位置を復帰する: "+pattern)
+		launch_bridge.release_checkpoint(held_launch.value)
+		launch_bridge.dispose()
+	for pattern in ["chase","wall","path"]:
 		var move = load("res://data/bosses/centaurus_moves/shower_"+pattern+".tres")
 		var records: Dictionary = builder.boss_technique_records(load("res://data/bosses/centaurus.tres"),move)
 		check(records.CentaurusShowerDefinition.size()==2 and records.CentaurusShowerDefinition[0].pattern==["chase","wall","path"].find(pattern) and records.CentaurusShowerDefinition[0].count==move.count and records.CentaurusShowerDefinition[1].count==move.count_p2 and records.CentaurusShowerDefinition[0].linger==move.linger and records.CentaurusShowerDefinition[0].rain_time==move.rain_time and records.BossTechniqueStage.is_empty(),"3パターンの実効値と形態別の数を生成する: "+pattern)
@@ -1640,7 +1658,7 @@ func native_centaurus_shower() -> void:
 	var scope := ContentResourceScope.new()
 	for asset: Dictionary in c.package.visuals:
 		if not asset.path.is_empty(): scope.provide(asset.path,load(asset.path))
-	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png"]: scope.provide(path,load(path))
+	for path in ["res://assets/pixel/airship_flame.png","res://assets/pixel/airship_spark.png","res://assets/effects/landmark/masks.tres","res://data/visuals/landmark_aura_material.tres","res://assets/effects/landmark/elite_contacts.tres","res://data/visuals/elite_runtime.tres"]: scope.provide(path,load(path))
 	var view = load("res://scripts/render/run_frame_view.gd").new()
 	add_child(view)
 	var entries: Array[Dictionary] = []
@@ -2308,6 +2326,69 @@ func centaurus_finish_steps(bridge, count: int) -> bool:
 	var ok := true
 	for i in count: ok = bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(640,360)}).ok and ok
 	return ok
+
+## 実制作の抽選候補と条件行動の境界を確認する。
+func native_centaurus_selection() -> void:
+	var f := centaurus_finish_case(-1.0,true)
+	check(not f.is_empty(),"制作データからケンタウルスの選択を開始する")
+	if f.is_empty(): get_tree().quit(1); return
+	var records: Dictionary = f.package.records
+	var opening: Dictionary = records.BossFlowSection.filter(func(row): return row.order==0)[0]
+	for name in ["volley","power_shot","rain","shower_chase"]:
+		var actions: Array = records.BossFlowAction.filter(func(row): return row.external_id==name)
+		check(actions.size()==1 and actions[0].cost<=opening.cap,"牽制の上限内で通常技を選べる: "+name)
+	for name in ["shower_wall","stomp","shower_path"]:
+		check(records.BossFlowAction.all(func(row): return row.external_id!=name),"条件技を無条件の抽選へ混ぜない: "+name)
+	var bridge = f.bridge
+	bridge._core.set_run_guards({"invincible":true})
+	var seen := {}
+	var checked_rest := false
+	var steps_ok := true
+	for i in 1200:
+		var flow: Dictionary = bridge.command("dev_boss_flow_state").value[0]
+		if not checked_rest and float(flow.rest)>0.1:
+			var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+			var close: Vector2 = body.position+Vector2(100,0)
+			bridge.command("dev_ship_motion",{"position":close,"velocity":Vector2.ZERO})
+			bridge._core.set_motion_context(close,close,Vector2(640,360))
+			steps_ok = bridge._core.step(0.05) and steps_ok
+			check(not bridge.command("dev_boss_body_state").value[0].leaping and bridge.command("dev_boss_state").value.all(func(t): return int(t.stage)>=5),"反撃の休息は接近でも跳び退きに置き換えない")
+			checked_rest = true
+			bridge.command("dev_ship_motion",{"position":Vector2(600,0),"velocity":Vector2.ZERO})
+			bridge._core.set_motion_context(Vector2(600,0),Vector2(600,0),Vector2(640,360))
+		steps_ok = bridge._core.step(0.05) and steps_ok
+		for attack: Dictionary in bridge.command("dev_boss_state").value:
+			if int(attack.stage)==1: seen[String(attack.technique)]=true
+	check(steps_ok,"自然選択の全更新が成功する")
+	check(checked_rest,"自然選択が反撃の休息まで進む")
+	check(seen.has("power_shot") and seen.has("volley") and seen.has("fan_volley"),"自然選択で強弓・速射・大技が発動する: "+str(seen.keys()))
+	check(not seen.has("shower_wall"),"接近していない通常抽選では壁を連打しない")
+	bridge.dispose()
+	f = centaurus_finish_case(-1.0,true)
+	bridge = f.bridge
+	bridge.command("dev_ship_motion",{"position":Vector2(-100,0),"velocity":Vector2.ZERO})
+	bridge._core.set_motion_context(Vector2(-100,0),Vector2(-100,0),Vector2(640,360))
+	bridge._core.step(0.01)
+	var attacks: Array = bridge.command("dev_boss_state").value
+	check(not bridge.command("dev_boss_body_state").value[0].leaping and attacks.size()==1 and attacks[0].technique=="rear_attack","背後へ回られたときは近距離跳躍より背後攻撃を優先する")
+	bridge.dispose()
+	# 通常選択を有効にしたまま、近接跳躍と離脱の着地から壁へつなぐ。
+	for distance in [100.0,380.0]:
+		f = centaurus_finish_case(-1.0,true)
+		bridge = f.bridge
+		var ship := Vector2(distance,0)
+		bridge.command("dev_ship_motion",{"position":ship,"velocity":Vector2.ZERO})
+		bridge._core.set_motion_context(ship,ship,Vector2(640,360))
+		check(bridge._core.step(0.01),"接近時の更新が成功する")
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		check(body.leaping and body.leap_to.is_equal_approx(Vector2(-320,0)),"接近時に通常技より先に後方へ跳ぶ: "+str(distance))
+		check(bridge._core.step(0.35),"着地時の更新が成功する")
+		body = bridge.command("dev_boss_body_state").value[0]
+		attacks = bridge.command("dev_boss_state").value.filter(func(t): return int(t.stage)<5)
+		check(not body.leaping and attacks.size()==1 and attacks[0].technique=="shower_wall" and int(attacks[0].stage)==0 and is_zero_approx(float(attacks[0].elapsed)),"近接跳躍・離脱から壁を開始し、着地のdtを予告へ使わない: "+str(distance))
+		bridge.dispose()
+	print("[cpp_centaurus_selection] failures=",failed)
+	get_tree().quit(1 if failed else 0)
 
 func native_centaurus_finish() -> void:
 	if semantics_strict():
@@ -5024,7 +5105,40 @@ func native_hydra_pincer() -> void:
 	check(bridge.command("dev_boss_state").value[0].stage==5 and bridge.command("dev_boss_body_state").value[0].effects.is_empty(),"自然終了は長い寿命が残ったビームも消す");bridge.dispose()
 	await get_tree().process_frame;print("[cpp_hydra_pincer] failures=",failed);get_tree().quit(1 if failed else 0)
 
+func check_hydra_tornado_feed_direction() -> void:
+	# 渦が瓦礫首を包む近距離配置も、投入中の岩は口から渦中心側へ進む。
+	var c := hydra_major_case("tornado",{"warning_time":0.1,"performance_time":3.4,"tornado_charge":1.2,"tornado_width":1600.0},true)
+	if c.is_empty(): return
+	var bridge = c.bridge
+	var samples := 0
+	var overlapping := false
+	var old_reverse := 0
+	for tick in 150:
+		bridge._core.step(0.01)
+		var body: Dictionary = bridge.command("dev_boss_body_state").value[0]
+		var charge: Array = body.effects.filter(func(e): return e.kind=="tornado_charge")
+		if charge.is_empty(): continue
+		var heads: Array = body.necks.filter(func(n): return n.mode=="tornado" and n.kind=="debris")
+		if heads.is_empty(): continue
+		var mouth: Vector2 = heads[0].strike_from+Vector2.from_angle(heads[0].angle)*40.0
+		var inward: Vector2 = charge[0].points[0]-mouth
+		var rocks: Array = body.get("tornado_rocks",[])
+		for index in rocks.size():
+			var rock: Dictionary = rocks[index]
+			if rock.progress<=0.0 or rock.progress>=1.0: continue
+			samples += 1
+			var ring: float = float(body.tornado_radius)*[0.86,0.62,0.42,0.74,0.54][index]
+			overlapping = overlapping or ring>inward.length()
+			var old_entry: Vector2 = charge[0].points[0]-inward.normalized()*ring
+			if (old_entry-mouth).dot(inward)<-0.001: old_reverse += 1
+			check((Vector2(rock.position)-mouth).dot(inward)>=-0.001,"渦が口を包んでも投入瓦礫が逆走しない")
+			check(Vector2.from_angle(rock.aim).dot(inward)>=-0.001,"瓦礫の尾も投入方向と同じ向きを使う")
+	check(samples>0 and overlapping and old_reverse>0,"渦が口を包む投入フレームを実際に検査する")
+	print("[hydra_tornado_feed] samples=%d old_reverse=%d" % [samples,old_reverse])
+	bridge.dispose()
+
 func native_hydra_tornado() -> void:
+	check_hydra_tornado_feed_direction()
 	var c := hydra_major_case("tornado",{"warning_time":0.15,"performance_time":0.65,"tornado_charge":0.2,"tornado_life":0.3,"tornado_speed":400.0,"tornado_width":120.0,"lump_dmg":7.0,"tech_recovery":0.05,"cooldown":0.1},true)
 	if c.is_empty(): get_tree().quit(1);return
 	var bridge=c.bridge;bridge._core.set_run_guards({"invincible":false})

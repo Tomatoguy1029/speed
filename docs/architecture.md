@@ -372,7 +372,7 @@ flowchart LR
 
 **資源の寿命**
 
-通常起動はタイトルを先に表示し、[起動準備](../speed/scripts/ui/startup_preparation.gd)が裏で全ステージの生成済みRunResources.orderから装備を含む依存を取得する。ContentManagerが起動用Scopeをアプリ終了まで保持する。複合資源の取得は主スレッドの処理を分割し、shaderはmaterialごとに同じ照明・幾何の組を描いて準備する。起動準備は戦闘Sessionを作らない。準備の完了前に出撃すると、Sessionがそのステージの資源を読込画面で待つ。読込画面の間は画面更新を待たず、フレーム単位の読込と描画準備を早く進める。headlessと明示した開発用起動は、それぞれの入口で必要な準備を行う。
+通常起動はタイトルを先に表示し、[起動準備](../speed/scripts/ui/startup_preparation.gd)が裏で全ステージの生成済みRunResources.orderから装備を含む依存を取得する。ContentManagerが起動用Scopeをアプリ終了まで保持する。複合資源の取得は主スレッドの処理を分割し、起動時は画面を更新しつつまとめて読み、プレイ中の追加取得には短い処理予算を使う。shaderはmaterialごとに同じ照明・幾何の組を描いて準備する。起動準備は戦闘Sessionを作らない。準備の完了前に出撃すると、Sessionがそのステージの資源を読込画面で待つ。読込画面の間は画面更新を待たず、フレーム単位の読込と描画準備を早く進める。headlessと明示した開発用起動は、それぞれの入口で必要な準備を行う。
 
 RunSessionがRunResourcesのパスと署名をContentManagerへ渡し、SessionのContentResourceScopeが利用中の参照を保持する。ContentManagerは同じ依存署名の要求を共有する。起動用Scopeが同じパスと署名を準備済みなら、その資源と描画準備を再利用する。生成後の版が異なる要求は、そのScopeで追加の準備を行う。セッション終了・出撃取り消しでSessionのScopeを取り消し、遅れて届いた結果と未使用資源を回収する。起動用Scopeはタイトルへ戻ったあとも保持し、アプリ終了で解放する。
 
@@ -498,6 +498,10 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 ### 10.2 層・資源・画面効果
 
+じょうぎ座の予告線とレーザーは `ruler_reference.gd` が動的な発射位置・時間・幅を `SpeedFxRaster` へ渡し、`cpp/api/fx_ruler.cpp` が論理画素の色と光をまとめて更新する。色の段階・ディザ・描画順を共通描画とそろえ、戦闘の判定はC++ランが保持する。ぎょしゃ座の車輪跡とやまねこ座の爪は `cpp/api/fx_trails.cpp`、いるか座の音波は `cpp/api/fx_dolphin.cpp` へ動的な位置・強さ・成長率を渡して画素を更新する。みなみのかんむり座の渦は `cpp/api/fx_corona.cpp` で動く粒をまとめて描く。描画バッファは表示の寿命に合わせて所有する。共通の論理画素面はImageを再利用し、描くものがある前後の面だけを画像へ転送する。光の合成はRGBを使う。共通の円形の光は、画素の多い円を `cpp/api/fx_glow.cpp` でまとめて計算し、小さい円はPainterで描く。
+
+おおいぬ座の残り火は、動く粒と足跡の範囲を `cpp/api/fx_density.cpp` へ渡し、再利用する3層の密度配列から色と光を描く。りゅう座の尾が通った跡は、時刻付きの点列を `cpp/api/fx_wake.cpp` へ渡し、元の順番で画素を重ねる。固定の素材は生成時に用意し、現在位置・時刻に依存する画素計算は表示の更新で行う。
+
 体当たりのクリティカルは `critical_hit` イベントから専用の短い表示へ渡す。`tools/art/critical_hit_source.mjs` を編集元とし、制作時の `bake_critical_hit.mjs` が固定版pixelfxの描画部品から `assets/effects/critical_hit/critical_hit.png` と `data/visuals/critical_hit.tres` を書き出す。コマ・文字・火花の合成は制作工程に置く。PNGは専用アート素材として保持し、通常の画像importとResource依存で配布する。Resourceは原点・寸法・再生値・入力と画像のハッシュ・MITのLICENSEとNOTICEを持つ。RunResourcesはRunPresentationの依存から素材を準備し、表示開始時に専用の再生処理がResourceを取得して表示の寿命で保持する。実行時は上限付きの出来事ごとに経過時間・位置・向きを保持し、既存の前面層でコマを描き、寿命が尽きた出来事を解放する。ポーズ・選択中は既存の演出時計とともに停止する。
 
 ビルドの攻撃は、RunFrameViewが装備ごとの表示部品（`scripts/render/equipment/<code_id>.gd`）へ出力を渡し、演出の試作と同じドット単位の規則で描く。共通部品は `scripts/render/fx/` にあり、`PixelPainter` が円・輪・線・光弾・砲口などを1ドットの格子にそろえて MultiMesh へまとめ、`PixelSparks` が火花、`FireBursts` がノイズで縁の崩れるピクセル炎、`BlastBursts` がピクセル炎と同じ4段の色で閃光・火球・衝撃波の輪・煙・燃えかす・火の粉をまとめた爆発を描く。数の多い輪・針・太い輪・六角形は `PixelShapes` が同じドットの規則を shader で判定し、1つの図形を1枚の四角として GPU でまとめて描く。武器・特性の演出は途中で手に入るので、出撃前の shader の準備（`build_run_resources.gd`）は `scripts/render/equipment`・`friendly`・`fx` が使う shader をすべて含める。重力レンズ・帯状のビームなど面の大きい演出は装備専用の shader を使う。RunFrameViewは装備IDと出来事の種類に応じて表示部品へ通知し、同じ攻撃の表示を重複させない。ギアアップの炎は共通ピクセル炎を後ろ向きに置いた `GearFire` で描く。表示の上書きは `effect_settings.tres` の装備キーで保持する。shader の調整値は各 shader の `group_uniforms tuning;` にまとめ、`ShaderTuning` が装備キーの `shader/<shader名>/<uniform名>` の値を material へ当てる。
@@ -506,7 +510,7 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 画素の多い動的な演出は、`SpeedFxRaster` が論理画素の色と光を、`SpeedWeaponGeometry` が `PixelPainter` と同じ形式のMultiMeshバッファをまとめて更新する。描画中はPainterの配列を渡し切り、書き込み後に戻す。別に保持した配列との変更分離はPacked配列のCOWで保つ。位置・時刻・半径・密度場など、そのフレームで変わる値だけを入力し、画素の訪問順・丸め・色・粒の発生と寿命を保つ。密度場と武器バッファの保存場所は表示部品の寿命内で再利用する。論理画素の画像も再利用し、空の層は画像更新を省いてSpriteとBackBufferCopyを一緒に隠す。光の合成はRGBだけを読み、未使用の光画像のαは更新しない。固定素材の生成と依存管理は[15.1](#151-ビルドと実行時の境界)に従う。
 
-`SpeedInstanceBuffer` は `InstanceBatch` の2D変換と色を12要素のMultiMesh配列へまとめ、敵の顎・部位の支点・軸方向の変形も同じ丸めで求める。表示部品はこの配列を寿命内で再利用し、同じ本体・装甲の束へ共有する。RenderFrameの検査は型・長さ・値域・形状ごとの規則を表示側で確認し、Packed浮動小数配列の全要素の有限値検査をC++へまとめる。
+`SpeedInstanceBuffer` は `InstanceBatch` の2D変換と色を12要素のMultiMesh配列へまとめ、敵の顎・部位の支点・軸方向の変形も同じ丸めで求め、じょうぎ座の上下を同じ描画順で反映する。表示部品はこの配列を寿命内で再利用し、同じ本体・装甲の束へ共有する。RenderFrameの検査は型・長さ・値域・形状ごとの規則を表示側で確認し、Packed浮動小数配列の全要素の有限値検査をC++へまとめる。
 
 共通の `PixelSparks` と `ShotFlashes` は、粒子と命中閃光の配列を表示順のまま再利用し、更新中に期限切れを整理する。命中閃光は種類ごとの描画時間と共通の保持期限を持つ。
 
@@ -588,7 +592,7 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 音の表（SoundTable）は欄ID → SoundEntry の辞書を持つ。インスペクタでは欄の一覧の分類・項目で折りたたんで並べ、合成音を鳴らす欄の名前に「（合成音）」、音なしの欄に「（音なし）」を付ける。SoundEntry は音なし・音・音量・ピッチの最小と最大・同時に鳴らす数・ループ・曲の開始位置と終わりとループの戻り先・合成音の設定を持つ。合成音の設定は取り込みの前後で表に残り、素材のない欄でだけ使う。
 
-`tools/content/build_audio.gd` が音の表を `.content/audio.res` のAudioBankへまとめる。素材のない欄は合成音を作り、ループする欄は繰り返しの設定にする。音なしの欄は音を入れない。曲はループの戻り先を音源に設定する。AudioBankは欄ID → 効果音・曲と、全欄の鳴らし方を持つ。AudioManagerは起動時に生成済みのバンクを読み、呼び出し側から欄IDだけを受け取って鳴らす。曲の終わりを決めた欄は、再生位置がそこへ届いたらループの戻り先へ戻すか止める。BGMは専用のMusicバスと単一の再生口で切り替える。ボス出現によるフェードの予約は、次の切り替えや画面退出で取り消す。メニューのBGMはMain、戦闘のBGMはHUDが所有し、前の画面の退出で次の画面の曲を止めない。
+`tools/content/build_audio.gd` が音の表を `.content/audio.res` のAudioBankへまとめる。素材のない欄は合成音を作り、ループする欄は繰り返しの設定にする。音なしの欄は音を入れない。曲はループの戻り先を音源に設定する。AudioBankは欄ID → 効果音・曲と、全欄の鳴らし方を持つ。配布は音声を埋め込んだバンクを含め、音の表と元音声がある `assets/audio/` は制作入力として除外する。AudioManagerは起動時に生成済みのバンクを読み、呼び出し側から欄IDだけを受け取って鳴らす。曲の終わりを決めた欄は、再生位置がそこへ届いたらループの戻り先へ戻すか止める。BGMは専用のMusicバスと単一の再生口で切り替える。ボス出現によるフェードの予約は、次の切り替えや画面退出で取り消す。メニューのBGMはMain、戦闘のBGMはHUDが所有し、前の画面の退出で次の画面の曲を止めない。
 
 AudioManagerは要求中の曲と実際に再生中の曲を分け、停止時に `music.menu`・`music.stage_select` の音源参照・再生位置・離脱要求時刻をメモリへ保持する。[再開の時間窓](spec.md#18-音)は `Time.get_ticks_msec()` で判定する。同じ音源なら停止位置を曲の範囲へ整えて再開し、音源が変わった場合は欄の開始位置を使う。切り替え要求番号とTweenの取り消しで古い再生予約を無効化し、再生開始に至らなかった曲の記憶は維持する。保持した音源参照は再開時に解放する。
 
@@ -792,7 +796,9 @@ Macのexportは `shader_baker/enabled` を有効にし、描画デバイスを�
 
 配布物は通常の `user://` 保存先と本番の起動Scriptで `export/` へ出力する。`--verify`・`--verify-final` は `verification/` 内の独立コピーに隔離した保存先と確認用の起動Scriptを設定し、確認用パッケージで配布エンジンによる最小ランとライブラリ欠落時の拒否を確認する。Macの `--rendered` は `--verify` または `--verify-final` と併用し、描画付きの起動を行う。Macのexportと描画付き確認はGodot本体を直接使い、PATHに `godot-bg` があれば補助として使う。性能や全種類の意味的な照合は別の確認範囲とする。
 
-`speed/export_presets.cfg` は通常ランに必要なC++拡張、`.content/run/`、Godotの表示・入力・UI・保存・音を含める。制作元の戦闘定義・生成器・生成用スキーマ・`gyms/`・`tests/`・開発用計測・編集用addon・`.content/dev/` を除外し、実行時の共通IDは含める。配布検査の入口は `speed/tests/integration/export_package.py`。Macのローカル実行用パッケージはGodot組み込みのad-hoc署名を使う。製品向け証明書・公証・ストア公開の設定は未決。
+`.content/run/` の配布対象は `stamp.json` の現在の出力一覧で選ぶ。内容ハッシュ別の過去の生成物は開発用キャッシュとして保持する。
+
+`speed/export_presets.cfg` は通常ランに必要なC++拡張、`.content/run/`、Godotの表示・入力・UI・保存・音を含める。ケンタウルスのパーツ制作画面は通常ランの資源一覧と配布対象から除外する。制作元の戦闘定義・生成器・生成用スキーマ・`gyms/`・`tests/`・開発用計測・編集用addon・`.content/dev/` を除外し、実行時の共通IDは含める。配布検査の入口は `speed/tests/integration/export_package.py`。Macのローカル実行用パッケージはGodot組み込みのad-hoc署名を使う。製品向け証明書・公証・ストア公開の設定は未決。
 
 ### 15.4 開発用ライブラリの配布
 

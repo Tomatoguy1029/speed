@@ -4,21 +4,21 @@ extends RefCounted
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 const FROM := [0.03, 0.0, 0.05]
-var _settings: Dictionary = SETTINGS.for_id("G12-lynx")
 var _raster := SpeedFxRaster.new()
+var _settings: Dictionary = SETTINGS.for_id("G12-lynx")
 
 func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 	var color := Color(_settings.color)
-	var palette := FX.ramp(color)
+	var palette := PackedColorArray(FX.ramp(color))
 	var span := deg_to_rad(float(_settings.span))
 	var multiplier := float(_settings.maxSize) * float(_settings.size)
 	var initial := float(_settings.start)
 	var grow := maxf(0.01, float(_settings.grow) * float(_settings.timing))
 	var cut_time := maxf(0.01, float(_settings.cutT) * float(_settings.timing))
 	canvas.front.place(0, 0)
+	var flags := 0
 	if not shots.is_empty():
-		_raster.begin_painter(canvas.front, float(canvas.world_scale), canvas._camera_position, true, true)
-	var native_palette := PackedColorArray(palette)
+		_raster.begin_painter(canvas.front, canvas.world_scale, canvas._camera_position, true, true)
 	for shot: Dictionary in shots:
 		var age := float(shot.age)
 		var fraction := clampf(age / grow, 0.0, 1.0)
@@ -30,12 +30,12 @@ func render(shots: Array, actors: Array, canvas, world_time: float) -> void:
 		var initial_size := full * initial
 		var shift: Vector2 = (shot.paw - _at(Vector2.ZERO, float(shot.angle), float(shot.side), initial_size, span, 0.0, 0.0)) * (initial_size / size)
 		var origin: Vector2 = shot.pos + shift
-		_raster.lynx_scratch(origin, float(shot.angle), float(shot.side), size, span, minf(1, age / cut_time), native_palette, _settings)
+		flags |= _raster.lynx_scratch(origin, float(shot.angle), float(shot.side), size, span, minf(1, age / cut_time), palette, _settings, canvas.front.fade, canvas.front.light_strength)
 	if not shots.is_empty():
 		canvas.front.colors = _raster.take_colors()
 		canvas.front.lights = _raster.take_lights()
-		canvas.front.has_color = canvas.front.has_color or _raster.has_color()
-		canvas.front.has_light = canvas.front.has_light or _raster.has_light()
+		canvas.front.has_color = canvas.front.has_color or (flags & 1) != 0
+		canvas.front.has_light = canvas.front.has_light or (flags & 2) != 0
 	for actor: Dictionary in actors:
 		var angle := float(actor.angle)
 		var side := float(actor.side)

@@ -23,12 +23,15 @@ class SpeedFxRaster : public RefCounted {
     Vector2 camera_;
     std::vector<float> mask_;
     Vector2 mask_camera_;
+    int reference_flags_=0;
+    void reference_dot(Vector2 p,Color color,double alpha,double fade);
+    void reference_light(Vector2 p,Color color,double strength);
+    void reference_glow(Vector2 p,double radius,Color color,double strength,double fade=1,double light_strength=1);
+    void reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength);
     bool color_used_=false,light_used_=false;
     std::vector<float> density_;
     void reference_dot(double x,double y,Color c,double alpha);
     void reference_add(int x,int y,Color c,double strength);
-    void reference_glow(Vector2 center,double radius,Color c,double strength);
-    void reference_glow_line(Vector2 a,Vector2 b,double radius,Color c,double strength);
     void put(int x,int y,Color c);
     void blend(float x,float y,Color c,double a);
     void add(int x,int y,Color c,double k);
@@ -51,16 +54,20 @@ public:
     PackedByteArray take_lights();
     bool has_color() const {return color_used_;}
     bool has_light() const {return light_used_;}
-    void auriga_trail(PackedVector2Array points,PackedFloat64Array strengths,double width,PackedColorArray palette,double clock);
-    void lynx_scratch(Vector2 origin,double angle,double side,double size,double span,double cut,PackedColorArray palette,Dictionary settings);
     void nova_field(PackedByteArray alpha,PackedFloat32Array emission,Dictionary state,bool front);
-    void dolphin_band(Vector2 center,double radius,double a0,double a1,double width,PackedColorArray palette,double alpha,double dissolve);
-    void dolphin_arc(Vector2 center,double radius,double a0,double a1,Color color,double alpha);
     void reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,Dictionary settings);
-    void corona_vortices(PackedFloat64Array owners,PackedColorArray palette);
     void corona_selection(Vector2 from,Vector2 to,double charge,double radius,double intensity,PackedColorArray palette,double clock);
     void corona_trail(Vector2 center,Vector2 direction,double trail,double age,double clock,double seed_angle,PackedColorArray palette);
-    void density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette);
+    int ruler_beam(Vector2 a,Vector2 b,double width,double time,Color color,double alpha,double fade,double light_strength);
+    int ruler_rail(Vector2 a,Vector2 b,Dictionary options,double fade,double light_strength);
+    int auriga_trail(PackedVector2Array points,PackedFloat64Array strengths,double width,PackedColorArray palette,double clock,double fade,double light_strength);
+    int lynx_scratch(Vector2 origin,double angle,double side,double size,double span,double cut,PackedColorArray palette,Dictionary settings,double fade,double light_strength);
+    int dolphin_band(Vector2 center,double radius,double a0,double a1,double width,PackedColorArray palette,double alpha,double dissolve,double fade);
+    int dolphin_arc(Vector2 center,double radius,double a0,double a1,Color color,double alpha,double fade);
+    int canvas_glow(Vector2 center,double radius,Color color,double strength,double fade,double light_strength);
+    int corona_vortex(PackedFloat64Array owners,PackedColorArray palette,double fade);
+    int density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette,double fade,double light_strength);
+    int sweep_wake(PackedVector2Array tails,PackedVector2Array roots,PackedFloat64Array ages,PackedFloat32Array reach,PackedFloat32Array fine,PackedColorArray palette,double time,double fade);
     void dim(double amount,double flash);
     void breath(PackedVector2Array fan,double elapsed,double active,double axis,double sweep,double half_angle,double reach,double fan_angle);
     void light_mask_reset();

@@ -41,6 +41,24 @@ var _reference_canvas
 func set_reference_canvas(canvas) -> void:
 	_reference_canvas = canvas
 
+## 描画間隔ではなく攻撃の経過時間から速度を求める。吹き飛ばしの判定は変えず、尾だけを制限する。
+static func rubble_motion(effect: Dictionary, previous: Dictionary) -> Dictionary:
+	var at: Vector2 = effect.points[0]
+	var age := float(effect.age)
+	var motion := {"at":at,"age":age,"angle":0.0,"speed":0.0}
+	if previous.is_empty() or age<float(previous.age): return motion
+	motion.angle = float(previous.angle)
+	var elapsed := age-float(previous.age)
+	if elapsed<=0.0:
+		motion.speed = float(previous.speed)
+		return motion
+	var step := at-Vector2(previous.at)
+	if step.length_squared()>0.000001:
+		motion.angle = step.angle()
+		# rock_cometの尾は0.42秒分。高速衝突でも画面を横断する直線にしない。
+		motion.speed = minf(step.length()/elapsed,maxf(320.0,float(effect.width)*8.0)/0.42)
+	return motion
+
 func draw_reference(canvas, _real_dt: float) -> void:
 	if state.is_empty(): return
 	var t := float(state.clock)
@@ -97,14 +115,10 @@ func draw_reference(canvas, _real_dt: float) -> void:
 				_raster.bolt_bar(points[0],(points[1]-points[0]).angle(),float(effect.age),life,float(effect.get("speed",900.0)),points[0].distance_to(points[1]),float(effect.width),beam_color,t)
 			"rubble":
 				var id := int(effect.id)
-				var last: Dictionary = _rock_last.get(id,{"at":points[0],"angle":0.0,"speed":0.0})
-				var step: Vector2 = points[0]-Vector2(last.at)
-				var angle := float(last.angle)
-				var speed := float(last.speed)
-				if step.length()>0.5:
-					angle = step.angle()
-					speed = lerpf(speed,step.length()*60.0,0.3 if speed>0.0 else 1.0)
-				rocks[id] = {"at":points[0],"angle":angle,"speed":speed}
+				var motion := rubble_motion(effect,_rock_last.get(id,{}))
+				var angle := float(motion.angle)
+				var speed := float(motion.speed)
+				rocks[id] = motion
 				if speed>0.0: _raster_back.rock_comet(points[0],angle,speed,float(effect.age),float(effect.width)*0.5,float(id%97),1.0 if speed>300.0 else 0.4)
 				var seed := float(id%97)
 				var spin := float(effect.age)*(3.0+3.0*DRACO_FX._hash(seed))*2.0*(1.0 if DRACO_FX._hash(seed*3.0)>0.5 else -1.0)

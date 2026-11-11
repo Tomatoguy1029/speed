@@ -19,7 +19,7 @@ func check(ok: bool, label: String) -> void:
 		push_error(label)
 
 func _ready() -> void:
-	if "--cpp-debug" in OS.get_cmdline_user_args() or "--cpp-debug-boss" in OS.get_cmdline_user_args():
+	if "--cpp-debug-ult" in OS.get_cmdline_user_args() or "--cpp-debug" in OS.get_cmdline_user_args() or "--cpp-debug-boss" in OS.get_cmdline_user_args():
 		await _test_cpp_debug()
 		print("[cpp_debug_panel] %d failures" % failed)
 		get_tree().quit(1 if failed else 0)
@@ -197,6 +197,35 @@ func _test_cpp_debug() -> void:
 	check((await panel._commands.handle_cpp(&"debug_invincible",{})).ok and bridge.read_frame().value.ui.invincible,"無敵を明示命令で切り替える")
 	check(not other.bridge.read_frame().value.ui.invincible,"別ランの無敵は変えない")
 	check((await panel._commands.handle_cpp(&"debug_grant",{"kind":"weapon","id":"W01","levels":1})).ok,"外観準備後に装備を取得する")
+	var hero_entries := ContentManager.sorted(ContentManager.catalog.table(&"heroes"))
+	check(panel._ult.item_count == hero_entries.size() and not hero_entries.is_empty(), "全ULTをカタログから列挙する")
+	var other_hero: Dictionary = other.bridge.read_frame().value.ui.hero.duplicate(true)
+	for i in hero_entries.size():
+		panel._ult.select(i)
+		await panel._grant_ult()
+		check(bridge.read_frame().value.ui.hero.power == String(hero_entries[i].id), "メニューからULTを獲得する: %s" % hero_entries[i].id)
+		check(other.bridge.read_frame().value.ui.hero == other_hero, "別ランのULTを保つ")
+	await panel._grant_ult()
+	check(bridge.read_frame().value.ui.hero.power == String(hero_entries[-1].id), "同じULTを繰り返し獲得する")
+	check(bridge.command("dev_hero_activate", {}).ok, "獲得したULTを発動する")
+	var cooldown: float = bridge.read_frame().value.ui.hero.cooldown
+	check(cooldown > 0.0, "獲得したULTを実際に使用できる")
+	panel._ult.select(0)
+	_button(panel, "ULTを獲得").pressed.emit()
+	await get_tree().process_frame
+	check(bridge.read_frame().value.ui.hero.power == String(hero_entries[0].id), "獲得ボタンから別のULTへ切り替える")
+	check(bridge.read_frame().value.ui.hero.active == 0.0 and bridge.read_frame().value.ui.hero.cooldown == cooldown, "発動中の効果を終了しクールダウンは保持する")
+	var power: String = bridge.read_frame().value.ui.hero.power
+	check(not (await panel._commands.handle_cpp(&"debug_ult", {"id":"missing_hero"})).ok, "未知のULTを拒否する")
+	check(bridge.read_frame().value.ui.hero.power == power, "拒否後は現在のULTを保持する")
+	if "--cpp-debug-ult" in OS.get_cmdline_user_args():
+		check(not session.has_meta("dev_content_edit") and panel._content_edit == null, "ULTの取得は制作データを再生成しない")
+		check(SaveManager.data == saved, "ULTの取得はセーブを変更しない")
+		check((await panel._commands.handle_cpp(&"debug_fail", {})).ok, "ランを終了する")
+		check(not (await panel._commands.handle_cpp(&"debug_ult", {"id":power})).ok, "終了中のULT取得を拒否する")
+		session.free()
+		other.free()
+		return
 	var old_keys: Dictionary = session.cpp_resources.keys.duplicate()
 	var old_weapons: Array = bridge.read_frame().value.ui.weapon_levels.duplicate(true)
 	var old_scope: ContentResourceScope = session.resources

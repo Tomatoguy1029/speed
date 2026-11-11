@@ -240,6 +240,9 @@ func _spawn(spots: PackedVector2Array) -> void:
 func _finish() -> void:
 	bridge.command("tutorial", {"action": "finish"})
 	SaveManager.mark_tutorial_done()
+	var guide := preload("res://scripts/ui/review_guide.gd").new()
+	hud.add_child(guide)
+	guide.run.call_deferred(hud)
 	_step = Step.DONE
 	_next_step = Step.DONE
 	_markers.hide_gate()

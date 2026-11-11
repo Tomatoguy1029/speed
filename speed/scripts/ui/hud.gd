@@ -58,7 +58,6 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 @export_group("報酬演出")
 ## 英雄の力の獲得演出の長さ（クリック・タップ・Space で飛ばせる）
 @export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
-@export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
 var _cards_accept_at := 0
 var _reward_advanced_frame := -1
@@ -107,6 +106,8 @@ var _music_started := false
 var _health_fill: AtlasTexture
 var _experience_fill: AtlasTexture
 var _pause_box: VBoxContainer
+var _review_pause_guide: Node
+var _review_entry: Button
 var _draw_button: Button
 var _banner := ""
 var _banner_cleared := false
@@ -132,6 +133,11 @@ func _ready() -> void:
 
 func can_show_menu_overlay() -> bool:
 	return _settings == null and _menu_overlay == null and int(_cpp_ui.get("phase",-1)) in [Phase.Play,Phase.Levelup,Phase.Paused]
+
+func can_show_navigation_guide() -> bool:
+	return can_show_menu_overlay() and int(_cpp_ui.get("phase", -1)) == Phase.Play \
+		and not _rewards.is_active() and float(_cpp_ui.get("cinematic_bars", 0.0)) <= 0.0 \
+		and not _cpp_ui.get("boss_bodies", []).any(func(body): return body.get("boss_spawned", false))
 
 func show_menu_overlay(overlay: Control) -> bool:
 	if not can_show_menu_overlay():
@@ -218,6 +224,19 @@ func _notification(what: int) -> void:
 		bridge.command("pause",{"paused":true})
 
 func _process(delta: float) -> void:
+	if _review_entry != null:
+		_review_entry.visible = _pause_box.visible
+		if _review_entry.visible:
+			_review_entry.size = _review_entry.get_combined_minimum_size()
+			var right := _pause_box.position.x + _pause_box.size.x + 24
+			var fit := clampf((size.x - right - 16) / _review_entry.size.x, 0.1, 1.0)
+			_review_entry.scale = Vector2.ONE * fit
+			_review_entry.position = Vector2(right, _pause_box.position.y + (_pause_box.size.y - _review_entry.size.y * fit) * 0.5)
+			if SaveManager.has_done_tutorial() and not SaveManager.settings.get("review_guide_pause", false) and not is_instance_valid(_review_pause_guide):
+				_review_pause_guide = preload("res://scripts/ui/review_guide.gd").new()
+				add_child(_review_pause_guide)
+				_review_pause_guide.pause_menu.call_deferred(self)
+
 	if not _banner.is_empty():
 		_banner_t += delta
 	_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
@@ -407,13 +426,7 @@ func _build_pause() -> void:
 	resume.custom_minimum_size = Vector2(320, 52)
 	resume.pressed.connect(func(): bridge.command("pause",{"paused":false}))
 	_pause_box.add_child(resume)
-	if SaveManager.is_review_build():
-		var custom := Button.new()
-		custom.name = "ReviewSettingsButton"
-		custom.custom_minimum_size = Vector2(320, 52)
-		custom.text = tr("review.title")
-		custom.pressed.connect(_open_review_settings)
-		_pause_box.add_child(custom)
+
 	var settings := Button.new()
 	settings.text = "menu.settings"
 	settings.custom_minimum_size = Vector2(320, 52)
@@ -438,6 +451,24 @@ func _build_pause() -> void:
 	quit.pressed.connect(_confirm_abort)
 	_pause_box.add_child(quit)
 	add_child(_pause_box)
+	if SaveManager.is_review_build():
+		_review_entry = Button.new()
+		_review_entry.name = "ReviewSettingsButton"
+		_review_entry.custom_minimum_size = Vector2(300, 180)
+		_review_entry.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_review_entry.text = tr("review.entry")
+		_review_entry.add_theme_font_size_override("font_size", 28)
+		for state: String in ["normal", "hover", "pressed", "focus"]:
+			var style := StyleBoxFlat.new()
+			style.bg_color = Color("713f20") if state == "normal" else Color("98572a")
+			style.border_color = Color("e2a267")
+			style.set_border_width_all(2)
+			style.set_corner_radius_all(8)
+			_review_entry.add_theme_stylebox_override(state, style)
+		_review_entry.add_theme_color_override("font_color", Color("fff1dd"))
+		_review_entry.pressed.connect(_open_review_settings)
+		_review_entry.hide()
+		add_child(_review_entry)
 
 func _open_codex(from: Button) -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
@@ -720,7 +751,6 @@ func _ready_cpp() -> void:
 	_prepare_cpp_finish()
 	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
 	_rewards.ult_acquire_seconds = ult_acquire_seconds
-	_rewards.ult_details_seconds = ult_details_seconds
 	_rewards.add_module_icon = _add_icon
 	add_child(_rewards)
 	_rewards.active_changed.connect(func(active: bool):
@@ -731,6 +761,10 @@ func _ready_cpp() -> void:
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
 	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
+	var guides := preload("res://scripts/ui/navigation_guides.gd").new()
+	guides.name = "NavigationGuides"
+	add_child(guides)
+	guides.setup(bridge, self)
 	_font = get_theme_default_font()
 	_stage_progress=RUN_PROGRESS.new()
 	_stage_progress.font=_font

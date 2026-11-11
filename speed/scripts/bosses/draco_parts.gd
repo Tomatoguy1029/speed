@@ -22,6 +22,9 @@ var _segments: Array[Sprite2D] = []
 var _head: Sprite2D
 var _arms: Array[Sprite2D] = []
 var _claws: Array[Sprite2D] = []
+var _entrance_materials := {}
+var _entrance_distances := {}
+var _entrance_length := 1.0
 var _lighting: ShaderMaterial
 
 func _ready() -> void:
@@ -86,6 +89,8 @@ func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 
 	_lighting.set_shader_parameter("cosmic", cosmic)
 	_lighting.set_shader_parameter("boss_hit_white", hit)
 	var total := FORM.length(points)
+	_entrance_length = maxf(1.0,total)
+	_entrance_distances.clear()
 	var distances := PackedFloat32Array()
 	var body_end := maxf(0.0, total - width * 0.70)
 	var cursor := minf(body_end, width * 0.43)
@@ -98,7 +103,9 @@ func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 
 	distances.append(total)
 	var count := distances.size()
 	if _segments.size() != count:
-		for sprite in _segments: sprite.free()
+		for sprite in _segments:
+			_entrance_materials.erase(sprite.get_instance_id())
+			sprite.free()
 		_segments.clear()
 		for i in count:
 			var part: StringName
@@ -109,6 +116,7 @@ func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 
 	var samples := _sample_positions(points, distances)
 	for i in count:
 		var sprite := _segments[i]
+		_entrance_distances[sprite] = distances[i]
 		var t := distances[i] / maxf(1.0, total)
 		var at := samples[i + 1]
 		var direction := at - samples[i]
@@ -117,6 +125,7 @@ func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 
 		var part_width := float(sprite.texture.get_width())
 		sprite.scale = Vector2.ONE * width * FORM.taper(t) / part_width
 		sprite.position = _split(at, split_origin, split_axis)
+	_entrance_distances[_head] = 0.0
 	_head.position = _split(points[0], split_origin, split_axis)
 	_head.rotation = -PI * 0.5
 	_head.scale = Vector2.ONE * head_scale * 2.0
@@ -136,7 +145,9 @@ func _pose_arms(points: PackedVector2Array, width: float, total: float, split_or
 		arm.rotation = direction.angle() - wrist.angle() + arm_turns[i]
 		arm.scale = Vector2(-side, 1) * unit
 		arm.position = _split(samples[1] + normal * side * width * FORM.taper(distance / maxf(1.0, total)) * 0.32, split_origin, split_axis)
+		_entrance_distances[arm] = distance
 		var claw := _claws[i]
+		_entrance_distances[claw] = distance
 		claw.rotation = arm.rotation
 		claw.scale = arm.scale
 		claw.position = arm.position + wrist.rotated(arm.rotation) * unit
@@ -157,3 +168,31 @@ func _sample_positions(points: PackedVector2Array, distances: PackedFloat32Array
 			span = points[segment].distance_to(points[segment + 1])
 		result.append(points[segment].lerp(points[segment + 1], clampf((distance - traversed) / maxf(0.001, span), 0.0, 1.0)))
 	return result
+
+## 頭から尾まで順に奥行きを抜ける。色の透明度は使わず、位置・大きさ・遮蔽で見せる。
+func entrance(intro: Dictionary, portal: Vector2, quiet: float) -> void:
+	var active: bool = intro.get("active",false)
+	for sprite: Sprite2D in _entrance_distances:
+		if not active:
+			sprite.material = _lighting
+			sprite.visible = true
+			continue
+		var id := sprite.get_instance_id()
+		if not _entrance_materials.has(id):
+			_entrance_materials[id] = _lighting.duplicate()
+		var mat: ShaderMaterial = _entrance_materials[id]
+		sprite.material = mat
+		var along := float(_entrance_distances[sprite])/_entrance_length
+		var travel := clampf(float(intro.emerged)*1.8-along*0.8,0.0,1.0)
+		var depth := smoothstep(0.0,1.0,travel)
+		var head := sprite==_head
+		sprite.visible = float(intro.time)>=quiet+0.35 and (head or travel>0.0)
+		var target := sprite.position
+		sprite.position = portal.lerp(target,depth)
+		sprite.scale *= lerpf(0.16,1.0,depth)
+		mat.set_shader_parameter("entrance",true)
+		mat.set_shader_parameter("entrance_head",head)
+		mat.set_shader_parameter("entrance_depth",depth)
+		mat.set_shader_parameter("entrance_eyes",float(intro.eyes))
+		mat.set_shader_parameter("entrance_portal",to_global(portal))
+		mat.set_shader_parameter("entrance_open",float(intro.rift))

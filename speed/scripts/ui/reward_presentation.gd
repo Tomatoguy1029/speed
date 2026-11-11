@@ -7,20 +7,17 @@ signal acquire_finished
 
 ## 英雄の力の獲得演出（フィールドで星座に絵が重なり機体へ流れ込む。hero_acquire.gd）の長さ。この間は画面を暗くせず、力の説明は出さない
 @export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
-@export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
-const DESIGN_SIZE := Vector2(800, 450)
+const DETAILS := preload("res://scripts/ui/hero_details.gd")
 const BONUS_SIZE := Vector2(640, 360)
 const CARD_VIEW := preload("res://scripts/ui/reward_card_view.gd")
 const CONTINUATION_FX := preload("res://scripts/ui/continuation_fx.gd")
 const COMPOSITE := preload("res://assets/ui/rewards/continuation_composite.gdshader")
 const SNAPSHOT := preload("res://assets/ui/rewards/continuation_snapshot.gdshader")
+var _ult_details: Control
 var _queue: Array[Dictionary] = []
 var _current: Dictionary = {}
 var _elapsed := 0.0
-var _canvas: Control
-var _ult_viewport: SubViewport
-var _ult_output: TextureRect
 var _bonus_viewport: SubViewport
 var _bonus_output: TextureRect
 var _continuation: Node2D
@@ -33,14 +30,8 @@ var _card_viewports: Array[SubViewport] = []
 var add_module_icon: Callable
 ## 3択で選んだカードの画面上の範囲。HUD が選んだ時に渡す。
 var picked_rect := Rect2()
-var _heading: Label
-var _dim: ColorRect
 ## 今の獲得演出の終わりを知らせたか
 var _acquire_told := false
-var _ult_block: PanelContainer
-var _ult_name: Label
-var _ult_desc: Label
-var _ult_key: Label
 ## 制作画面が明示注入する表示だけの再生面。配布用の設定や抽選経路を参照しない。
 var _authoring_surface: Control
 
@@ -51,7 +42,6 @@ func attach_authoring_surface(surface: Control) -> bool:
 	for child in get_children():
 		if child is CanvasItem: child.hide()
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(surface)
 	surface.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	show()
@@ -68,41 +58,9 @@ func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_dim = ColorRect.new()
-	_dim.color = Color(0.015, 0.025, 0.045, 0.82)
-	_dim.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_dim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_dim)
-	_build_ult_canvas()
-	_heading = _label(Rect2(100, 58, 600, 36), 20, Color("#efcb70"))
 	_build_bonus()
-	_build_ult_block()
 	hide()
 
-func _build_ult_canvas() -> void:
-	# 800×450 の差し替え契約を保ち、HUDと同じ画素密度へ描いてから最近傍拡大する。
-	_ult_viewport = SubViewport.new()
-	_ult_viewport.size = Vector2i(BONUS_SIZE)
-	_ult_viewport.transparent_bg = true
-	_ult_viewport.world_2d = World2D.new()
-	_ult_viewport.use_hdr_2d = get_viewport().use_hdr_2d
-	_ult_viewport.gui_disable_input = true
-	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	add_child(_ult_viewport)
-	_canvas = Control.new()
-	_canvas.size = DESIGN_SIZE
-	_canvas.scale = BONUS_SIZE / DESIGN_SIZE
-	_canvas.theme = get_theme()
-	_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_ult_viewport.add_child(_canvas)
-	_ult_output = TextureRect.new()
-	_ult_output.texture = _ult_viewport.get_texture()
-	_ult_output.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_ult_output.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_ult_output.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_ult_output)
-	_ult_output.hide()
 
 func _build_bonus() -> void:
 	# 試作と同じ 640×360 の層へ描き、画面とはsRGB上で重ねる。層の中の加算・半透明もsRGBで計算する。
@@ -183,55 +141,6 @@ func _to_bonus(area: Rect2) -> Rect2:
 	var origin := global_position + (size - BONUS_SIZE * factor) * 0.5
 	return Rect2((area.position - origin) / factor, area.size / factor)
 
-func _build_ult_block() -> void:
-	_ult_block = PanelContainer.new()
-	_ult_block.position = Vector2(80, 150)
-	_ult_block.size = Vector2(640, 220)
-	_ult_block.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color("#0f1424")
-	style.border_color = Color("#efcb70")
-	style.anti_aliasing = false
-	style.set_border_width_all(1)
-	style.border_width_left = 4
-	style.content_margin_left = 28
-	style.content_margin_right = 28
-	style.content_margin_top = 20
-	style.content_margin_bottom = 20
-	_ult_block.add_theme_stylebox_override("panel", style)
-	_canvas.add_child(_ult_block)
-	var column := VBoxContainer.new()
-	column.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	column.add_theme_constant_override("separation", 14)
-	_ult_block.add_child(column)
-	_ult_name = Label.new()
-	_ult_desc = Label.new()
-	_ult_key = Label.new()
-	for label in [_ult_name, _ult_desc, _ult_key]:
-		label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		column.add_child(label)
-	_ult_name.add_theme_font_size_override("font_size", 30)
-	_ult_name.add_theme_color_override("font_color", Color("#efcb70"))
-	_ult_desc.add_theme_font_size_override("font_size", 21)
-	_ult_desc.add_theme_color_override("font_color", Color("#d5dbea"))
-	_ult_key.add_theme_font_size_override("font_size", 16)
-	_ult_key.add_theme_color_override("font_color", Color("#5bc8db"))
-	_ult_block.hide()
-
-func _label(area: Rect2, font_size: int, color: Color, parent: Control = null) -> Label:
-	var label := Label.new()
-	label.position = area.position
-	label.size = area.size
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_shadow_color", Color(0.01, 0.03, 0.05, 0.95))
-	label.add_theme_constant_override("shadow_offset_y", 1 if parent != null else 3)
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	(_canvas if parent == null else parent).add_child(label)
-	return label
 
 func enqueue_bonus(event: Dictionary) -> void:
 	_queue.append(event.duplicate())
@@ -249,8 +158,8 @@ func cancel() -> void:
 	_queue.clear()
 	if is_acquiring(): _tell_acquired()
 	_current = {}
+	_clear_ult_details()
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	hide()
 	active_changed.emit(false)
 
@@ -287,12 +196,11 @@ func _tell_acquired() -> void:
 	acquire_finished.emit()
 
 func _begin_next() -> void:
-	_ult_block.hide()
+	_clear_ult_details()
 	if _queue.is_empty():
 		_current = {}
 		_continuation.reset()
 		_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
-		_ult_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 		hide()
 		active_changed.emit(false)
 		return
@@ -302,12 +210,6 @@ func _begin_next() -> void:
 	show()
 	active_changed.emit(true)
 	var ult: bool = _current.type == &"hero_freed"
-	# 継続画面は自分の層で暗くする
-	_dim.modulate.a = 0.0
-	_heading.modulate.a = 0.0 if ult else 1.0
-	_canvas.visible = ult
-	_ult_output.visible = ult
-	_ult_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if ult else SubViewport.UPDATE_DISABLED
 	_bonus_output.visible = not ult
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED if ult else SubViewport.UPDATE_ALWAYS
 	if ult:
@@ -332,13 +234,22 @@ func _begin_next() -> void:
 	AudioManager.play(&"growth.level.levelup_step", 1.0 + 0.12 * (step - 1))
 
 func _begin_ult() -> void:
-	var definition: HeroDef = ContentManager.heroes.get(_current.id)
-	_heading.text = tr("hud.ult_granted")
-	_heading.add_theme_color_override("font_color", Color("#efcb70"))
-	_ult_name.text = "%s — %s" % [definition.display_name, tr("hero.%s.power" % definition.id)]
-	_ult_desc.text = tr("hero.%s.desc" % definition.id)
-	_ult_key.text = tr("hud.ult_key").format({key = OS.get_keycode_string(InputActions.key_of(&"hero"))})
 	AudioManager.play(&"growth.level.levelup_step", 0.65)
+
+func _clear_ult_details() -> void:
+	if _ult_details == null: return
+	_ult_details.hide()
+	_ult_details.queue_free()
+	_ult_details = null
+
+func _show_ult_details() -> void:
+	var definition: HeroDef = ContentManager.heroes.get(_current.id)
+	_ult_details = DETAILS.new()
+	_ult_details.constellation_name = definition.display_name
+	_ult_details.power_name = tr("hero.%s.power" % definition.id)
+	_ult_details.description = tr("hero.%s.desc" % definition.id)
+	add_child(_ult_details)
+	_ult_details.closed.connect(_begin_next)
 
 func _process(delta: float) -> void:
 	if _authoring_surface != null: return
@@ -351,18 +262,6 @@ func _process(delta: float) -> void:
 		_bonus_output.size = BONUS_SIZE * factor
 		_composite.set_shader_parameter("linear_target", get_viewport().use_hdr_2d)
 		return
-	var factor := minf(size.x / BONUS_SIZE.x, size.y / BONUS_SIZE.y)
-	_ult_output.position = ((size - BONUS_SIZE * factor) * 0.5).round()
-	_ult_output.size = BONUS_SIZE * factor
-	if _current.type == &"hero_freed":
-		# 獲得演出の間はフィールドを見せ、終わってから暗くして力の説明を出す
-		var shown := smoothstep(ult_acquire_seconds, ult_acquire_seconds + 0.22, _elapsed)
-		if _elapsed >= ult_acquire_seconds: _tell_acquired()
-		_dim.modulate.a = shown
-		_ult_output.visible = _elapsed >= ult_acquire_seconds
-		_ult_block.visible = _ult_output.visible
-		_ult_block.modulate.a = shown
-		_heading.modulate.a = shown
-		if _elapsed >= ult_acquire_seconds + ult_details_seconds:
-			_begin_next()
-		return
+	if _current.type == &"hero_freed" and _elapsed >= ult_acquire_seconds:
+		_tell_acquired()
+		if _ult_details == null: _show_ult_details()
