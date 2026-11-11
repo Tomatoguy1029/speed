@@ -123,6 +123,11 @@ double PickupSystem::collect_rows(godot::SpeedRunCore &core,const std::vector<si
     EventBuilder::crystals_collected(run,details,base,actual,multiplier,method);return actual;
 }
 void PickupSystem::collect_coin(RunRuntime &run,double value) {
+    // 整数百分率で端数を保持し、取得ごとの丸めと浮動小数点誤差を避ける。
+    auto &remainder=run.state.lifecycle.coin_hundredths;
+    remainder+=run.state.pickup_config.coin_gain_percent;
+    if (remainder<100) return;
+    remainder-=100;
     godot::Dictionary item;item["kind"]=godot::StringName("coin");item["value"]=value;run.state.collections.append(item);
     if (run.api_configured) ++run.state.lifecycle.coins;
     EventBuilder::flush_combat(run);

@@ -6,6 +6,6 @@
 script = ExtResource("1")
 stat = &"attack"
 per_level = 0.06
-costs = PackedInt32Array(20, 40, 70, 110, 160)
+costs = PackedInt32Array(20, 40, 70, 110, 300)
 id = &"atk"
 order = 3

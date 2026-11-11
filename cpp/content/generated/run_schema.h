@@ -104,6 +104,7 @@ struct RunConfig {
     double fx_monoceros_kick_life{};
     double fx_monoceros_lance_timing{};
     double fx_boss_touch_damage{};
+    uint32_t coin_gain_percent{};
 };
 struct StringEntry {
     uint32_t id{};

@@ -6,6 +6,6 @@
 script = ExtResource("1")
 stat = &"reroll"
 per_level = 1.0
-costs = PackedInt32Array(60, 140, 260)
+costs = PackedInt32Array(60, 140, 300)
 id = &"reroll"
 order = 7
