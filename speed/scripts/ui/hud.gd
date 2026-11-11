@@ -79,6 +79,8 @@ var _entrance_skip: Button
 var _rewards: Control
 ## RunSession が木に入れる前に入れる
 var input_router: InputRouter
+## 初回の操作練習を付けて始めるか。RunSession が表示を木へ入れる前に決める
+var tutorial_requested := false
 var bridge: RefCounted
 var _cpp_ui: Dictionary = {}
 var cpp_scope: ContentResourceScope
@@ -104,6 +106,8 @@ var _music_started := false
 var _health_fill: AtlasTexture
 var _experience_fill: AtlasTexture
 var _pause_box: VBoxContainer
+var _review_pause_guide: Node
+var _review_entry: Button
 var _draw_button: Button
 var _banner := ""
 var _banner_cleared := false
@@ -220,6 +224,19 @@ func _notification(what: int) -> void:
 		bridge.command("pause",{"paused":true})
 
 func _process(delta: float) -> void:
+	if _review_entry != null:
+		_review_entry.visible = _pause_box.visible
+		if _review_entry.visible:
+			_review_entry.size = _review_entry.get_combined_minimum_size()
+			var right := _pause_box.position.x + _pause_box.size.x + 24
+			var fit := clampf((size.x - right - 16) / _review_entry.size.x, 0.1, 1.0)
+			_review_entry.scale = Vector2.ONE * fit
+			_review_entry.position = Vector2(right, _pause_box.position.y + (_pause_box.size.y - _review_entry.size.y * fit) * 0.5)
+			if SaveManager.has_done_tutorial() and not SaveManager.settings.get("review_guide_pause", false) and not is_instance_valid(_review_pause_guide):
+				_review_pause_guide = preload("res://scripts/ui/review_guide.gd").new()
+				add_child(_review_pause_guide)
+				_review_pause_guide.pause_menu.call_deferred(self)
+
 	if not _banner.is_empty():
 		_banner_t += delta
 	_hero_notice_t = maxf(0.0,_hero_notice_t-delta)
@@ -409,13 +426,7 @@ func _build_pause() -> void:
 	resume.custom_minimum_size = Vector2(320, 52)
 	resume.pressed.connect(func(): bridge.command("pause",{"paused":false}))
 	_pause_box.add_child(resume)
-	if SaveManager.is_review_build():
-		var custom := Button.new()
-		custom.name = "ReviewSettingsButton"
-		custom.custom_minimum_size = Vector2(320, 52)
-		custom.text = tr("review.title")
-		custom.pressed.connect(_open_review_settings)
-		_pause_box.add_child(custom)
+
 	var settings := Button.new()
 	settings.text = "menu.settings"
 	settings.custom_minimum_size = Vector2(320, 52)
@@ -427,6 +438,12 @@ func _build_pause() -> void:
 	codex.custom_minimum_size = Vector2(320, 52)
 	codex.pressed.connect(_open_codex.bind(codex))
 	_pause_box.add_child(codex)
+	var guide := Button.new()
+	guide.name = "GuideButton"
+	guide.text = "tutorial.guide"
+	guide.custom_minimum_size = Vector2(320, 52)
+	guide.pressed.connect(_open_guide.bind(guide))
+	_pause_box.add_child(guide)
 	var quit := Button.new()
 	quit.name = "QuitButton"
 	quit.text = "hud.quit_run"
@@ -434,6 +451,24 @@ func _build_pause() -> void:
 	quit.pressed.connect(_confirm_abort)
 	_pause_box.add_child(quit)
 	add_child(_pause_box)
+	if SaveManager.is_review_build():
+		_review_entry = Button.new()
+		_review_entry.name = "ReviewSettingsButton"
+		_review_entry.custom_minimum_size = Vector2(300, 180)
+		_review_entry.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		_review_entry.text = tr("review.entry")
+		_review_entry.add_theme_font_size_override("font_size", 28)
+		for state: String in ["normal", "hover", "pressed", "focus"]:
+			var style := StyleBoxFlat.new()
+			style.bg_color = Color("713f20") if state == "normal" else Color("98572a")
+			style.border_color = Color("e2a267")
+			style.set_border_width_all(2)
+			style.set_corner_radius_all(8)
+			_review_entry.add_theme_stylebox_override(state, style)
+		_review_entry.add_theme_color_override("font_color", Color("fff1dd"))
+		_review_entry.pressed.connect(_open_review_settings)
+		_review_entry.hide()
+		add_child(_review_entry)
 
 func _open_codex(from: Button) -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
@@ -446,6 +481,23 @@ func _open_codex(from: Button) -> void:
 		page.queue_free()
 	add_child(page)
 	AudioManager.play(&"ui.common.confirm")
+
+## ポーズ中に操作ガイドを重ねて開く。
+func _open_guide(from: Button) -> void:
+	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
+	var page: UiScreen = preload("res://scripts/ui/tutorial_guide.gd").new()
+	from.grab_focus()
+	show_menu_overlay(page)
+	page.close_fn = func():
+		page.set_process_unhandled_input(false)
+		close_menu_overlay(page)
+		page.queue_free()
+	add_child(page)
+	AudioManager.play(&"ui.common.confirm")
+
+## カード選びのあとの継続演出など、報酬の表示が続いているか。
+func reward_active() -> bool:
+	return _rewards != null and _rewards.is_active()
 
 func _confirm_abort() -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
@@ -753,6 +805,13 @@ func _ready_cpp() -> void:
 	_cards_box.add_child(_cpp_cancel)
 	resized.connect(_layout_cpp_art)
 	_layout_cpp_art()
+	if tutorial_requested:
+		var tutorial: Control = preload("res://scripts/ui/tutorial.gd").new()
+		tutorial.name = "Tutorial"
+		tutorial.hud = self
+		tutorial.bridge = bridge
+		tutorial.world = input_router.get_parent()
+		add_child(tutorial)
 
 func _prepare_cpp_finish() -> void:
 	_finish_skip = Button.new()

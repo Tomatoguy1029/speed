@@ -3,6 +3,7 @@
 #include "../content/content_bundle.h"
 #include <climits>
 #include <cmath>
+#include <utility>
 using namespace godot;
 namespace speed {
 namespace {
@@ -25,23 +26,31 @@ bool value_only(const Variant &value,unsigned depth=0) {
     }
 }
 void count(int64_t &value) {if (value<INT64_MAX) ++value;}
-}
-void FrameBuilder::append(RunRuntime &run,StringName type,const Dictionary &data) {
+// 検査・連番・旧窓口は共通にし、検査成功後の所有だけを入口ごとに分ける。
+void append_value(RunRuntime &run,StringName type,const Dictionary &data,Dictionary *owned) {
     if (!run.api_configured) {auto legacy=data.duplicate(true);legacy["type"]=type;run.state.events.append(legacy);return;}
     auto &out=run.frame_workspace;EventType kind;
     if (out.invalid) return;
     if (!parse_symbol(String(type).utf8().get_data(),kind) || out.next_sequence==INT64_MAX || !value_only(data)) {out.invalid=true;return;}
-    auto payload=data.duplicate(true);auto names=payload.keys();
+    auto names=data.keys();
     for (int64_t i=0;i<names.size();++i) {
         const String key=names[i];
         if (key=="t" || key=="world_t") continue;
         if (!event_field_allowed(kind,key.utf8().get_data())) {out.invalid=true;return;}
     }
+    auto payload=owned?std::move(*owned):data.duplicate(true);
     Notification event;event.type=kind;event.sequence=out.next_sequence++;
     event.tick=out.publishing_tick>=0?out.publishing_tick:run.state.control.tick;
-    event.time=data.get("t",run.state.time);event.world_time=data.get("world_t",run.state.world_time);
-    payload.erase("t");payload.erase("world_t");event.payload=payload;
+    event.time=payload.get("t",run.state.time);event.world_time=payload.get("world_t",run.state.world_time);
+    payload.erase("t");payload.erase("world_t");event.payload=std::move(payload);
     out.pending.push_back(std::move(event));count(out.metrics.events_emitted);
+}
+}
+void FrameBuilder::append(RunRuntime &run,StringName type,const Dictionary &data) {
+    append_value(run,type,data,nullptr);
+}
+void FrameBuilder::append_owned(RunRuntime &run,StringName type,Dictionary &&data) {
+    append_value(run,type,data,&data);
 }
 Array FrameBuilder::events(RunRuntime &run) {
     Array events;auto &out=run.frame_workspace;

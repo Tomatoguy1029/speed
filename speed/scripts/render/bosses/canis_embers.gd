@@ -4,43 +4,10 @@ extends RefCounted
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const H := [Color("#ffffff"),Color("#f2fbff"),Color("#d8f1ff"),Color("#a9dcff"),Color("#6fb8f2"),Color("#3f8ce0"),Color("#2a66c4"),Color("#1d479b"),Color("#13306a")]
 const SOOT := [Color("#0c1420"),Color("#142238")]
-const MASK := 0xffffffff
 
 static func _hash(n: float) -> float:
 	var value := sin(n*127.1+311.7)*43758.5453
 	return value-floorf(value)
-
-static func _key(x: int,y: int) -> int:
-	return ((x&MASK)<<32)|(y&MASK)
-
-static func _splat(field: PackedFloat32Array, width: int, height: int, origin: Vector2i, point: Vector2, radius: float, channel: int) -> void:
-	if radius<0.3: return
-	var x0 := maxi(0,floori(point.x-radius-origin.x))
-	var x1 := mini(width-1,ceili(point.x+radius-origin.x))
-	var y0 := maxi(0,floori(point.y-radius-origin.y))
-	var y1 := mini(height-1,ceili(point.y+radius-origin.y))
-	for y in range(y0,y1+1):
-		for x in range(x0,x1+1):
-			var dx := (x+origin.x+0.5-point.x)/radius
-			var dy := (y+origin.y+0.5-point.y)/radius
-			var d2 := dx*dx+dy*dy
-			if d2>=1.0: continue
-			var i := (y*width+x)*3+channel
-			field[i]+=exp(-d2*3.2)*(1.0-smoothstep(0.72,1.0,sqrt(d2)))
-
-static func _read(field: PackedFloat32Array, width: int, height: int, x: float, y: float, channel: int) -> float:
-	var i := clampi(floori(x+0.5),0,width-1)
-	var j := clampi(floori(y+0.5),0,height-1)
-	return field[(j*width+i)*3+channel]
-
-static func _visible(canvas, point: Vector2, masks: Array) -> bool:
-	if masks.is_empty(): return true
-	for mask: Dictionary in masks:
-		var cell := float(mask.cell)
-		if cell<=0.0: continue
-		var world: Vector2 = mask.origin+(point-mask.logical_origin)/float(canvas.world_scale)
-		if mask.keys.has(_key(floori(world.x/cell),floori(world.y/cell))): return true
-	return false
 
 static func draw(canvas, rows: Array, clock: float, logical_pixel: float) -> void:
 	var groups := {}
@@ -106,27 +73,36 @@ static func _draw_group(canvas, rows: Array, clock: float, logical_pixel: float,
 	var width := mini(logical_size.x,ceili(hi.x))-origin.x+1
 	var height := mini(logical_size.y,ceili(hi.y))-origin.y+1
 	if width<=0 or height<=0: return
-	var field := PackedFloat32Array()
-	field.resize(width*height*3)
+	var points := PackedVector2Array()
+	var radii := PackedFloat64Array()
+	var layers := PackedByteArray()
 	for particle: Dictionary in particles:
 		var point: Vector2 = particle.point
 		var radius := float(particle.radius)
 		var age := float(particle.age)
-		_splat(field,width,height,origin,point,radius*1.25,0)
-		if age<0.55: _splat(field,width,height,origin,point+Vector2(0,-radius*0.15),radius*0.8,1)
-		if age<0.25: _splat(field,width,height,origin,point+Vector2(0,-radius*0.2),radius*0.5,2)
-	var stepped_clock := floorf(clock*30.0)/30.0
-	for y in height:
-		for x in width:
-			var px := x+origin.x
-			var py := y+origin.y
-			var wx := px*logical_pixel
-			var wy := py*logical_pixel
-			var u := (sin(wy*0.075-stepped_clock*4.4)+sin(wx*0.11+wy*0.033+stepped_clock*2.1))*1.2
-			var v := cos(wx*0.08+stepped_clock*3.0)*0.66
-			if not _visible(canvas,Vector2(px+0.5,py+0.5),masks) or _read(field,width,height,x+u,y+v,0)<0.32: continue
-			var inner := _read(field,width,height,x+u,y+v,1)>=0.32
-			var core := inner and _read(field,width,height,x+u,y+v,2)>=0.32
-			var color: Color = H[1 if core else 4 if inner else 6]
-			canvas.mid.px(px,py,color)
-			if (px&3)==0 and (py&3)==0: canvas.mid.glow(px,py,4.0,color,0.18*float(params.intensity))
+		points.append(point)
+		radii.append(radius * 1.25)
+		layers.append(0)
+		if age < 0.55:
+			points.append(point + Vector2(0, -radius * 0.15))
+			radii.append(radius * 0.8)
+			layers.append(1)
+		if age < 0.25:
+			points.append(point + Vector2(0, -radius * 0.2))
+			radii.append(radius * 0.5)
+			layers.append(2)
+	var display := {"clock": floorf(clock * 30.0) / 30.0, "logical_pixel": logical_pixel,
+		"deformation": 1.2, "v_gain": 0.66, "v_deformation": 1.0, "threshold": 0.32,
+		"glow_radius": 4.0, "strengths": PackedFloat64Array([0.18 * float(params.intensity), 0.18 * float(params.intensity), 0.18 * float(params.intensity)]),
+		"masks": masks, "include_edge": true}
+	_draw_density(canvas, canvas.mid, points, radii, layers, origin, width, height, display, PackedColorArray([H[6], H[4], H[1]]))
+
+## 動く粒の入力をまとめて渡し、密度領域の保存場所は再利用する。
+static func _draw_density(canvas, painter, points: PackedVector2Array, radii: PackedFloat64Array, layers: PackedByteArray, origin: Vector2i, width: int, height: int, display: Dictionary, palette: PackedColorArray) -> void:
+	var raster: SpeedFxRaster = canvas.get_density_raster()
+	raster.begin_painter(painter, float(canvas.world_scale), canvas._camera_position, true, true)
+	raster.density_field(points, radii, layers, origin, width, height, display, palette)
+	painter.colors = raster.take_colors()
+	painter.lights = raster.take_lights()
+	painter.has_color = painter.has_color or raster.has_color()
+	painter.has_light = painter.has_light or raster.has_light()

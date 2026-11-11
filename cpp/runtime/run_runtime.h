@@ -13,6 +13,7 @@ struct RunWorkspace {
     std::vector<godot::Vector2> avoidance_from;
     std::vector<std::pair<int64_t,uint32_t>> crowd_cells;
     std::vector<godot::Vector2> crowd_shift;
+    std::vector<uint8_t> crowd_movable;
 };
 struct ContentBundle;
 class RunRuntime {

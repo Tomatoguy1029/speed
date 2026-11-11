@@ -37,10 +37,14 @@ class Painter:
 		place(0.0, 0.0)
 
 	func finish() -> void:
-		color_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, colors)
-		# 黒の光も不透明にし、加算合成で透明な背景と同じ結果にする。
-		for i in range(3, lights.size(), 4): lights[i] = 255
-		light_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, lights)
+		if not has_color and not has_light: return
+		if color_image == null:
+			color_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, colors)
+			light_image = Image.create_from_data(width, height, false, Image.FORMAT_RGBA8, lights)
+		else:
+			color_image.set_data(width, height, false, Image.FORMAT_RGBA8, colors)
+			light_image.set_data(width, height, false, Image.FORMAT_RGBA8, lights)
+		# 合成シェーダーは光の RGB だけを読む。αの全画素更新は不要。
 
 	func place(x: float, y: float, flip := false, angle := 0.0) -> void:
 		tx = x
@@ -281,11 +285,17 @@ var back := Painter.new()
 var mid := Painter.new()
 var mid_landing := Painter.new()
 var front := Painter.new()
+var _density_raster: SpeedFxRaster
 var world_scale := 1.0
 var _camera_position := Vector2.ZERO
 var _logical_size := Vector2i.ZERO
 var logical_size: Vector2i:
 	get: return _logical_size
+
+## 動的な密度場の保存場所はこの描画面の寿命に合わせる。
+func get_density_raster() -> SpeedFxRaster:
+	if _density_raster == null: _density_raster = SpeedFxRaster.new()
+	return _density_raster
 
 ## world_to_screen_scale はカメラの基準倍率と現在のズームを掛けた実効値。
 func begin_frame(view_size: Vector2, camera_position: Vector2, world_to_screen_scale: float) -> void:

@@ -234,6 +234,7 @@ func _poll_cpp_loading() -> void:
 			hud.bridge = bridge
 			hud.cpp_scope = resources
 			hud.cpp_resources = cpp_resources
+			hud.tutorial_requested = bool(start_options.get("tutorial",false))
 		else: view.get_node("Hud").free()
 		cpp_input_source = view.get_node("World/InputRouter").poll
 		add_child(view)

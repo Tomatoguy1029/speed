@@ -6,11 +6,23 @@ extends InstanceBatch
 
 const BAYER := [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]
 var px := 2.366
+var _geometry: SpeedWeaponGeometry
 
 func setup_painter(cell: float) -> void:
 	px = cell
 	setup_shader_quad()
 	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+
+## 大量の画素を同じバッファへまとめて追加する。引渡し中の配列共有を外し、複製を避ける。
+func geometry_begin() -> SpeedWeaponGeometry:
+	if _geometry == null: _geometry = SpeedWeaponGeometry.new()
+	_geometry.begin(_buf, _count, px)
+	_buf = PackedFloat32Array()
+	return _geometry
+
+func geometry_end() -> void:
+	_count = _geometry.get_count()
+	_buf = _geometry.take_buffer()
 
 ## 世界座標をドットの座標へ。
 func cell(p: Vector2) -> Vector2:
