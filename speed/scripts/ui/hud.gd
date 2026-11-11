@@ -58,7 +58,6 @@ const RANK_COLORS := [Color("#d5dbea"), Color("#8ed7a3"), Color("#3989ff"), Colo
 @export_group("報酬演出")
 ## 英雄の力の獲得演出の長さ（クリック・タップ・Space で飛ばせる）
 @export_range(0.5, 4.0, 0.05) var ult_acquire_seconds := 4.3
-@export_range(1.0, 8.0, 0.1) var ult_details_seconds := 3.0
 
 var _cards_accept_at := 0
 var _reward_advanced_frame := -1
@@ -130,6 +129,11 @@ func _ready() -> void:
 
 func can_show_menu_overlay() -> bool:
 	return _settings == null and _menu_overlay == null and int(_cpp_ui.get("phase",-1)) in [Phase.Play,Phase.Levelup,Phase.Paused]
+
+func can_show_navigation_guide() -> bool:
+	return can_show_menu_overlay() and int(_cpp_ui.get("phase", -1)) == Phase.Play \
+		and not _rewards.is_active() and float(_cpp_ui.get("cinematic_bars", 0.0)) <= 0.0 \
+		and not _cpp_ui.get("boss_bodies", []).any(func(body): return body.get("boss_spawned", false))
 
 func show_menu_overlay(overlay: Control) -> bool:
 	if not can_show_menu_overlay():
@@ -695,7 +699,6 @@ func _ready_cpp() -> void:
 	_prepare_cpp_finish()
 	_rewards = preload("res://scripts/ui/reward_presentation.gd").new()
 	_rewards.ult_acquire_seconds = ult_acquire_seconds
-	_rewards.ult_details_seconds = ult_details_seconds
 	_rewards.add_module_icon = _add_icon
 	add_child(_rewards)
 	_rewards.active_changed.connect(func(active: bool):
@@ -706,6 +709,10 @@ func _ready_cpp() -> void:
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
 	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
+	var guides := preload("res://scripts/ui/navigation_guides.gd").new()
+	guides.name = "NavigationGuides"
+	add_child(guides)
+	guides.setup(bridge, self)
 	_font = get_theme_default_font()
 	_stage_progress=RUN_PROGRESS.new()
 	_stage_progress.font=_font

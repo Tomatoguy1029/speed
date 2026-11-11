@@ -141,14 +141,14 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | hud.level&#95;bonus&#95;more | 継続！ | More! |
 | hud.ult&#95;granted | 英雄の力を授かった | ULT ACQUIRED |
 | hud.ult&#95;key | {key}：英雄の星座の力を発動 | {key}: Activate constellation power |
-| hero.leo.power | 獅子になる | Become the Lion |
-| hero.leo.desc | 星の獅子になって駆け回り、触れた敵を装甲に関係なく貫く。その間は被弾せず、武器・特性・ブーストは止まる。 | Become a lion of stars and rush around, piercing enemies on contact regardless of armor. While active you take no damage, and weapons, traits and boost stop. |
+| hero.leo.power | 獅子まとい | Lion Mantle |
+| hero.leo.desc | 星の獅子に変身し、触れた敵を装甲に関係なく突き飛ばす。<br>変身中はダメージを受けず、武器・特性・ブーストは停止する。 | Transform into a lion of stars and knock enemies away regardless of armor.<br>While transformed, take no damage; weapons, traits and boost are disabled. |
 | hero.perseus.power | メドゥーサの首 | Medusa's Head |
-| hero.perseus.desc | 画面の中の敵（ボスと障害物のほか）と敵の弾を石にする。石は触れると砕ける。ボスは短時間止まる。 | Petrify enemies (except bosses and obstacles) and hostile shots on screen. Touch stone to shatter it. Bosses stop briefly. |
+| hero.perseus.desc | 画面内の敵（ボス・障害物を除く）と敵の弾を石に変える。<br>石はすぐに砕ける。<br>大物は砕けずダメージを受ける。<br>ボスにはダメージを与え、短時間動きを止める。 | Turn enemies (except bosses and obstacles) and hostile shots on screen to stone.<br>The stone shatters shortly afterward.<br>Large enemies take damage instead of shattering. Bosses take damage and briefly stop moving. |
 | hero.gemini.power | 光と影の兄弟 | Light and Shadow Twins |
-| hero.gemini.desc | 機体が光と影に分かれ、影は描いた線を左右反転した経路を同時に駆け抜け、同じ武器を使う。 | Your ship splits into light and shadow. The shadow dashes the mirrored path at the same time and uses the same weapons. |
+| hero.gemini.desc | 機体が光と影に分かれる。<br>影は描いた線を左右反転したルートで同時に駆け抜け、同じ武器で攻撃する。 | Split the ship into light and shadow.<br>The shadow follows a horizontally mirrored route at the same time and attacks with the same weapons. |
 | hero.hercules.power | 火の隕石 | Fiery Meteors |
-| hero.hercules.desc | 機体の周りに火の隕石を落とし、落ちた跡を燃やす。 | Drop fiery meteors around the ship and leave burning ground. |
+| hero.hercules.desc | 機体の周囲に隕石を降らせる。<br>隕石が落下した場所には炎が残り、敵に一時的にダメージを与える。 | Rain meteors around the ship.<br>The impact sites leave flames that temporarily damage enemies. |
 | hud.skip&#95;finish | 演出をスキップ | Skip sequence |
 | hud.continuation | モジュール連続強化 | CONSECUTIVE UPGRADE |
 | hud.continuation&#95;count | {n} 連続！ | {n} CHAIN! |
@@ -1054,6 +1054,18 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | review.preparing | 準備しています… | Preparing… |
 | review.applied | 適用しました。 | Applied. |
 | review.unavailable | 操作できません。準備完了後、通常プレイを一時停止して試してください。 | Unavailable. Pause normal play after preparation and try again. |
+| guide.resume | 再開 [Space] | Resume [Space] |
+| guide.heading | 航海ガイド | Navigation guide |
+| guide.hero.title | 英雄の星座 | Hero constellation |
+| guide.landmark.title | 目印の星 | Guiding stars |
+| guide.hero.desc | 英雄の星座に光を取り戻し、英雄の力を授かる | Restore the constellation’s light and receive the hero’s power |
+| guide.landmark.desc | 金色のオーラをまとった敵は、「英雄の星座」への手がかり | Enemies with a golden aura lead to a hero constellation |
+| guide.hero.step1 | 線をブーストでなぞる | Trace the lines with boost |
+| guide.hero.step2 | 全ての線を光らせる | Light up every line |
+| guide.hero.step3 | 英雄の星座に光を取り戻す | Restore the constellation’s light |
+| guide.landmark.step1 | オーラを纏った敵を倒す | Defeat an enemy with an aura |
+| guide.landmark.step2 | ミニマップ上に線が出る | A line appears on the minimap |
+| guide.landmark.step3 | もう一体倒すと場所が判明 | Defeat another to locate it |
 <!-- csv:end -->
 
 ### 互換行

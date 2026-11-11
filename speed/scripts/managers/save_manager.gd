@@ -45,6 +45,8 @@ func default_data() -> Dictionary:
 	return {
 		"version": SAVE_VERSION,
 		"intro_seen": false,
+		"landmark_guide_seen": false,
+		"hero_guide_seen": false,
 		"coins": 0,
 		"meta": {},
 		"cleared_stage": 0,
