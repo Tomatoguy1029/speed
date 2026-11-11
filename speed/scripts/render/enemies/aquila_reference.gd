@@ -9,6 +9,7 @@ const EDGES := preload("res://assets/effects/reference/edges.tres")
 const FLICK := [1.0,0.72,0.3,0.95,0.5,0.8,0.22]
 var _settings: Dictionary = SETTINGS.for_id("G12-aquila")
 var _light = LIGHTNING.new()
+var _raster := SpeedFxRaster.new()
 var _noise = JET.new()
 var _edges: Dictionary = EDGES.get_meta("edges")
 var _scope: ContentResourceScope
@@ -98,7 +99,14 @@ func _draw_zone(row: Dictionary, time: float, canvas, clock: float, colors: Arra
 	var age := time-delay
 	_draw_sky_bolt(canvas,center,seed,colors,age)
 	var heat := pow(clampf(1.0-age/1.2,0.0,1.0),1.4)
-	if heat>0:
+	var native := _native_back(canvas)
+	if heat>0 and native:
+		var p = canvas.back
+		_raster.begin_painter(p,1.0,Vector2.ZERO,true,false)
+		var flags := _raster.aquila_cracks(_light.cracks(seed,radius),center,heat,PackedColorArray(colors),p.fade)
+		p.colors = _raster.take_colors()
+		p.has_color = p.has_color or (flags & 1)!=0
+	if heat>0 and not native:
 		for crack: Dictionary in _light.cracks(seed,radius):
 			var points: Array = crack.points
 			for i in range(points.size()):
@@ -173,7 +181,16 @@ func _draw_sky_bolt(canvas, center: Vector2, seed: int, colors: Array[Color], ag
 func _wake(history: Array, canvas, clock: float, colors: Array[Color], strength: float) -> void:
 	if history.size()<2 or strength<=0: return
 	var frame := floori(clock*30.0)
-	for i in range(1,history.size()):
+	var native := _native_back(canvas)
+	if native:
+		var p = canvas.back
+		_raster.begin_painter(p,canvas.world_scale,canvas._camera_position,true,true)
+		var flags := _raster.aquila_wake(history,clock,strength,PackedColorArray(colors),p.fade,p.light_strength)
+		p.colors = _raster.take_colors()
+		p.lights = _raster.take_lights()
+		p.has_color = p.has_color or (flags & 1)!=0
+		p.has_light = p.has_light or (flags & 2)!=0
+	for i in range(1,1 if native else history.size()):
 		var a: Vector2 = canvas.to_logical(history[i-1].pos)
 		var b: Vector2 = canvas.to_logical(history[i].pos)
 		var u := clampf((clock-float(history[i].time))/0.45,0.0,1.0)
@@ -269,3 +286,7 @@ func _electrify(row: Dictionary, canvas, clock: float, colors: Array[Color], str
 func _edge(row: Dictionary, point: Vector2, angle: float, scale: float, canvas) -> Vector2:
 	return canvas.to_logical(row.pos+point.rotated(angle)*scale)
 
+
+func _native_back(canvas) -> bool:
+	var p = canvas.back
+	return p.tx==0.0 and p.ty==0.0 and p.fx==1.0 and p.cs==1.0 and p.sn==0.0

@@ -1,5 +1,6 @@
 ## monoDanceBurn の熱から煤へ変わる跡。位置と年齢は戦闘状態から受け取る。
 extends RefCounted
+static var _raster := SpeedFxRaster.new()
 const SLASH := preload("res://scripts/render/bosses/monoceros_slash.gd")
 
 static func _mix(a: Color, b: Color, amount: float) -> Color:
@@ -28,3 +29,20 @@ static func draw(canvas, position: Vector2, age: float, params: Dictionary) -> v
 				canvas.back.px(origin.x+x,origin.y+y,heat[index])
 			else:
 				canvas.back.blend(origin.x+x,origin.y+y,soot[0 if k<0.5 else 1],0.7)
+
+## 同じ色段を使う跡を、入力順のまままとめて描く。
+static func draw_all(canvas, burns: Array, clock: float, params: Dictionary) -> void:
+	if burns.is_empty(): return
+	var painter = canvas.back
+	if painter.tx != 0.0 or painter.ty != 0.0 or painter.fx != 1.0 or painter.cs != 1.0 or painter.sn != 0.0:
+		for burn: Dictionary in burns: draw(canvas,burn.position,clock-float(burn.started),params)
+		return
+	var outer := Color(params.tailOuterColor)
+	var inner := Color(params.tailJetColor)
+	var core := Color(params.tailCoreColor)
+	var black := Color("#05030a")
+	var palette := PackedColorArray([core,_mix(core,inner,0.5),inner,_mix(inner,outer,0.5),outer,_mix(outer,black,0.3),_mix(outer,black,0.6),_mix(outer,black,0.8),_mix(outer,black,0.88),_mix(outer,black,0.78)])
+	_raster.begin_painter(painter,canvas.world_scale,canvas._camera_position,true,false)
+	_raster.monoceros_burns(burns,clock,3.2*float(params.size),palette,painter.fade)
+	painter.colors = _raster.take_colors()
+	painter.has_color = painter.has_color or _raster.has_color()

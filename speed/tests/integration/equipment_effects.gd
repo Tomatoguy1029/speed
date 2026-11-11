@@ -1704,6 +1704,7 @@ func check_cpp_w05() -> void:
 
 func trait_test_session(id: String, config: GameConfig, seed_value: int):
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 84
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["splitling","shield"] if id in ["T03","T06"] else ["splitling"])
@@ -2542,7 +2543,8 @@ func check_cpp_t06() -> void:
 	var config := trait_test_config()
 	config.base_crit_chance = 1.0
 	config.xp_base = 100000.0
-	# 通常候補は固定seed 606の3回目の引き直しでT06を含む。
+	# 選択の確認では所持装備の重みを上げて、対象の強化を候補へ出す。
+	config.owned_card_bias = 1000.0
 	var seed_value := 606
 	var session = await trait_test_session("T06",config,seed_value)
 	if session==null:

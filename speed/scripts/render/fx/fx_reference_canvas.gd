@@ -172,6 +172,13 @@ class Painter:
 				p.y += sy
 
 	func circle(cx: float, cy: float, r: float, c: Variant, alpha: Variant = 1.0) -> void:
+		if r >= 2.0 and c is Color and (alpha is float or alpha is int) and tx == 0.0 and ty == 0.0 and fx == 1.0 and cs == 1.0 and sn == 0.0:
+			if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
+			_glow_raster.begin_painter(self, 1.0, Vector2.ZERO, true, false)
+			var flags := _glow_raster.canvas_circle(cx, cy, r, c, float(alpha), fade, false)
+			colors = _glow_raster.take_colors()
+			has_color = has_color or (flags & 1) != 0
+			return
 		if r < 0.6:
 			dot(cx, cy, _value(c, [0.0, 0.0]), _value(alpha, [0.0, 0.0]))
 			return
@@ -182,6 +189,13 @@ class Painter:
 			out.a = _value(alpha, [d.length()/r, d.angle()]))
 
 	func disc(cx: float, cy: float, r: float, c: Variant, alpha: Variant = 1.0) -> void:
+		if r >= 2.0 and c is Color and (alpha is float or alpha is int) and tx == 0.0 and ty == 0.0 and fx == 1.0 and cs == 1.0 and sn == 0.0:
+			if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
+			_glow_raster.begin_painter(self, 1.0, Vector2.ZERO, true, false)
+			var flags := _glow_raster.canvas_circle(cx, cy, r, c, float(alpha), fade, true)
+			colors = _glow_raster.take_colors()
+			has_color = has_color or (flags & 1) != 0
+			return
 		if r < 0.5:
 			blend(cx, cy, _value(c, [0.0, 0.0]), _value(alpha, [0.0, 0.0]))
 			return
@@ -199,6 +213,13 @@ class Painter:
 					_blend(x,y,_value(c,[d.length()/r,d.angle()]),_value(alpha,[d.length()/r,d.angle()]))
 
 	func beam(x0: float, y0: float, x1: float, y1: float, width0: float, c: Variant, alpha: Variant = 1.0) -> void:
+		if c is Color and (alpha is float or alpha is int) and tx==0.0 and ty==0.0 and fx==1.0 and cs==1.0 and sn==0.0:
+			if _glow_raster==null: _glow_raster=SpeedFxRaster.new()
+			_glow_raster.begin_painter(self,1.0,Vector2.ZERO,true,false)
+			var flags := _glow_raster.canvas_beam(x0,y0,x1,y1,width0,c,float(alpha),fade)
+			colors = _glow_raster.take_colors()
+			has_color = has_color or (flags & 1)!=0
+			return
 		var a := Vector2(x0,y0)
 		var b := Vector2(x1,y1)
 		var d := b-a
@@ -255,40 +276,27 @@ class Painter:
 	func glow(x: float, y: float, r: float, c: Color, strength := 0.5) -> void:
 		if r < 1.0 or strength <= 0.004: return
 		var center := _to(x,y)
-		# 小さい光はその場で描き、画素の多い円だけまとめて計算する。
-		if r >= 8.0:
-			if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
-			_glow_raster.begin(PackedByteArray(), lights, width, height, 1.0, Vector2.ZERO)
-			var flags := _glow_raster.canvas_glow(center, r, c, strength, fade, light_strength)
-			lights = _glow_raster.take_lights()
-			has_light = has_light or (flags & 2) != 0
-			return
-		for sy in range(maxi(0,floori(center.y-r)),mini(height-1,ceili(center.y+r))+1):
-			for sx in range(maxi(0,floori(center.x-r)),mini(width-1,ceili(center.x+r))+1):
-				var d := Vector2(sx+0.5,sy+0.5).distance_to(center)/r
-				if d < 1.0: _add(sx,sy,c,(1.0-d)*(1.0-d)*strength)
+		if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
+		_glow_raster.begin_painter(self, 1.0, Vector2.ZERO, false, true)
+		var flags := _glow_raster.canvas_glow(center, r, c, strength, fade, light_strength)
+		lights = _glow_raster.take_lights()
+		has_light = has_light or (flags & 2) != 0
 
 	func glow_line(x0: float, y0: float, x1: float, y1: float, r: float, c: Color, strength := 0.5) -> void:
 		if r < 1.0 or strength <= 0.004: return
-		var a := _to(x0,y0)
-		var b := _to(x1,y1)
-		var delta := b-a
-		var l2 := maxf(delta.length_squared(),0.000000001)
-		for sy in range(maxi(0,floori(minf(a.y,b.y)-r)),mini(height-1,ceili(maxf(a.y,b.y)+r))+1):
-			for sx in range(maxi(0,floori(minf(a.x,b.x)-r)),mini(width-1,ceili(maxf(a.x,b.x)+r))+1):
-				var p := Vector2(sx+0.5,sy+0.5)
-				var u := clampf((p-a).dot(delta)/l2,0.0,1.0)
-				var d := p.distance_to(a+delta*u)/r
-				if d < 1.0: _add(sx,sy,c,(1.0-d)*(1.0-d)*strength)
+		if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
+		_glow_raster.begin_painter(self, 1.0, Vector2.ZERO, false, true)
+		var flags := _glow_raster.canvas_glow_line(_to(x0,y0), _to(x1,y1), r, c, strength, fade, light_strength)
+		lights = _glow_raster.take_lights()
+		has_light = has_light or (flags & 2) != 0
 
 	func glow_ring(x: float, y: float, radius: float, r: float, c: Color, strength := 0.5) -> void:
 		if r < 1.0 or strength <= 0.004: return
-		var center := _to(x,y)
-		var extent := radius+r
-		for sy in range(maxi(0,floori(center.y-extent)),mini(height-1,ceili(center.y+extent))+1):
-			for sx in range(maxi(0,floori(center.x-extent)),mini(width-1,ceili(center.x+extent))+1):
-				var d := absf(Vector2(sx+0.5,sy+0.5).distance_to(center)-radius)/r
-				if d < 1.0: _add(sx,sy,c,(1.0-d)*(1.0-d)*strength)
+		if _glow_raster == null: _glow_raster = SpeedFxRaster.new()
+		_glow_raster.begin_painter(self, 1.0, Vector2.ZERO, false, true)
+		var flags := _glow_raster.canvas_glow_ring(_to(x,y), radius, r, c, strength, fade, light_strength)
+		lights = _glow_raster.take_lights()
+		has_light = has_light or (flags & 2) != 0
 
 var back := Painter.new()
 var mid := Painter.new()

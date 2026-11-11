@@ -3,6 +3,8 @@
 ## ライセンスと帰属は assets/ui/rewards/pixelfx_LICENSE.txt・pixelfx_NOTICE.txt を参照。
 extends RefCounted
 
+var _raster := SpeedFxRaster.new()
+
 const SPARK := 0
 const EMBER := 7
 const SMOKE := 8
@@ -133,13 +135,4 @@ func advance(dt: float, stamp_scorch: bool) -> void:
 		_stamp_scorch()
 
 func _stamp_scorch() -> void:
-	for p in particles:
-		if p.kind != FIRE or p.delay > 0:
-			continue
-		var r: float = p.size * 0.9
-		var center: Vector2 = p.pos + Vector2(scorch_radius, scorch_radius)
-		for y in range(maxi(0, floori(center.y - r)), mini(scorch_size - 1, ceili(center.y + r)) + 1):
-			for x in range(maxi(0, floori(center.x - r)), mini(scorch_size - 1, ceili(center.x + r)) + 1):
-				var d2 := Vector2(x + 0.5, y + 0.5).distance_squared_to(center) / (r * r)
-				if d2 < 1:
-					scorch[y * scorch_size + x] += (1 - d2) * 0.08
+	scorch = _raster.phoenix_stamp_scorch(scorch,scorch_size,scorch_radius,particles)

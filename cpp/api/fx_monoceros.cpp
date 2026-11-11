@@ -49,4 +49,28 @@ int SpeedFxRaster::monoceros_crescent(Array points,double head,double tail,doubl
     }
     return reference_flags_;
 }
+int SpeedFxRaster::monoceros_burns(Array burns,double clock,double radius,PackedColorArray palette,double fade) {
+    reference_flags_=0;
+    if (radius<=0 || palette.size()<10) return 0;
+    for (int row=0;row<burns.size();++row) {
+        const Dictionary burn=burns[row];
+        const double age=clock-double(burn["started"]);
+        if (age<0 || age>2.5) continue;
+        const Vector2 origin=logical(burn["position"]);
+        const double t=std::clamp((age-1.4)/(2.5-1.4),0.0,1.0),remaining=1-t*t*(3-2*t);
+        for (int y=-int(std::ceil(radius));y<=int(std::floor(radius));++y) for (int x=-int(std::ceil(radius));x<=int(std::floor(radius));++x) {
+            const double hashed=std::sin(((std::floor(origin.x+0.5)+x)*12.9898+(std::floor(origin.y+0.5)+y)*78.233)*127.1+311.7)*43758.5453,k=hashed-std::floor(hashed);
+            const double distance=Vector2(x,y).length()/radius;
+            if (distance>0.7+0.5*k || k>remaining*0.95) continue;
+            const double temperature=std::pow(std::clamp(1-age/0.9,0.0,1.0),1.3)*(1.1-distance)-k*0.35;
+            const Vector2 cell(std::floor(double(origin.x)+x),std::floor(double(origin.y)+y));
+            if (temperature>0.1) {
+                const int index=std::min(7,int(std::floor((1-std::min(1.0,temperature))*7)));
+                reference_dot(cell,palette[index],1,fade);
+            } else reference_blend(cell,palette[k<0.5?8:9],0.7,fade);
+        }
+    }
+    return reference_flags_;
+}
+
 }

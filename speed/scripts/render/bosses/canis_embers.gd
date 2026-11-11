@@ -23,10 +23,8 @@ static func _draw_group(canvas, rows: Array, clock: float, logical_pixel: float,
 	var masks := []
 	if has_footprints:
 		for row: Dictionary in rows:
-			var keys := {}
-			for key: int in row.footprint: keys[key] = true
 			var origin: Vector2 = row.field_origin
-			masks.append({"keys":keys,"cell":float(row.history_cell),"origin":origin,"logical_origin":canvas.to_logical(origin)})
+			masks.append({"cells":row.footprint,"cell":float(row.history_cell),"origin":origin,"logical_origin":canvas.to_logical(origin)})
 	var particles: Array = []
 	for row: Dictionary in rows:
 		var elapsed := clock-float(row.started)

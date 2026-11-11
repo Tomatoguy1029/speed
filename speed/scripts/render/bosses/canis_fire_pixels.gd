@@ -1,5 +1,6 @@
 ## 本番が作った炎の密度画素を、同じworld位置に表示する。
 extends RefCounted
+static var _raster := SpeedFxRaster.new()
 
 const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const BASE := Color("#80c8ff")
@@ -32,6 +33,24 @@ static func _palette(tint: Color) -> Array[Color]:
 	return colors
 
 static func draw(canvas, rows: Array) -> void:
+	var painter = canvas.front
+	if painter.tx!=0.0 or painter.ty!=0.0 or painter.fx!=1.0 or painter.cs!=1.0 or painter.sn!=0.0:
+		draw_transformed(canvas,rows)
+		return
+	for row: Dictionary in rows:
+		var cell := float(row.cell)
+		if cell<=0.0: continue
+		var params := SETTINGS.for_id(str(row.settings))
+		if params.is_empty(): continue
+		var colors := PackedColorArray(_palette(Color(str(params.color))))
+		_raster.begin_painter(painter,canvas.world_scale,canvas._camera_position,true,true)
+		_raster.canis_pixels(row.pixels,row.field_origin,cell,colors,painter.fade*minf(1.0,float(params.intensity)),painter.light_strength)
+		painter.colors = _raster.take_colors()
+		painter.lights = _raster.take_lights()
+		painter.has_color = painter.has_color or _raster.has_color()
+		painter.has_light = painter.has_light or _raster.has_light()
+
+static func draw_transformed(canvas, rows: Array) -> void:
 	for row: Dictionary in rows:
 		var cell := float(row.cell)
 		if cell<=0.0: continue

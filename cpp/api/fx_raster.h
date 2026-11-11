@@ -6,6 +6,7 @@
 #include <godot_cpp/variant/packed_vector2_array.hpp>
 #include <godot_cpp/variant/packed_float64_array.hpp>
 #include <godot_cpp/variant/packed_float32_array.hpp>
+#include <godot_cpp/variant/packed_int32_array.hpp>
 #include <godot_cpp/variant/packed_color_array.hpp>
 #include <godot_cpp/variant/dictionary.hpp>
 #include <godot_cpp/variant/array.hpp>
@@ -25,9 +26,10 @@ class SpeedFxRaster : public RefCounted {
     Vector2 mask_camera_;
     int reference_flags_=0;
     void reference_dot(Vector2 p,Color color,double alpha,double fade);
+    void reference_blend(Vector2 p,Color color,double alpha,double fade);
     void reference_light(Vector2 p,Color color,double strength);
     void reference_glow(Vector2 p,double radius,Color color,double strength,double fade=1,double light_strength=1);
-    void reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength);
+    void reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength,double fade=1,double light_strength=1);
     bool color_used_=false,light_used_=false;
     std::vector<float> density_;
     void reference_dot(double x,double y,Color c,double alpha);
@@ -68,6 +70,20 @@ public:
     int corona_vortex(PackedFloat64Array owners,PackedColorArray palette,double fade);
     int density_field(PackedVector2Array points,PackedFloat64Array radii,PackedByteArray layers,Vector2i origin,int width,int height,Dictionary settings,PackedColorArray palette,double fade,double light_strength);
     int sweep_wake(PackedVector2Array tails,PackedVector2Array roots,PackedFloat64Array ages,PackedFloat32Array reach,PackedFloat32Array fine,PackedColorArray palette,double time,double fade);
+    PackedFloat32Array phoenix_stamp_scorch(PackedFloat32Array field,int size,int radius,Array particles);
+    int phoenix_scorch(PackedFloat32Array field,int size,int radius,double age,PackedColorArray palette,Dictionary settings);
+    int aquila_cracks(Array paths,Vector2 center,double heat,PackedColorArray colors,double fade);
+    int aquila_wake(Array history,double clock,double strength,PackedColorArray colors,double fade,double light_strength);
+    int lightning_ink(Array paths,double strength,PackedColorArray colors,double scale,bool thin,double glow_strength,double fade,double light_strength);
+    int canvas_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength,double fade,double light_strength);
+    int canvas_glow_ring(Vector2 center,double radius,double width,Color color,double strength,double fade,double light_strength);
+    int canvas_circle(double x,double y,double radius,Color color,double alpha,double fade,bool blended);
+    int canvas_beam(double x0,double y0,double x1,double y1,double width,Color color,double alpha,double fade);
+    int canvas_flame_blade(Dictionary shape,PackedColorArray palette,Array layers,double fade);
+    int draco_dark_fall(Vector2 center,double age,double warning,double radius,double clock,PackedColorArray palette,double fade);
+    int canis_pixels(PackedInt32Array pixels,Vector2 origin,double cell,PackedColorArray palette,double fade,double light_strength);
+    int canis_hound_trails(Array trails,double clock,PackedColorArray palette,double fade,double light_strength);
+    int monoceros_burns(Array burns,double clock,double radius,PackedColorArray palette,double fade);
     int monoceros_crescent(Array points,double head,double tail,double width,PackedColorArray ramp,double age,double radius_scale,double fade,double light_strength);
     void dim(double amount,double flash);
     void breath(PackedVector2Array fan,double elapsed,double active,double axis,double sweep,double half_angle,double reach,double fan_angle);

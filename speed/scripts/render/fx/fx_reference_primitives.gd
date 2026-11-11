@@ -1,6 +1,7 @@
 ## 固定試作 fxlib.js の論理画素用の共通描画。
 ## pixelFX の作例に基づく。帰属・ライセンス: assets/ui/rewards/pixelfx_NOTICE.txt・pixelfx_LICENSE.txt。
 extends RefCounted
+static var _raster := SpeedFxRaster.new()
 
 static func hash_value(n: float) -> float:
 	var value := sin(n * 127.1 + 311.7) * 43758.5453
@@ -55,6 +56,14 @@ static func _flow(packets: Array[Vector3], along: float) -> float:
 
 ## 始点・終点は論理画素。options は固定試作の warnRail と同じ名前を使う。
 static func warn_rail(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
+	if painter.tx != 0.0 or painter.ty != 0.0 or painter.fx != 1.0 or painter.cs != 1.0 or painter.sn != 0.0:
+		warn_rail_transformed(painter, a, b, options)
+		return
+	_raster.begin_painter(painter, 1.0, Vector2.ZERO, true, true)
+	_raster.ruler_rail(a, b, options, painter.fade, painter.light_strength)
+	_finish(painter)
+
+static func warn_rail_transformed(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
 	var palette := ramp(options.color)
 	var delta := b - a
 	var length := delta.length()
@@ -117,6 +126,21 @@ static func gather(painter, origin: Vector2, radius: float, strength: float, col
 
 ## 先端・後端と、内側から外側の5色の帯を試作どおりに描く。
 static func beam(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
+	if painter.tx != 0.0 or painter.ty != 0.0 or painter.fx != 1.0 or painter.cs != 1.0 or painter.sn != 0.0:
+		beam_transformed(painter, a, b, options)
+		return
+	_raster.begin_painter(painter, 1.0, Vector2.ZERO, true, true)
+	var settings := options
+	if painter.fade != 1.0 or painter.light_strength != 1.0:
+		settings = options.duplicate()
+		settings.fade = painter.fade
+		settings.light_strength = painter.light_strength
+	_raster.reference_beam(a, b, PackedColorArray(ramp(options.color)), settings)
+	_finish(painter)
+	if a.distance_to(b) >= 1.0 and bool(options.get("source", true)) and float(options.get("from", 0)) <= 0.0:
+		flare(painter, a, float(options.w)*1.3, options.color, float(options.get("time", 0)), clampf(float(options.get("alpha", 1)), 0.0, 1.0))
+
+static func beam_transformed(painter, a: Vector2, b: Vector2, options: Dictionary) -> void:
 	var palette := ramp(options.color)
 	var delta := b - a
 	var length := delta.length()
@@ -196,3 +220,9 @@ static func crescent(painter, center: Vector2, radius: float, from_angle: float,
 			if step % 3 == 0:
 				painter.light(center.x + cos(angle) * radius, center.y + sin(angle) * radius, palette[2], 0.3 * alpha * (1 - age))
 		step += 1
+
+static func _finish(painter) -> void:
+	painter.colors = _raster.take_colors()
+	painter.lights = _raster.take_lights()
+	painter.has_color = painter.has_color or _raster.has_color()
+	painter.has_light = painter.has_light or _raster.has_light()

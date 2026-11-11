@@ -4,6 +4,8 @@ extends RefCounted
 const JET := preload("res://scripts/render/enemies/aquarius_jet.gd")
 const HSL := preload("res://scripts/render/enemies/phoenix_particle_draw.gd")
 const VOLT := ["120a33","2a1b78","4630c0","5a62f0","58a6ff","9ed8ff","e4f6ff","ffffff"]
+var _raster := SpeedFxRaster.new()
+var _crack_paths := {}
 var _hsl = HSL.new()
 
 func palette(base: Color) -> Array[Color]:
@@ -57,6 +59,17 @@ func zigzag(r, a: Vector2, b: Vector2, jag := 0.32, forks := 0.35, width := 1.0,
 	return out
 
 func ink(p, paths: Array, strength: float, colors: Array[Color], scale := 1.0, thin := false, glow := 0.5) -> void:
+	if p.tx == 0.0 and p.ty == 0.0 and p.fx == 1.0 and p.cs == 1.0 and p.sn == 0.0:
+		_raster.begin_painter(p,1.0,Vector2.ZERO,true,true)
+		_raster.lightning_ink(paths,strength,PackedColorArray(colors),scale,thin,glow,p.fade,p.light_strength)
+		p.colors = _raster.take_colors()
+		p.lights = _raster.take_lights()
+		p.has_color = p.has_color or _raster.has_color()
+		p.has_light = p.has_light or _raster.has_light()
+		return
+	_ink_transformed(p,paths,strength,colors,scale,thin,glow)
+
+func _ink_transformed(p, paths: Array, strength: float, colors: Array[Color], scale: float, thin: bool, glow: float) -> void:
 	if strength <= 0.02: return
 	var grid := {}
 	for path: Dictionary in paths:
@@ -112,9 +125,14 @@ func static_bolts(p, center: Vector2, radius: float, count: int, length: float, 
 		ink(p,paths,strength*r.between(0.5,1),colors,1,true,0.3)
 
 func cracks(seed: int, radius: float) -> Array:
+	# 経路は種と半径だけで決まり、描画側は座標を読み取り専用で使う。
+	var known: Dictionary = _crack_paths.get(seed,{})
+	if not known.is_empty() and float(known.radius)==radius: return known.paths
 	var out: Array = []
 	var r = JET.Rng.new(seed)
 	for i in range(7): _grow(out,r,Vector2.ZERO,i*TAU/7.0+r.between(-0.3,0.3),radius*r.between(0.55,0.95),1.0,0)
+	if not _crack_paths.has(seed) and _crack_paths.size()>=64: _crack_paths.erase(_crack_paths.keys()[0])
+	_crack_paths[seed] = {"radius":radius,"paths":out}
 	return out
 
 func _grow(out: Array, r, pos: Vector2, angle: float, length: float, width: float, depth: int) -> void:

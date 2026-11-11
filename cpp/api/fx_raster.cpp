@@ -46,6 +46,20 @@ Color cmix(Color a,Color b,double k) {return a.lerp(b,float(k));}
 struct Ramp {Color v[5];explicit Ramp(Color c) {const auto mk=[&](double l,double w) {return Color(float(std::min(1.0,c.r*l+w*(1-c.r*l))),float(std::min(1.0,c.g*l+w*(1-c.g*l))),float(std::min(1.0,c.b*l+w*(1-c.b*l))));};v[0]=mk(0.35,0);v[1]=mk(0.6,0);v[2]=mk(1,0);v[3]=mk(1,0.45);v[4]=Color(1,1,1);}};
 }
 void SpeedFxRaster::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("aquila_cracks","paths","center","heat","colors","fade"),&SpeedFxRaster::aquila_cracks);
+    ClassDB::bind_method(D_METHOD("aquila_wake","history","clock","strength","colors","fade","light_strength"),&SpeedFxRaster::aquila_wake);
+    ClassDB::bind_method(D_METHOD("phoenix_stamp_scorch","field","size","radius","particles"),&SpeedFxRaster::phoenix_stamp_scorch);
+    ClassDB::bind_method(D_METHOD("phoenix_scorch","field","size","radius","age","palette","settings"),&SpeedFxRaster::phoenix_scorch);
+    ClassDB::bind_method(D_METHOD("lightning_ink","paths","strength","colors","scale","thin","glow_strength","fade","light_strength"),&SpeedFxRaster::lightning_ink);
+    ClassDB::bind_method(D_METHOD("canvas_glow_line","a","b","radius","color","strength","fade","light_strength"),&SpeedFxRaster::canvas_glow_line);
+    ClassDB::bind_method(D_METHOD("canvas_glow_ring","center","radius","width","color","strength","fade","light_strength"),&SpeedFxRaster::canvas_glow_ring);
+    ClassDB::bind_method(D_METHOD("canvas_circle","x","y","radius","color","alpha","fade","blended"),&SpeedFxRaster::canvas_circle);
+    ClassDB::bind_method(D_METHOD("canvas_beam","x0","y0","x1","y1","width","color","alpha","fade"),&SpeedFxRaster::canvas_beam);
+    ClassDB::bind_method(D_METHOD("canvas_flame_blade","shape","palette","layers","fade"),&SpeedFxRaster::canvas_flame_blade);
+    ClassDB::bind_method(D_METHOD("draco_dark_fall","center","age","warning","radius","clock","palette","fade"),&SpeedFxRaster::draco_dark_fall);
+    ClassDB::bind_method(D_METHOD("canis_pixels","pixels","origin","cell","palette","fade","light_strength"),&SpeedFxRaster::canis_pixels);
+    ClassDB::bind_method(D_METHOD("canis_hound_trails","trails","clock","palette","fade","light_strength"),&SpeedFxRaster::canis_hound_trails);
+    ClassDB::bind_method(D_METHOD("monoceros_burns","burns","clock","radius","palette","fade"),&SpeedFxRaster::monoceros_burns);
     ClassDB::bind_method(D_METHOD("monoceros_crescent","points","head","tail","width","ramp","age","radius_scale","fade","light_strength"),&SpeedFxRaster::monoceros_crescent);
     ClassDB::bind_method(D_METHOD("ruler_beam","a","b","width","time","color","alpha","fade","light_strength"),&SpeedFxRaster::ruler_beam);
     ClassDB::bind_method(D_METHOD("auriga_trail","points","strengths","width","palette","clock","fade","light_strength"),&SpeedFxRaster::auriga_trail);
@@ -97,7 +111,7 @@ void SpeedFxRaster::put(int x,int y,Color c) {if (x<0 || y<0 || x>=w_ || y>=h_) 
 void SpeedFxRaster::blend(float x,float y,Color c,double a) {if (a<=0.004) return;const int ix=int(std::floor(x)),iy=int(std::floor(y));if (ix<0 || iy<0 || ix>=w_ || iy>=h_) return;a=std::min(a,1.0);uint8_t *q=c_+(iy*w_+ix)*4;const double da=q[3]/255.0,oa=a+da*(1-a),k=a/oa;q[0]=uint8_t(int(c.r*255)*k+q[0]*(1-k));q[1]=uint8_t(int(c.g*255)*k+q[1]*(1-k));q[2]=uint8_t(int(c.b*255)*k+q[2]*(1-k));q[3]=uint8_t(oa*255);color_used_|=q[3]>0;}
 void SpeedFxRaster::add(int x,int y,Color c,double k) {if (k<=0.004 || x<0 || y<0 || x>=w_ || y>=h_) return;uint8_t *q=l_+(y*w_+x)*4;q[0]=uint8_t(std::min(255.0,q[0]+int(c.r*255)*k));q[1]=uint8_t(std::min(255.0,q[1]+int(c.g*255)*k));q[2]=uint8_t(std::min(255.0,q[2]+int(c.b*255)*k));light_used_|=(q[0]|q[1]|q[2])!=0;}
 void SpeedFxRaster::glow(float x,float y,float r,Color c,double strength) {if (r<1 || strength<=0.004) return;for (int sy=std::max(0,int(std::floor(y-r)));sy<=std::min(h_-1,int(std::ceil(y+r)));++sy) for (int sx=std::max(0,int(std::floor(x-r)));sx<=std::min(w_-1,int(std::ceil(x+r)));++sx) {const double d=std::hypot(sx+0.5-x,sy+0.5-y)/r;if (d<1) add(sx,sy,c,(1-d)*(1-d)*strength);}}
-void SpeedFxRaster::disc(float cx,float cy,float r,Color c,double a) {const float r2=r*r;for (int sy=int(std::floor(cy-r));sy<=int(std::ceil(cy+r));++sy) {const float dy=sy+0.5f-cy,s2=r2-dy*dy;if (s2<0) continue;const float s=std::sqrt(s2);for (int sx=int(std::ceil(cx-s-0.5f));sx<=int(std::floor(cx+s-0.5f));++sx) {if (a>=1) put(sx,sy,c);else blend(sx,sy,c,a);}}}
+void SpeedFxRaster::disc(float cx,float cy,float r,Color c,double a) {const float r2=r*r;for (int sy=std::max(0,int(std::floor(cy-r)));sy<=std::min(h_-1,int(std::ceil(cy+r)));++sy) {const float dy=sy+0.5f-cy,s2=r2-dy*dy;if (s2<0) continue;const float s=std::sqrt(s2);for (int sx=std::max(0,int(std::ceil(cx-s-0.5f)));sx<=std::min(w_-1,int(std::floor(cx+s-0.5f)));++sx) {if (a>=1) put(sx,sy,c);else blend(sx,sy,c,a);}}}
 void SpeedFxRaster::solid(float x,float y,float r,Color c) {if (r<0.6f) px(x,y,c);else disc(x,y,r,c,1);}
 void SpeedFxRaster::soft(float x,float y,float r,Color c,double a) {if (a<=0.004) return;if (r<0.5f) blend(x,y,c,a);else disc(x,y,r,c,a);}
 void SpeedFxRaster::fire_puff(float x,float y,double k,double size,double frac,const Color *H,int n,double glow_k,double tx,double ty) {const double age=1-k,heat=std::min(0.999,std::pow(age,0.62)+frac*0.1);const int idx=std::min(n-2,int(std::floor(heat*(n-1))));const float r=float(size*(0.55+0.45*std::min(1.0,age*7))*(1-age*0.55));const Color c=H[idx];if (idx>=n-2) {soft(x,y,r,c,std::min(1.0,k*3)*0.85);return;}solid(x,y,r,H[std::min(n-1,idx+2)]);if (r>1.6f && ty>-0.99) solid(float(x+tx*r*1.5),float(y+ty*r*1.5),r*0.3f,H[std::min(n-1,idx+1)]);solid(x-r*0.16f,y-r*0.22f,r*0.78f,c);if (r>1.6f) solid(float(x+tx*r*0.9),float(y+ty*r*0.9),r*0.42f,c);if (idx<=3 && r>1.8f) solid(x-r*0.28f,y-r*0.34f,r*0.36f,H[std::max(0,idx-1)]);if (idx<6) glow(x,y,r*2.4f+2,c,glow_k*k);}
@@ -288,6 +302,7 @@ void SpeedFxRaster::nova_field(PackedByteArray alpha,PackedFloat32Array emission
 
 
 void SpeedFxRaster::reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,Dictionary settings) {
+    const double fade=settings.get("fade",1),light_strength=settings.get("light_strength",1);
     const Vector2 delta=b-a;
     const double length=delta.length();
     if (length<1 || palette.size()<5) return;
@@ -306,11 +321,11 @@ void SpeedFxRaster::reference_beam(Vector2 a,Vector2 b,PackedColorArray palette,
             const double q=std::abs(q0)/std::max(w,0.01);
             const int level=std::max(0,(q<0.25?0:q<0.45?1:q<0.7?2:q<0.95?3:4)-pulse);
             const Vector2 pixel=point+normal*q0;
-            reference_dot(pixel.x,pixel.y,palette[4-level],alpha*(level==4?0.45:1));
+            reference_dot(pixel,palette[4-level],alpha*(level==4?0.45:1),fade);
         }
-        if ((int(std::floor(d*2+0.5))&5)==0) reference_add(int(std::floor(point.x)),int(std::floor(point.y)),palette[2],0.25*alpha*intensity);
+        if ((int(std::floor(d*2+0.5))&5)==0) reference_light(point,palette[2],0.25*alpha*intensity*fade*light_strength);
     }
-    reference_glow_line(a+direction*d0,a+direction*d1,width*2.6+3,palette[2],0.35*alpha*intensity);
+    reference_glow_line(a+direction*d0,a+direction*d1,width*2.6+3,palette[2],0.35*alpha*intensity,fade,light_strength);
 }
 
 

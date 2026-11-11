@@ -1302,7 +1302,11 @@ func check_cpp_phoenix() -> bool:
 	check(cpp_motion_for(actor).anchor==fixed and is_equal_approx(cpp_motion_for(actor).charge,0.5),"予告中に相手が移動しても着地点を追い直さない")
 	var frame: Dictionary = cpp_bridge.read_render(Rect2(fixed-Vector2(250,250),Vector2(500,500))).value
 	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
-	if not retry: check(frame.batches.all(func(b): return not b.ids.has(actor)) and frame.phoenix.size()==7 and presentation.frame_view.apply_frame(frame) and presentation.frame_view._phoenix_visual._frame_values==frame.phoenix,"本体が画面外でも着地点の影と専用shaderの火の粉を描く")
+	presentation.frame_view.prepare_reference_view(Vector2(1280,720),fixed,0.85)
+	var accepted: bool = presentation.frame_view.apply_frame(frame)
+	presentation.frame_view.update_reference_effects(cpp_bridge.read_frame().value,0.0)
+	var reference = presentation.frame_view._enemy_reference._phoenix
+	if not retry: check(frame.batches.all(func(b): return not b.ids.has(actor)) and frame.phoenix_fx.size()==1 and accepted and reference._actors.has(actor) and reference._shadows.has(actor),"本体が画面外でも着地点の影と火の粉を現在の描画へ渡す")
 	await get_tree().process_frame
 	cpp_core.step(0.16)
 	if not retry: check(cpp_motion_for(actor).mode==RunIds.EnemyModeId.Dash and is_equal_approx(cpp_motion_for(actor).timer,0.2),"編集した予告が終わると突入へ切り替える")
@@ -1368,7 +1372,10 @@ func check_cpp_aquila() -> bool:
 	check(warning.anchor.is_equal_approx(anchor) and warning.charge>0.0,"現在の機体へ向く進路を編集した最大走行距離で固定する")
 	var frame: Dictionary = cpp_bridge.read_render(Rect2(cpp_origin-Vector2(200,300),Vector2(1000,600))).value
 	var presentation: RunPresentation = cpp_session.view.get_node("RunPresentation")
-	check(frame.aquila.values.size()==9 and is_equal_approx(frame.aquila.values[6],50.0) and is_equal_approx(frame.aquila.values[7],80.0) and presentation.frame_view.apply_frame(frame) and presentation.frame_view._aquila==frame.aquila.values,"固定した終点までの線と編集した雷の間隔・半径を通常画面で描く")
+	presentation.frame_view.prepare_reference_view(Vector2(1280,720),cpp_origin,0.85)
+	var accepted: bool = presentation.frame_view.apply_frame(frame)
+	presentation.frame_view.update_reference_effects(cpp_bridge.read_frame().value,0.0)
+	check(frame.aquila_actors.size()==1 and is_equal_approx(frame.aquila_actors[0].step,50.0) and is_equal_approx(frame.aquila_actors[0].blast_radius,80.0) and accepted and presentation.frame_view._reference_layer.canvas.back.has_color,"固定した終点までの線と編集した雷の間隔・半径を通常画面で描く")
 	await get_tree().process_frame
 	var pending: Dictionary = cpp_bridge.checkpoint()
 	var before: Array = cpp_core.enemy_motion_snapshot()
@@ -1857,6 +1864,9 @@ func check_cpp_visual_contracts() -> void:
 	var before: int = painter._count
 	shot.flags[0] = 0
 	check(view.apply_frame(frame) and painter._count>before,"同じ座標でも弾の表示形式だけの変更で描き直す")
+	var previous_buffer: PackedFloat32Array = painter._buf.duplicate()
+	shot.transforms[4] += 17.0
+	check(view.apply_frame(frame) and painter._buf!=previous_buffer,"受け取った座標配列が書き換わっても前の座標と比較して描き直す")
 	var iron: Dictionary = frame.batches.filter(func(row): return view.visuals[row.visual_id].get("iron",false))[0]
 	var display = view.enemy_frames[iron.visual_id]
 	check(iron.flags.has(0) and iron.flags.has(1) and iron.flags.has(2) and display._batches.all(func(batch): return batch._count==1),"鉄がれきの固定3種類を同じ位置と寸法のバッチへ分ける")
