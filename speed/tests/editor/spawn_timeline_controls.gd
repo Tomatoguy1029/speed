@@ -1,4 +1,4 @@
-## 曲線削除・境界リサイズの2操作を実エディターの履歴・Window入力で確認する。
+## 曲線削除・境界リサイズ・区間削除を実エディターの履歴・Window入力で確認する。
 ## godot --headless --editor --path speed --script res://tests/editor/spawn_timeline_controls.gd
 @tool
 extends SceneTree
@@ -169,10 +169,63 @@ func _run() -> void:
 	check(canvas.selected == 0, "Clip selection follows the new time origin")
 	check(FileAccess.get_file_as_string(SAVE) == saved, "Resizing and selecting do not change stage data")
 	await capture("small-window")
+	# 指定区間を一括削除し、保存・1回のUndo・Redoまでを確認する。
+	manager.clear_history()
+	stage = StageDef.new()
+	var defaults := StageDef.new()
+	defaults.boss_time = 100.0
+	defaults.surge_start = 40.0
+	canvas.clocks.defaults = defaults
+	stage.time_limit = 200.0
+	stage.surge_end = 80.0
+	for at in [0.0, 30.0, 50.0, 90.0]:
+		var p := PhaseDef.new()
+		p.start = at
+		p.id = StringName("phase_%d" % int(at))
+		p.attack_budget = int(at)
+		stage.phases.append(p)
+	stage.surge_phases = {"phase_30": true, "phase_50": false}
+	for span in [Vector2(0, 10), Vector2(90, 20), Vector2(10, 100), Vector2(30, 15)]:
+		var item := SpawnClip.new()
+		item.time = span.x
+		item.length = span.y
+		stage.clips.append(item)
+	var curve := SpawnCurve.new()
+	curve.points = PackedVector2Array([Vector2(0, 10), Vector2(20, 20), Vector2(40, 50), Vector2(60, 80), Vector2(100, 120)])
+	stage.zako_curves = [curve]
+	ResourceSaver.save(stage, SAVE)
+	stage.take_over_path(SAVE)
+	panel.set_stage(stage)
+	var original := FileAccess.get_file_as_string(SAVE)
+	panel._show_cut_dialog()
+	var dialog: ConfirmationDialog = panel.get_node("CutRange")
+	check(dialog.get_ok_button().disabled, "時刻未指定では区間を削除できない")
+	var from: LineEdit = dialog.find_child("StartTime", true, false)
+	var to: LineEdit = dialog.find_child("EndTime", true, false)
+	from.text = "1:00"
+	to.text = "0:20"
+	to.text_changed.emit(to.text)
+	check(dialog.get_ok_button().disabled, "逆順の区間では削除できない")
+	from.text = "0:20"
+	to.text = "1:00"
+	to.text_changed.emit(to.text)
+	check(not dialog.get_ok_button().disabled, "開始と終了を時刻で指定できる")
+	dialog.confirmed.emit()
+	dialog.hide()
+	check(stage.clips.size() == 3 and stage.clips[0].length == 10 and stage.clips[1].time == 50 and stage.clips[2].length == 60, "区間内のクリップを削除し、またぐクリップだけを短縮する")
+	check(stage.clips[1].track == 1 and stage.clips[2].track == 2, "削除後も暗黙のトラック位置を保つ")
+	check(stage.phases.size() == 3 and stage.phases[1].start == 20 and stage.phases[1].attack_budget == 50 and stage.phases[2].start == 50, "削除終了時点の時間帯を継ぎ目へ引き継ぐ")
+	check(stage.surge_phases == {"phase_50": false}, "残る時間帯の強化設定を保つ")
+	check(curve.points == PackedVector2Array([Vector2(0, 10), Vector2(20, 80), Vector2(60, 120)]), "曲線は削除終了時点の値につないで後ろを詰める")
+	var cut_saved: Resource = reload_stage()
+	check(cut_saved.clips.size() == 3 and cut_saved.boss_time == 60 and cut_saved.time_limit == 160 and cut_saved.surge_start == 20 and cut_saved.surge_end == 40, "継承した時刻を含めて進行時刻を動かし、保存する")
+	history = manager.get_history_undo_redo(manager.get_object_history_id(stage))
+	check(history.undo() and FileAccess.get_file_as_string(SAVE) == original, "1回の取り消しで保存内容と継承状態を全て復元する")
+	check(history.redo() and reload_stage().clips.size() == 3, "やり直しも全体を保存する")
 	manager.clear_history()
 	window.queue_free()
 	await settle()
 	plugin.free()
 	DirAccess.remove_absolute(SAVE)
-	print("[timeline_controls] 2 scenarios, %d failures" % failures)
+	print("[timeline_controls] 3 scenarios, %d failures" % failures)
 	quit(1 if failures else 0)
