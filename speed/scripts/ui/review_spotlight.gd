@@ -67,6 +67,7 @@ func _process(_delta: float) -> void:
 func _draw() -> void:
 	var shade := Color(0, 0, 0, 0.67)
 	if _hole.size == Vector2.ZERO:
+		draw_rect(Rect2(Vector2.ZERO, size), Color(0, 0, 0, 0.3))
 		return
 	draw_rect(Rect2(0, 0, size.x, maxf(0, _hole.position.y)), shade)
 	draw_rect(Rect2(0, _hole.end.y, size.x, maxf(0, size.y - _hole.end.y)), shade)
