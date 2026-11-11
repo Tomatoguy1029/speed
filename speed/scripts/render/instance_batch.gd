@@ -10,6 +10,7 @@ const STRIDE := 12  # 2D の変換 8 ＋ 色 4
 
 var _buf := PackedFloat32Array()
 var _count := 0
+var _frame_buffer: SpeedInstanceBuffer
 
 ## points：単位の大きさの多角形（中心を含む三角形の扇に分ける）
 func setup_polygon(points: PackedVector2Array) -> void:
@@ -158,24 +159,23 @@ func deform_last(radial: Vector2, amount: float) -> void:
 
 ## RenderFrameの2D変換6要素と色を、既存のMultiMeshバッファへまとめて投入する。
 func apply_frame(transforms: PackedFloat32Array, colors: PackedColorArray) -> void:
-	_count = colors.size()
-	var need := _count*STRIDE
-	if _buf.size()<need: _buf.resize(maxi(need,_buf.size()*2))
-	for i in _count:
-		var source := i*6
-		var target := i*STRIDE
-		_buf[target] = transforms[source]
-		_buf[target+1] = transforms[source+2]
-		_buf[target+2] = 0.0
-		_buf[target+3] = transforms[source+4]
-		_buf[target+4] = transforms[source+1]
-		_buf[target+5] = transforms[source+3]
-		_buf[target+6] = 0.0
-		_buf[target+7] = transforms[source+5]
-		_buf[target+8] = colors[i].r
-		_buf[target+9] = colors[i].g
-		_buf[target+10] = colors[i].b
-		_buf[target+11] = colors[i].a
+	_begin_frame_buffer().frame(transforms, colors)
+	_take_frame_buffer()
+
+func _begin_frame_buffer() -> SpeedInstanceBuffer:
+	if _frame_buffer == null: _frame_buffer = SpeedInstanceBuffer.new()
+	_frame_buffer.begin(_buf)
+	_buf = PackedFloat32Array()
+	return _frame_buffer
+
+func _take_frame_buffer() -> void:
+	_count = _frame_buffer.get_count()
+	_buf = _frame_buffer.take_buffer()
+
+## 敵の部位も同じ配列へ一括投入する。部位ごとの表示順と画素の丸めは維持する。
+func apply_enemy_frame(row: Dictionary, pivot: Vector2, angle_offset: float, jaw_sign: int, ruler_side: int, articulate: bool) -> void:
+	_begin_frame_buffer().enemy_part(row, pivot, angle_offset, jaw_sign, ruler_side, articulate)
+	_take_frame_buffer()
 
 ## 本体と装甲のように同じ変換・色を使う束は、作成済みの配列を共有する。
 ## source.end()のあとに呼ぶ。画像・法線・材質と描画順はそれぞれの束が持つ。

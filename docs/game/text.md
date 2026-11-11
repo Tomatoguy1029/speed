@@ -79,6 +79,27 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | intro.touch | 「描く」を押し、お手本の線をなぞる | Tap Draw, then follow the example path |
 | intro.touch&#95;draw | 描く | Draw |
 | intro.motive | 何か異変が起きている。あの星々も救わねば。 | Something is happening. I must save those stars too. |
+|  | ■ 操作練習 |  |
+| tutorial.guide | 操作ガイド | Controls Guide |
+| tutorial.next | クリックで進む | Click to continue |
+| tutorial.strip.click | クリック | Click |
+| tutorial.strip.move | 動かす | Move |
+| tutorial.move.title | 移動 | Movement |
+| tutorial.move.body | 機体はマウスカーソルの方へ進み続けます。<br>カーソルを動かして、進行方向を決めます。 | The ship keeps flying toward the mouse cursor.<br>Move the cursor to choose its heading. |
+| tutorial.boost.title | ブースト | Boost |
+| tutorial.boost.body | ブースト攻撃で敵に攻撃することができます。<br>① クリックで描き始める<br>② ボタンを離したまま動かして線を引く<br>③ もう一度クリックするか、ゲージ切れでブースト開始 | Boost attacks damage enemies.<br>1. Click to start drawing<br>2. Move with the button released to draw a line<br>3. Click again, or run out of gauge, to boost |
+| tutorial.gauge.title | ゲージ | Gauge |
+| tutorial.gauge.body | カーソルの横のリングがゲージです。<br>線を長く描くほど多く消費し、時間経過で回復します。 | The ring beside the cursor is the gauge.<br>Longer lines use more of it, and it refills over time. |
+| tutorial.xp.title | 経験値とレベルアップ | Experience and Level Up |
+| tutorial.xp.body | 敵を倒すと星のかけらが落ちます。<br>星のかけらを一定数拾うと、レベルアップします。 | Defeated enemies drop star shards.<br>Collect enough star shards to level up. |
+| tutorial.cards.title | 武器と特性 | Weapons and Traits |
+| tutorial.cards.body | レベルアップのたびに、武器か特性を1枚選びます。<br>同じものを選ぶとそのレベルが上がり、最大レベル5まで強化することができます。 | Each level up lets you pick one weapon or trait.<br>Picking the same one again raises its level, up to level 5. |
+| tutorial.goal.move | 光る輪へ移動　残り{n} | Fly to the glowing ring: {n} left |
+| tutorial.goal.boost | 線をなぞるようにブースト | Boost along the line |
+| tutorial.goal.gauge | 全ての敵を倒す　残り{n} | Defeat all enemies: {n} left |
+| tutorial.goal.xp | 星のかけらを拾ってレベルアップ | Collect star shards to level up |
+| tutorial.goal.cards | 武器・特性を1枚選ぶ | Pick one weapon or trait |
+| tutorial.goal.done | チュートリアルはメニュー(esc)からもみることができます | You can review the tutorial from the menu (Esc) |
 | menu.start | ゲームスタート | Start Game |
 | menu.settings | 設定 | Settings |
 | menu.quit | 終了 | Quit |
@@ -1035,6 +1056,18 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.armor.color | 塗る色 | Paint color |
 | lab.armor.help | 左クリックで装甲片を塗り、右クリックで元の色に戻します。上下左右につながるピクセルだけを同じ片として扱い、斜めの接触は分けます。画像は元の向きで表示します。外観の保存ボタンでステージにも反映できます。 | Left-click to paint a piece; right-click to restore its original color. Only horizontal and vertical neighbors connect. Diagonal contacts stay separate. The image uses its original orientation. Save appearance to use the paint in stages. |
 | review.badge | 審査版 | Review build |
+| review.guide.welcome | このゲームは審査版です。全ステージの解放や、プレイ中の装備・機体強化などの変更ができます。説明中も画面を操作できます。 | このゲームは審査版です。全ステージの解放や、プレイ中の装備・機体強化などの変更ができます。説明中も画面を操作できます。 |
+| review.guide.unlock | 審査版では「全ステージ解放」を押すと、未クリアのステージも選択できます。 | 審査版では「全ステージ解放」を押すと、未クリアのステージも選択できます。 |
+| review.guide.pause | Escで一時停止すると「カスタム設定」を開けます。武器・特性とそのレベル、英雄の力、機体強化の変更、無敵の切り替え、ボス戦への移動ができます。変更は今回のプレイだけに適用されます。 | Escで一時停止すると「カスタム設定」を開けます。武器・特性とそのレベル、英雄の力、機体強化の変更、無敵の切り替え、ボス戦への移動ができます。変更は今回のプレイだけに適用されます。 |
+| review.guide.custom | カスタム設定では、装備・英雄の力・機体強化、無敵、ボス戦への移動を設定できます。 | カスタム設定では、装備・英雄の力・機体強化、無敵、ボス戦への移動を設定できます。 |
+| review.guide.next | 閉じる | 閉じる |
+| review.guide.skip | 案内をスキップ | 案内をスキップ |
+| review.equipment | 武器・特性 | 武器・特性 |
+| review.helpers | 補助機能 | 補助機能 |
+| review.target | 装備 | 装備 |
+| review.slot | 追加先・入れ替える所持装備 | 追加先・入れ替える所持装備 |
+| review.current | 所持中：{items} | 所持中：{items} |
+| review.entry | 審査版<br>カスタム設定 | 審査版<br>カスタム設定 |
 | review.title | カスタム設定（審査版のみ） | Custom settings (review build) |
 | review.run_only | 変更はこのプレイだけに適用します。次のプレイは通常の設定で始まります。 | Changes apply to this run only. The next run uses normal settings. |
 | review.unlock_all | 全ステージ解放 | Unlock all stages |
@@ -1045,8 +1078,8 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | review.slots | 所持枠 {used} / {max} | Slots {used} / {max} |
 | review.add | 追加（空き枠を使用） | Add (use an empty slot) |
 | review.level | 適用するレベル | Target level |
-| review.apply_equipment | 選択した装備・レベルを適用 | Apply equipment and level |
-| review.remove | 選択した所持装備を削除 | Remove selected owned equipment |
+| review.apply_equipment | 変更を適用 | Apply equipment and level |
+| review.remove | 所持装備を削除 | Remove selected owned equipment |
 | review.none | なし | None |
 | review.apply | 適用 | Apply |
 | review.invincible | 無敵 | Invincible |

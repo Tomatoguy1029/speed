@@ -237,6 +237,5 @@ func _fork(r: RandomNumberGenerator, path: PackedVector2Array, length: float, ja
 ## 稲妻1本：右へ1ドットずらした紫の線に、白い芯（先の4割は薄紫）。
 func _arc(p: PixelPainter, o: Vector2, path: PackedVector2Array, k: float) -> void:
 	if k <= 0.05: return
-	for i in range(1, path.size()):
-		_line(p, o, path[i - 1] + Vector2.RIGHT, path[i] + Vector2.RIGHT, C[4], k * 0.8)
-		_line(p, o, path[i - 1], path[i], C[6] if i < path.size() * 0.6 else C[5], minf(1.0, k * 1.4))
+	p.geometry_begin().end_blast_arc(o, path, k)
+	p.geometry_end()
