@@ -21,7 +21,7 @@ uniform vec4 azure = vec4(0.45, 0.62, 1.0, 1.0);
 uniform vec4 shine = vec4(1.0, 0.97, 0.92, 1.0);
 uniform vec4 gold = vec4(1.0, 0.85, 0.55, 1.0);
 // にじみ始める、真ん中からの距離（画面の縁が 1）
-uniform float inner : hint_range(0.0, 1.4, 0.01) = 0.7;
+uniform float inner : hint_range(0.0, 1.4, 0.01) = 0.8;
 // 外側でのぼけの半径（ドット）
 uniform float soften : hint_range(0.0, 12.0, 0.1) = 3.0;
 // 星雲の光の濃さ
