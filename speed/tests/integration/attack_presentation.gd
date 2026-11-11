@@ -1861,9 +1861,23 @@ func check_cpp_visual_contracts() -> void:
 	var display = view.enemy_frames[iron.visual_id]
 	check(iron.flags.has(0) and iron.flags.has(1) and iron.flags.has(2) and display._batches.all(func(batch): return batch._count==1),"鉄がれきの固定3種類を同じ位置と寸法のバッチへ分ける")
 	check(display._batches[1].texture.resource_path.ends_with("iron_debris_2.png") and display._batches[2].texture.resource_path.ends_with("iron_debris_3.png"),"鉄がれきの別素材を資源範囲から受け取る")
+	var shake_failures_before: int = failed
+	for cause: StringName in [&"shot", &"afterimage", &"hullDebris", &"barrier", &"towShot", &"interceptor", &"endBlast", &"mine", &"contactWave", &"sonic", &"contactArc", &"bipolar", &"dashRangeDrone", &"flashSlash"]:
+		for radius: float in [12.0, 80.0]:
+			check(view.kill_shake(cause,radius)==0.0,"武器の撃破では敵の大きさによらず揺らさない: %s" % cause)
+	check(view.kill_shake(&"ram",12.0)==5.0 and view.kill_shake(&"ram",80.0)==8.0,"突進による撃破の揺れを保つ")
+	check(view.kill_shake(&"vortex",80.0)==8.0,"特性による撃破の揺れを保つ")
+	for repeat in 3:
+		view.ruler_shake=0.0
+		view._queued_events.append({"type":&"anchor_fire","pos":cpp_origin})
+		view._queued_events.append({"type":&"shot_hit","visual_key":"weapon/massTow","pos":cpp_origin})
+		view._queued_events.append({"type":&"beam","visual_key":"weapon/bipolar","from":cpp_origin,"to":cpp_origin+Vector2(100,0),"width":10.0,"life":0.2})
+		view.update_effects(cpp_bridge.read_frame().value,0.0)
+		check(view.ruler_shake==0.0,"武器の発射と命中を重ねても揺れを蓄積しない")
 	view._queued_events.append({"type":&"draco_roar","pos":cpp_origin,"radius":700.0})
 	view.update_effects(cpp_bridge.read_frame().value,0.0)
 	check(view.ruler_shake==12.0,"竜の咆哮通知を揺れへ接続する")
+	print("[weapon_camera_shake] failed=%d" % (failed-shake_failures_before))
 	var mono = preload("res://scenes/bosses/monoceros_presentation.tscn").instantiate()
 	add_child(mono)
 	mono.hit_feedback = view.boss_hit_feedback
