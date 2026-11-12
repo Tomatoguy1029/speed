@@ -48,14 +48,21 @@ void CentaurusReferenceFx::update(RunRuntime &r,BossBodyState &b) {
             const auto data=CentaurusStomp::snapshot(r,t);
             fx.stomps.push_back({data["center"],e.facing,data["half_angle"],data["range_radius"],t.started_at+technique.warn});fx.stomp_id=t.id;
         }
-        if (technique.kind!=10 || t.stage!=TechniqueStage::Windup) continue;
-        const auto rule=std::find_if(r.content->centaurus_rains.begin(),r.content->centaurus_rains.end(),[&](const auto &v){return v.technique==t.definition;});
-        if (rule==r.content->centaurus_rains.end()) continue;
-        if (fx.rain_id!=t.id) {fx.rain_id=t.id;fx.up_emitted.assign(rule->traces*4,0);}
-        double radius=12,length=0;
-        for (const auto &fan:r.content->centaurus_fans) if (r.content->boss_techniques[fan.technique-1].boss==technique.boss) {radius=fan.radius;length=fan.length;break;}
-        for (uint32_t v=0;v<rule->traces;++v) for (uint32_t i=0;i<4;++i) {
-            const uint32_t index=v*4+i;const double at=t.started_at+.08+v*(technique.warn-.16)/std::max(1u,rule->traces)+i*.035;
+        if ((technique.kind!=10 && technique.kind!=14) || t.stage!=TechniqueStage::Windup) continue;
+        uint32_t groups=0,arrows=4;double radius=12,length=0;
+        if (technique.kind==10) {
+            const auto rule=std::find_if(r.content->centaurus_rains.begin(),r.content->centaurus_rains.end(),[&](const auto &v){return v.technique==t.definition;});
+            if (rule==r.content->centaurus_rains.end()) continue;
+            groups=rule->traces;
+            for (const auto &fan:r.content->centaurus_fans) if (r.content->boss_techniques[fan.technique-1].boss==technique.boss) {radius=fan.radius;length=fan.length;break;}
+        } else {
+            const auto rule=std::find_if(r.content->centaurus_showers.begin(),r.content->centaurus_showers.end(),[&](const auto &v){return v.technique==t.definition;});
+            if (rule==r.content->centaurus_showers.end()) continue;
+            groups=rule->count;arrows=b.phase==1?2:3;radius=rule->arrow_radius;length=rule->arrow_length;
+        }
+        if (fx.rain_id!=t.id) {fx.rain_id=t.id;fx.up_emitted.assign(groups*arrows,0);}
+        for (uint32_t v=0;v<groups;++v) for (uint32_t i=0;i<arrows;++i) {
+            const uint32_t index=v*arrows+i;const double at=t.started_at+.08+v*(technique.warn-.16)/std::max(1u,groups)+i*.035;
             if (index>=fx.up_emitted.size() || fx.up_emitted[index] || b.clock<at) continue;
             const double value=std::sin((v*7+i)*127.1+311.7)*43758.5453;
             fx.ups.push_back({mouth(r,b),-3.141592653589793*.5+((value-std::floor(value))-.5)*.3,at,radius,length});fx.up_emitted[index]=1;

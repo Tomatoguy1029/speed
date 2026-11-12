@@ -82,6 +82,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 |  | ■ 操作練習 |  |
 | tutorial.guide | 操作ガイド | Controls Guide |
 | tutorial.next | クリックで進む | Click to continue |
+| tutorial.guide.prev | 前へ | Previous |
+| tutorial.guide.next | 次へ | Next |
 | tutorial.strip.click | クリック | Click |
 | tutorial.strip.move | 動かす | Move |
 | tutorial.move.title | 移動 | Movement |
@@ -99,7 +101,8 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | tutorial.goal.gauge | 全ての敵を倒す　残り{n} | Defeat all enemies: {n} left |
 | tutorial.goal.xp | 星のかけらを拾ってレベルアップ | Collect star shards to level up |
 | tutorial.goal.cards | 武器・特性を1枚選ぶ | Pick one weapon or trait |
-| tutorial.goal.done | チュートリアルはメニュー(esc)からもみることができます | You can review the tutorial from the menu (Esc) |
+| tutorial.end.title | チュートリアル終了 | Tutorial Complete |
+| tutorial.end.body | ここからが本番です。最初の武器を選んで出撃します。<br>チュートリアルはメニュー(esc)からもみることができます。 | The real run starts here. Pick your first weapon and launch.<br>You can review the tutorial from the menu (Esc). |
 | menu.start | ゲームスタート | Start Game |
 | menu.settings | 設定 | Settings |
 | menu.quit | 終了 | Quit |
@@ -745,7 +748,7 @@ lab.toughness,HP の属性（-1 柔らかめ・0 標準・1 硬め）,HP class (
 | lab.field.comet | 彗星 | Comet |
 | lab.field.gravity | 重力 | Gravity well |
 | lab.field.warp | ワープホール | Warp hole |
-| lab.field.gem | 経験値の結晶 | Experience crystals |
+| lab.field.gem | 星のかけら | Experience crystals |
 | lab.ui.class&#95;boss | ボス | Bosses |
 | lab.ui.class&#95;other | 出現から外した敵 | Retired enemies |
 | lab.ui.stars&#95;all | 星：すべて | Stars: all |

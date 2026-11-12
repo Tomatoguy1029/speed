@@ -164,11 +164,11 @@ graph_nodes = {
 "source": "shower_chase"
 },
 "shower_wall": {
-"connected": true,
+"connected": false,
 "source": "shower_wall"
 },
 "stomp": {
-"connected": true,
+"connected": false,
 "source": "stomp"
 }
 }

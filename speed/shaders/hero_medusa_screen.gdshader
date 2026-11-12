@@ -15,10 +15,10 @@ uniform float cell_px = 2.0;
 // HDR の画面では、取り込んだ画面の色を sRGB へ戻して混ぜ、最後にリニアへ直す
 uniform bool linear_output = false;
 group_uniforms tuning;
-uniform vec4 abyss = vec4(0.020, 0.035, 0.035, 1.0);
-uniform vec4 murk = vec4(0.071, 0.125, 0.110, 1.0);
-uniform vec4 moss = vec4(0.149, 0.247, 0.200, 1.0);
-uniform vec4 venom = vec4(0.294, 0.459, 0.353, 1.0);
+uniform vec4 abyss = vec4(0.000910581, 0.008568126, 0.004024717, 1.0);
+uniform vec4 murk = vec4(0.005181517, 0.059511238, 0.023153366, 1.0);
+uniform vec4 moss = vec4(0.008023193, 0.274677312, 0.072271851, 1.0);
+uniform vec4 venom = vec4(0.039546235, 0.708375780, 0.124771818, 1.0);
 uniform float blur_strength : hint_range(0.0, 0.3, 0.005) = 0.12;
 uniform float aberration : hint_range(0.0, 0.05, 0.001) = 0.012;
 uniform float strands : hint_range(4.0, 16.0, 1.0) = 11.0;
@@ -79,6 +79,9 @@ void fragment() {
 	if (aura > 0.0) {
 		vec3 dark = mix(abyss.rgb, murk.rgb, 0.4);
 		col = mix(col, dark, aura * 0.8);
+		// 細い縁と交差部を保ち、うねる煙の面だけを濃い緑で塗る。
+		float body_mask = (1.0 - smoothstep(0.0, 0.12, rim)) * aura * fade;
+		col = mix(col, mix(moss.rgb, venom.rgb, 0.28), body_mask);
 		col = mix(col, moss.rgb, (aura * 0.25 + rim * 0.45) * fade);
 		col = mix(col, venom.rgb, rim * rim * 0.3 * fade);
 	}

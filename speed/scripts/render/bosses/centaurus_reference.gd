@@ -16,7 +16,7 @@ func draw_reference(body: Dictionary, attack: Dictionary, canvas) -> void:
 	_clock = float(body.clock)
 	var effects: Dictionary = body.get("reference_fx",{})
 	_ups = effects.get("ups",[])
-	if attack.get("technique","")=="power_shot" and int(attack.get("stage",5))==0: _power(body,attack,canvas)
+	if int(attack.get("kind",-1))==11 and int(attack.get("stage",5))==0: _power(body,attack,canvas)
 	for row: Dictionary in effects.get("releases",[]): _release(row,canvas)
 	for row: Dictionary in effects.get("landings",[]): _landing(row,canvas)
 	if attack.get("technique","")=="stomp" and int(attack.get("stage",5))==0:
@@ -44,9 +44,12 @@ func _draw() -> void:
 		ARROW.draw_arrow(self,at,float(row.angle),float(row.radius),false,_clock,1.0-smoothstep(0.3,0.5,age),Color.WHITE,float(row.length))
 
 func _power(body: Dictionary, attack: Dictionary, canvas) -> void:
+	for offset: float in attack.get("offsets",PackedFloat64Array([0.0])):
+		_power_ray(body,attack,canvas,float(attack.aim_angle)+offset)
+
+func _power_ray(body: Dictionary, attack: Dictionary, canvas, angle: float) -> void:
 	var p: Dictionary = SETTINGS.for_id("C07-power-shot")
 	var mouth: Vector2 = attack.aim_origin
-	var angle := float(attack.aim_angle)
 	var end := mouth+Vector2.from_angle(angle)*float(attack.travel)
 	var hit := Geom.seg_circle_t(mouth,end,attack.ship_position,float(attack.ship_radius))
 	if hit>=0.0: end=mouth.lerp(end,hit)

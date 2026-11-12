@@ -1,6 +1,5 @@
 #include "rear_attack.h"
 #include "../../systems/combat_resolver.h"
-#include "../../systems/boss_contact.h"
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
@@ -21,7 +20,7 @@ void CentaurusRear::step(RunRuntime &r,TechniqueState &t,double dt) {
     const auto center=e.pos-godot::Vector2::from_angle(e.facing)*v.back_offset;
     if (!r.state.observations.check(t.observation_id,CollisionQuery::touches(PointCircle{center,v.radius},{t.previous_ship,r.state.ship_pos,r.state.ship_config.ship_radius},{true,true}))) return;
     t.hit=true;
-    ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::RearAttack;request.source=e.definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);BossContactSystem::knock_back(r,t.actor);
+    ShipDamageRequest request;request.observation_id=t.observation_id;request.amount=p.damage;request.scale=DamageScale::AtkScale;request.cause=Cause::RearAttack;request.source=e.definition+1;request.technique=t.definition;CombatResolver::ship_damage(r,request);
 }
 void CentaurusRear::command(RunRuntime &r,TechniqueState &t,TechniqueCommand command) {
     if (command==TechniqueCommand::StrikeRear && t.stage==TechniqueStage::Windup) {t.stage=TechniqueStage::Active;t.hit=false;cue(r,t,"strike");}

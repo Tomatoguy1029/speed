@@ -22,6 +22,8 @@ var cpp_resources: Resource
 var cpp_scope: ContentResourceScope
 var frame_view: Node2D
 var cpp_background: Node2D
+var _field_boundary: DrawLayer
+var _field_radius := 0.0
 var pipeline: RenderPipeline
 var _roar_post: CanvasLayer
 var _rift_post: CanvasLayer
@@ -34,6 +36,15 @@ var bonus_visual: Node
 
 func _ready() -> void:
 	if bridge!=null:_ready_cpp()
+
+func _draw_field_boundary(canvas: CanvasItem) -> void:
+	if _field_radius>0.0:
+		canvas.draw_arc(Vector2.ZERO,_field_radius,0.0,TAU,256,Color(1.0,0.4,0.4,0.35),2.0/maxf(cam_zoom,0.01))
+
+func _update_field_boundary(radius: float, bodies: Array) -> void:
+	_field_radius = radius
+	_field_boundary.visible = not bodies.any(func(body): return body.has("arena"))
+	_field_boundary.queue_redraw()
 
 func _process(delta: float) -> void:
 	if bridge!=null:_present_cpp(delta)
@@ -126,6 +137,10 @@ func _ready_cpp() -> void:
 	frame_view = load("res://scripts/render/run_frame_view.gd").new()
 	get_node(world_path).add_child(frame_view)
 	frame_view.setup(cpp_scope,cpp_resources.visuals,float(snapshot.value.ui.character_scale))
+	_field_boundary = DrawLayer.new()
+	_field_boundary.draw_fn = _draw_field_boundary
+	_field_boundary.show_behind_parent = true
+	frame_view._layer(2).add_child(_field_boundary)
 	frame_view.finish_settings = {"flash":finish_flash,"shake":finish_shake,"effect":finish_effect_scene,"color":finish_color,"particles":finish_particles,"wave_seconds":finish_wave_seconds}
 	cpp_background = preload("res://scripts/render/run_stage_background.gd").new()
 	cpp_background.z_index = -10
@@ -191,6 +206,8 @@ func _present_cpp(delta: float) -> void:
 		frame_view.hide()
 		return
 	frame_view.show()
+	# 反発が始まる半径を世界原点に描く。専用の闘技場ではそちらの壁を使う。
+	_update_field_boundary(float(frame.ui.hero.field_radius),render.value.get("boss_bodies",[]))
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var finale_camera: bool = frame_view.finale_camera_active()
 	# ボス撃破の演出もカットシーンとして、寄り引きの間は背景を固定する。
@@ -203,15 +220,9 @@ func _present_cpp(delta: float) -> void:
 	if frame_view.finish_shake>0.0:
 		shake = maxf(shake,frame_view.finish_shake)
 		frame_view.finish_shake = 0.0
-	if frame_view._end_blast_visual!=null:
-		shake = maxf(shake,frame_view._end_blast_visual.frame_shake)
-		frame_view._end_blast_visual.frame_shake = 0.0
 	if frame_view._vortex_visual!=null:
 		shake = maxf(shake,frame_view._vortex_visual.frame_shake)
 		frame_view._vortex_visual.frame_shake = 0.0
-	if frame_view._knockback_visual!=null:
-		shake = maxf(shake,frame_view._knockback_visual.frame_shake)
-		frame_view._knockback_visual.frame_shake = 0.0
 	if not frame.ui.get("presentation_frozen",false):
 		shake = maxf(0.0,shake-delta*40.0)
 		_camera.offset = Vector2.ZERO if not view.is_empty() and not view.get("shake",false) else Vector2(randf_range(-1,1),randf_range(-1,1))*shake*float(SaveManager.settings.screen_shake)/maxf(cam_zoom,0.01)

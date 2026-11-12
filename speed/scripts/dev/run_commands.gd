@@ -27,6 +27,7 @@ func handle_cpp(name: StringName, args: Dictionary) -> Dictionary:
 			_cpp_busy = false
 			if not ready.ok: return ready
 			return owner.bridge.command("dev_edit",{"kind":"debug_action","payload":{"action":"random","args":{"ids":ready.value,"count":clampi(int(args.get("count",100)),1,10000)}}})
+		&"debug_ult": return owner.bridge.command("dev_set_hero", {"id": String(args.get("id", ""))})
 		&"debug_gravity": return owner.bridge.command("dev_spawn_well",{})
 		&"debug_warp": return owner.bridge.command("dev_spawn_warp",{})
 		&"debug_comet": return owner.bridge.command("dev_spawn_comet",{"rare":bool(args.get("rare",false))})

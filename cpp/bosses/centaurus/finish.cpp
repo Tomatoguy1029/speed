@@ -25,9 +25,12 @@ bool rear_ready(const RunRuntime &r,const BossBodyState &b,const BossFlowState &
 void CentaurusFinish::leap(RunRuntime &r,BossBodyState &b) {begin_leap(r,b);}
 bool CentaurusFinish::idle(RunRuntime &r,BossBodyState &b) {
     const auto flow=std::find_if(r.state.bosses->flows.begin(),r.state.bosses->flows.end(),[&](const auto &f){return same_handle(f.actor,b.actor);});if (flow==r.state.bosses->flows.end() || !flow->selection_enabled || b.initial_wait>0 || b.phase_pending) return false;
+    // Let the shared flow finish its action and preserve its recovery/rest windows.
+    if (flow->active || flow->rest_remaining>0 || flow->interval>0) return false;
+    for (const auto &section:r.content->flow_sections) if (section.flow==flow->definition && section.order==flow->index && section.request==2) return false;
     auto &v=*b.centaurus;const auto &p=rule(r,b);const auto &e=r.state.enemies[b.actor.slot];const auto wall=technique(r,b,"shower_wall");const bool wall_ready=wall && TechniqueRunner::ready(r,b.actor,wall);const double distance=e.pos.distance_to(r.state.ship_pos);
-    if (wall_ready && b.clock>=v.leap_ready_at && distance<p.leap_trigger) {begin_leap(r,b);return true;}
     if (rear_ready(r,b,*flow)) return false;
+    if (wall_ready && b.clock>=v.leap_ready_at && distance<p.leap_trigger) {begin_leap(r,b);return true;}
     if (conditional(r,b,*flow,"stomp")) {start(r,b,technique(r,b,"stomp"));return true;}
     if (v.path_hold>=p.path_hold && conditional(r,b,*flow,"shower_path")) {if (start(r,b,technique(r,b,"shower_path"))) v.path_hold=0;return true;}
     if (wall_ready && b.clock>=v.retreat_ready_at && distance<p.retreat_trigger) {v.retreat_ready_at=b.clock+p.leap_time+p.retreat_cd;begin_leap(r,b);return true;}

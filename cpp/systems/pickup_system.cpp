@@ -26,7 +26,7 @@ void drop_gem(RunRuntime &run,godot::Vector2 position,double value) {
 
 void collect_enemy_coins(RunRuntime &run,int64_t count) {
     for (int64_t i=0;i<count;++i) {
-        // 散布で使っていた乱数を進め、以降の結晶・カプセル等の抽選を維持する。
+        // 散布で使っていた乱数を進め、以降の星のかけら・カプセル等の抽選を維持する。
         run.state.control.rng.randf();
         run.state.control.rng.randf();
         PickupSystem::collect_coin(run);

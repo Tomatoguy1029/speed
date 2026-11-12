@@ -5,7 +5,6 @@ extends WeaponVisual
 var breaks: Array[Dictionary] = []
 var hits: Array[Dictionary] = []
 var _frame_seen := {}
-var frame_shake := 0.0
 
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
@@ -28,7 +27,6 @@ func on_event(ev: Dictionary) -> void:
 		var glitter: Array[Dictionary] = []
 		for i in 40: glitter.append({"a": randf() * TAU, "v": 30.0 + randf() * 90.0})
 		breaks.append({"pos": ev.pos, "age": 0.0, "glitter": glitter})
-		frame_shake = maxf(frame_shake,4.0)
 
 	elif ev.type == &"shot_hit":
 		hits.append({"pos": ev.pos, "age": 0.0, "turn": randf() * TAU})

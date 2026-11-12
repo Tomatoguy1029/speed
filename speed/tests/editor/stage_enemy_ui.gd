@@ -291,7 +291,7 @@ func cpp_live() -> bool:
 	panel._edit_value(3.0,"rank",1.0)
 	panel._edit_value(4.0,"xp_reward_counts.mid",0.0)
 	var recording: Dictionary = bridge.read_recording(true)
-	check(recording.ok and recording.value.xp_config.enemy_rewards.splitling.rank==3 and recording.value.xp_config.enemy_rewards.splitling.counts[1]==4,"星と結晶の数を編集境界で解決し録画用定義へ渡す")
+	check(recording.ok and recording.value.xp_config.enemy_rewards.splitling.rank==3 and recording.value.xp_config.enemy_rewards.splitling.counts[1]==4,"星と星のかけらの数を編集境界で解決し録画用定義へ渡す")
 	if not bridge.command("dev_spawn",{"definition_id":"splitling","position":Vector2(-300,250)}).ok: return false
 	check(bridge._core.enemies_snapshot()[1].max_hp==bridge._core.enemies_snapshot()[0].max_hp,"次の出現も同じ編集定義を使う")
 	panel.values.clear()
@@ -332,7 +332,7 @@ func cpp_reward_display() -> void:
 	check(hp_text.contains("実効 "+String.num(resolved.base_hp(config),3)) and reward_text.contains("実効 "+String.num(float(resolved.resolve_xp_reward().counts[1]),3)),"星の数を変えるとHPと固定報酬の実効値表示も更新する")
 	var reward_base := StageEnemyTuning.base_value(common,"xp_reward_counts.mid",config)
 	panel._toggle_override(true,"xp_reward_counts.mid",reward_base)
-	check(panel.values.splitling["xp_reward_counts.mid"]==resolved.resolve_xp_reward().counts[1],"結晶の上書きONは現在の星から計算した値で始める")
+	check(panel.values.splitling["xp_reward_counts.mid"]==resolved.resolve_xp_reward().counts[1],"星のかけらの上書きONは現在の星から計算した値で始める")
 	panel._reset_key("rank",panel._row_controls.rank[2],float(common.rank))
 	check(panel._row_controls.hp[0].text.contains("実効 "+String.num(common.base_hp(config),3)),"星の上書きを解除すると派生HP表示も基準へ戻る")
 	panel.free()

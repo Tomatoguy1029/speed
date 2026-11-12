@@ -42,7 +42,7 @@ func _cpp_ready() -> void:
 		if path.contains("/weapons/"): paths.append(path)
 	check(paths.has(ContentManager.catalog.find(&"weapons",&"W01").path),"通常装備と同じ定義資源を使う")
 	await preview.set_effect("trait/pickup",false)
-	check(preview.session.history.filter(func(item): return item.kind=="command" and item.args.name=="dev_drop_crystal" and item.args.args.kind==RunIds.GemKind.Low).size()==3,"結晶3つをkind付きの命令だけで配置する")
+	check(preview.session.history.filter(func(item): return item.kind=="command" and item.args.name=="dev_drop_crystal" and item.args.args.kind==RunIds.GemKind.Low).size()==3,"星のかけら3つをkind付きの命令だけで配置する")
 	await preview.set_effect("weapon/barrier",false)
 	check(preview.session.events.any(func(e): return e.type=="barrier_hit"),"バリアの発動条件をC++命令から作る")
 	preview.refresh_effects()

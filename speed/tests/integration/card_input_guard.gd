@@ -16,6 +16,7 @@ func _ready() -> void:
 	SaveManager.settings = settings_copy
 	SaveManager.data = SaveManager.default_data()
 	SaveManager.data.intro_seen = true
+	SaveManager.data.tutorial_done = true
 	scene = await _cpp_open(1, false)
 	if scene.bridge == null:
 		_check(false, "C++の通常ランを開始する")
@@ -23,6 +24,12 @@ func _ready() -> void:
 		get_tree().quit(1)
 		return
 	bridge = scene.bridge
+	var initial: Dictionary = bridge.read_frame().value
+	_check(initial.camera.center.is_equal_approx(initial.ui.ship.ship_pos), "初期武器の選択前から自機の出撃位置を映す")
+	bridge.step(1.0/120.0,bridge.pack_intent(Intent.new()),{"logical_size":Vector2(1280,720)})
+	var choosing: Dictionary = bridge.read_frame().value
+	_check(choosing.camera.half.x > 0.0 and choosing.camera.half.y > 0.0 and choosing.camera.center.is_equal_approx(choosing.ui.ship.ship_pos), "初期武器の選択中も画角を初期化する")
+	_check(choosing.ui.run_time == 0.0 and choosing.ui.cards.initial and choosing.ui.cards.selected_id == 0, "画角の準備で選択や戦闘の時計を進めない")
 	router = scene.view.get_node("World/InputRouter")
 	hud = scene.view.get_node("Hud/HudRoot")
 	# 初期武器も通常出撃の実際の候補と資源準備を通す。

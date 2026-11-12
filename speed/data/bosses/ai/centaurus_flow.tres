@@ -14,7 +14,7 @@ layout = {
 "shared_rest": Vector2(427, 28)
 }
 sections = [{
-"name": "牽制", "request": "normal", "allowed_groups": ["choose_normal"], "cap": 1.0, "action_count": 1, "no_candidate_timeout": 1.0, "next": 1, "weights": {"single": 100.0}
+"name": "牽制", "request": "normal", "allowed_groups": ["choose_normal"], "cap": 2.0, "action_count": 1, "no_candidate_timeout": 1.0, "next": 1, "weights": {"single": 100.0}
 }, {
 "name": "圧力", "request": "normal", "allowed_groups": ["choose_normal", "choose_combo"], "cap": 3.0, "section_budget": 4.0, "action_count": 2, "action_interval": 0.25, "no_candidate_timeout": 1.0, "next": 2, "weights": {"single": 35.0, "combo": 65.0}
 }, {

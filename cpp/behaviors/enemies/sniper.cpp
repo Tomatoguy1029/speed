@@ -19,10 +19,10 @@ void search(RunRuntime &r,uint32_t row,double dt) {
     const double sway=std::sin(e.age*2.0*godot::Math::PI/p.search_period+double(e.id))*p.search_sway;
     EnemyMotion::turn(e,(r.state.ship_pos-e.pos).angle()+sway,p.search_turn,dt,tracking);
 }
-void cancel(RunRuntime &r,uint32_t row) {
+void cancel(RunRuntime &r,uint32_t row,double dt) {
     auto &e=r.state.enemies[row];if (e.mode==EnemyMode::Windup) event(r,"enemy_laser_cancel",row);
     AttackBudgetSystem(r).cancel(AttackBudgetSystem::owner(r.state,e.id,e.attack_group),e.id);
-    e.mode=EnemyMode::Move;e.charge=0;std::get<SniperState>(e.behavior_state).rays.clear();
+    e.mode=EnemyMode::Move;e.timer=0;e.charge=std::max(0.0,e.charge-dt*definition(r,row).lock_decay);std::get<SniperState>(e.behavior_state).rays.clear();
 }
 bool in_range(const RunRuntime &r,uint32_t row) {const double d=SniperBehavior::lens(r.state.enemies[row]).distance_to(r.state.ship_pos);return d>=1.0 && d<=definition(r,row).band_len;}
 void cast(RunRuntime &r,uint32_t row,bool target_only) {
@@ -56,8 +56,8 @@ void SniperBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     if (e.mode==EnemyMode::Recover && e.timer>recovery-hold) e.vel={};
     else EnemyMotion::steer(e,aim+u*p.keep+godot::Vector2(-u.y,u.x)*150.0*(e.id%2?1.0:-1.0),e.speed,p.accel,dt,tracking);
     if (e.mode==EnemyMode::Recover) {e.timer=e.timer-dt;search(r,row,dt);std::get<SniperState>(e.behavior_state).rays.clear();if (e.timer<=0) e.mode=EnemyMode::Move;return;}
-    if (!in_range(r,row)) {cancel(r,row);search(r,row,dt);return;}
-    cast(r,row,true);if (sight(r,row,s.ship_pos)!=1) {cancel(r,row);search(r,row,dt);return;}
+    if (!in_range(r,row)) {cancel(r,row,dt);search(r,row,dt);return;}
+    cast(r,row,true);if (sight(r,row,s.ship_pos)!=1) {cancel(r,row,dt);search(r,row,dt);return;}
     const auto owner=AttackBudgetSystem::owner(s,e.id,e.attack_group);AttackBudgetSystem budget(r);
     if (e.attack_managed && !((e.mode==EnemyMode::Windup || e.charge>0) && budget.owns(owner,e.id))) {
         const double duration=std::max(0.0,1.0-e.charge)*p.lock_fill+p.laser_charge+p.laser_delay+p.laser_time+0.1;

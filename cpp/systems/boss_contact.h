@@ -17,7 +17,6 @@ public:
     // 着地のnative更新だけ有効。飛行中には登録しない。
     static void register_landing(RunRuntime &,EnemyHandle,godot::Vector2 center,double radius,uint32_t technique,int64_t observation);
     static void clear_landings(RunRuntime &);
-    static void knock_back(RunRuntime &,EnemyHandle);
     static void normal_contact(RunRuntime &,EnemyHandle,godot::Vector2 impact);
     static bool resolve(RunRuntime &,godot::Vector2 from,godot::Vector2 to,double ship_radius);
 };

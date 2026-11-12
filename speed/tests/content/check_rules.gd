@@ -309,6 +309,9 @@ func _package_final_runtime() -> void:
 	if not await _package_startup():
 		quit(1)
 		return
+	# この確認は操作練習後の通常出撃を対象にする。隔離セーブだけを準備し、
+	# 保存回数・ハッシュの観測は準備が終わってから始める。
+	SaveManager.mark_tutorial_done()
 	var save_path: String = SaveManager.save_path()
 	var before_hash := FileAccess.get_sha256(save_path) if FileAccess.file_exists(save_path) else ""
 	var before_runs := int(SaveManager.data.best.runs)
