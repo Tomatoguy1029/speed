@@ -183,7 +183,6 @@ func _build_start_panel(canvas: Control) -> void:
 	var back := Button.new()
 	back.position = Vector2(7, 7)
 	back.size = Vector2(71, 30)
-	back.tooltip_text = tr("common.back")
 	for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
 		back.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	back.mouse_entered.connect(fill.show)

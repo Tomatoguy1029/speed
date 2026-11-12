@@ -107,7 +107,6 @@ func _build_art() -> void:
 	_back_fill.hide()
 	_image(_texture("upgrade_ui_back_button"))
 	var back := _button(Rect2(7, 7, 74, 30))
-	back.tooltip_text = tr("common.back")
 	back.mouse_entered.connect(func(): _back_fill.show())
 	back.mouse_exited.connect(func(): _back_fill.hide())
 	back.focus_entered.connect(func(): _back_fill.show())

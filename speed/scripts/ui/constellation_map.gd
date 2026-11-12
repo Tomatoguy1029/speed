@@ -154,7 +154,6 @@ func _ready() -> void:
 	_artwork(preload("res://assets/ui/map/selection_screen_back_button.png"), self)
 	var back := _button("", Vector2(7, 7), Vector2(74, 30))
 	_back = back
-	back.tooltip_text = tr("common.back")
 	_transparent_button(back)
 	back.mouse_entered.connect(back_fill.show)
 	back.mouse_exited.connect(back_fill.hide)
