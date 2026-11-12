@@ -16,6 +16,10 @@ const SHIP := preload("res://assets/pixel/airship.png")
 const SHAPES := {0: [177.0, 2.24], 1: [135.3, 2.24], 2: [132.4, 2.24], 3: [340.0, 2.95]}
 ## 試作の画面の幅。画面に対する大きさ（揺れ・ぼかし・粒の最小の大きさ）を合わせる。
 const PROTOTYPE_WIDTH := 960.0
+## 切り口が通る範囲（中心からのドット）。試作と同じく中心のボス（うみへび座は不死の蛇）だけを通す。
+const CUT_RADIUS := 95.0
+## 光の粒を拾う格子の一辺の上限。広いボスは間隔を広げ、粒の数を試作の上限に近づける。
+const MAX_GRID := 220.0
 const Z_BODY := 15
 const Z_STOP_BACK := 35
 const Z_STOP := 36
@@ -279,12 +283,16 @@ func apply(finish: Dictionary, character_scale: float, ship_heading: Vector2) ->
 	_relic = finish.relic
 	_ship = finish.ship
 	_ship_angle = ship_heading.angle()+PI/2.0
-	var shape: Array = SHAPES.get(_kind,SHAPES[0])
+	var shape: Array = SHAPES.get(_kind,SHAPES[0]).duplicate()
+	# うみへび座は、不死の蛇から残った蛇の先までをC++が測って渡す。
+	if float(finish.get("reach",0.0))>0.0: shape[0] = float(finish.reach)/cs
 	_max_r = shape[0]
+	shape[1] = maxf(float(shape[1]),2.0*_max_r/MAX_GRID)
+	var cut_r := CUT_RADIUS
 	var to_center := (_origin-_impact)/cs
 	var u0 := to_center.dot(_dir)
 	var d0 := to_center.x*_dir.y-to_center.y*_dir.x
-	var half := sqrt(maxf(0.0,pow(_max_r*0.6,2.0)-d0*d0))
+	var half := sqrt(maxf(0.0,cut_r*cut_r-d0*d0))
 	_cut_in = u0-half-8.0
 	_cut_out = u0+half+8.0
 	if not visible:

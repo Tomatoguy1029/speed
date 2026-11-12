@@ -7,6 +7,8 @@
 #include "../../output/frame_builder.h"
 #include "../../state/boss_states.h"
 #include "../../content/content_bundle.h"
+#include "../hydra/state.h"
+#include "../hydra/regrow.h"
 #include <algorithm>
 #include <cmath>
 namespace speed {
@@ -59,6 +61,15 @@ bool BossFinish::check(RunRuntime &r) {
     auto &s=r.state;using Phase=godot::RunState::Phase;if (r.content->boss_finish.empty() || s.phase!=Phase::Play || s.ship.hp<=0) return false;auto &f=s.bosses->finish;const auto &p=r.content->boss_finish.front();
     if (s.boss_dead) {
         f.active=true;f.elapsed=0;f.blasted=f.banner=false;f.reveal=reveals(r);f.ship=s.ship_pos;f.origin=s.ship_pos;for (const auto &b:s.bosses->bodies) if (s.enemy_handles.contains(b.actor)) {f.origin=s.enemies[b.actor.slot].pos;break;}
+        if (f.has_focus) f.origin=f.focus;
+        // うみへび座は、不死の蛇から残った蛇の先まで崩す。
+        f.reach=0;
+        for (const auto &b:s.bosses->bodies) if (!b.hydra->necks.empty()) {
+            auto farthest=[&](const HydraNeckState &n) {double d=double(n.free_pos.distance_to(f.origin));for (const auto &p:n.points) d=std::max(d,double(p.distance_to(f.origin)));return d;};
+            f.reach=farthest(b.hydra->bearer);
+            for (const auto &n:b.hydra->necks) if (HydraRegrow::alive(r,n)) f.reach=std::max(f.reach,farthest(n));
+            f.reach+=40*r.content->config.character_scale;
+        }
         auto &c=s.control;const double factor=std::pow(c.zoom_ref_speed/std::max(c.zoom_ref_speed,s.ship_config.max_speed),c.zoom_exp);f.base_zoom=std::min(c.logical_size.x,c.logical_size.y)/c.base_view*std::clamp(factor,c.zoom_min,1.0);
         reset(r);cue(r,"boss_finish",true);s.phase=Phase::Finishing;camera(r);
         if (s.control.draco_finish_done) {f.elapsed=times(r).clear;sweep(r,0,true);}
@@ -82,7 +93,7 @@ bool BossFinish::abort(RunRuntime &r) {if (r.state.lifecycle.result) return fals
 bool BossFinish::validate(const godot::RunState &s) {const auto &f=s.bosses->finish;if (!std::isfinite(f.elapsed) || f.elapsed<0 || !std::isfinite(f.base_zoom) || !f.origin.is_finite() || !f.impact.is_finite() || !f.direction.is_finite() || !f.ship.is_finite()) return false;return f.active==(s.phase==godot::RunState::Phase::Finishing);}
 godot::Dictionary BossFinish::snapshot(const RunRuntime &r) {
     godot::Dictionary out;if (r.content->boss_finish.empty()) return out;const auto &f=r.state.bosses->finish;const Times t=times(r);
-    out["active"]=f.active;out["elapsed"]=f.elapsed;out["origin"]=f.origin;out["impact"]=f.impact;out["direction"]=f.direction;out["boost"]=f.boost;out["reveal"]=f.reveal;out["ship"]=f.ship;out["relic"]=relic(r);out["blasted"]=f.blasted;out["base_zoom"]=f.base_zoom;
+    out["active"]=f.active;out["elapsed"]=f.elapsed;out["origin"]=f.origin;out["impact"]=f.impact;out["direction"]=f.direction;out["boost"]=f.boost;out["reveal"]=f.reveal;out["ship"]=f.ship;out["relic"]=relic(r);out["blasted"]=f.blasted;out["base_zoom"]=f.base_zoom;out["reach"]=f.reach;
     godot::Dictionary at;at["slow"]=t.slow;at["crack"]=t.crack;at["hold"]=t.hold;at["burst"]=t.burst;at["settle"]=t.settle;at["cool"]=t.cool;at["show"]=t.show;at["take"]=t.take;at["clear"]=t.clear;at["end"]=t.end;out["times"]=at;
     out["slow_end"]=t.crack;out["reveal_start"]=t.cool;out["reveal_duration"]=t.clear-t.cool;out["legendary"]=godot::String(r.content->lifecycle.legendary.c_str());
     return out;
