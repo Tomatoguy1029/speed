@@ -89,6 +89,10 @@ struct BossFinishState {
     bool boost=false,reveal=false;
     double elapsed=0,base_zoom=1;
     godot::Vector2 origin,impact,direction,ship;
+    // 撃破演出の中心（うみへび座は不死の蛇の頭）と、崩れる範囲（世界単位、0なら絵の既定）。
+    bool has_focus=false;
+    godot::Vector2 focus;
+    double reach=0;
 };
 struct BossStates {
     BossFinishState finish;
