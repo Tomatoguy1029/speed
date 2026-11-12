@@ -116,7 +116,13 @@ func _build_art() -> void:
 	_heading = _label(Rect2(444, 80, 152, 38), 15)
 	_information = _label(Rect2(444, 138, 152, 92), 12)
 	_price = _label(Rect2(444, 236, 152, 28), 12)
-	_coins = _label(Rect2(444, 37, 162, 16), 10)
+	var gear := _image(_texture("upgrade_ui_gear"))
+	gear.name = "PartsGear"
+	gear.z_index = 2
+	_coins = _label(Rect2(476, 5, 138, 28), 18)
+	_coins.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_coins.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_coins.add_theme_color_override("font_color", CYAN)
 	_buy_button = _button(Rect2(448, 275, 139, 32))
 	_buy_button.add_theme_font_size_override("font_size", 12)
 	_buy_button.pressed.connect(_buy)
@@ -355,7 +361,7 @@ func _select(id: StringName) -> void:
 	_refresh_details()
 
 func _refresh_details() -> void:
-	_coins.text = tr("common.parts").format({n = "∞" if OS.is_debug_build() and SaveManager.dev_infinite_parts else str(SaveManager.coins())})
+	_coins.text = "∞" if OS.is_debug_build() and SaveManager.dev_infinite_parts else str(SaveManager.coins())
 	var def := ContentManager.catalog.find(&"meta_upgrades", _selected)
 	_buy_button.disabled = true
 	if def == null:

@@ -134,7 +134,6 @@ func _ready() -> void:
 		star.name = "Constellation%d" % (i + 1)
 		star.texture_normal = SYMBOL_TEXTURES[i]
 		star.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		star.tooltip_text = tr("stage.%d.name" % (i + 1))
 		star.pressed.connect(select_constellation.bind(i))
 		star.focus_entered.connect(_on_stage_focus.bind(i))
 		_map_content.add_child(star)
@@ -227,7 +226,6 @@ func _build_dragon_page() -> void:
 		art.position = DRAGON_ORIGIN
 	_final_stage = _button("", DRAGON_ORIGIN + DRAGON_RECT.position, DRAGON_RECT.size)
 	_final_stage.reparent(_map_content)
-	_final_stage.tooltip_text = tr("stage.5.name")
 	_transparent_button(_final_stage)
 	_final_stage.add_theme_stylebox_override("focus", StyleBoxEmpty.new())
 	_final_stage.pressed.connect(select_constellation.bind(DRAGON_INDEX))

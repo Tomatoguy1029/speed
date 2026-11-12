@@ -34,9 +34,10 @@ layout_mode = 2
 theme_override_constants/separation = 18
 
 [node name="Logo" type="Label" parent="Center/Box"]
+visible = false
 layout_mode = 2
 theme_override_font_sizes/font_size = 96
-text = "SPEED"
+text = "STARWARD"
 horizontal_alignment = 1
 
 [node name="Spacer" type="Control" parent="Center/Box"]
