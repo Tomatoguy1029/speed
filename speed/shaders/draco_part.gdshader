@@ -1,5 +1,6 @@
 shader_type canvas_item;
 render_mode unshaded;
+#include "res://shaders/draco_rift_shape.gdshaderinc"
 
 uniform bool use_normal = true;
 uniform bool cosmic = false;
@@ -19,13 +20,15 @@ uniform float finale_gray = 0.0;
 uniform float finale_lit = 0.0;
 uniform float finale_gap = 0.0;
 uniform vec2 finale_center = vec2(0.0);
-// 登場時だけ、顔の元画像の赤い目を発光させ、奥の部位を裂け目の内側へ隠す。
+// 登場のあいだ、奥にいる部位を裂け目の内側だけに出して深淵の色へ沈め、顔の絵の赤い目を光らせる。
 uniform bool entrance = false;
 uniform bool entrance_head = false;
-uniform float entrance_depth = 1.0;
+uniform bool entrance_behind = false;
+uniform float entrance_dark = 0.0;
 uniform float entrance_eyes = 0.0;
-uniform vec2 entrance_portal = vec2(0.0);
-uniform float entrance_open = 1.0;
+uniform vec2 rift_viewport = vec2(1280.0, 720.0);
+uniform vec4 rift_ends = vec4(0.0);
+uniform vec4 rift_shape = vec4(0.0);
 varying vec2 world_at;
 varying vec2 axis_x;
 varying vec2 axis_y;
@@ -75,13 +78,10 @@ void fragment() {
 		result = mix(shadow, result, finale_lit);
 	}
 	if (entrance) {
-		vec2 portal_at = world_at - entrance_portal;
-		float aperture = max(1.0, 190.0 * entrance_open) * sqrt(max(0.0, 1.0 - pow(portal_at.y / 390.0, 2.0)));
-		if (entrance_depth < 0.25 && (abs(portal_at.y) > 390.0 || abs(portal_at.x) > aperture)) { discard; }
+		if (entrance_behind && !rift_interior(rift_cell(SCREEN_UV, rift_viewport), rift_ends, rift_shape)) { discard; }
+		result = mix(result, vec3(0.0235, 0.0118, 0.0588), entrance_dark);
 		bool eye = entrance_head && albedo.r > 0.2 && albedo.r > albedo.g * 1.6 && albedo.r > albedo.b * 1.4;
-		if (entrance_depth <= 0.001 && !eye) { discard; }
-		result *= smoothstep(0.0, 0.7, entrance_depth);
-		if (eye) { result = mix(result, vec3(1.0, 0.025, 0.055), entrance_eyes); }
+		if (eye) { result = mix(result, vec3(1.0, 0.157, 0.196), entrance_eyes); }
 	}
 	result = mix(result, vec3(1.0), boss_hit_white);
 	COLOR = vec4(srgb_light ? pow(max(result, vec3(0.0)), vec3(2.2)) : result, pixel.a) * vertex_tint;

@@ -54,9 +54,10 @@ struct DracoIntroState {
     std::vector<Held> held;
     bool active=false;
     uint8_t stage=0;
-    double time=0,rift=0,eyes=0,chest=0,emerged=0,zoom=1,facing=0,guard=0;
+    double time=0,rift=0,rift_open=0,rift_wide=0,eyes=0,chest=0,chest_flare=0,head_s=0,path_step=1,zoom=1,facing=0,guard=0;
     BossMode mode=BossMode::Idle;
     godot::Vector2 origin,ship,camera,center,rift_center;
+    std::vector<godot::Vector2> path,trail;
 };
 enum class DracoCycleStage : uint8_t { None,Roar,Collect,WaitBeams,Return,Generate };
 struct DracoCycleState {

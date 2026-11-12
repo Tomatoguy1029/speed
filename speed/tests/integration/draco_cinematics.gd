@@ -91,7 +91,7 @@ func native_intro() -> void:
 	bridge._core.step(1.0)
 	check(bridge.command("dev_boss_body_state").value[-1]==expected,"復帰後も同じ位置・段階・時刻になる")
 	bridge.release_checkpoint(held.value)
-	bridge._core.step(10.0)
+	bridge._core.step(12.0)
 	check(not bridge.command("dev_boss_body_state").value[-1].intro.active and bridge.command("dev_boss_body_state").value[-1].mode==1,"登場は自然終了で戦闘へ渡す")
 	view.free();bridge.dispose()
 	print("[B_draco_intro] failures=",failures)
