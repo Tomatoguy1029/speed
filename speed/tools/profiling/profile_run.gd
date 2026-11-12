@@ -142,6 +142,8 @@ func _ready() -> void:
 		return
 	startup_us = Time.get_ticks_usec()
 	SaveManager.data = SaveManager.default_data()
+	# 通常戦闘の計測では、初回の操作練習と案内による進行停止を除く。
+	for flag in ["tutorial_done","landmark_guide_seen","hero_guide_seen"]: SaveManager.data[flag] = true
 	SaveManager.dev_meta_override.clear()
 	for item in String(options.get("meta","")).split(",",false):
 		var pair := item.split(":")
@@ -385,11 +387,16 @@ func _process(_delta: float) -> void:
 	var draw := geometry+float(display.get("view_draw.attacks",0.0))+float(display.get("view_draw.enemy_decorations",0.0))
 	var viewport := get_viewport().get_viewport_rid()
 	var bonus := float(packet.ui.get("bonus_remaining",0.0))>0
-	var ui_paused: bool = packet.ui.phase in [Phase.Paused,Phase.Levelup] or session.view.get_node("Hud/HudRoot")._rewards.is_active()
+	var hud = session.view.get_node("Hud/HudRoot")
+	var ui_overlay: bool = hud._menu_overlay!=null
+	var ui_paused: bool = packet.ui.phase in [Phase.Paused,Phase.Levelup] or hud._rewards.is_active() or ui_overlay
 	var scene := "ui" if ui_paused else "bonus" if bonus else "boss" if not packet.ui.get("boss_bodies",[]).is_empty() else "normal"
 	var row := {"elapsed_ms":(now-start_us)/1000.0,"frame_ms":frame_ms,"tick":metrics.tick,"fixed_steps":metrics.fixed_steps,"enemies":metrics.enemies,"enemy_types":metrics.enemy_types,"attack_pools":metrics.attack_pools,"friendly":metrics.friendly_shots,"run_clock":packet.ui.run_time,"run_delta":float(packet.ui.run_time)-last_run_clock,"world_clock":packet.ui.world_time,"phase":packet.ui.phase,"scene":scene,"bonus_remaining":packet.ui.get("bonus_remaining",0.0),"hitstop":packet.ui.get("hitstop",0.0),"drawing":packet.ui.draw.drawing,"tracing":packet.ui.draw.tracing,"ship_position":str(packet.ui.ship.ship_pos),"boss_bodies":packet.ui.get("boss_bodies",[]),"sim":timings.sim,"output_build":timings.output_build,"bridge_copy":timings.bridge_copy,"resource_wait":timings.resource_wait,"bridge_bytes":int(metrics.packed_bytes)-last_packed_bytes,"view_update":update,"view_draw":draw,"view_detail":display,"observation_ms":(now-before)/1000.0,"keep_refill":maintenance_us/1000.0,"viewport_cpu_ms":RenderingServer.viewport_get_measured_render_time_cpu(viewport),"viewport_gpu_ms":RenderingServer.viewport_get_measured_render_time_gpu(viewport),"draw_calls":Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),"scope_resources":session.resources.resources.size(),"objects":Performance.get_monitor(Performance.OBJECT_COUNT),"nodes":Performance.get_monitor(Performance.OBJECT_NODE_COUNT),"static_mb":Performance.get_monitor(Performance.MEMORY_STATIC)/1048576.0}
+	row["ui_overlay"]=ui_overlay
 	row["keep_refill_inclusive"]=maintenance_total_us/1000.0
 	maintenance_total_us=0
+	row["process_ms"]=Performance.get_monitor(Performance.TIME_PROCESS)*1000.0
+	row["physics_ms"]=Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)*1000.0
 	row["sim_clock"]=metrics.clocks.sim_time
 	row["world_updates"]=metrics.clocks.world_updates
 	row["world_real_accum"]=metrics.clocks.world_real_accum
@@ -479,6 +486,7 @@ func _finish() -> void:
 	if summary.viewport_gpu_ms.max<=0:
 		summary.viewport_gpu_ms={"available":false,"reason":"この環境ではGPU時間が返らない"}
 	if options.mode=="natural" and samples[-1].run_clock<300: invalid_reasons.append("5分以降の通常進行を観測できない")
+	if samples.any(func(row): return row.get("ui_overlay",false)): invalid_reasons.append("案内またはメニューによる戦闘停止が計測に混入")
 	var condition_valid := invalid_reasons.is_empty()
 	var result := {"metadata":metadata,"condition_valid":condition_valid,"invalid_reasons":invalid_reasons,"observed":true,"performance_pass":condition_valid and segments.all(func(segment): return segment.performance_pass),"segments":segments,"summary":summary,"physics_steps":int(last_metrics.fixed_steps)-int(start_metrics.fixed_steps),"input_ticks":input_ticks,"stroke_starts":stroke_starts,"drawing_ticks":drawing_ticks,"tracing_ticks":traced_ticks,"equipment_end":actual,"weapon_activations":activated,"boss_actions":boss_actions,"event_counts":event_counts,"notifications":notifications,"samples":samples,"gpu_by_kind":"未分離","physical_copy_bytes":"未分離"}
 	result["minute_windows"]=minute_windows

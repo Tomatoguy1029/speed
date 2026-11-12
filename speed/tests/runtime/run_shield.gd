@@ -165,6 +165,7 @@ func check_cpp_shield() -> void:
 	config.iron_count = 0
 	config.saw_count = 0
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 82
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["shield"])

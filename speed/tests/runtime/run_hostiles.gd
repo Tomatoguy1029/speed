@@ -1275,6 +1275,7 @@ func check_cpp_reticle() -> void:
 	cfg.character_scale = 1.0
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 92
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["reticle","telescope"])
@@ -1335,7 +1336,10 @@ func check_cpp_reticle() -> void:
 	check(output_frame.events.any(func(event): return event.type==&"beam") and output_frame.events.any(func(event): return event.type==&"rock_break"),"ビームと岩の破片を共通イベントへ渡す")
 	presentation.frame_view.receive_frame(output_frame)
 	presentation.frame_view.update_effects(output_frame,0.0)
-	check(not presentation.frame_view._mutiny_beams.is_empty() and not presentation.frame_view._meteor_shards.is_empty(),"発射した光線と岩の破片を通常画面へ表示する")
+	presentation.frame_view.prepare_reference_view(Vector2(1280,720),target,0.85)
+	presentation.frame_view.apply_frame(bridge.read_render(Rect2(target-Vector2(900,400),Vector2(1800,800))).value)
+	presentation.frame_view.update_reference_effects(output_frame,0.0)
+	check(not presentation.frame_view._enemy_reference._reticle._shots.is_empty() and presentation.frame_view._reference_layer.canvas.front.has_color,"発射した光線と岩の破片を現在の描画へ渡す")
 	await get_tree().process_frame
 	bridge.command("dev_stream_rocks",{"center":target,"half":Vector2(640,360),"dt":0.3})
 	rocks = bridge.command("dev_field_query",{"action":"rocks"}).value
@@ -1377,6 +1381,7 @@ func check_cpp_cepheus() -> void:
 	cfg.planet_radius = 0.0
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 93
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["cepheus","splitling"])
@@ -1478,6 +1483,7 @@ func check_cpp_triangle_star() -> void:
 	cfg.planet_radius = 0.0
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 94
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["triangle","triangle_star"])
@@ -1503,13 +1509,13 @@ func check_cpp_triangle_star() -> void:
 	core.set_motion_context(target,target,Vector2(640,360))
 	# 親の三角形が辺を移動する間（Dash）だけ、星のゲートが働く。
 	var parent: int = core.spawn_enemy(&"triangle",target+Vector2(500,0),{})
-	var at := target+Vector2(200,100)
-	var made: Dictionary = bridge.command("dev_spawn_part",{"parent_id":parent,"definition_id":"triangle_star","position":at})
-	check(made.ok,"既存の部位生成入口で星を登録する")
-	if not made.ok:
+	var stars: Array = core.enemy_motion_snapshot().filter(func(row): return row.get("parent_id",0)==parent)
+	check(stars.size()==3,"三角形の生成時に通常の三つの星を登録する")
+	if stars.size()!=3:
 		session.free()
 		return
-	var star: int = made.value
+	var star: int = stars[0].id
+	var at := Vector2(dolphin_enemy(core,star).pos[0],dolphin_enemy(core,star).pos[1])
 	check(pulse_motion(core,star).parent_id==parent,"星は世代付きの親と個体IDを保持する")
 	var hit: Dictionary = bridge.command("dev_damage",{"entity_id":star,"amount":0.5,"cause":"shot","no_crit":true})
 	check(hit.ok and hit.value.applied==0.5,"親が止まっている間は星へ通常の攻撃が通る")
@@ -1520,25 +1526,25 @@ func check_cpp_triangle_star() -> void:
 	hit = bridge.command("dev_damage",{"entity_id":star,"amount":0.5,"cause":"shot","no_crit":true})
 	check(hit.ok and hit.value.applied==0.0 and hit.value.reason==&"damage_gate","親が辺を移動中は星のゲートがダメージを止める")
 	var hp: float = dolphin_enemy(core,star).hp
+	at = Vector2(dolphin_enemy(core,star).pos[0],dolphin_enemy(core,star).pos[1])
 	core.rebuild_enemy_grid(cfg.grid_cell)
 	bridge.command("dev_ship_motion",{"position":at+Vector2(5,0),"velocity":Vector2(1200,0)})
 	core.collide_ship(at-Vector2(5,0),cfg.ship_radius)
 	check(dolphin_enemy(core,star).hp==hp and core.ship_snapshot().ship_vel==Vector2(1200,0),"移動中の星を体当たりで通り抜け、反射もダメージも出さない")
-	var wall: Dictionary = bridge.command("dev_fire_wall",{"position":at-Vector2(150,0),"angle":0.0,"length":150.0,"width":14.0,"delay":0.0,"active":0.5,"damage":3.0,"style":1,"attached":true,"owner_id":star})
-	check(wall.ok,"既存の壁入口で星へ赤い軌跡を付ける")
+	check(core.hazards_snapshot().size()==3,"辺の移動で三つの星に通常の赤い軌跡を付ける")
 	var pending: Dictionary = bridge.checkpoint()
 	var before: Array = core.enemy_motion_snapshot()
 	var hazards: Array = core.hazards_snapshot()
 	var frame: Dictionary = bridge.read_render(Rect2(target-Vector2(900,500),Vector2(1800,1000))).value
 	var presentation: RunPresentation = session.view.get_node("RunPresentation")
-	check(frame.triangle_star.size()==5 and presentation.frame_view.apply_frame(frame),"星の画像と段差のある赤い軌跡を通常画面へ表示する")
+	check(frame.triangle_star.size()==15 and presentation.frame_view.apply_frame(frame),"星の画像と段差のある赤い軌跡を通常画面へ表示する")
 	await get_tree().process_frame
 	core.step_hazards(0.6)
 	check(core.hazards_snapshot().is_empty(),"星の軌跡は自然寿命で終了する")
 	check(bridge.restore(pending.value).ok and core.enemy_motion_snapshot()==before and core.hazards_snapshot()==hazards,"親参照・ゲート・軌跡を値から復帰する")
 	bridge.command("dev_kill",{"entity_id":star,"cause":"shot"})
 	core.step_hazards(0.01)
-	check(core.hazards_snapshot().is_empty() and not dolphin_enemy(core,parent).dead,"星の途中撃破で付属軌跡を終了し親へダメージを転送しない")
+	check(core.hazards_snapshot().size()==2 and not dolphin_enemy(core,parent).dead,"星の途中撃破でその星の軌跡だけを終了し親へダメージを転送しない")
 	bridge.restore(pending.value)
 	core.remove_enemy(parent)
 	var replacement: int = core.spawn_enemy(&"triangle",target+Vector2(500,0),{})

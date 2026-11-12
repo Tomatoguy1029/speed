@@ -379,8 +379,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	var values: Dictionary = REFERENCE_SETTINGS.for_id(_reference_id)
 	_draw_charge_tell(canvas, move)
 	var burn_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_dance")
-	for burn: Dictionary in state.get("monoceros_burns",[]):
-		REFERENCE_BURN.draw(canvas,burn.position,float(state.clock)-float(burn.started),burn_values)
+	REFERENCE_BURN.draw_all(canvas,state.get("monoceros_burns",[]),float(state.clock),burn_values)
 	# 前面の重なり順も元の monoDraw に合わせる。
 	var wave_values: Dictionary = REFERENCE_SETTINGS.for_id("I-horn_wave")
 	for wave: Dictionary in state.get("horn_waves",[]): REFERENCE_WAVE.draw(canvas,wave,wave_values)

@@ -774,7 +774,7 @@ func apply_frame(frame: Dictionary) -> bool:
 		_gunner_marks.queue_redraw()
 	var next_shots := {}
 	for row: Dictionary in frame.batches:
-		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = {"transforms":row.transforms,"flags":row.flags}
+		if visuals[row.visual_id].role==2: next_shots[row.visual_id] = {"transforms":row.transforms.duplicate(),"flags":row.flags.duplicate()}
 	var unchanged_shots := {}
 	for id in visuals:
 		if visuals[id].role==2 and next_shots.get(id,{})==_shot_transforms.get(id,{}): unchanged_shots[id] = true

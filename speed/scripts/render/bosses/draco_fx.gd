@@ -44,6 +44,15 @@ static func soft(p, x: float, y: float, r: float, c: Color, a: float) -> void:
 	p.disc(x,y,r,c,a)
 
 static func flame_blade(p, x: float, y: float, ux: float, uy: float, length: float, w: float, bend: float, time: float, n: float, H: Array, layers: Array = LAYERS, jit := 0.5, wob := 1.1) -> void:
+	if p.tx==0.0 and p.ty==0.0 and p.fx==1.0 and p.cs==1.0 and p.sn==0.0:
+		_wake_raster.begin_painter(p,1.0,Vector2.ZERO,true,false)
+		_wake_raster.canvas_flame_blade({"x":x,"y":y,"ux":ux,"uy":uy,"length":length,"width":w,"bend":bend,"time":time,"seed":n,"jitter":jit,"wobble":wob},PackedColorArray(H),layers,p.fade)
+		p.colors = _wake_raster.take_colors()
+		p.has_color = p.has_color or _wake_raster.has_color()
+		return
+	flame_blade_transformed(p,x,y,ux,uy,length,w,bend,time,n,H,layers,jit,wob)
+
+static func flame_blade_transformed(p, x: float, y: float, ux: float, uy: float, length: float, w: float, bend: float, time: float, n: float, H: Array, layers: Array = LAYERS, jit := 0.5, wob := 1.1) -> void:
 	if length<1.0: return
 	var nx := -uy
 	var ny := ux
@@ -313,6 +322,16 @@ static func dark_muzzle(canvas, mouth: Vector2, facing: float, age: float) -> vo
 
 ## 着弾点：闇の染みが広がってから縮む。
 static func dark_fall(canvas, at: Vector2, age: float, warn: float, radius: float, time: float) -> void:
+	var painter = canvas.back
+	if radius>0.0 and warn>0.0 and painter.tx==0.0 and painter.ty==0.0 and painter.fx==1.0 and painter.cs==1.0 and painter.sn==0.0:
+		_wake_raster.begin_painter(painter,canvas.world_scale,canvas._camera_position,true,false)
+		_wake_raster.draco_dark_fall(canvas.to_logical(at),age,warn,radius*canvas.world_scale,time,PackedColorArray(DARK),painter.fade)
+		painter.colors = _wake_raster.take_colors()
+		painter.has_color = painter.has_color or _wake_raster.has_color()
+		return
+	dark_fall_transformed(canvas,at,age,warn,radius,time)
+
+static func dark_fall_transformed(canvas, at: Vector2, age: float, warn: float, radius: float, time: float) -> void:
 	var p = canvas.back
 	var c: Vector2 = canvas.to_logical(at)
 	var k := clampf(age/warn,0.0,1.0)

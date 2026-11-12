@@ -12,12 +12,23 @@ const FPS := 30.0
 const SMOKE_YOUNG := Color("#5d5660")
 const SMOKE_OLD := Color("#2b2630")
 
+var _native := false
+var _raster := SpeedFxRaster.new()
+var _points := PackedVector2Array()
+var _radii := PackedFloat64Array()
+var _layers := PackedByteArray()
+var _weights := PackedFloat64Array()
 var _field := PackedFloat32Array()
 var _width := 0
 var _height := 0
 var _origin := Vector2i.ZERO
 
 func draw(painter, particles: Array[Dictionary], smoke: bool, clock: float, burst_age: float, pixel_size: float, flame_colors: Array) -> void:
+	_native = painter.cs == 1.0 and painter.sn == 0.0 and painter.fx == 1.0
+	_points.clear()
+	_radii.clear()
+	_layers.clear()
+	_weights.clear()
 	var kind := SMOKE if smoke else FIRE
 	var list: Array[Dictionary] = []
 	var lo := Vector2(INF, INF)
@@ -37,8 +48,9 @@ func draw(painter, particles: Array[Dictionary], smoke: bool, clock: float, burs
 	_origin = Vector2i(floori(lo.x) - PAD, floori(lo.y) - PAD)
 	_width = ceili(hi.x) - _origin.x + PAD
 	_height = ceili(hi.y) - _origin.y + PAD
-	_field.resize(_width * _height * 3)
-	_field.fill(0.0)
+	if not _native:
+		_field.resize(_width * _height * 3)
+		_field.fill(0.0)
 	for q in list:
 		var age: float = 1.0 - q.life / q.max
 		var pos: Vector2 = q.pos
@@ -64,6 +76,19 @@ func draw(painter, particles: Array[Dictionary], smoke: bool, clock: float, burs
 	if not smoke:
 		for pair in flame_colors:
 			colors.append(_mix_8bit(pair[0], pair[1], cool))
+	if _native:
+		var settings := {"clock": t, "logical_pixel": pixel_size, "deformation": DEFORMATION,
+			"v_gain": 0.55, "v_deformation": DEFORMATION, "threshold": THRESHOLD,
+			"glow_radius": 5.0, "strengths": PackedFloat64Array([0.08,0.18,0.3]),
+			"weights": _weights, "local": true, "smoke": smoke, "offset_x": painter.tx, "offset_y": painter.ty}
+		var palette := PackedColorArray([SMOKE_YOUNG,SMOKE_OLD,Color.TRANSPARENT]) if smoke else PackedColorArray(colors)
+		_raster.begin_painter(painter,1.0,Vector2.ZERO,true,true)
+		_raster.density_field(_points,_radii,_layers,_origin,_width,_height,settings,palette,painter.fade,painter.light_strength)
+		painter.colors = _raster.take_colors()
+		painter.lights = _raster.take_lights()
+		painter.has_color = painter.has_color or _raster.has_color()
+		painter.has_light = painter.has_light or _raster.has_light()
+		return
 	for j in _height:
 		for i in _width:
 			var x := i + _origin.x
@@ -91,6 +116,12 @@ func draw(painter, particles: Array[Dictionary], smoke: bool, clock: float, burs
 
 func _splat(pos: Vector2, radius: float, channel: int, weight := 1.0) -> void:
 	if radius < 0.3:
+		return
+	if _native:
+		_points.append(pos)
+		_radii.append(radius)
+		_layers.append(channel)
+		_weights.append(weight)
 		return
 	var x0 := maxi(0, floori(pos.x - radius - _origin.x))
 	var x1 := mini(_width - 1, ceili(pos.x + radius - _origin.x))

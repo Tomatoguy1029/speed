@@ -12,6 +12,7 @@ const SPARK_RAMP := ["#fff1c4", "#ffb35a", "#e8333f", "#7a1430"]
 const FLAME_RAMP := [["#e8333f", "#7a1430"], ["#ff7a3a", "#c42340"], ["#fff1c4", "#ff9a3a"]]
 const HOT := [Color("#fff3a6"), Color("#ffe26b"), Color("#ff8a2a"), Color("#f2561d")]
 
+var _raster := SpeedFxRaster.new()
 var _density = DENSITY.new()
 var _fire: Array[Color] = []
 var _spark: Array[Color] = []
@@ -85,6 +86,18 @@ func _draw_other_particles(painter, simulation, behind: bool) -> void:
 			painter.glow(pos.x, pos.y, 3 + q.size, color, 0.35 * k)
 
 func _draw_scorch(painter, simulation, age: float) -> void:
+	if painter.cs == 1.0 and painter.sn == 0.0 and painter.fx == 1.0:
+		var settings := {"x":painter.tx,"y":painter.ty,"fade":painter.fade,"light_strength":painter.light_strength}
+		_raster.begin_painter(painter,1.0,Vector2.ZERO,true,true)
+		_raster.phoenix_scorch(simulation.scorch,simulation.scorch_size,simulation.scorch_radius,age,PackedColorArray(_fire),settings)
+		painter.colors = _raster.take_colors()
+		painter.lights = _raster.take_lights()
+		painter.has_color = painter.has_color or _raster.has_color()
+		painter.has_light = painter.has_light or _raster.has_light()
+		return
+	_draw_scorch_transformed(painter,simulation,age)
+
+func _draw_scorch_transformed(painter, simulation, age: float) -> void:
 	var fade := 1.0 - smoothstep(1.6, 3.2, age)
 	if fade <= 0:
 		return

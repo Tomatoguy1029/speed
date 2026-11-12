@@ -23,6 +23,9 @@ func setup_effects(scope: ContentResourceScope, entries: Dictionary) -> void:
 	_field.setup_effects(scope,entries)
 var _rift_image: Polygon2D
 var _rift_material: ShaderMaterial
+var _rift_frame := {}
+var _chest_copy: BackBufferCopy
+var _chest_light: Sprite2D
 var _parts: Node2D
 var _reference_canvas
 var _pose := {}
@@ -54,6 +57,11 @@ func _ready() -> void:
 	add_child(_rift_image)
 	_parts = preload("res://scripts/bosses/draco_parts.gd").new()
 	add_child(_parts)
+	var made: Array = _parts.light_plate(self,Vector2(340,340),[Vector4(0.5,0.5,0.5,0.5),Vector4(0.5,0.5,0.1,0.1)],[Vector4(0.624,0.847,1.0,0.8),Vector4(1.0,1.0,1.0,1.0)],Vector3(70.0/340.0,3.0/340.0,1.0))
+	_chest_copy = made[0]
+	_chest_light = made[1]
+	_chest_copy.z_index = 402
+	_chest_light.z_index = 402
 	_fire = preload("res://scripts/render/bosses/draco_meteor_fire.gd").new()
 	add_child(_fire)
 	EFFECT_SETTINGS.apply_key(self,"boss/body/draco")
@@ -79,7 +87,17 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	_parts.set_finale_tone(finale_view.tone() if finale_view!=null and finale_view.visible else {})
 	_parts.arm_turns = _pose.arms
 	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
-	_parts.entrance(intro,to_local(intro.get("rift_center",body.position)),float(body.get("entrance_quiet",2.5)))
+	_parts.entrance(intro,_rift_frame,float(body.get("entrance_quiet",2.5)))
+	# 登場のあいだだけ、胸の北極星の強い光を体の上へ重ねる。
+	var flare := float(intro.get("chest_flare",0.0)) if intro.get("active",false) else 0.0
+	_chest_copy.visible = flare>0.004
+	_chest_light.visible = flare>0.004
+	if flare>0.004:
+		_chest_light.position = _parts.entrance_chest
+		_chest_light.rotation = -rotation
+		var light: ShaderMaterial = _chest_light.material
+		light.set_shader_parameter("strength",flare*(0.85+0.15*sin((float(intro.time)-float(body.get("entrance_quiet",2.5))+1.2)*3.0)))
+		light.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	_parts.position = Vector2(feedback.offset).rotated(-float(body.facing))
 	_parts.rotation = float(feedback.angle)
 	var live := {}
@@ -119,6 +137,7 @@ func _draw() -> void:
 	if not finale.get("stage","").is_empty():glow=0.0
 	var depth := float(state.perspective_scale)
 	var core := Vector2(-110.0*float(state.head_scale)*depth,0)
+	if intro.get("active",false) and intro.has("path"): core = _parts.entrance_chest
 	var pulse := 0.85+sin(float(state.clock)*3.0)*0.15
 	draw_circle(core,core_glow_radius*depth,Color(core_glow_color,core_glow_opacity*pulse*float(state.alpha)*glow))
 	preload("res://scripts/bosses/draco_form.gd").star(self,core,27.0*depth,Color(0.85,0.96,1.0,float(state.alpha)*glow))
@@ -526,25 +545,25 @@ func _cracks(seed: float, radius: float) -> Array:
 
 ## 攻撃と同じ裂け目shaderを竜より奥へ置く。画面座標への変換も攻撃と揃える。
 func _update_entrance_rift(intro: Dictionary) -> void:
-	_rift_image.visible = intro.get("active",false) and float(intro.get("rift",0.0))>0.0
+	_rift_frame = {"viewport":Vector2(1280,720),"ends":Vector4.ZERO,"shape":Vector4.ZERO}
+	_rift_image.visible = intro.get("active",false) and intro.has("rift_from") and float(intro.get("rift",0.0))>0.0
 	if not _rift_image.visible: return
 	var size := get_viewport_rect().size
 	var pixel := size.y/225.0
 	var transform := get_global_transform_with_canvas()
 	var inverse := transform.affine_inverse()
 	_rift_image.polygon = PackedVector2Array([inverse*Vector2.ZERO,inverse*Vector2(size.x,0),inverse*size,inverse*Vector2(0,size.y)])
-	var center: Vector2 = intro.rift_center
-	var opening := float(intro.rift)
-	var a := transform*to_local(center+Vector2(0,-430)) / pixel
-	var b := transform*to_local(center+Vector2(0,430)) / pixel
+	var a := transform*to_local(intro.rift_from) / pixel
+	var b := transform*to_local(intro.rift_to) / pixel
 	var zoom := transform.x.length()
 	var ends := PackedVector4Array([Vector4(a.x,a.y,b.x,b.y)])
-	var shapes := PackedVector4Array([Vector4(230.0*zoom/pixel*opening,opening,opening,17.0)])
+	var shapes := PackedVector4Array([Vector4(float(intro.rift_wide)*zoom/pixel,float(intro.rift),float(intro.rift_open),17.0)])
+	_rift_frame = {"viewport":size,"ends":ends[0],"shape":shapes[0]}
 	ends.resize(12)
 	shapes.resize(12)
 	_rift_material.set_shader_parameter("linear_target",get_viewport().use_hdr_2d)
 	_rift_material.set_shader_parameter("viewport_size",size)
-	_rift_material.set_shader_parameter("time",float(state.clock))
+	_rift_material.set_shader_parameter("time",float(intro.time)-float(state.get("entrance_quiet",2.5))+1.2)
 	_rift_material.set_shader_parameter("count",1)
 	_rift_material.set_shader_parameter("ends",ends)
 	_rift_material.set_shader_parameter("shape",shapes)

@@ -39,6 +39,18 @@ void SpeedFxRaster::reference_dot(Vector2 p,Color color,double alpha,double fade
     q[3]=k!=1?255:uint8_t(std::clamp(double(color.a),0.0,1.0)*255);
     if (q[3]) {reference_flags_|=1;color_used_=true;}
 }
+void SpeedFxRaster::reference_blend(Vector2 p,Color color,double alpha,double fade) {
+    const double a=alpha*fade;
+    const int x=int(std::floor(p.x)),y=int(std::floor(p.y));
+    if (a<=0.004 || color.a<=0 || x<0 || y<0 || x>=w_ || y>=h_) return;
+    auto *q=c_+(y*w_+x)*4;
+    const double da=q[3]/255.0,oa=a+da*(1-a),k=a/oa;
+    q[0]=uint8_t(int(int(double(color.r)*255)*k+q[0]*(1-k)));
+    q[1]=uint8_t(int(int(double(color.g)*255)*k+q[1]*(1-k)));
+    q[2]=uint8_t(int(int(double(color.b)*255)*k+q[2]*(1-k)));
+    q[3]=uint8_t(int(oa*255));
+    if (q[3]) {reference_flags_|=1;color_used_=true;}
+}
 void SpeedFxRaster::reference_light(Vector2 p,Color color,double strength) {
     if (strength<=0.004) return;
     const int x=int(std::floor(p.x)),y=int(std::floor(p.y));
@@ -49,7 +61,7 @@ void SpeedFxRaster::reference_light(Vector2 p,Color color,double strength) {
     q[2]=uint8_t(std::min(255,int(q[2]+int(double(color.b)*255)*strength)));
     if (q[0] || q[1] || q[2]) {reference_flags_|=2;light_used_=true;}
 }
-void SpeedFxRaster::reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength) {
+void SpeedFxRaster::reference_glow_line(Vector2 a,Vector2 b,double radius,Color color,double strength,double fade,double light_strength) {
     if (radius<1 || strength<=0.004) return;
     const Vector2 delta=b-a;
     const double l2=std::max(double(delta.length_squared()),0.000000001);
@@ -65,7 +77,7 @@ void SpeedFxRaster::reference_glow_line(Vector2 a,Vector2 b,double radius,Color 
             const Vector2 p(x+0.5,y+0.5);
             const double u=std::clamp(double((p-a).dot(delta))/l2,0.0,1.0);
             const double d=p.distance_to(a+delta*u)/radius;
-            if (d<1) reference_light(Vector2(x,y),color,(1-d)*(1-d)*strength);
+            if (d<1) reference_light(Vector2(x,y),color,(1-d)*(1-d)*strength*fade*light_strength);
         }
     }
 }
@@ -110,18 +122,21 @@ int SpeedFxRaster::ruler_rail(Vector2 a,Vector2 b,Dictionary options,double fade
         const double key=seed*3.17+i*19.13,speed=hash(key+2)<0.5?1:2;
         packets[i]=Vector3(positive_mod(hash(key+1)+speed*time),0.035+(0.102-0.035)*hash(key+5),0.22+(0.67-0.22)*hash(key+7));
     }
+    const bool has_reveal=options.has("reveal");
+    const double reveal=double(options.get("reveal",0))*length,offset=options.get("offset",0),path=options.get("path",length);
+    const int max_level=options.get("maxLv",4);
     for (double d=0;d<=length;++d) {
         double envelope=smooth(0,6,d)*smooth(0,14,length-d);
-        if (options.has("reveal")) {const double reveal=double(options["reveal"])*length;envelope*=smooth(reveal,reveal-8,d);}
+        if (has_reveal) envelope*=smooth(reveal,reveal-8,d);
         if (envelope<=0.04) continue;
-        const double along=d/length;
+        const double along=(d+offset)/path;
         double total=0;
         for (const auto &packet:packets) {const double distance=positive_mod(along-packet.x+0.5)-0.5;total+=std::exp(-std::pow(distance/packet.y,2))*packet.z;}
         const double flow=1-std::exp(-total*0.9);
         const Vector2 point=a+direction*d;
         const double brightness=envelope*(0.35+0.65*k)*(0.7+0.6*flow)*intensity;
         const int level=brightness>0.95?4:brightness>0.62?3:brightness>0.3?2:1;
-        reference_dot(point,colors[level],1,fade);
+        reference_dot(point,colors[std::min(max_level,level)],1,fade);
         reference_light(point,colors[2],0.16*envelope*(0.4+k)*(0.6+flow)*intensity*fade*light_strength);
         reference_light(point+normal*side,colors[2],0.22*envelope*(0.3+0.7*k)*(0.6+0.6*flow)*intensity*fade*light_strength);
         reference_light(point-normal*side,colors[1],0.18*envelope*(0.3+0.7*k)*(0.6+0.6*flow)*intensity*fade*light_strength);

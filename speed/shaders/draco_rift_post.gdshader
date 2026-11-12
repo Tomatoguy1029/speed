@@ -1,5 +1,6 @@
 shader_type canvas_item;
 render_mode unshaded, blend_disabled;
+#include "res://shaders/draco_rift_shape.gdshaderinc"
 // 空間の裂け目：奥に次元の狭間がのぞき、まわりの景色が押しのけられて筋になる。論理画素の格子で計算する。
 uniform sampler2D screen : hint_screen_texture, filter_nearest, repeat_disable;
 uniform sampler2D noise_tex : repeat_enable, filter_linear;
@@ -11,13 +12,6 @@ uniform vec4 ends[12];  // 論理画素の A.xy, B.xy
 uniform vec4 shape[12]; // wide, tip(0-1), open2, seed
 const float PIXEL_HEIGHT = 225.0;
 const float BAND = 34.0;
-float hash1(float n) { return fract(sin(n * 127.1 + 311.7) * 43758.5453); }
-float tear_edge(float s, float seed) { return (hash1(floor(s / 5.0) * 1.7 + seed) * 2.0 - 1.0) * 0.3 + mod(s, 5.0) / 5.0 * 0.16; }
-float width_at(float s, float side, float L, float tip_s, float wide, float seed) {
-	float lens = pow(sin(3.14159265 * clamp(s / L, 0.0, 1.0)), 0.55);
-	float mouth = smoothstep(0.0, max(8.0, tip_s * 0.35), tip_s - s);
-	return wide * lens * mouth * (1.0 + tear_edge(s + side * 13.0, seed));
-}
 vec3 to_target(vec3 c) { return linear_target ? pow(c, vec3(2.2)) : c; }
 void fragment() {
 	float lp = viewport_size.y / PIXEL_HEIGHT;

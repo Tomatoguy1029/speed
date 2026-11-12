@@ -59,6 +59,7 @@ func check_cpp_split() -> void:
 	cfg.spawn_total_cap = 0.0
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 95
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["splitter","splitling"])
@@ -165,6 +166,7 @@ func check_cpp_defender() -> void:
 	cfg.world_tick_div = 1
 	for key in ["moon_count","meteor_count","iron_count","saw_count"]: cfg.set(key,0)
 	var stage := RuntimeStage.new()
+	stage.boss_enabled = false
 	stage.index = 97
 	stage.resources = StageResources.new()
 	stage.resources.enemy_ids = PackedStringArray(["splitling","defender","hydra_bite"])

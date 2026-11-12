@@ -64,7 +64,7 @@ func _sparks(row: Dictionary, canvas, elapsed: float, color: Color) -> void:
 
 ## 定規座の固定式をまとめて実行し、粒の順番・色・光の加算を保つ。
 func _begin(painter) -> void:
-	_raster.begin(painter.colors,painter.lights,painter.width,painter.height,1.0,Vector2.ZERO)
+	_raster.begin_painter(painter,1.0,Vector2.ZERO,true,true)
 
 func _finish(painter, flags: int) -> void:
 	painter.colors = _raster.take_colors()

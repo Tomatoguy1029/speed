@@ -2232,6 +2232,10 @@
       {
         "name": "DracoShake",
         "value": "draco_shake"
+      },
+      {
+        "name": "Bud",
+        "value": "bud"
       }
     ],
     "ResultKind": [
@@ -2492,6 +2496,10 @@
     ]
   },
   "event_fields": {
+    "bud": [
+      "pos",
+      "color"
+    ],
     "lab_spawn": [
       "pos",
       "enemy_type"

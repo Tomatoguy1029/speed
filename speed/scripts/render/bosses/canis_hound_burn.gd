@@ -1,5 +1,6 @@
 ## canisHoundBurn: 実画像輪郭の青い炎と14点の通過跡。
 extends RefCounted
+static var _raster := SpeedFxRaster.new()
 
 const EDGES := preload("res://data/visuals/canis_hound_edges.tres")
 const COLORS := [Color("#ffffff"),Color("#f2fbff"),Color("#d8f1ff"),Color("#a9dcff"),Color("#6fb8f2"),Color("#3f8ce0"),Color("#2a66c4"),Color("#1d479b"),Color("#13306a")]
@@ -39,6 +40,15 @@ static func draw(canvas, trails: Dictionary, clock: float) -> void:
 	var edges: PackedVector2Array = EDGES.get_meta("points")
 	var size := Vector2(float(EDGES.get_meta("width")),float(EDGES.get_meta("height")))
 	if edges.is_empty(): return
+	var p = canvas.back
+	var native: bool = p.tx==0.0 and p.ty==0.0 and p.fx==1.0 and p.cs==1.0 and p.sn==0.0
+	if native:
+		_raster.begin_painter(p,canvas.world_scale,canvas._camera_position,true,true)
+		_raster.canis_hound_trails(trails.values(),clock,PackedColorArray(COLORS),p.fade,p.light_strength)
+		p.colors = _raster.take_colors()
+		p.lights = _raster.take_lights()
+		p.has_color = p.has_color or _raster.has_color()
+		p.has_light = p.has_light or _raster.has_light()
 	for actor: Dictionary in trails.values():
 		var points: PackedVector2Array = actor.points
 		if points.is_empty(): continue
@@ -47,7 +57,7 @@ static func draw(canvas, trails: Dictionary, clock: float) -> void:
 		if k<=0.0: continue
 		var index := int(actor.index)
 		var radius := float(actor.radius)
-		for i in points.size():
+		for i in (0 if native else points.size()):
 			var f := float(i+1)/points.size()
 			var drop := 1.0 if i%3==0 else 0.55
 			var point: Vector2 = canvas.to_logical(points[i])+Vector2((_hash(i*3.1+index)-0.5)*2.0,(_hash(i*5.7+index)-0.5)*2.0)
