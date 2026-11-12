@@ -104,6 +104,7 @@ settings.fullscreen,フルスクリーン,Fullscreen
 settings.exclusive,排他フルスクリーン,Exclusive Fullscreen
 settings.key_bindings,キー設定（ボタンを押してから、割り当てるキーを押す）,"Key Bindings (click a button, then press the key to assign)"
 settings.reset_bindings,キー設定を初期値に戻す,Reset Key Bindings
+settings.show_debug_buttons,デバッグ用ボタンを表示,Show Debug Buttons
 settings.no_key,（なし）,(None)
 settings.press_key,キーを押す…,Press a key…
 ,■ キー設定のアクション（action.<アクション名>）,

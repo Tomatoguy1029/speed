@@ -184,6 +184,7 @@ func _ready() -> void:
 		_debug_unlock.toggle_mode = true
 		_debug_unlock.add_theme_font_size_override("font_size", 10)
 		_debug_unlock.reparent(_details)
+		SaveManager.register_debug_button(_debug_unlock)
 		_debug_unlock.toggled.connect(func(_enabled: bool):
 			_refresh_stage_visibility()
 			_reveal_details()

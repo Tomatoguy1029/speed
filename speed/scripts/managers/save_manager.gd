@@ -227,8 +227,14 @@ func default_settings() -> Dictionary:
 		"screen_shake": 1.0,
 		"hitstop": true,
 		"intro_auto_advance": false,
+		"show_debug_buttons": true,
 		"bindings": {},
 	}
+
+## ボタンの機能や試遊用の状態を保ち、画面上の入口だけを切り替える。
+func register_debug_button(button: Control) -> void:
+	button.add_to_group(&"debug_buttons")
+	button.visible = bool(settings.get("show_debug_buttons", true))
 
 func set_setting(key: String, value) -> void:
 	settings[key] = value
@@ -245,6 +251,8 @@ func apply_settings() -> void:
 	InputActions.apply_bindings(settings.bindings)
 	TranslationServer.set_locale("ja")
 	_apply_window_mode()
+	for button: Control in get_tree().get_nodes_in_group(&"debug_buttons"):
+		button.visible = bool(settings.get("show_debug_buttons", true))
 	settings_changed.emit()
 
 func _apply_window_mode() -> void:

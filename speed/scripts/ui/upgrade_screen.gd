@@ -164,6 +164,7 @@ func _build_debug_controls() -> void:
 		_refresh_details())
 	_canvas.add_child(infinite)
 	for button: Button in [reset, infinite]:
+		SaveManager.register_debug_button(button)
 		button.z_index = 10
 		for state in ["normal", "hover", "pressed", "hover_pressed", "focus"]:
 			var style := StyleBoxFlat.new()

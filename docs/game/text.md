@@ -128,6 +128,7 @@ git diff -- docs/game/text.md speed/data/text/strings.csv speed/data/enemies spe
 | settings.exclusive | 排他フルスクリーン | Exclusive Fullscreen |
 | settings.key&#95;bindings | キー設定（ボタンを押してから、割り当てるキーを押す） | Key Bindings (click a button, then press the key to assign) |
 | settings.reset&#95;bindings | キー設定を初期値に戻す | Reset Key Bindings |
+| settings.show&#95;debug&#95;buttons | デバッグ用ボタンを表示 | Show Debug Buttons |
 | settings.no&#95;key | （なし） | (None) |
 | settings.press&#95;key | キーを押す… | Press a key… |
 |  | ■ キー設定のアクション（action.&lt;アクション名&gt;） |  |
