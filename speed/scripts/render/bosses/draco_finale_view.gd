@@ -7,6 +7,12 @@ const SHIP := preload("res://assets/pixel/airship.png")
 const FINAL_SHIP := preload("res://assets/pixel/legendary/starship_final.png")
 const FINAL_SHIP_SIZE := Vector2(39,57)
 const FLAME := preload("res://assets/pixel/airship_blue_flame.png")
+## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。
+const URSA_MINOR := preload("res://assets/pixel/ursa_minor/ursa_minor.png")
+const URSA_FRAME := Vector2(200,160)
+const URSA_SCALE := 2.0
+## 各コマの尾の先。コマの中心からの位置で、北極星をここへ置く。
+const URSA_TAILS := [Vector2(-56,-57),Vector2(-56,-57),Vector2(-76,-45),Vector2(-96,-30)]
 ## 決着で合体する順番：船尾、竜骨、帆、羅針盤。
 const MODULES := [
 	preload("res://assets/pixel/legendary/tail.png"),
@@ -441,23 +447,23 @@ func _fx_release() -> void:
 	var q := rel-0.92
 	var core := chest.lerp(up,_out_expo(q/0.9))
 	if q<1.0: _glow(chest,520.0*(1.0-q*0.6),Color("#d9edff"),exp(-q*4.5))
-	var fade := 1.0-_smooth(0.4,1.2,t) if stage=="combine" else 1.0
-	if fade<=0.0: return
-	var form := _smooth(1.2,2.2,rel)
+	var bear := _bear()
+	if bear.fade<=0.0: return
 	var inhale := _smooth(2.25,2.7,rel)*(1.0-_smooth(2.7,2.8,rel))
-	var tail := up+Vector2(-190,26)
-	if form>0.0: _draw_bear(up+Vector2(0,-4),inhale,_smooth(2.3,2.75,rel),form*fade)
-	_star(core.lerp(tail,_smooth(1.1,2.0,rel)) if form>0.0 else core,(60.0+inhale*40.0)*(1.0+exp(-q*3.0)),Color("#cfe8ff"),fade)
+	if bear.form>0.0: _draw_bear(_fx,bear,0.35)
+	_star(core.lerp(bear.tail,_smooth(1.1,2.0,rel)) if bear.form>0.0 else core,(60.0+inhale*40.0)*(1.0+exp(-q*3.0)),Color("#cfe8ff"),bear.fade)
 
-## こぐま座は正式な絵が届くまでの仮の形。
-func _draw_bear(at: Vector2, inhale: float, lift: float, alpha: float) -> void:
-	var color := Color(Color("#8ea8ff"),0.34*alpha)
-	var scale_ := 1.5+inhale*0.2
-	_fx.draw_set_transform(at,0.0,Vector2.ONE*scale_)
-	_fx.draw_colored_polygon(PackedVector2Array([Vector2(-120,8),Vector2(-92,-30),Vector2(-30,-42),Vector2(40,-34),Vector2(78,-16),Vector2(86,20),Vector2(60,30),Vector2(52,58),Vector2(30,58),Vector2(26,30),Vector2(-30,30),Vector2(-38,58),Vector2(-62,58),Vector2(-66,28),Vector2(-110,24)]),color)
-	_fx.draw_set_transform(at+Vector2(80,-8).rotated(0.0)*scale_,-0.1-lift*0.5,Vector2.ONE*scale_)
-	_fx.draw_colored_polygon(PackedVector2Array([Vector2(-14,-22),Vector2(26,-24),Vector2(58,-2),Vector2(26,4+lift*14.0),Vector2(-10,18)]),color)
-	_fx.draw_set_transform(Vector2.ZERO)
+## こぐま座の位置・濃さ・コマ。核の解放で現れ、合体の始めに消える。
+func _bear() -> Dictionary:
+	var rel := t if stage=="release" else 4.0+t
+	var frame := 0 if rel<2.25 else mini(3,1+int((rel-2.25)/0.25))
+	var at := Vector2(f.core_to)-position+Vector2(0,-4)
+	return {"at":at,"frame":frame,"tail":at+Vector2(URSA_TAILS[frame])*URSA_SCALE,
+		"form":_smooth(1.2,2.2,rel),"fade":1.0-_smooth(0.4,1.2,t) if stage=="combine" else 1.0}
+
+func _draw_bear(canvas: Node2D, bear: Dictionary, alpha: float) -> void:
+	var size_ := URSA_FRAME*URSA_SCALE
+	canvas.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,float(bear.form)*float(bear.fade)*alpha))
 
 func _star(at: Vector2, radius: float, color: Color, alpha: float) -> void:
 	_glow(at,radius*1.4,color,alpha)
@@ -896,7 +902,12 @@ func _docked_count() -> int:
 
 func _draw_top() -> void:
 	match stage:
+		"release":
+			var bear := _bear()
+			if bear.form>0.0: _draw_bear(_top,bear,1.0)
 		"combine":
+			var bear := _bear()
+			if bear.form>0.0 and bear.fade>0.0: _draw_bear(_top,bear,1.0)
 			for i in 4:
 				var start := 0.25+i*0.16
 				var dock := DOCK_FIRST+i*DOCK_STEP
