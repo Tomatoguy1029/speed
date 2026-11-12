@@ -5,10 +5,13 @@
 [ext_resource type="Texture2D" path="res://data/legendary_aura_bakes/legendary_stern_front.res" id="2_6na5r"]
 [ext_resource type="Texture2D" path="res://assets/ui/legendary_aura_masks/legendary_stern_mask.res" id="3_a2nis"]
 
+[ext_resource type="Texture2D" path="res://assets/pixel/legendary/tail.png" id="4_art"]
+
 [resource]
 script = ExtResource("1")
 id = &"legendary_stern"
 boss_id = &"monoceros"
+preview_texture = ExtResource("4_art")
 order = 1
 reveal_aura_mask = ExtResource("3_a2nis")
 reveal_aura_baked_back = ExtResource("1_deer5")

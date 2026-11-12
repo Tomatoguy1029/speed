@@ -5,10 +5,13 @@
 [ext_resource type="Texture2D" path="res://data/legendary_aura_bakes/legendary_keel_front.res" id="2_7tlid"]
 [ext_resource type="Texture2D" path="res://assets/ui/legendary_aura_masks/legendary_keel_mask.res" id="3_6whfx"]
 
+[ext_resource type="Texture2D" path="res://assets/pixel/legendary/ryuukotsu.png" id="4_art"]
+
 [resource]
 script = ExtResource("1")
 id = &"legendary_keel"
 boss_id = &"canis_major"
+preview_texture = ExtResource("4_art")
 order = 3
 reveal_aura_mask = ExtResource("3_6whfx")
 reveal_aura_baked_back = ExtResource("1_7vjqk")

@@ -5,10 +5,13 @@
 [ext_resource type="Texture2D" path="res://data/legendary_aura_bakes/legendary_compass_front.res" id="2_el230"]
 [ext_resource type="Texture2D" path="res://assets/ui/legendary_aura_masks/legendary_compass_mask.res" id="3_0d45k"]
 
+[ext_resource type="Texture2D" path="res://assets/pixel/legendary/compass.png" id="4_art"]
+
 [resource]
 script = ExtResource("1")
 id = &"legendary_compass"
 boss_id = &"hydra"
+preview_texture = ExtResource("4_art")
 order = 4
 reveal_aura_mask = ExtResource("3_0d45k")
 reveal_aura_baked_back = ExtResource("1_m08se")
