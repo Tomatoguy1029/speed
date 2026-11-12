@@ -29,6 +29,8 @@ func _on_screen_ready(view: Control) -> void:
 	background_button.name = "BackgroundLabButton"
 	background_button.text = tr("bg.title")
 	background_button.pressed.connect(view._go.bind(GameManager.Screen.BACKGROUND_LAB))
+	SaveManager.register_debug_button(button)
+	SaveManager.register_debug_button(background_button)
 	if path.ends_with("/title_screen.gd"):
 		var tools := VBoxContainer.new()
 		tools.name = "DevelopmentTools"

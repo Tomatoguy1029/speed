@@ -49,6 +49,7 @@ func _build() -> void:
 			_display_dropdown()
 		2:
 			_build_bindings()
+			_toggle("show_debug_buttons", "settings.show_debug_buttons")
 
 func _toggle(key: String, label_key: String) -> void:
 	var box := CheckBox.new()
