@@ -4,9 +4,16 @@ extends Node2D
 const RUSH: DracoFinaleRush = preload("res://data/visuals/draco_finale_rush.tres")
 const PUFF := preload("res://assets/effects/build/draco_finale_puff.png")
 const SHIP := preload("res://assets/pixel/airship.png")
+const FINAL_SHIP := preload("res://assets/pixel/legendary/starship_final.png")
+const FINAL_SHIP_SIZE := Vector2(39,57)
 const FLAME := preload("res://assets/pixel/airship_blue_flame.png")
-const MODULE := preload("res://scripts/ui/legendary_module_geometry.gd")
-const MODULES := ["legendary_stern","legendary_keel","legendary_sail","legendary_compass"]
+## 決着で合体する順番：船尾、竜骨、帆、羅針盤。
+const MODULES := [
+	preload("res://assets/pixel/legendary/tail.png"),
+	preload("res://assets/pixel/legendary/ryuukotsu.png"),
+	preload("res://assets/pixel/legendary/sail.png"),
+	preload("res://assets/pixel/legendary/compass.png"),
+]
 const DEBRIS_PARTS := ["body_a","body_b","body_c","body_d","body_e","tail_joint","claw","arm"]
 const WARM := [Color("#ffffff"),Color("#ffe6bd"),Color("#ffc27a"),Color("#ff9d52"),Color("#a9c8ff"),Color("#7fb0ff"),Color("#ffffff"),Color("#d9c2ff")]
 const GOLD := Color("#ffc24d")
@@ -609,8 +616,16 @@ func _sharp_hit(time: float) -> int:
 
 func _ship_shape(canvas: Node2D, at: Vector2, angle: float, color: Color, scale_ := 1.0) -> void:
 	canvas.draw_set_transform(at,angle+PI*0.5,Vector2.ONE*scale_)
-	canvas.draw_texture(SHIP,-SHIP.get_size()*0.5,color)
+	if stage=="combine" and _docked_count()<4:
+		canvas.draw_texture(SHIP,-SHIP.get_size()*0.5,color)
+	else:
+		_draw_final_ship(canvas,color)
 	canvas.draw_set_transform(Vector2.ZERO)
+
+func _draw_final_ship(canvas: Node2D, color := Color.WHITE) -> void:
+	# 元素材の2コマを各100msで再生する。透明余白は書き出し時に共通範囲で除く。
+	var frame := int(clock*10.0)%2
+	canvas.draw_texture_rect_region(FINAL_SHIP,Rect2(-FINAL_SHIP_SIZE*0.5,FINAL_SHIP_SIZE),Rect2(Vector2(frame*FINAL_SHIP_SIZE.x,0),FINAL_SHIP_SIZE),color)
 
 func _fx_rush(time: float) -> void:
 	_trail(_fx,time,RAIL_TRAIL,0.0,9.0,Color("#3f78ff"),0.5)
@@ -851,20 +866,30 @@ func _draw_rubble(age: float, alpha: float) -> void:
 		_draw_piece(_back,piece.part,piece.at+piece.v*f2,rot,float(piece.size),cos(float(piece.tum)+float(piece.spin)*f2*2.0),alpha)
 	_back.draw_set_transform(Vector2.ZERO)
 
+func _draw_module(index: int) -> void:
+	var texture: Texture2D = MODULES[index]
+	var size_ := texture.get_size()
+	size_ *= 180.0/maxf(size_.x,size_.y)
+	_top.draw_texture_rect(texture,Rect2(-size_*0.5,size_),false)
+
 func _ship_modules(at: Vector2, scale_: float, count: int) -> void:
 	var offsets := [Vector2(0,42),Vector2(-26,8),Vector2(26,8),Vector2(0,-16)]
 	for i in count:
 		_top.draw_set_transform(at+offsets[i]*scale_,0.0,Vector2.ONE*0.2*scale_)
-		MODULE.draw(_top,MODULES[i],GOLD_LIGHT)
+		_draw_module(i)
 	_top.draw_set_transform(Vector2.ZERO)
 
 func _ship_full(at: Vector2, scale_: float, count: int) -> void:
 	var frame := int(clock*14.0)%3
 	_top.draw_set_transform(at,0.0,Vector2.ONE*scale_)
-	_top.draw_texture_rect_region(FLAME,Rect2(-15.5,-35,31,70),Rect2(frame*31,0,31,70))
-	_top.draw_texture(SHIP,-SHIP.get_size()*0.5)
+	var flame_y := -18.5 if count==4 else -35.0
+	_top.draw_texture_rect_region(FLAME,Rect2(-15.5,flame_y,31,70),Rect2(frame*31,0,31,70))
+	if count==4:
+		_draw_final_ship(_top)
+	else:
+		_top.draw_texture(SHIP,-SHIP.get_size()*0.5)
 	_top.draw_set_transform(Vector2.ZERO)
-	_ship_modules(at,scale_,count)
+	if count<4: _ship_modules(at,scale_,count)
 
 func _docked_count() -> int:
 	return int(f.get("docked",0))
@@ -877,7 +902,7 @@ func _draw_top() -> void:
 				var dock := DOCK_FIRST+i*DOCK_STEP
 				if t>start and t<dock:
 					_top.draw_set_transform(_module_at(i,clampf((t-start)/(dock-start),0.0,1.0),_ship_at()),0.0,Vector2.ONE*0.3)
-					MODULE.draw(_top,MODULES[i],GOLD_LIGHT)
+					_draw_module(i)
 			_top.draw_set_transform(Vector2.ZERO)
 			_ship_full(_ship_at(),_ship_scale,_docked_count())
 		"pose","input":
@@ -889,11 +914,6 @@ func _draw_top() -> void:
 				var dir := Vector2(hits[row+5],hits[row+6])
 				var at := Vector2(hits[row+3],hits[row+4])-dir*64.0
 				_ship_shape(_top,at,dir.angle(),Color.WHITE,1.45*_ship_scale)
-				var offsets := [Vector2(0,42),Vector2(-26,8),Vector2(26,8),Vector2(0,-16)]
-				for i in 4:
-					_top.draw_set_transform(at+offsets[i].rotated(dir.angle()+PI*0.5)*1.45*_ship_scale,dir.angle()+PI*0.5,Vector2.ONE*0.29*_ship_scale)
-					MODULE.draw(_top,MODULES[i],GOLD_LIGHT)
-				_top.draw_set_transform(Vector2.ZERO)
 		"charge":
 			var charge := _charge_time()
 			var shaking := _smooth(0.0,charge,t)*(1.0-_smooth(charge,charge+0.04,t))

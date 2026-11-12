@@ -1,4 +1,4 @@
-## 仮の伝説獲得。既存の部品図と名称だけを表示し、付与・セーブを行わない。
+## 伝説獲得。モジュール画像と名称を表示し、付与・セーブは呼び出し元が行う。
 ## 差替シーンの契約：setup(LegendaryModuleDef)、set_progress(0..1)、任意で
 ## set_timing(出現秒, 静止秒, 回収秒) / set_endpoints(出現位置, 機体位置)。位置は画面座標。
 extends Control
@@ -80,11 +80,21 @@ func _ready() -> void:
 	_viewport.transparent_bg = true
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	add_child(_viewport)
-	var preview := ModulePreview.new()
-	preview.size = Vector2(PREVIEW_SIZE)
-	preview.position = Vector2(AURA_PADDING)
-	_viewport.add_child(preview)
-	preview.setup(_definition, true)
+	if _definition.preview_texture != null:
+		var artwork := TextureRect.new()
+		artwork.texture = _definition.preview_texture
+		artwork.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		artwork.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		artwork.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		artwork.size = Vector2(300, 180)
+		artwork.position = Vector2(_viewport.size) * 0.5 - artwork.size * 0.5
+		_viewport.add_child(artwork)
+	else:
+		var preview := ModulePreview.new()
+		preview.size = Vector2(PREVIEW_SIZE)
+		preview.position = Vector2(AURA_PADDING)
+		_viewport.add_child(preview)
+		preview.setup(_definition, true)
 	_image.texture = _viewport.get_texture()
 	_image.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_image.size = Vector2(_viewport.size)

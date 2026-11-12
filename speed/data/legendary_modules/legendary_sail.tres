@@ -5,10 +5,13 @@
 [ext_resource type="Texture2D" path="res://data/legendary_aura_bakes/legendary_sail_front.res" id="2_4nmg7"]
 [ext_resource type="Texture2D" path="res://assets/ui/legendary_aura_masks/legendary_sail_mask.res" id="3_s5xpf"]
 
+[ext_resource type="Texture2D" path="res://assets/pixel/legendary/sail.png" id="4_art"]
+
 [resource]
 script = ExtResource("1")
 id = &"legendary_sail"
 boss_id = &"centaurus"
+preview_texture = ExtResource("4_art")
 order = 2
 reveal_aura_mask = ExtResource("3_s5xpf")
 reveal_aura_baked_back = ExtResource("1_qt3tq")
