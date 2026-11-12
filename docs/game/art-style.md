@@ -27,6 +27,8 @@
 - 取り戻した星が背景の空に戻り、星雲や天の川が色鮮やかになっていく。いつ変わるかは [仕様書](../spec.md) の2.2。
 - 敵や弾が見にくくならない範囲で鮮やかにする。
 
+中央の惑星はステージ1〜4で `planet_c`〜`planet_f` を順に使い、ステージの `planet_texture_path` で指定する。原画は `assets/pixel/background/` に保持し、`tools/art/prepare_field_planets.gd` で本体を中央に合わせた `centered/` の画像を用意する。月は同じ処理で `assets/pixel/moon.png` に保存する。
+
 ### 3.2 ワールドマップ（ステージ選択）
 
 - 5つの星系を航路で結んだ海図として描く。

@@ -477,6 +477,7 @@ points = PackedVector2Array(0, 0, 27, 0, 33, 17, 60, 29, 80, 29, 90, 9, 122, 9, 
 [resource]
 script = ExtResource("1")
 index = 4
+planet_texture_path = "res://assets/pixel/background/centered/planet_f.png"
 clear_bonus = 700
 backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), SubResource("Resource_rjgwb"), SubResource("Resource_6ur6i"), SubResource("Resource_vt7nj"), SubResource("Resource_g1k3m"), SubResource("Resource_vv5jg"), SubResource("Resource_qrqj0"), SubResource("Resource_8jnq7"), SubResource("Resource_dyeu7")])
 scene_path = "res://scenes/stages/stage_4.tscn"

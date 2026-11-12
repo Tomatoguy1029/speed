@@ -313,6 +313,7 @@ points = PackedVector2Array(0, 0, 15, 0, 28, 0, 38, 0, 50, 0, 60, 0, 75, 0, 90, 
 [resource]
 script = ExtResource("stage")
 index = 1
+planet_texture_path = "res://assets/pixel/background/centered/planet_c.png"
 clear_bonus = 100
 scene_path = "res://scenes/stages/stage_1.tscn"
 phases = [SubResource("Phase_grow_1"), SubResource("Phase_peak_1"), SubResource("Phase_grow_2"), SubResource("Phase_peak_2"), SubResource("Phase_grow_3"), SubResource("Phase_peak_3"), SubResource("Phase_grow_4"), SubResource("Phase_peak_4"), SubResource("Phase_grow_5"), SubResource("Phase_peak_5"), SubResource("Phase_grow_6"), SubResource("Phase_peak_6"), SubResource("Phase_boss"), SubResource("Resource_m3sfq")]
