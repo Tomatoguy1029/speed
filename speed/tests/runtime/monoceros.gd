@@ -995,7 +995,7 @@ func finish_fixture(limit := -1.0, automatic := false, normal_finish_times := fa
 	cfg.planet_radius = 0.0
 	cfg.character_scale = 1.0
 	if not normal_finish_times:
-		for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+		for key in ["boss_finish_stop_time","boss_finish_slow_time","boss_finish_crack_time","boss_finish_hold_time","boss_finish_burst_time","boss_finish_settle_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
 	cfg.death_freeze_time = 0.01
 	cfg.death_explosion_time = 0.01
 	cfg.death_game_over_time = 0.01
@@ -1120,7 +1120,7 @@ func native_finish_tail(retry := false) -> void:
 	check(frame.ui.phase==RunIds.Phase.Finishing and frame.ui.boss_finish.active and frame.result==null,"実撃破のboss_deadから報酬を確定せずクリア演出へ入る")
 	var scope := ContentResourceScope.new()
 	for entry: Dictionary in f.package.visuals:
-		if entry.get("purpose","") in ["legendary","reveal"]: scope.provide(entry.path,load(entry.path))
+		if entry.get("purpose","")=="legendary": scope.provide(entry.path,load(entry.path))
 	var resources = load("res://scripts/data_types/run_resources.gd").new()
 	resources.visuals.assign(f.package.visuals)
 	var hud = load("res://scripts/ui/hud.gd").new()
@@ -1129,19 +1129,17 @@ func native_finish_tail(retry := false) -> void:
 	hud.cpp_resources = resources
 	add_child(hud)
 	hud.size = Vector2(640,360)
-	if not retry: check(hud._legendary_reveal!=null,"報酬表示は開始前に準備した同じ資源Scopeから作る")
+	if not retry: check(hud._legendary!=null and hud._legendary.preview_texture!=null,"獲得するモジュールは開始前に準備した同じ資源Scopeから読む")
 	var held: Dictionary = bridge.checkpoint()
 	finish_steps(bridge,3)
 	var expected: Dictionary = bridge.read_frame().value.ui.boss_finish
-	check(expected.blasted and f.events.filter(func(e): return e.type==&"boss_explode").size()==1,"スロー再生の時間後にボスと残る敵弾を一度消す")
-	check(held.ok and bridge.restore(held.value).ok,"決着途中の再生位置・演出時計・消滅済みを復帰する")
+	check(expected.blasted and f.events.filter(func(e): return e.type==&"boss_explode").size()==1,"崩壊の時刻にボスと残る敵弾を一度消す")
+	check(held.ok and bridge.restore(held.value).ok,"決着途中の演出時計・消滅済みを復帰する")
 	finish_steps(bridge,3)
 	check(bridge.read_frame().value.ui.boss_finish==expected,"復帰後も同じ決着の段階へ進む")
 	bridge.release_checkpoint(held.value)
 	finish_steps(bridge,3)
-	hud.apply_snapshot(bridge.read_frame().value.ui)
-	hud._update_cpp_finish()
-	check(hud._legendary_reveal.visible,"消滅後は伝説の姿と名前の既存表示へ進む")
+	check(bridge.read_frame().value.ui.boss_finish.reveal,"初回のクリアは消滅後に伝説のモジュールの獲得へ進む")
 	finish_steps(bridge,10)
 	frame = bridge.read_frame().value
 	check(frame.result!=null and frame.result.kind=="Clear" and frame.result.legendary=="legendary_stern" and f.events.any(func(e): return e.type==&"clear_banner"),"報酬表示とCLEARの後に共通Lifecycleへ一度だけ勝利を確定する")

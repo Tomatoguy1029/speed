@@ -42,32 +42,44 @@ extends Resource
 
 ## ボス撃破・敗北・被弾などの見せ方。攻撃力や当たり判定には影響しない
 @export_group("演出")
-## 撃破の再生：記録する長さ
-## ボスにトドメを刺す直前の機体の動きを、この長さだけ記録してスローで見せる。
+## 撃破：命中の静止
+## とどめの瞬間に画面を白黒の影絵にして止める時間。
 ## 単位：実秒
-@export var boss_finish_replay_window: float
-## 撃破の再生：スローの長さ
-## 記録した動きを、この時間をかけてゆっくり再生する。
+@export var boss_finish_stop_time: float
+## 撃破：スローの長さ
+## カメラがボスへ寄り、ボスがのけぞって色が抜ける時間。ブーストのとどめでは切り口が伸びる。
 ## 単位：実秒
 @export var boss_finish_slow_time: float
-## 撃破の再生：寄りの倍率
-## スロー再生中、カメラを機体にこの倍率で寄せる。
+## 撃破：寄りの倍率
+## スローの間、カメラを通常の見え方からこの倍率でボスへ寄せる。
 ## 単位：倍
 @export var boss_finish_zoom: float
-## 撃破：爆発から獲得演出までの時間
-## ボスが爆発して残りの敵が消えたあと、モジュールの出現（報酬なしなら CLEAR!）まで待つ時間。
+## 撃破：ひびが走る時間
+## 切り口（武器などのとどめではボスの中心）から体じゅうへ金色のひびが広がる時間。
 ## 単位：実秒
-@export var boss_finish_blast_time: float
-## 伝説獲得：出現の時間
-## 既存の伝説モジュールが光の中から現れ、中央へ移る仮演出。
+@export var boss_finish_crack_time: float
+## 撃破：ための時間
+## 光が一度沈み、ボスが少し縮む時間。
+## 単位：実秒
+@export var boss_finish_hold_time: float
+## 撃破：崩壊の時間
+## ボスの体が光の粒に変わって消えるまでの時間。周りの敵は衝撃の輪が届いた順に消える。
+## 単位：実秒
+@export var boss_finish_burst_time: float
+## 撃破：余韻と集束の時間
+## 粒が広がって消え、初回の獲得では半分の粒が1点へ集まる時間。
+## 単位：実秒
+@export var boss_finish_settle_time: float
+## 伝説獲得：姿が出る時間
+## 集まった光が開き、白く焼けた伝説のモジュールが現れる時間。入手済みのクリアでは出さない。
 ## 単位：実秒
 @export var boss_finish_relic_appear_time: float
 ## 伝説獲得：見せる時間
-## 部品の姿と既存名称を静止して見せる時間。
+## モジュールの色が戻り、名前を見せる時間。
 ## 単位：実秒
 @export var boss_finish_relic_hold_time: float
 ## 伝説獲得：回収の時間
-## 部品の光が機体へ収束する時間。報酬の保存は結果へ移るときに行う。
+## モジュールがためてから曲がりながら機体へ飛ぶ時間。報酬の保存は結果へ移るときに行う。
 ## 単位：実秒
 @export var boss_finish_relic_collect_time: float
 ## 撃破：CLEAR! の表示時間

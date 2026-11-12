@@ -85,9 +85,10 @@ struct BossBodyState {
 };
 struct BossFinishState {
     bool active=false,blasted=false,banner=false,final_started=false;
-    double elapsed=0;
-    godot::Vector2 origin;
-    std::vector<godot::Vector2> approach,replay;
+    // ブーストのとどめだけが、当たった向きの切り口を持つ。
+    bool boost=false,reveal=false;
+    double elapsed=0,base_zoom=1;
+    godot::Vector2 origin,impact,direction,ship;
 };
 struct BossStates {
     BossFinishState finish;

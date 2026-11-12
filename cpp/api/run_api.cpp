@@ -131,9 +131,10 @@ Dictionary SpeedRunCore::configure_run(const PackedByteArray &bytes,const Dictio
 Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options) {
     if (runtime.busy) return failure(7,"start","更新中は再入できません");Guard guard(runtime.busy);
     if (!runtime.api_configured || runtime.state.started || runtime.state.closed) return failure(4,"start","設定済みの新しいランだけを開始できます");
-    if (seed.get_type()!=Variant::INT || !keys(options,{"start_time","equipment","position","start_kind","scenario","endless","lab_mode","tutorial"}) ||
+    if (seed.get_type()!=Variant::INT || !keys(options,{"start_time","equipment","position","start_kind","scenario","endless","legendary_owned","lab_mode","tutorial"}) ||
         (options.has("lab_mode") && (!is(options,"lab_mode",Variant::BOOL) || (bool(options["lab_mode"]) && !runtime.api_development))) ||
         (options.has("endless") && !is(options,"endless",Variant::BOOL)) ||
+        (options.has("legendary_owned") && !is(options,"legendary_owned",Variant::BOOL)) ||
         (options.has("tutorial") && !is(options,"tutorial",Variant::BOOL)) ||
         (options.has("position") && (!is(options,"position",Variant::VECTOR2) || !Vector2(options["position"]).is_finite()))) return failure(1,"start","開始入力が不正です");
     const Variant time=options.get("start_time",0.0);
@@ -154,6 +155,7 @@ Dictionary SpeedRunCore::start_run(const Variant &seed,const Dictionary &options
     state.ship.vel=Vector2(0,-state.ship_config.base_max_speed*0.3);state.ship.hp=state.ship_config.max_hp;
     state.ship_ready=state.draw_ready=true;
     state.lifecycle.endless=options.get("endless",false);
+    state.lifecycle.legendary_owned=options.get("legendary_owned",false);
     state.control.lab_mode=options.get("lab_mode",false);
     state.population.frame_enabled=state.population.ready && !state.control.lab_mode;
     if (state.control.lab_mode) state.world.boss_spawned=true;

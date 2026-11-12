@@ -500,7 +500,7 @@ func finish_fixture(name := "", phase := 1, limit := -1.0) -> Dictionary:
 	cfg.planet_radius=0.0
 	cfg.time_up_charge_time=0.3
 	for key in ["death_freeze_time","death_explosion_time","death_game_over_time"]:cfg.set(key,0.01)
-	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time"]:cfg.set(key,0.02)
+	for key in ["boss_finish_stop_time","boss_finish_slow_time","boss_finish_crack_time","boss_finish_hold_time","boss_finish_burst_time","boss_finish_settle_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time"]:cfg.set(key,0.02)
 	var definition: BossDef=load("res://data/bosses/draco.tres").duplicate(true)
 	var rules=load("res://data/bosses/ai/draco_action_rules.tres").duplicate(true)
 	var flow=load("res://data/bosses/ai/draco_flow.tres").duplicate(true)
