@@ -17,6 +17,8 @@ const EDITOR_ORDER := 5
 @export var clear_bonus: int
 ## 星と背景素材の背後に描く、ステージ全体の地色。
 @export var background_color: Color = Color(0.02, 0.03, 0.07)
+## ステージ中央の惑星。余白と中心位置を制作時に整えた画像のパス。
+@export_file("*.png") var planet_texture_path: String = "res://assets/pixel/planet.png"
 ## 開始地点を基準に置く背景。配列の後ろほど手前に重ねる。
 @export var backgrounds: Array[BackgroundPlacement] = []
 ## 開始地点を基準とする固定位置の共通炎。名前 → {preset, offset, scale}。

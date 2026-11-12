@@ -46,6 +46,7 @@ static func build(stage: RuntimeStage, output := "res://.content", config: GameC
 	if index == null: return null
 	result.look_names = index.look_names
 	result.look_paths = index.look_paths.duplicate()
+	_add(paths, stage.planet_texture_path)
 	for placement: BackgroundPlacement in stage.backgrounds:
 		if not placement.texture_path.is_empty(): _add(paths, placement.texture_path)
 		if not placement.fire_preset_path.is_empty():
@@ -110,7 +111,7 @@ static func build(stage: RuntimeStage, output := "res://.content", config: GameC
 		_add(paths, boss.path)
 		var definition := load(boss.path) as BossDef
 		_add(paths, definition.scene_path)
-	for common in ["res://.content/hero_aura.res", "res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/render_pipeline.gd", "res://scripts/render/gpu_sparks.gd", "res://assets/pixel/planet.png", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
+	for common in ["res://.content/hero_aura.res", "res://.content/audio.res", "res://scenes/run/run.tscn", "res://scripts/render/render_pipeline.gd", "res://scripts/render/gpu_sparks.gd", "res://assets/pixel/moon.png", "res://shaders/pixel_sprite.gdshader", "res://shaders/xp_crystal.gdshader"]: _script(paths, common) if common.ends_with(".gd") else _add(paths, common)
 	# 武器・特性の演出は途中で手に入るので、使う shader をすべて事前に準備する
 	for folder in ["res://scripts/render/equipment", "res://scripts/render/friendly", "res://scripts/render/fx"]:
 		for file in DirAccess.get_files_at(folder):

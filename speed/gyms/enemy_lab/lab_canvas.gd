@@ -80,9 +80,10 @@ func texture_for(id: String) -> Texture2D:
 		var def: EnemyDef = session.run.enemies.def_of(StringName(id)) if session != null and is_instance_valid(session.run) else ContentManager.enemies.get(StringName(id))
 		return RunPresentation.look_texture(look, _look_textures, def.armor_colors if def != null else {}, preload("res://tools/content/visual_transforms.gd").live_look)
 	if id.begins_with("field_planet"):
-		if not _textures.has("planet"):
-			_textures["planet"] = load("res://assets/pixel/planet.png")
-		return _textures["planet"]
+		var planet_path := stage.planet_texture_path if stage != null else "res://assets/pixel/planet.png"
+		if not _textures.has(planet_path):
+			_textures[planet_path] = load(planet_path)
+		return _textures[planet_path]
 	# 絵はステージの敵の見た目に従うので、ファイルごとに覚える
 	var path := "res://assets/pixel/%s.png" % id
 	if session != null and is_instance_valid(session.run) and session.run.state.stage != null:

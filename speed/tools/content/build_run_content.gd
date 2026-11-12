@@ -2658,6 +2658,7 @@ static func build(stage: RuntimeStage, config: GameConfig, output: String, input
 			data.LoadoutAsset.append({"id":data.LoadoutAsset.size()+1,"equipment":int(resource.get("equipment",1)),"asset":row.id})
 		for resource: Dictionary in field_visuals:
 			var row := resource.duplicate()
+			if row.role==9: row.path = stage.planet_texture_path
 			row.id = data.ResourceKey.size()+1
 			data.ResourceKey.append({"id":row.id,"role":row.role})
 			visuals.append(row)
