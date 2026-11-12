@@ -34,6 +34,10 @@ func create_run(overrides := {}) -> RunSession:
 	if not timeline and GameManager.run_stage == 1 and not GameManager.run_endless and not SaveManager.has_done_tutorial():
 		options.cpp_start.tutorial = true
 	if timeline: options.cpp_start.scenario = {"kind":"timeline","params":{"time":start_time}}
+	# 入手済みの伝説のモジュールは、クリアしても獲得の演出を出さない。
+	var stage_def := ContentManager.stage(GameManager.run_stage)
+	if stage_def!=null and not stage_def.legendary_module_id.is_empty():
+		options.cpp_start.legendary_owned = SaveManager.has_legendary(stage_def.legendary_module_id)
 	var session := _register(RunSession.new(),options)
 	session.loading_timings["stage_and_profile_ms"] = (Time.get_ticks_usec()-before)/1000.0
 	current_id = session.id

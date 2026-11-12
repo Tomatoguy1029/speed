@@ -75,9 +75,8 @@ var _cpp_cancel: Button
 
 ## 英雄の力の獲得演出と独立した仮演出。setup / set_progress の契約はシーンのスクリプトを参照。
 @export_group("伝説獲得の仮演出")
-@export var legendary_reveal_scene: PackedScene
-@export_file("*.tscn") var legendary_reveal_path := "res://scenes/run/legendary_reveal.tscn"
-var _legendary_reveal: Control
+## 初回クリアで見せる伝説のモジュール。名前は撃破演出の「名前を見せる」場面で画面下に出す。
+var _legendary: LegendaryModuleDef
 var _finish_skip: Button
 var _entrance_skip: Button
 var _rewards: Control
@@ -710,6 +709,23 @@ func _lap_filled(before: float, after: float, capacity: float) -> bool:
 			return true
 	return false
 
+## 撃破演出の「名前を見せる」場面で、モジュールの下に種類と名前を出す。
+func _draw_legendary_name(finish: Dictionary) -> void:
+	if _legendary==null or not finish.get("reveal",false): return
+	var at: Dictionary = finish.times
+	var t := float(finish.elapsed)
+	if t<at.show or t>=at.clear: return
+	var shown := clampf((t-at.show)/maxf(0.001,at.take-at.show),0.0,1.0)
+	var taken := clampf((t-at.take)/maxf(0.001,at.clear-at.take),0.0,1.0)
+	var alpha := smoothstep(0.0,1.0,shown*4.0)*(1.0-smoothstep(0.0,1.0,taken*3.0))
+	if alpha<=0.0: return
+	var unit := size.y/540.0
+	var name_text := _legendary.get_display_name()
+	var kind := tr("codex.legendary")
+	draw_string(_font,Vector2(0,size.y*0.5+118.0*unit),kind,HORIZONTAL_ALIGNMENT_CENTER,size.x,roundi(13.0*unit),Color(Color("#b9a983"),alpha))
+	draw_string(_bold_font,Vector2(0,size.y*0.5+152.0*unit),name_text,HORIZONTAL_ALIGNMENT_CENTER,size.x,roundi(26.0*unit),Color(0,0,0,alpha))
+	draw_string(_bold_font,Vector2(0,size.y*0.5+150.0*unit),name_text,HORIZONTAL_ALIGNMENT_CENTER,size.x,roundi(26.0*unit),Color(Color("#ecd6a5"),alpha))
+
 func _draw_banner() -> void:
 	if _banner == "":
 		return
@@ -841,34 +857,17 @@ func _prepare_cpp_finish() -> void:
 	_finish_skip.pressed.connect(func(): bridge.command("skip_finish"))
 	add_child(_finish_skip)
 	if cpp_scope==null or cpp_resources==null: return
-	var scene: PackedScene
-	var definition: LegendaryModuleDef
 	for entry: Dictionary in cpp_resources.visuals:
-		if entry.get("purpose","")=="reveal": scene = cpp_scope.resources.get(entry.path)
-		if entry.get("purpose","")=="legendary": definition = cpp_scope.resources.get(entry.path)
-	if scene==null or definition==null: return
-	_legendary_reveal = scene.instantiate() as Control
-	_legendary_reveal.setup(definition)
-	add_child(_legendary_reveal)
-	_legendary_reveal.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	_legendary_reveal.hide()
-	move_child(_finish_skip,-1)
+		if entry.get("purpose","")=="legendary": _legendary = cpp_scope.resources.get(entry.path)
 
 func _update_cpp_finish() -> void:
 	var value: Dictionary = _cpp_ui.get("boss_finish",{})
 	var active: bool = value.get("active",false)
 	var slow := int(_cpp_ui.get("phase",-1))==Phase.Play and float(_cpp_ui.get("world_scale",1.0))<0.999
-	if active: slow = value.elapsed<value.slow_time
+	if active: slow = value.elapsed<value.slow_end
 	AudioManager.set_slow_motion(slow and not _cpp_ui.get("presentation_frozen",false) and _menu_overlay==null and not _rewards.is_active())
 	_finish_skip.visible = active and value.elapsed>=0.35 and value.elapsed<value.reveal_start+value.reveal_duration
 	if _speed_indicator!=null: _speed_indicator.visible = not active
-	if _legendary_reveal==null: return
-	_legendary_reveal.visible = active and value.reveal_duration>0.0 and value.elapsed>=value.reveal_start and value.elapsed<value.reveal_start+value.reveal_duration
-	if not _legendary_reveal.visible: return
-	_legendary_reveal.set_timing(value.appear_time,value.hold_time,value.collect_time)
-	var zoom: float = size.x/maxf(1.0,_cpp_ui.view_half.x*2.0)
-	_legendary_reveal.set_endpoints((value.origin-_cpp_ui.view_center)*zoom+size*0.5,(_cpp_ui.ship.ship_pos-_cpp_ui.view_center)*zoom+size*0.5)
-	_legendary_reveal.set_progress(clampf((value.elapsed-value.reveal_start)/maxf(0.001,value.reveal_duration),0.0,1.0))
 
 func _layout_cpp_art() -> void:
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
@@ -888,6 +887,7 @@ func _draw_cpp() -> void:
 		_draw_finale_text()
 		return
 	if _cpp_ui.get("boss_finish",{}).get("active",false):
+		_draw_legendary_name(_cpp_ui.boss_finish)
 		_draw_banner()
 		return
 	var factor := minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
@@ -1184,7 +1184,6 @@ func _draw_finale_slots(finale: Dictionary) -> void:
 	var left:=size.x*0.5-(slot*4.0+gap*3.0)*0.5
 	var top:=size.y*0.778
 	var clock:=time if finale.stage=="combine" else 3.8+time
-	var geometry=preload("res://scripts/ui/legendary_module_geometry.gd")
 	var ids:=["legendary_stern","legendary_keel","legendary_sail","legendary_compass"]
 	for i in 4:
 		var box:=Rect2(left+i*(slot+gap),top,slot,slot)
@@ -1192,10 +1191,10 @@ func _draw_finale_slots(finale: Dictionary) -> void:
 		draw_rect(box,Color(0.055,0.07,0.14,0.86*alpha))
 		draw_rect(box,Color(Color("#d9aa4a") if age>0.0 else Color("#3b4468"),alpha),false,2.0*unit)
 		if age>0.0:
-			var scale_:=0.3*unit*(1.0+0.7*exp(-age*9.0))
-			draw_set_transform(box.get_center(),0.0,Vector2.ONE*scale_)
-			geometry.draw(self,ids[i],Color(Color("#ffd777"),alpha))
-			draw_set_transform(Vector2.ZERO)
+			var art: Texture2D=preload("res://scripts/ui/legendary_module_icon.gd").art(StringName(ids[i]))
+			if art!=null:
+				var scale_:=minf(slot*0.8/art.get_width(),slot*0.8/art.get_height())*(1.0+0.7*exp(-age*9.0))
+				draw_texture_rect(art,Rect2(box.get_center()-art.get_size()*scale_*0.5,art.get_size()*scale_),false,Color(1,1,1,alpha))
 			if age<0.25: draw_rect(box,Color(Color("#ffd777"),alpha*(1.0-age*4.0)))
 		else:
 			draw_rect(Rect2(box.get_center()-Vector2.ONE*13.0*unit,Vector2.ONE*26.0*unit),Color(Color("#515a7c"),alpha))

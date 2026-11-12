@@ -1554,10 +1554,13 @@ struct BossBodyDefinition {
 };
 struct BossFinishDefinition {
     uint32_t id{};
-    double replay_window{};
+    double stop_time{};
     double slow_time{};
     double zoom{};
-    double blast_time{};
+    double crack_time{};
+    double hold_time{};
+    double burst_time{};
+    double settle_time{};
     double relic_appear_time{};
     double relic_hold_time{};
     double relic_collect_time{};

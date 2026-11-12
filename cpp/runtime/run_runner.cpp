@@ -138,7 +138,6 @@ bool RunRunner::step_play(godot::SpeedRunCore &core,double dt,const InputFrame &
     if (state.boss_contact_interrupt_trace) {state.boss_contact_interrupt_trace=false;if (state.draw.tracing) core.end_trace(false);}
     if (!timed("ship",[&]{return core.step_ship_input(dt,world_dt,input);})) return false;
     BossContactSystem::clear_landings(core.runtime);
-    BossFinish::record_approach(core.runtime);
     if (!control.tutorial && (control.lab_enemy_ai || !control.lab_mode)) {
         if (input.hero_press) HeroesSystem::activate(core.runtime);
         timed("heroes",[&]{HeroesSystem::step(core.runtime,dt,world_dt);});

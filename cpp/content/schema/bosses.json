@@ -619,7 +619,7 @@
           "min": 1
         },
         {
-          "name": "replay_window",
+          "name": "stop_time",
           "type": "f64",
           "min": 0
         },
@@ -634,7 +634,22 @@
           "min": 0
         },
         {
-          "name": "blast_time",
+          "name": "crack_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "hold_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "burst_time",
+          "type": "f64",
+          "min": 0
+        },
+        {
+          "name": "settle_time",
           "type": "f64",
           "min": 0
         },

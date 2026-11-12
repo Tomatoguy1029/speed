@@ -185,9 +185,10 @@ var _forward_world_time := -1.0
 var _queued_events: Array[Dictionary] = []
 var _epoch := 0
 var _jet_time := 0.0
-var finish_settings := {}
+## ボス撃破（ステージ1〜4）の演出。揺れは finish_shake で run_presentation へ渡す。
+var finish_view: Node2D
 var finish_shake := 0.0
-var finish_flash := 0.0
+var _boss_body_info := {}
 var pipeline: RenderPipeline
 var _particles: Array[Dictionary] = []
 var _rings: Array[Dictionary] = []
@@ -436,7 +437,7 @@ func setup(scope: ContentResourceScope, entries: Array[Dictionary], character_sc
 	_layer(16).add_child(_dim)
 	_dim.draw.connect(func():
 		if _dim_strength>0.0: _dim.draw_rect(_dim_rect.grow(400.0),Color(0,0,0,_dim_strength))
-		if finish_flash>0.0: _dim.draw_rect(_dim_rect.grow(400.0),Color(1,1,1,finish_flash*0.5)))
+		pass)
 	_flame = _exhaust("res://assets/pixel/airship_flame.png",character_scale)
 	_spark = _exhaust("res://assets/pixel/airship_spark.png",character_scale)
 	_spark.modulate.a = 0.65
@@ -1037,6 +1038,7 @@ func apply_frame(frame: Dictionary) -> bool:
 	for body: Dictionary in frame.get("boss_bodies",[]):
 		if body.kind not in [0,1,2,3,4]: continue
 		body_seen[body.id] = true
+		_boss_body_info[body.id] = {"kind":int(body.kind),"mode":int(body.mode)}
 		if body.mode>=4:
 			if _boss_body_displays.has(body.id):
 				if body.kind==2: _boss_body_displays[body.id].clear_flames()
@@ -1543,7 +1545,12 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	var captured := {}
 	for event: Dictionary in _queued_events:
 		if event.type==&"anchor_capture": captured[event.get("id",0)] = true
+	_update_finish(frame.ui)
 	for event: Dictionary in _queued_events:
+		# 撃破演出で消える敵は、衝撃の輪が届いた順に撃破演出が光の粒へ変える。
+		if event.type==&"kill" and str(event.get("cause",""))=="finale":
+			if finish_view!=null: finish_view.mook_burst(event.pos,int(event.get("id",0)))
+			continue
 		var stone_kill := _hero_power_visual.frame_event(event)
 		if event.type==&"hurt":
 			_hurt_fx.hurt()
@@ -1657,16 +1664,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 			var duration: float = 0.3*EFFECT_SETTINGS.number("","visible_time_scale",1.0)
 			_rings.append({"pos":event.pos,"radius":event.r*2.4,"color":Color("#ffe27a"),"life":duration,"max":duration})
 			_burst(event.pos,Color("#ffd23f"),14,360.0)
-		if event.type==&"boss_explode":
-			finish_flash = float(finish_settings.get("flash",0.2))
-			finish_shake = float(finish_settings.get("shake",6.0))
-			var scene: PackedScene = finish_settings.get("effect")
-			if scene!=null:
-				var effect: Node2D = scene.instantiate()
-				effect.position = event.pos
-				add_child(effect)
-			else: _burst(event.pos,finish_settings.get("color",Color("#e2b96b")),int(finish_settings.get("particles",80)),700.0)
-			if pipeline!=null: pipeline.add_wave(event.pos,1600.0,float(finish_settings.get("wave_seconds",0.8)))
 		if event.type==&"ship_explode": _death_burst(event.pos)
 		if equipped_full_burst: _full_burst_visual.frame_event(event,frame.ui.ship.ship_pos,frame.ui.ship.ship_heading,frame.ui.character_scale)
 		if equipped_duplicator and event.type==&"duplicate": _duplicator_visual.on_event(event)
@@ -1698,7 +1695,6 @@ func update_effects(frame: Dictionary, dt: float) -> void:
 	_lion_on = HeroPowers.lion_active(ui.get("hero",{})) or _hero_power_visual.twin_light()>0.5
 	for id: int in [17,18]:
 		if _layers.has(id): _layers[id].visible = not _lion_on
-	finish_flash = maxf(0.0,finish_flash-effect_dt*2.0)
 	if ui.has("light_lances"):
 		if not ui.light_lances.is_empty() and not is_instance_valid(_critical_lances):
 			_critical_lances = preload("res://scripts/render/light_lance.gd").new()
@@ -2075,3 +2071,27 @@ func _sync_cpp_boss_final_beams(bodies: Array) -> void:
 			_boss_final_beams[id].queue_free()
 			_boss_final_beams.erase(id)
 
+## ボス撃破の演出。撃破したボスの表示を演出へ渡し、以後は演出が写して崩す。
+func _update_finish(ui: Dictionary) -> void:
+	var finish: Dictionary = ui.get("boss_finish",{})
+	if not finish.get("active",false):
+		if finish_view!=null: finish_view.hide_view()
+		finish_shake = 0.0
+		return
+	if finish_view==null:
+		finish_view = preload("res://scripts/render/boss_finish_view.gd").new()
+		add_child(finish_view)
+		finish_view.set_layers(pipeline,_shield_layer)
+		for entry: Dictionary in visuals.values():
+			if entry.get("purpose","")=="legendary":
+				var definition: LegendaryModuleDef = _scope.resources.get(entry.path)
+				if definition!=null: finish_view.set_module_art(definition.preview_texture)
+	if not finish.get("blasted",false):
+		for id in _boss_body_displays.keys():
+			var info: Dictionary = _boss_body_info.get(id,{})
+			if int(info.get("mode",0))>=4 and int(info.get("kind",-1)) in [0,1,2,3]:
+				finish_view.adopt(_boss_body_displays[id],int(info.kind))
+				_boss_body_displays.erase(id)
+				break
+	finish_view.apply(finish,float(ui.character_scale),ui.ship.ship_heading)
+	finish_shake = finish_view.shake

@@ -3,8 +3,6 @@ extends Control
 
 const TOOLS := [
 	["fire", "炎", "res://gyms/pixel_fire_preview.gd"],
-	["aura", "オーラ", "res://gyms/legendary_reveal_preview.gd"],
-	["rays", "後光", "res://gyms/legendary_reveal_preview.gd"],
 	["map", "マップ", "res://gyms/map_reveal_preview.gd"],
 	["landmark", "目印の星", "res://gyms/enemy_mark_preview.gd"],
 	["elite", "エリート", "res://gyms/enemy_mark_preview.gd"],
@@ -133,8 +131,7 @@ func _ready() -> void:
 
 func _key(index: int) -> String:
 	if String(TOOLS[index][0]).begins_with("combo_"): return "combo_transitions"
-	if index in [1, 2]: return "legendary"
-	if index in [4, 5]: return "enemy_marks"
+	if index in [2, 3]: return "enemy_marks"
 	return TOOLS[index][0]
 
 func _current() -> Variant:
@@ -169,7 +166,7 @@ func select_tool(index: int) -> void:
 		session.preview.process_mode = Node.PROCESS_MODE_INHERIT if active else Node.PROCESS_MODE_DISABLED
 		session.editor.visible = active
 		session.editor.set_active(active)
-	if key in ["legendary", "enemy_marks", "combo_transitions"]:
+	if key in ["enemy_marks", "combo_transitions"]:
 		_current().set_section(TOOLS[index][0])
 	_selector.select(index)
 	_refresh()

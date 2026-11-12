@@ -106,12 +106,6 @@ func _build(animation: Resource = null) -> void:
 			_icon.position = Vector2(150,74)
 			_icon.scale = Vector2.ONE*minf(220.0/_icon.texture.get_width(),130.0/_icon.texture.get_height())
 			_viewport.add_child(_icon)
-		elif definition is LegendaryModuleDef or (definition is ContentEntry and definition.category==&"legendary_modules"):
-			var legend: Control = preload("res://scripts/ui/legendary_module_icon.gd").new()
-			legend.module_id = definition.id
-			legend.position = Vector2(60,0)
-			legend.size = Vector2(180,150)
-			_viewport.add_child(legend)
 		elif ResourceLoader.exists("res://data/codex/%s.res" % definition.code_id):
 			_demo = preload("res://scripts/ui/codex_demonstration.gd").new()
 			_viewport.add_child(_demo)

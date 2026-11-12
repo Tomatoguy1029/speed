@@ -2797,14 +2797,20 @@ inline bool read(BinaryReader &input, BossBodyDefinition &out) {
 inline bool read(BinaryReader &input, BossFinishDefinition &out) {
     if (!input.read_u32(out.id)) return false;
     if (out.id < 1) return false;
-    if (!input.read_f64(out.replay_window)) return false;
-    if (out.replay_window < 0) return false;
+    if (!input.read_f64(out.stop_time)) return false;
+    if (out.stop_time < 0) return false;
     if (!input.read_f64(out.slow_time)) return false;
     if (out.slow_time < 0) return false;
     if (!input.read_f64(out.zoom)) return false;
     if (out.zoom < 0) return false;
-    if (!input.read_f64(out.blast_time)) return false;
-    if (out.blast_time < 0) return false;
+    if (!input.read_f64(out.crack_time)) return false;
+    if (out.crack_time < 0) return false;
+    if (!input.read_f64(out.hold_time)) return false;
+    if (out.hold_time < 0) return false;
+    if (!input.read_f64(out.burst_time)) return false;
+    if (out.burst_time < 0) return false;
+    if (!input.read_f64(out.settle_time)) return false;
+    if (out.settle_time < 0) return false;
     if (!input.read_f64(out.relic_appear_time)) return false;
     if (out.relic_appear_time < 0) return false;
     if (!input.read_f64(out.relic_hold_time)) return false;
@@ -5747,7 +5753,7 @@ inline bool read_section(uint32_t kind, uint32_t version, uint32_t count, Binary
     }
     case 163: {
         if (version != 1) return false;
-        if (count > input.remaining()/76) return false;
+        if (count > input.remaining()/100) return false;
         for (uint32_t i=0; i<count; ++i) { BossFinishDefinition row; if (!read(input,row)) return false; out.BossFinishDefinition_rows.push_back(std::move(row)); }
         return input.remaining()==0;
     }

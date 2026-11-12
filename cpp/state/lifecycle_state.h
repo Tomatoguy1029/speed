@@ -17,6 +17,8 @@ struct LifecycleState {
     uint32_t coin_hundredths=0;
     int64_t coins=0;
     bool endless=false;
+    // 開始時点で入手済みの伝説のモジュール。入手済みのクリアは獲得の演出を出さない。
+    bool legendary_owned=false;
     std::optional<RunResult> result;
     std::vector<uint32_t> obtained;
     ShipDamageRequest last_request;ShipDamageResult last_damage;bool has_damage=false;

@@ -1294,12 +1294,12 @@ static func _boss_package(definition: BossDef, config: GameConfig, stage: Runtim
 	package.records.RunConfig[0].time_limit = stage.time_limit if stage!=null else -1.0
 	package.records.LifecycleDefinition[0].legendary = String(stage.legendary_module_id) if stage!=null else ""
 	var finish := {"id":1,"time_up_charge_time":config.time_up_charge_time}
-	for key in ["replay_window","slow_time","zoom","blast_time","relic_appear_time","relic_hold_time","relic_collect_time","clear_time"]: finish[key] = config.get("boss_finish_"+key)
+	for key in ["stop_time","slow_time","zoom","crack_time","hold_time","burst_time","settle_time","relic_appear_time","relic_hold_time","relic_collect_time","clear_time"]: finish[key] = config.get("boss_finish_"+key)
 	package.records.BossFinishDefinition = [finish]
 	if stage!=null and not stage.legendary_module_id.is_empty():
 		var definition_resource = _definition(&"legendary_modules",stage.legendary_module_id)
 		if definition_resource==null: return {}
-		for value in [{"path":"res://scenes/run/legendary_reveal.tscn","purpose":"reveal"},{"path":definition_resource.resource_path,"purpose":"legendary"}]:
+		for value in [{"path":definition_resource.resource_path,"purpose":"legendary"}]:
 			var key: int = package.records.ResourceKey.size()+1
 			package.records.ResourceKey.append({"id":key,"role":Schema.ENUMS.VisualRole.BossFinish})
 			value.id = key

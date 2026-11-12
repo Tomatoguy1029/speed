@@ -9,13 +9,6 @@ const CRYSTAL_COLORS := [Color("#08deff"),Color("#945cff"),Color("#ffb609")]
 
 @export var world_path: NodePath
 @export var camera_path: NodePath
-@export_group("ボス消滅の仮演出")
-@export var finish_effect_scene: PackedScene
-@export var finish_color := Color("#e2b96b")
-@export_range(0.0,1.0) var finish_flash := 0.2
-@export_range(0.0,40.0) var finish_shake := 6.0
-@export_range(0,200) var finish_particles := 80
-@export_range(0.1,3.0) var finish_wave_seconds := 0.8
 
 var bridge: RefCounted
 var cpp_resources: Resource
@@ -141,7 +134,6 @@ func _ready_cpp() -> void:
 	_field_boundary.draw_fn = _draw_field_boundary
 	_field_boundary.show_behind_parent = true
 	frame_view._layer(2).add_child(_field_boundary)
-	frame_view.finish_settings = {"flash":finish_flash,"shake":finish_shake,"effect":finish_effect_scene,"color":finish_color,"particles":finish_particles,"wave_seconds":finish_wave_seconds}
 	cpp_background = preload("res://scripts/render/run_stage_background.gd").new()
 	cpp_background.z_index = -10
 	frame_view.add_child(cpp_background)
@@ -217,9 +209,7 @@ func _present_cpp(delta: float) -> void:
 	frame_view.update_reference_effects(frame,delta)
 	shake=maxf(shake,frame_view.ruler_shake)
 	frame_view.ruler_shake=0.0
-	if frame_view.finish_shake>0.0:
-		shake = maxf(shake,frame_view.finish_shake)
-		frame_view.finish_shake = 0.0
+	if frame_view.finish_shake>0.0: shake = maxf(shake,frame_view.finish_shake)
 	if frame_view._vortex_visual!=null:
 		shake = maxf(shake,frame_view._vortex_visual.frame_shake)
 		frame_view._vortex_visual.frame_shake = 0.0

@@ -2280,7 +2280,7 @@ func centaurus_finish_case(limit := -1.0, automatic := false, parameters := {}, 
 	var cfg = load("res://data/config.tres").duplicate(true)
 	cfg.planet_radius = 0.0
 	cfg.character_scale = 1.0
-	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+	for key in ["boss_finish_stop_time","boss_finish_slow_time","boss_finish_crack_time","boss_finish_hold_time","boss_finish_burst_time","boss_finish_settle_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
 	cfg.death_freeze_time = 0.01
 	cfg.death_explosion_time = 0.01
 	cfg.death_game_over_time = 0.01
@@ -4741,7 +4741,7 @@ func canis_finish_case(name := "", low := false, limit := -1.0) -> Dictionary:
 	cfg.planet_radius = 0.0
 	cfg.base_hp = 10000.0
 	cfg.character_scale = 1.0
-	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
+	for key in ["boss_finish_stop_time","boss_finish_slow_time","boss_finish_crack_time","boss_finish_hold_time","boss_finish_burst_time","boss_finish_settle_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time","time_up_charge_time"]: cfg.set(key,0.02)
 	for key in ["death_freeze_time","death_explosion_time","death_game_over_time"]: cfg.set(key,0.01)
 	var boss = load("res://data/bosses/canis_major.tres").duplicate(true)
 	boss.speed = 0.0
@@ -5987,7 +5987,7 @@ func native_boss_trace() -> void:
 func hydra_finish_case(name := "", count := 3, limit := -1.0) -> Dictionary:
 	var builder = load("res://tools/content/build_run_content.gd")
 	var cfg = load("res://data/config.tres").duplicate(true);cfg.planet_radius=0.0
-	for key in ["boss_finish_slow_time","boss_finish_blast_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time"]:cfg.set(key,0.02)
+	for key in ["boss_finish_stop_time","boss_finish_slow_time","boss_finish_crack_time","boss_finish_hold_time","boss_finish_burst_time","boss_finish_settle_time","boss_finish_relic_appear_time","boss_finish_relic_hold_time","boss_finish_relic_collect_time","boss_finish_clear_time"]:cfg.set(key,0.02)
 	cfg.time_up_charge_time=0.3
 	for key in ["death_freeze_time","death_explosion_time","death_game_over_time"]:cfg.set(key,0.01)
 	var boss = load("res://data/bosses/hydra.tres").duplicate(true);boss.speed=0.0;boss.params.growth_time=0.1
