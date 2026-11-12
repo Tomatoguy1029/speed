@@ -12,4 +12,4 @@ armor = 10.0
 speed = 240.0
 turn = 2.4
 xp = 500.0
-params = {"release_time":4.0,"combine_time":3.8,"pose_time":2.4,"rush_time":5.12,"charge_time":0.5,"hold_time":0.15,"line_time":0.07,"flash_from":0.075,"flash_ramp":0.12,"flash_peak":0.1,"flash_fade":2.45,"flash_after":0.3,"sight_time":2.8,"explode_time":7.5, "body_length": 1500.0, "body_width": 154.0, "head_scale": 1.35, "body_segments": 128, "body_wave": 180.0, "aim_lead_cap": 280.0, "approach_distance": 900.0, "thresholds": [0.7,0.4], "phase_time":1.0,"warn": 0.8, "active": 0.22, "recover": 0.8, "damage": 30.0, "reach": 360.0, "width": 45.0}
+params = {"release_time":4.0,"combine_time":3.8,"pose_time":2.4,"rush_time":5.12,"charge_time":0.5,"hold_time":0.15,"line_time":0.07,"flash_from":0.075,"flash_ramp":0.12,"flash_peak":0.1,"flash_fade":2.45,"flash_after":0.3,"sight_time":2.8,"explode_time":7.5, "body_length": 1500.0, "body_width": 154.0, "head_scale": 1.35, "body_segments": 128, "body_wave": 180.0, "aim_lead_cap": 280.0, "approach_distance": 900.0, "thresholds": [0.7,0.4], "initial_wait":1.2,"phase_time":1.0,"warn": 0.8, "active": 0.22, "recover": 0.8, "damage": 30.0, "reach": 360.0, "width": 45.0}
