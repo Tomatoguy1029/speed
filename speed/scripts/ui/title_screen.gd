@@ -1,6 +1,8 @@
 ## タイトル（仕様書 3）。「ゲームスタート」「設定」「終了」。
 extends UiScreen
 
+const LOGO_TEXTURE := preload("res://assets/ui/title/ui_title_screen_stars_new_title_log.png")
+const LOGO_REGION := Rect2(12, 56, 286, 65)
 const TITLE_TEXTURE := preload("res://assets/ui/title/ui_title_screen.png")
 const SWEEP_TEXTURE := preload("res://assets/ui/title/ui_title_screen_sweep.png")
 const STARS_TEXTURE := preload("res://assets/ui/title/ui_title_screen_stars_in_ring.png")
@@ -14,6 +16,7 @@ const MENU_DIRECTIONS := {KEY_W: KEY_UP, KEY_A: KEY_LEFT, KEY_S: KEY_DOWN, KEY_D
 ## 起動側から加えるメニューの操作。
 var menu_accessory: Control
 
+var _title_logo: TextureRect
 var _art: Control
 var _radar_material: ShaderMaterial
 var _elapsed := 0.0
@@ -100,6 +103,15 @@ func _build_title_art() -> void:
 	_radar_material.set_shader_parameter("map_ring_texture", preload("res://assets/ui/map/ui_circle.png"))
 	background.material = _radar_material
 	canvas.add_child(background)
+	_title_logo = TextureRect.new()
+	_title_logo.name = "TitleLogo"
+	var logo := AtlasTexture.new()
+	logo.atlas = LOGO_TEXTURE
+	logo.region = LOGO_REGION
+	_title_logo.texture = logo
+	_title_logo.position = Vector2(20, 69)
+	_title_logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	canvas.add_child(_title_logo)
 	var menu := $Center/Box as VBoxContainer
 	_title_menu = menu
 	menu.reparent(canvas, false)
@@ -171,7 +183,6 @@ func _build_start_panel(canvas: Control) -> void:
 	var back := Button.new()
 	back.position = Vector2(7, 7)
 	back.size = Vector2(71, 30)
-	back.tooltip_text = tr("common.back")
 	for state: String in ["normal", "hover", "pressed", "hover_pressed"]:
 		back.add_theme_stylebox_override(state, StyleBoxEmpty.new())
 	back.mouse_entered.connect(fill.show)
@@ -195,7 +206,6 @@ func _build_start_panel(canvas: Control) -> void:
 func show_start_panel(open: bool) -> void:
 	_start_panel.visible = open
 	_title_menu.visible = not open
-	_radar_material.set_shader_parameter("panel_open", open)
 	if open:
 		_stage_button.grab_focus.call_deferred()
 	else:
@@ -218,6 +228,7 @@ func show_screen(screen: GameManager.Screen, animate := true) -> void:
 	_start_panel.modulate.a = 0.0 if returning_from_map else 1.0
 	_start_panel.process_mode = Node.PROCESS_MODE_DISABLED if returning_from_map else Node.PROCESS_MODE_INHERIT
 	_title_menu.visible = screen == GameManager.Screen.TITLE
+	_title_logo.visible = screen == GameManager.Screen.TITLE
 	_map.visible = mapping or _map_progress > 0.0
 	_map.process_mode = Node.PROCESS_MODE_DISABLED
 	if animate and (mapping or _map_progress > 0.0):

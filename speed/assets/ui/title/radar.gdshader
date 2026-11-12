@@ -4,7 +4,6 @@ render_mode unshaded;
 uniform sampler2D sweep_texture : filter_nearest, repeat_disable;
 uniform sampler2D stars_texture : filter_nearest, repeat_disable;
 uniform float elapsed = 0.0;
-uniform bool panel_open = false;
 uniform float map_progress = 0.0;
 uniform sampler2D map_ring_texture : filter_nearest, repeat_disable;
 uniform float map_scroll = 0.0;
@@ -32,14 +31,6 @@ void fragment() {
 	vec4 stars = texture(stars_texture, radar_uv);
 	vec4 starfield = texture(menu_stars_texture, UV);
 	vec3 base = mix(starfield.rgb * starfield.a, vec3(0.012, 0.035, 0.045), map_progress);
-	vec2 pixel = UV * canvas;
-	if (!panel_open) {
-		bool logo_area = pixel.x >= 20.0 && pixel.x < 275.0 && pixel.y >= 79.0 && pixel.y < 133.0;
-		if (logo_area) {
-			vec4 logo = texture(TEXTURE, UV);
-			base = max(base, logo.rgb * logo.a * (1.0 - map_progress));
-		}
-	}
 	vec3 radar = sweep.rgb * sweep.a * 0.45 + stars.rgb * stars.a * fade;
 	float reveal = smoothstep(0.55, 1.0, map_progress);
 	float rc = cos(map_angle * map_progress);

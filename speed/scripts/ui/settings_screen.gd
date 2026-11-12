@@ -217,7 +217,6 @@ func _setup_art() -> void:
 	_focus_skin.bg_color = Color.TRANSPARENT
 	_focus_skin.border_color = Color("#a5dae5")
 	_focus_skin.set_border_width_all(2)
-	%BackButton.tooltip_text = "common.back"
 	%BackButton.add_theme_stylebox_override("focus", _focus_skin)
 	var blank := StyleBoxEmpty.new()
 	for i in TAB_ART.size():

@@ -17,72 +17,129 @@
 [ext_resource type="PackedScene" path="res://data/formations/corona_solo.tscn" id="9_corona"]
 [ext_resource type="Texture2D" uid="uid://bqfiq1operinu" path="res://assets/pixel/background/station_b.png" id="9_mwefo"]
 [ext_resource type="Texture2D" uid="uid://bm5mbtuu1o5mj" path="res://assets/pixel/background/planet_b.png" id="10_05gyn"]
+[ext_resource type="Texture2D" uid="uid://x2vwl62iaak0" path="res://assets/pixel/background/planet_e.png" id="11_mpbfx"]
+[ext_resource type="Texture2D" uid="uid://ds783bbf476x4" path="res://assets/pixel/background/planet_d.png" id="12_vh3c5"]
+[ext_resource type="Texture2D" uid="uid://b7rqout8bpgfj" path="res://assets/pixel/background/planet_c.png" id="13_02yv8"]
+[ext_resource type="Texture2D" uid="uid://rkin7mrvujlr" path="res://assets/pixel/background/driller.png" id="14_vh3c5"]
 [ext_resource type="Texture2D" uid="uid://c3cwwuke74vrn" path="res://assets/pixel/background/colony.png" id="bg_colony"]
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="bg_script"]
 
-[sub_resource type="Resource" id="Resource_psaqe"]
+[sub_resource type="Resource" id="Resource_dnw1w"]
 script = ExtResource("bg_script")
 texture = ExtResource("bg_colony")
 offset = Vector2(-677.3871, 10.675674)
 parallax = 0.5
 scale = 2.0
 tint = Color(0.55, 0.65, 0.75, 0.6)
+texture_path = "res://assets/pixel/background/colony.png"
+used_rect = Rect2(469, 160, 497, 331)
 
-[sub_resource type="Resource" id="Resource_rjgwb"]
+[sub_resource type="Resource" id="Resource_psaqe"]
 script = ExtResource("bg_script")
 texture = ExtResource("3_3vyts")
 offset = Vector2(993.7828, -1361.9727)
 parallax = 0.4
 scale = 1.2
 rotation_degrees = 40.0
+texture_path = "res://assets/pixel/background/solar.png"
+used_rect = Rect2(50, 107, 887, 380)
 
-[sub_resource type="Resource" id="Resource_6ur6i"]
+[sub_resource type="Resource" id="Resource_rjgwb"]
 script = ExtResource("bg_script")
 texture = ExtResource("4_pmvkf")
 offset = Vector2(-191.7809, -129.1954)
+texture_path = "res://assets/pixel/background/asteroid_b.png"
+used_rect = Rect2(43, 26, 77, 76)
 
-[sub_resource type="Resource" id="Resource_vt7nj"]
+[sub_resource type="Resource" id="Resource_6ur6i"]
 script = ExtResource("bg_script")
 texture = ExtResource("5_fkgl6")
 offset = Vector2(-425.6096, 419.38715)
+texture_path = "res://assets/pixel/background/asteroid_a.png"
+used_rect = Rect2(29, 9, 94, 99)
 
-[sub_resource type="Resource" id="Resource_g1k3m"]
+[sub_resource type="Resource" id="Resource_vt7nj"]
 script = ExtResource("bg_script")
 texture = ExtResource("6_bab1x")
 offset = Vector2(-141.14066, -390.97345)
 parallax = 0.7
 scale = 1.4
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
 
-[sub_resource type="Resource" id="Resource_vv5jg"]
+[sub_resource type="Resource" id="Resource_g1k3m"]
 script = ExtResource("bg_script")
 texture = ExtResource("7_fkgl6")
 offset = Vector2(4007.9856, -784.17163)
 parallax = 0.5
 scale = 1.4
 tint = Color(0.55, 0.65, 0.75, 0.9)
+texture_path = "res://assets/pixel/background/planet_a.png"
+used_rect = Rect2(126, 96, 477, 477)
 
-[sub_resource type="Resource" id="Resource_qrqj0"]
+[sub_resource type="Resource" id="Resource_vv5jg"]
 script = ExtResource("bg_script")
 texture = ExtResource("8_bab1x")
 offset = Vector2(2710.7993, 856.8749)
 parallax = 0.4
 scale = 1.3
+texture_path = "res://assets/pixel/background/station_a.png"
+used_rect = Rect2(360, 215, 701, 354)
 
-[sub_resource type="Resource" id="Resource_8jnq7"]
+[sub_resource type="Resource" id="Resource_qrqj0"]
 script = ExtResource("bg_script")
 texture = ExtResource("9_mwefo")
 offset = Vector2(2788.6362, -1720.3271)
 parallax = 0.6
 scale = 1.4
 rotation_degrees = -20.0
+texture_path = "res://assets/pixel/background/station_b.png"
+used_rect = Rect2(549, 117, 260, 436)
 
-[sub_resource type="Resource" id="Resource_dyeu7"]
+[sub_resource type="Resource" id="Resource_8jnq7"]
 script = ExtResource("bg_script")
 texture = ExtResource("10_05gyn")
 offset = Vector2(439.6783, 1507.744)
 parallax = 0.3
 scale = 4.0
 rotation_degrees = 20.0
+texture_path = "res://assets/pixel/background/planet_b.png"
+used_rect = Rect2(35, 174, 747, 355)
+
+[sub_resource type="Resource" id="Resource_dyeu7"]
+script = ExtResource("bg_script")
+texture = ExtResource("11_mpbfx")
+offset = Vector2(4270.4556, 916.0774)
+parallax = 0.5
+texture_path = "res://assets/pixel/background/planet_e.png"
+used_rect = Rect2(116, 92, 572, 564)
+
+[sub_resource type="Resource" id="Resource_bopot"]
+script = ExtResource("bg_script")
+texture = ExtResource("12_vh3c5")
+offset = Vector2(-438.89392, -1093.4185)
+parallax = 0.3
+scale = 0.8
+texture_path = "res://assets/pixel/background/planet_d.png"
+used_rect = Rect2(108, 69, 692, 662)
+
+[sub_resource type="Resource" id="Resource_lt8h4"]
+script = ExtResource("bg_script")
+texture = ExtResource("13_02yv8")
+offset = Vector2(3096.7568, 2678.1362)
+parallax = 0.7
+scale = 2.5999999999999996
+texture_path = "res://assets/pixel/background/planet_c.png"
+used_rect = Rect2(61, 147, 583, 581)
+
+[sub_resource type="Resource" id="Resource_47wyc"]
+script = ExtResource("bg_script")
+texture = ExtResource("14_vh3c5")
+offset = Vector2(1874.5034, -111.27124)
+parallax = 0.6
+rotation_degrees = 30.0
+texture_path = "res://assets/pixel/background/driller.png"
+used_rect = Rect2(108, 60, 375, 327)
 
 [sub_resource type="Resource" id="Resource_3ghul"]
 script = ExtResource("1_3ghul")
@@ -477,9 +534,9 @@ points = PackedVector2Array(0, 0, 27, 0, 33, 17, 60, 29, 80, 29, 90, 9, 122, 9, 
 [resource]
 script = ExtResource("1")
 index = 4
-planet_texture_path = "res://assets/pixel/background/centered/planet_f.png"
 clear_bonus = 700
-backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_psaqe"), SubResource("Resource_rjgwb"), SubResource("Resource_6ur6i"), SubResource("Resource_vt7nj"), SubResource("Resource_g1k3m"), SubResource("Resource_vv5jg"), SubResource("Resource_qrqj0"), SubResource("Resource_8jnq7"), SubResource("Resource_dyeu7")])
+planet_texture_path = "res://assets/pixel/background/centered/planet_f.png"
+backgrounds = Array[ExtResource("bg_script")]([SubResource("Resource_dnw1w"), SubResource("Resource_psaqe"), SubResource("Resource_rjgwb"), SubResource("Resource_6ur6i"), SubResource("Resource_vt7nj"), SubResource("Resource_g1k3m"), SubResource("Resource_vv5jg"), SubResource("Resource_qrqj0"), SubResource("Resource_8jnq7"), SubResource("Resource_dyeu7"), SubResource("Resource_bopot"), SubResource("Resource_lt8h4"), SubResource("Resource_47wyc")])
 scene_path = "res://scenes/stages/stage_4.tscn"
 phases = [SubResource("Resource_4bt7u"), SubResource("Resource_pmvkf"), SubResource("Resource_fkgl6"), SubResource("Resource_bab1x"), SubResource("Resource_unpfa"), SubResource("Resource_mwefo"), SubResource("Resource_05gyn"), SubResource("Resource_s6gwe"), SubResource("Resource_0kp78"), SubResource("Resource_g5w3b")]
 enemies = Array[StringName]([&"aquarius", &"biter", &"bomber", &"cross", &"dolphin", &"reticle", &"splitter", &"telescope", &"corona"])
