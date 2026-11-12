@@ -3,13 +3,113 @@
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_aepvt"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="2_5plhc"]
+[ext_resource type="Texture2D" uid="uid://b7rqout8bpgfj" path="res://assets/pixel/background/planet_c.png" id="2_cnhb3"]
+[ext_resource type="Texture2D" uid="uid://rkin7mrvujlr" path="res://assets/pixel/background/driller.png" id="2_esfk7"]
 [ext_resource type="PackedScene" uid="uid://c7lv3gs5b6ybn" path="res://data/formations/s2_beamer.tscn" id="3_hhbsv"]
+[ext_resource type="Texture2D" uid="uid://c8h7tnjigs1n8" path="res://assets/pixel/background/planet_a.png" id="3_k0r5q"]
+[ext_resource type="Texture2D" uid="uid://x2vwl62iaak0" path="res://assets/pixel/background/planet_e.png" id="4_cnhb3"]
 [ext_resource type="PackedScene" uid="uid://c2bfyhrynkq2f" path="res://data/formations/s2_ruler.tscn" id="4_ttetq"]
+[ext_resource type="Texture2D" uid="uid://clpquq7aoceco" path="res://assets/pixel/background/space_debris.png" id="5_0kvk0"]
 [ext_resource type="PackedScene" uid="uid://cur5vh0jpoy0c" path="res://data/formations/s2_shield.tscn" id="5_3y6x8"]
+[ext_resource type="Texture2D" uid="uid://gf58m1qarphv" path="res://assets/pixel/background/station_a.png" id="6_7hkhu"]
 [ext_resource type="PackedScene" uid="uid://cagn3eqtiqrgr" path="res://data/formations/s2_telescope.tscn" id="6_fv8bx"]
+[ext_resource type="Texture2D" uid="uid://bm5mbtuu1o5mj" path="res://assets/pixel/background/planet_b.png" id="7_axpqg"]
 [ext_resource type="PackedScene" uid="uid://dix03w6vstef7" path="res://data/formations/s2_crab.tscn" id="7_esfk7"]
+[ext_resource type="Texture2D" uid="uid://d1fo4ol823m6g" path="res://assets/pixel/background/radar_base.png" id="9_0kvk0"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_5plhc"]
+[ext_resource type="Texture2D" uid="uid://tjjeljuu2pbc" path="res://assets/pixel/background/planet_f.png" id="10_0kvk0"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_hhbsv"]
+
+[sub_resource type="Resource" id="Resource_cv5ny"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("2_cnhb3")
+offset = Vector2(477.75488, 1266.4144)
+parallax = 0.3
+texture_path = "res://assets/pixel/background/planet_c.png"
+used_rect = Rect2(61, 147, 583, 581)
+
+[sub_resource type="Resource" id="Resource_6fing"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("3_k0r5q")
+offset = Vector2(-769.72156, -26.23964)
+parallax = 0.3
+texture_path = "res://assets/pixel/background/planet_a.png"
+used_rect = Rect2(126, 96, 477, 477)
+
+[sub_resource type="Resource" id="Resource_6otkm"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("2_esfk7")
+offset = Vector2(1379.4265, -654.1365)
+parallax = 0.6
+scale = 2.5
+texture_path = "res://assets/pixel/background/driller.png"
+used_rect = Rect2(108, 60, 375, 327)
+
+[sub_resource type="Resource" id="Resource_8p7g0"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("4_cnhb3")
+offset = Vector2(4732.379, -2156.1821)
+parallax = 0.7
+scale = 2.0
+tint = Color(0.55, 0.65, 0.75, 0.5)
+texture_path = "res://assets/pixel/background/planet_e.png"
+used_rect = Rect2(116, 92, 572, 564)
+
+[sub_resource type="Resource" id="Resource_t0ib2"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("5_0kvk0")
+offset = Vector2(1850.7174, -713.8346)
+parallax = 0.8
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
+
+[sub_resource type="Resource" id="Resource_yrm00"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("5_0kvk0")
+offset = Vector2(749.8784, -930.7286)
+parallax = 0.9
+scale = 1.7
+rotation_degrees = 30.0
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
+
+[sub_resource type="Resource" id="Resource_pajg5"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("6_7hkhu")
+offset = Vector2(4007.8154, 1275.6731)
+parallax = 0.6
+scale = 2.5
+rotation_degrees = 60.0
+texture_path = "res://assets/pixel/background/station_a.png"
+used_rect = Rect2(360, 215, 701, 354)
+
+[sub_resource type="Resource" id="Resource_36yfd"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("7_axpqg")
+offset = Vector2(-288.7455, -2547.575)
+parallax = 0.6
+scale = 2.3
+texture_path = "res://assets/pixel/background/planet_b.png"
+used_rect = Rect2(35, 174, 747, 355)
+
+[sub_resource type="Resource" id="Resource_v37jp"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("9_0kvk0")
+offset = Vector2(2375.5723, -2591.714)
+parallax = 0.8
+scale = 1.7
+rotation_degrees = -20.0
+texture_path = "res://assets/pixel/background/radar_base.png"
+used_rect = Rect2(193, 57, 396, 453)
+
+[sub_resource type="Resource" id="Resource_dlaah"]
+script = ExtResource("1_aepvt")
+texture = ExtResource("10_0kvk0")
+offset = Vector2(2192.5554, 1961.2213)
+parallax = 0.8
+scale = 2.5
+texture_path = "res://assets/pixel/background/planet_f.png"
+used_rect = Rect2(68, 90, 630, 634)
 
 [sub_resource type="Resource" id="Resource_esfk7"]
 script = ExtResource("2_5plhc")
@@ -262,71 +362,6 @@ time = 661.0
 length = 313.0
 interval = 5.0
 
-[sub_resource type="Resource" id="Resource_hhbsv"]
-script = ExtResource("9_5plhc")
-start = 386.0
-pop_from = 90.0
-pop_to = 120.0
-rate = 12.0
-mix = {
-"missile": 1.6,
-"splitter": 1.5
-}
-id = &"phase_347783990498013494"
-display_name = "4回目の育成"
-
-[sub_resource type="Resource" id="Resource_5plhc"]
-script = ExtResource("9_5plhc")
-start = 415.0
-pop_from = 90.0
-pop_to = 120.0
-rate = 12.0
-attack_budget = 5
-mix = {
-"missile": 1.6,
-"splitter": 1.5
-}
-id = &"phase_6374603078355179547"
-display_name = "ボス前ラッシュ"
-
-[sub_resource type="Resource" id="Resource_ttetq"]
-script = ExtResource("9_5plhc")
-start = 475.0
-pop_from = 90.0
-pop_to = 120.0
-rate = 12.0
-attack_budget = 4
-mix = {
-"missile": 1.6,
-"splitter": 1.5
-}
-id = &"phase_6315931189886180248"
-display_name = "ボス戦"
-
-[sub_resource type="Resource" id="Resource_vp438"]
-script = ExtResource("9_5plhc")
-start = 661.0
-pop_from = 90.0
-pop_to = 120.0
-rate = 12.0
-attack_budget = 4
-mix = {
-"missile": 1.6,
-"splitter": 1.5
-}
-id = &"phase_9125328042912577426"
-display_name = "ボス後強化"
-
-[sub_resource type="Resource" id="Resource_fv8bx"]
-script = ExtResource("10_hhbsv")
-type = &"splitter"
-points = PackedVector2Array(0, 10, 10, 23, 27, 8, 37, 21, 53, 24, 56, 0, 66, 13, 121, 16, 136, 12, 140, 33, 165, 31, 170, 12, 260, 18, 267, 41, 284, 43, 290, 19, 383, 14, 390, 36, 409, 47, 418, 19, 475, 32, 482, 0, 660, 0, 663, 37)
-
-[sub_resource type="Resource" id="Resource_0kvk0"]
-script = ExtResource("10_hhbsv")
-type = &"defender"
-points = PackedVector2Array(0, 0, 10, 198, 39, 179, 55, 53, 57, 304, 97, 170, 134, 288, 136, 45, 152, 103, 169, 51, 171, 336, 259, 329, 261, 57, 267, 174, 277, 48, 285, 178, 290, 65, 291, 367, 311, 202, 332, 412, 360, 254, 386, 378, 386.1, 0, 393, 143, 407, 143, 415, 0, 418, 214, 430, 170, 441, 527, 454, 325, 464, 519, 476, 444, 485, 0, 654, 12, 662, 361)
-
 [sub_resource type="Resource" id="Phase_stage2_build1"]
 script = ExtResource("9_5plhc")
 pop_from = 14.0
@@ -407,11 +442,77 @@ mix = {
 id = &"escape"
 display_name = "3回目の山"
 
+[sub_resource type="Resource" id="Resource_hhbsv"]
+script = ExtResource("9_5plhc")
+start = 386.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+mix = {
+"missile": 1.6,
+"splitter": 1.5
+}
+id = &"phase_347783990498013494"
+display_name = "4回目の育成"
+
+[sub_resource type="Resource" id="Resource_5plhc"]
+script = ExtResource("9_5plhc")
+start = 415.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+attack_budget = 5
+mix = {
+"missile": 1.6,
+"splitter": 1.5
+}
+id = &"phase_6374603078355179547"
+display_name = "ボス前ラッシュ"
+
+[sub_resource type="Resource" id="Resource_ttetq"]
+script = ExtResource("9_5plhc")
+start = 475.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+attack_budget = 4
+mix = {
+"missile": 1.6,
+"splitter": 1.5
+}
+id = &"phase_6315931189886180248"
+display_name = "ボス戦"
+
+[sub_resource type="Resource" id="Resource_vp438"]
+script = ExtResource("9_5plhc")
+start = 661.0
+pop_from = 90.0
+pop_to = 120.0
+rate = 12.0
+attack_budget = 4
+mix = {
+"missile": 1.6,
+"splitter": 1.5
+}
+id = &"phase_9125328042912577426"
+display_name = "ボス後強化"
+
+[sub_resource type="Resource" id="Resource_fv8bx"]
+script = ExtResource("10_hhbsv")
+type = &"splitter"
+points = PackedVector2Array(0, 10, 10, 23, 27, 8, 37, 21, 53, 24, 56, 0, 66, 13, 121, 16, 136, 12, 140, 33, 165, 31, 170, 12, 260, 18, 267, 41, 284, 43, 290, 19, 383, 14, 390, 36, 409, 47, 418, 19, 475, 32, 482, 0, 660, 0, 663, 37)
+
+[sub_resource type="Resource" id="Resource_0kvk0"]
+script = ExtResource("10_hhbsv")
+type = &"defender"
+points = PackedVector2Array(0, 0, 10, 198, 39, 179, 55, 53, 57, 304, 97, 170, 134, 288, 136, 45, 152, 103, 169, 51, 171, 336, 259, 329, 261, 57, 267, 174, 277, 48, 285, 178, 290, 65, 291, 367, 311, 202, 332, 412, 360, 254, 386, 378, 386.1, 0, 393, 143, 407, 143, 415, 0, 418, 214, 430, 170, 441, 527, 454, 325, 464, 519, 476, 444, 485, 0, 654, 12, 662, 361)
+
 [resource]
 script = ExtResource("1")
 index = 2
-planet_texture_path = "res://assets/pixel/background/centered/planet_d.png"
 clear_bonus = 300
+planet_texture_path = "res://assets/pixel/background/centered/planet_d.png"
+backgrounds = Array[ExtResource("1_aepvt")]([SubResource("Resource_cv5ny"), SubResource("Resource_6fing"), SubResource("Resource_6otkm"), SubResource("Resource_8p7g0"), SubResource("Resource_t0ib2"), SubResource("Resource_yrm00"), SubResource("Resource_pajg5"), SubResource("Resource_36yfd"), SubResource("Resource_v37jp"), SubResource("Resource_dlaah")])
 scene_path = "res://scenes/stages/stage_2.tscn"
 phases = [SubResource("Phase_stage2_build1"), SubResource("Phase_stage2_pressure"), SubResource("Phase_stage2_build2"), SubResource("Phase_stage2_rampage"), SubResource("Phase_stage2_tension"), SubResource("Phase_stage2_escape"), SubResource("Resource_hhbsv"), SubResource("Resource_5plhc"), SubResource("Resource_ttetq"), SubResource("Resource_vp438")]
 enemies = Array[StringName]([&"beamer", &"crab", &"defender", &"ruler", &"shield", &"splitling", &"splitter", &"telescope"])

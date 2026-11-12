@@ -2,14 +2,111 @@
 
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="1"]
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_2vgpk"]
+[ext_resource type="Texture2D" uid="uid://b7rqout8bpgfj" path="res://assets/pixel/background/planet_c.png" id="2_beaf5"]
 [ext_resource type="Script" uid="uid://d0672r8x2mkv7" path="res://scripts/data_types/spawn_clip.gd" id="2_mgob6"]
 [ext_resource type="PackedScene" uid="uid://b5ynln1hy5dmj" path="res://data/formations/s3_lynx.tscn" id="3_gibww"]
+[ext_resource type="Texture2D" uid="uid://c8h7tnjigs1n8" path="res://assets/pixel/background/planet_a.png" id="3_yo0rm"]
+[ext_resource type="Texture2D" uid="uid://c3cwwuke74vrn" path="res://assets/pixel/background/colony.png" id="4_f46h8"]
 [ext_resource type="PackedScene" uid="uid://psh27x4c22fn" path="res://data/formations/s3_marlin.tscn" id="4_p4nfj"]
 [ext_resource type="PackedScene" uid="uid://2jtm8qsrcrj1" path="res://data/formations/s3_corona.tscn" id="5_d6uyw"]
+[ext_resource type="Texture2D" uid="uid://c3iyce7kbg8je" path="res://assets/pixel/background/moon.png" id="5_l47yt"]
 [ext_resource type="PackedScene" uid="uid://dck8igaktitco" path="res://data/formations/s3_phoenix.tscn" id="6_fori7"]
+[ext_resource type="Texture2D" uid="uid://ds783bbf476x4" path="res://assets/pixel/background/planet_d.png" id="6_q0ddx"]
 [ext_resource type="PackedScene" uid="uid://cndq41mk8akpn" path="res://data/formations/s3_auriga.tscn" id="7_2vgpk"]
+[ext_resource type="Texture2D" uid="uid://tjjeljuu2pbc" path="res://assets/pixel/background/planet_f.png" id="7_iwkbi"]
+[ext_resource type="Texture2D" uid="uid://b8em170lls2yd" path="res://assets/pixel/background/satellite_c.png" id="8_7wela"]
+[ext_resource type="Texture2D" uid="uid://clpquq7aoceco" path="res://assets/pixel/background/space_debris.png" id="9_5d1dk"]
 [ext_resource type="Script" uid="uid://bgcaj84fkc4ln" path="res://scripts/data_types/phase_def.gd" id="9_mgob6"]
 [ext_resource type="Script" uid="uid://docg5tx55gg1y" path="res://scripts/data_types/spawn_curve.gd" id="10_gibww"]
+[ext_resource type="Texture2D" uid="uid://bqfiq1operinu" path="res://assets/pixel/background/station_b.png" id="10_luhxi"]
+
+[sub_resource type="Resource" id="Resource_kpaf0"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("2_beaf5")
+offset = Vector2(-778.3369, -478.45648)
+parallax = 0.3
+texture_path = "res://assets/pixel/background/planet_c.png"
+used_rect = Rect2(61, 147, 583, 581)
+
+[sub_resource type="Resource" id="Resource_ariil"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("3_yo0rm")
+offset = Vector2(-6.354248, 1000.5934)
+parallax = 0.4
+scale = 1.4000000000000001
+texture_path = "res://assets/pixel/background/planet_a.png"
+used_rect = Rect2(126, 96, 477, 477)
+
+[sub_resource type="Resource" id="Resource_fucdt"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("4_f46h8")
+offset = Vector2(2958.0479, 572.0364)
+parallax = 0.4
+scale = 3.0
+rotation_degrees = 80.0
+texture_path = "res://assets/pixel/background/colony.png"
+used_rect = Rect2(469, 160, 497, 331)
+
+[sub_resource type="Resource" id="Resource_m2oi8"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("5_l47yt")
+offset = Vector2(1904.8512, 1139.8102)
+parallax = 0.4
+scale = 2.0
+texture_path = "res://assets/pixel/background/moon.png"
+used_rect = Rect2(3, 1, 94, 94)
+
+[sub_resource type="Resource" id="Resource_546xu"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("6_q0ddx")
+offset = Vector2(4260.384, -1443.013)
+parallax = 0.55
+scale = 2.0
+texture_path = "res://assets/pixel/background/planet_d.png"
+used_rect = Rect2(108, 69, 692, 662)
+
+[sub_resource type="Resource" id="Resource_jxj5i"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("7_iwkbi")
+offset = Vector2(1031.2566, -2161.1829)
+parallax = 0.7
+scale = 3.5
+texture_path = "res://assets/pixel/background/planet_f.png"
+used_rect = Rect2(68, 90, 630, 634)
+
+[sub_resource type="Resource" id="Resource_sfivi"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("8_7wela")
+offset = Vector2(1973.9338, 2327.746)
+parallax = 0.8
+scale = 1.6
+texture_path = "res://assets/pixel/background/satellite_c.png"
+used_rect = Rect2(144, 115, 418, 391)
+
+[sub_resource type="Resource" id="Resource_nyxk7"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("9_5d1dk")
+offset = Vector2(3800, 273.80453)
+parallax = 0.4
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
+
+[sub_resource type="Resource" id="Resource_2p7nx"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("9_5d1dk")
+offset = Vector2(2500, 700)
+parallax = 0.45
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
+
+[sub_resource type="Resource" id="Resource_ti5au"]
+script = ExtResource("1_2vgpk")
+texture = ExtResource("10_luhxi")
+offset = Vector2(2753.1772, -846.73346)
+parallax = 0.8
+scale = 2.0
+texture_path = "res://assets/pixel/background/station_b.png"
+used_rect = Rect2(549, 117, 260, 436)
 
 [sub_resource type="Resource" id="Resource_ruix5"]
 script = ExtResource("2_mgob6")
@@ -319,8 +416,9 @@ points = PackedVector2Array(0, 0, 37, 37, 59, 35, 66, 16, 78, 33, 91, 22, 108, 3
 [resource]
 script = ExtResource("1")
 index = 3
-planet_texture_path = "res://assets/pixel/background/centered/planet_e.png"
 clear_bonus = 500
+planet_texture_path = "res://assets/pixel/background/centered/planet_e.png"
+backgrounds = Array[ExtResource("1_2vgpk")]([SubResource("Resource_kpaf0"), SubResource("Resource_ariil"), SubResource("Resource_fucdt"), SubResource("Resource_m2oi8"), SubResource("Resource_546xu"), SubResource("Resource_jxj5i"), SubResource("Resource_sfivi"), SubResource("Resource_nyxk7"), SubResource("Resource_2p7nx"), SubResource("Resource_ti5au")])
 scene_path = "res://scenes/stages/stage_3.tscn"
 phases = [SubResource("Phase_stage3_build1"), SubResource("Phase_stage3_pressure"), SubResource("Phase_stage3_build2"), SubResource("Phase_stage3_rampage"), SubResource("Phase_stage3_tension"), SubResource("Phase_stage3_escape"), SubResource("Resource_gibww"), SubResource("Resource_p4nfj"), SubResource("Resource_d6uyw"), SubResource("Resource_eal8u"), SubResource("Resource_uagtc")]
 enemies = Array[StringName]([&"auriga", &"bomber", &"corona", &"hound", &"lynx", &"marlin", &"phoenix", &"splitter"])
