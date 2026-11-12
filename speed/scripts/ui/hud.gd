@@ -15,6 +15,10 @@ const RING_FLASH_TIME := 0.3
 ## 制作済みの色・円帯・目盛りと、3周目以降の間隔
 const BOOST_STYLE := preload("res://data/visuals/boost_gauge_runtime.tres")
 const RING_GAP := 7.0
+const PAUSE_FRAME := preload("res://assets/ui/pause/pause_ui.png")
+const PAUSE_BUTTONS := preload("res://assets/ui/pause/pause_ui_buttons.png")
+const PAUSE_REGION := Rect2(188, 31, 267, 299)
+const PAUSE_SCALE := 0.7
 const SETTINGS_SCENE := preload("res://scenes/app/settings.tscn")
 ## 装備一覧の枠の大きさ（素材のpx）
 const LOADOUT_SLOT := 16.0
@@ -105,7 +109,7 @@ var _loadout_key := ""
 var _music_started := false
 var _health_fill: AtlasTexture
 var _experience_fill: AtlasTexture
-var _pause_box: VBoxContainer
+var _pause_box: Control
 var _review_pause_guide: Node
 var _review_entry: Button
 var _draw_button: Button
@@ -228,10 +232,10 @@ func _process(delta: float) -> void:
 		_review_entry.visible = _pause_box.visible
 		if _review_entry.visible:
 			_review_entry.size = _review_entry.get_combined_minimum_size()
-			var right := _pause_box.position.x + _pause_box.size.x + 24
+			var right := _pause_box.position.x + _pause_box.size.x * _pause_box.scale.x + 24
 			var fit := clampf((size.x - right - 16) / _review_entry.size.x, 0.1, 1.0)
 			_review_entry.scale = Vector2.ONE * fit
-			_review_entry.position = Vector2(right, _pause_box.position.y + (_pause_box.size.y - _review_entry.size.y * fit) * 0.5)
+			_review_entry.position = Vector2(right, _pause_box.position.y + (_pause_box.size.y * _pause_box.scale.y - _review_entry.size.y * fit) * 0.5)
 			if SaveManager.has_done_tutorial() and not SaveManager.settings.get("review_guide_pause", false) and not is_instance_valid(_review_pause_guide):
 				_review_pause_guide = preload("res://scripts/ui/review_guide.gd").new()
 				add_child(_review_pause_guide)
@@ -410,47 +414,53 @@ static func card_info(c: Dictionary, trait_max_stacks := -1) -> Dictionary:
 # ── ポーズ ───────────────────────────────────────────────────────
 
 func _build_pause() -> void:
-	_pause_box = VBoxContainer.new()
-	_pause_box.set_anchors_preset(Control.PRESET_CENTER)
-	_pause_box.grow_horizontal = Control.GROW_DIRECTION_BOTH
-	_pause_box.grow_vertical = Control.GROW_DIRECTION_BOTH
-	_pause_box.add_theme_constant_override("separation", 14)
+	_pause_box = Control.new()
+	_pause_box.name = "PauseMenu"
+	_pause_box.size = PAUSE_REGION.size
+	_pause_box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pause_box.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_pause_box.visible = false
-	var title := Label.new()
-	title.text = "hud.pause"
-	title.add_theme_font_size_override("font_size", 40)
-	title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_pause_box.add_child(title)
-	var resume := Button.new()
-	resume.text = "hud.resume"
-	resume.custom_minimum_size = Vector2(320, 52)
-	resume.pressed.connect(func(): bridge.command("pause",{"paused":false}))
-	_pause_box.add_child(resume)
-
-	var settings := Button.new()
-	settings.text = "menu.settings"
-	settings.custom_minimum_size = Vector2(320, 52)
-	settings.pressed.connect(_open_settings.bind(settings))
-	_pause_box.add_child(settings)
-	var codex := Button.new()
-	codex.name = "CodexButton"
-	codex.text = "menu.encyclopedia"
-	codex.custom_minimum_size = Vector2(320, 52)
-	codex.pressed.connect(_open_codex.bind(codex))
-	_pause_box.add_child(codex)
-	var guide := Button.new()
-	guide.name = "GuideButton"
-	guide.text = "tutorial.guide"
-	guide.custom_minimum_size = Vector2(320, 52)
-	guide.pressed.connect(_open_guide.bind(guide))
-	_pause_box.add_child(guide)
-	var quit := Button.new()
-	quit.name = "QuitButton"
-	quit.text = "hud.quit_run"
-	quit.custom_minimum_size = Vector2(320, 52)
-	quit.pressed.connect(_confirm_abort)
-	_pause_box.add_child(quit)
+	var frame := TextureRect.new()
+	var frame_texture := AtlasTexture.new()
+	frame_texture.atlas = PAUSE_FRAME
+	frame_texture.region = PAUSE_REGION
+	frame.texture = frame_texture
+	frame.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_pause_box.add_child(frame)
+	var names := ["ResumeButton", "SettingsButton", "CodexButton", "GuideButton", "QuitButton"]
+	var labels := ["hud.resume", "menu.settings", "menu.encyclopedia", "tutorial.guide", "hud.quit_run"]
+	for i in names.size():
+		var button := TextureButton.new()
+		button.name = names[i]
+		button.tooltip_text = tr(labels[i])
+		button.focus_mode = Control.FOCUS_ALL
+		var texture := AtlasTexture.new()
+		texture.atlas = PAUSE_BUTTONS
+		texture.region = Rect2(230, 80 + i * 48, 182, 42)
+		button.texture_normal = texture
+		button.position = texture.region.position - PAUSE_REGION.position
+		button.mouse_entered.connect(_tint_pause_button.bind(button))
+		button.mouse_exited.connect(_tint_pause_button.bind(button))
+		button.focus_entered.connect(_tint_pause_button.bind(button))
+		button.focus_exited.connect(_tint_pause_button.bind(button))
+		_pause_box.add_child(button)
+		match i:
+			0: button.pressed.connect(func(): bridge.command("pause", {"paused": false}))
+			1: button.pressed.connect(_open_settings.bind(button))
+			2: button.pressed.connect(_open_codex.bind(button))
+			3: button.pressed.connect(_open_guide.bind(button))
+			4: button.pressed.connect(_confirm_abort)
+	for i in names.size():
+		var button := _pause_box.get_child(i + 1) as TextureButton
+		var previous := button.get_path_to(_pause_box.get_child(posmod(i - 1, names.size()) + 1))
+		var next := button.get_path_to(_pause_box.get_child((i + 1) % names.size() + 1))
+		button.focus_previous = previous
+		button.focus_neighbor_top = previous
+		button.focus_next = next
+		button.focus_neighbor_bottom = next
 	add_child(_pause_box)
+	resized.connect(_layout_pause)
+	_layout_pause()
 	if SaveManager.is_review_build():
 		_review_entry = Button.new()
 		_review_entry.name = "ReviewSettingsButton"
@@ -470,7 +480,15 @@ func _build_pause() -> void:
 		_review_entry.hide()
 		add_child(_review_entry)
 
-func _open_codex(from: Button) -> void:
+func _layout_pause() -> void:
+	var factor := minf(size.x / ART_SIZE.x, size.y / ART_SIZE.y) * PAUSE_SCALE
+	_pause_box.scale = Vector2.ONE * factor
+	_pause_box.position = ((size - _pause_box.size * factor) * 0.5).round()
+
+func _tint_pause_button(button: TextureButton) -> void:
+	button.self_modulate = Color(1.25, 1.25, 1.25) if button.has_focus() or button.is_hovered() else Color.WHITE
+
+func _open_codex(from: BaseButton) -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
 	var page := (load("res://scenes/app/encyclopedia.tscn") as PackedScene).instantiate() as UiScreen
 	from.grab_focus()
@@ -483,7 +501,7 @@ func _open_codex(from: Button) -> void:
 	AudioManager.play(&"ui.common.confirm")
 
 ## ポーズ中に操作ガイドを重ねて開く。
-func _open_guide(from: Button) -> void:
+func _open_guide(from: BaseButton) -> void:
 	if int(_cpp_ui.get("phase",-1)) != Phase.Paused or not can_show_menu_overlay(): return
 	var page: UiScreen = preload("res://scripts/ui/tutorial_guide.gd").new()
 	from.grab_focus()
@@ -517,7 +535,7 @@ func _confirm_abort() -> void:
 			dialog.queue_free())
 
 ## ポーズ中に設定を重ねて開く。戻ると閉じてポーズに戻る。
-func _open_settings(from: Button) -> void:
+func _open_settings(from: BaseButton) -> void:
 	AudioManager.play(&"ui.common.confirm")
 	_settings = SETTINGS_SCENE.instantiate() as UiScreen
 	_settings.close_fn = func():
