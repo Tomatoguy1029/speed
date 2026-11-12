@@ -193,7 +193,9 @@ func _present_cpp(delta: float) -> void:
 	frame_view.show()
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
 	var finale_camera: bool = frame_view.finale_camera_active()
-	cpp_background.update_frame(frame.camera,bool(frame.ui.get("cinematic_camera",false)),frame_view.finale_camera_roll() if finale_camera else 0.0,frame_view.finale_camera_push() if finale_camera else 1.0)
+	# ボス撃破の演出もカットシーンとして、寄り引きの間は背景を固定する。
+	var hold_background: bool = frame.ui.get("cinematic_camera",false) or frame.ui.get("boss_finish",{}).get("active",false)
+	cpp_background.update_frame(frame.camera,hold_background,frame_view.finale_camera_roll() if finale_camera else 0.0,frame_view.finale_camera_push() if finale_camera else 1.0)
 	frame_view.update_effects(frame,delta)
 	frame_view.update_reference_effects(frame,delta)
 	shake=maxf(shake,frame_view.ruler_shake)
