@@ -1,4 +1,4 @@
-## 全部の音の欄。インスペクタでは分類・項目ごとに折りたたんで並べ、合成音・音なしの欄は名前に印を付ける。
+## 全部の音の欄。インスペクタでは分類・項目ごとに折りたたんで並べ、プリセット・合成音・音なしの欄は名前に印を付ける。
 ## 欄の一覧は sound_slots.gd、値の正は共有の音づけ表（設計書 13）。
 @tool
 class_name SoundTable
@@ -7,6 +7,7 @@ extends Resource
 const SLOTS = preload("res://scripts/data_types/sound_slots.gd")
 const SYNTH_MARK := "（合成音）"
 const SILENT_MARK := "（音なし）"
+const PRESET_MARK := "（プリセット："
 
 ## 欄ID → SoundEntry。インスペクタには下の分類つきの項目として出す。
 @export_storage var entries: Dictionary = {}
@@ -31,7 +32,9 @@ func _get_property_list() -> Array[Dictionary]:
 			out.append({"name": section, "type": TYPE_NIL, "usage": PROPERTY_USAGE_SUBGROUP, "hint_string": group + "/" + section + "/"})
 		var item := entry(row[0])
 		var mark := ""
-		if item != null: mark = SILENT_MARK if item.silent else SYNTH_MARK if item.is_synth() else ""
+		if item != null:
+			if item.preset != "": mark = PRESET_MARK + item.preset + "）"
+			mark += SILENT_MARK if item.silent else SYNTH_MARK if item.is_synth() else ""
 		var name := base + mark
 		out.append({"name": name, "type": TYPE_OBJECT, "hint": PROPERTY_HINT_RESOURCE_TYPE, "hint_string": "SoundEntry", "usage": PROPERTY_USAGE_EDITOR})
 	return out
@@ -56,4 +59,6 @@ func _id(property: StringName) -> StringName:
 	if _paths.is_empty():
 		for row: Array in SLOTS.ROWS: _paths[_base(row)] = StringName(row[0])
 	var name := String(property).trim_suffix(SYNTH_MARK).trim_suffix(SILENT_MARK)
+	var at := name.rfind(PRESET_MARK)
+	if at >= 0 and name.ends_with("）"): name = name.left(at)
 	return _paths.get(name, &"")

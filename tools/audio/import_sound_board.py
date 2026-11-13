@@ -5,6 +5,8 @@
 効果音は使う範囲で切り出して speed/assets/audio/sfx/board/<欄ID>.wav に、曲はそのまま
 speed/assets/audio/music/board/<欄ID>.<拡張子> に置く。曲の範囲とループは実行時に当てる。
 既存の素材と同じ音を切らずに使う欄は、既存の素材をそのまま参照する。
+プリセット（is_preset の文書）は欄の一覧に入れない。プリセットを使う欄は、プリセットの音と設定で鳴らし、
+音のファイルはプリセットごとに1つだけ <プリセットID>.wav（曲はそのまま）に置いて共有する。
 欄の一覧を speed/scripts/data_types/sound_slots.gd に書き出し、Godot で import してから
 speed/tools/audio/apply_sound_board.gd で speed/assets/audio/sound_table.tres を上書きする。
 
@@ -37,6 +39,10 @@ SYNTH = {
     "boss.common.roar": (90.0, 38.0, 1.0, "saw"),
     "boss.common.explode": (120.0, 30.0, 0.5, "noise"),
 }
+
+
+# プリセットから欄へ写す値。音なし・ループするかどうかは欄ごとに持つ。
+PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start")
 
 
 def load_slots(folder: Path) -> list[dict]:
@@ -117,11 +123,32 @@ def number(d: dict, key: str, default: float) -> float:
     return float(value) if isinstance(value, (int, float)) else default
 
 
+def split_presets(docs: list[dict]) -> tuple[list[dict], dict[str, dict]]:
+    """欄とプリセットに分け、プリセットを使う欄にプリセットの音と設定を写す。"""
+    presets = {d["_id"]: d for d in docs if d.get("is_preset")}
+    slots = []
+    for d in docs:
+        if d.get("is_preset"):
+            continue
+        preset = presets.get(d.get("preset") or "")
+        if preset is not None:
+            d = {k: v for k, v in d.items() if k not in PRESET_KEYS and k != "repo"}
+            d.update({k: preset[k] for k in PRESET_KEYS if k in preset})
+            d["_preset"] = preset["_id"]
+            d["_preset_label"] = str(preset.get("label") or preset["_id"]).replace("/", "／")
+        slots.append(d)
+    if not slots:
+        sys.exit("欄が見つかりません")
+    return slots, presets
+
+
 def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[dict]:
     plan = []
     kept: set[Path] = set()
     for d in slots:
         sid, music = d["_id"], d.get("kind") == "music"
+        # プリセットの欄は、プリセットごとの1つのファイルを共有する
+        name = d.get("_preset") or sid
         row = {
             "id": sid,
             "stream": "",
@@ -134,6 +161,7 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             "trim_start": 0.0,
             "trim_end": 0.0,
             "loop_start": number(d, "loop_start", 0.0),
+            "preset": d.get("_preset_label", ""),
         }
         if music:
             row["trim_start"] = number(d, "trim_start", 0.0)
@@ -148,12 +176,14 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             if original is not None and original.exists() and original.read_bytes() == raw and (music or uncut(d)):
                 row["stream"] = f"res://assets/audio/{folder}/{d['repo']}"
             elif music:
-                out = project / MUSIC_BOARD / (sid + suffix)
-                out.parent.mkdir(parents=True, exist_ok=True)
-                out.write_bytes(raw)
+                out = project / MUSIC_BOARD / (name + suffix)
+                if out not in kept:
+                    out.parent.mkdir(parents=True, exist_ok=True)
+                    out.write_bytes(raw)
             else:
-                out = project / SFX_BOARD / (sid + ".wav")
-                cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out)
+                out = project / SFX_BOARD / (name + ".wav")
+                if out not in kept:
+                    cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out)
             if not row["stream"]:
                 kept.add(out)
                 row["stream"] = "res://" + out.relative_to(project).as_posix()
@@ -207,7 +237,7 @@ def main() -> None:
     if shutil.which("afconvert") is None:
         sys.exit("afconvert がありません（macOS で実行してください）")
     project = args.project.resolve()
-    slots = load_slots(args.slots)
+    slots, presets = split_presets(load_slots(args.slots))
     write_slot_list(slots, project)
     plan = build_plan(slots, args.assets, project)
     with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False, encoding="utf-8") as handle:
@@ -219,7 +249,8 @@ def main() -> None:
     finally:
         os.unlink(plan_path)
     add_uids(project)
-    print(f"{len(plan)}欄を取り込みました（音あり {sum(1 for r in plan if r['stream'])}欄）")
+    linked = sum(1 for r in plan if r["preset"])
+    print(f"{len(plan)}欄を取り込みました（音あり {sum(1 for r in plan if r['stream'])}欄、プリセット {len(presets)}個を {linked}欄で使用）")
 
 
 if __name__ == "__main__":

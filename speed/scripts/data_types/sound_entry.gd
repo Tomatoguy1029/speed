@@ -16,6 +16,8 @@ extends Resource
 @export_range(0, 32) var max_voices := 0
 ## 止めるまで繰り返す。
 @export var loop := false
+## 使っているプリセットの名前。空ならこの欄だけの音。同じプリセットの欄は同じ音のファイルと設定で鳴る。
+@export var preset := ""
 
 @export_group("BGM")
 ## 曲の再生を始める位置（秒）。
