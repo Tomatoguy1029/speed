@@ -53,6 +53,11 @@ func sync_frame(values: Dictionary, ship: Dictionary, clock: float, view: Rect2)
 			_flash = maxf(0.0,0.1-beam.age)
 		for item: Dictionary in beams:
 			if item.get("id",-1)==beam.id: item.age = beam.age
+	# 寿命が尽きた個体には次の年齢が届かないので、フレームから消えた時点で回収する。
+	for i in range(beams.size()-1,-1,-1):
+		if not alive.has(beams[i].get("id",-1)):
+			beams[i].node.queue_free()
+			beams.remove_at(i)
 	_frame_seen = alive
 func frame_event(event: Dictionary) -> void:
 	if event.type==&"kill": on_event(event)
