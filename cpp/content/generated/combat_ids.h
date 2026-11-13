@@ -1034,7 +1034,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::Crash: return field=="pos" || field=="power";
     case EventType::Ring: return field=="pos" || field=="radius" || field=="color" || field=="life" || field=="visual_key";
     case EventType::Shoot: return field=="pos" || field=="kind";
-    case EventType::EnemyLaserCharge: return field=="id" || field=="row";
+    case EventType::EnemyLaserCharge: return field=="id" || field=="row" || field=="time";
     case EventType::EnemyLaserFire: return field=="id";
     case EventType::EnemyLaserCancel: return field=="id";
     case EventType::CrystalDrop: return field=="id" || field=="kind" || field=="base_xp" || field=="source" || field=="enemy" || field=="enemy_id" || field=="spawn_t" || field=="spawn_world_t" || field=="pos" || field=="new_supply" || field=="ground_count" || field=="carrier_id" || field=="origin" || field=="xp";

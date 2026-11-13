@@ -49,7 +49,7 @@ void RulerBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     const auto direction=godot::Vector2::from_angle(e.facing);e.timer-=dt;
     if (e.mode==EnemyMode::Dash) {
         const auto normal=godot::Vector2(-direction.y,direction.x);EnemyMotion::steer(e,s.ship_pos+normal*(double(v.side)*p.half_gap)-direction*p.emit_back,p.deploy_speed,6,dt,tracking);
-        if (e.timer<=0) {e.mode=EnemyMode::Windup;e.timer=p.warn;godot::Dictionary event;event["id"]=e.id;event["row"]=int64_t(row);FrameBuilder::append(r,"enemy_laser_charge",event);}return;
+        if (e.timer<=0) {e.mode=EnemyMode::Windup;e.timer=p.warn;godot::Dictionary event;event["id"]=e.id;event["row"]=int64_t(row);event["time"]=p.warn;FrameBuilder::append(r,"enemy_laser_charge",event);}return;
     }
     e.vel*=std::max(0.0,1-8*dt);
     if (e.mode==EnemyMode::Windup) {
