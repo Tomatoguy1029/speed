@@ -34,6 +34,15 @@ intro.scene6.1,行き交う船は襲われ、コロニーは破壊されてい�
 intro.scene6.2,かつて星々に導かれていた銀河は、もはや安全に旅することすら叶わない世界へと変わり果ててしまった。,
 intro.scene7.1,それでも、あの日機体に宿った星の光は、今も消えていない。,
 intro.scene7.2,失われた星々を取り戻し、すべての元凶であるあの影を討つため、一人のパイロットが再び宇宙へと旅立った。,
+,■ エンディング,
+ending.scene1.1,長い戦いの末、巨竜はついに倒れた。,
+ending.scene1.2,その身に囚われていた北極星は、再び本来の輝きを取り戻し、こぐま座の星々とともに夜空へと帰っていった。,
+ending.scene2.1,元凶を失った怪物たちは次々と崩れ去り、奪われていた星々が解き放たれていく。,
+ending.scene2.2,かつての美しい星空が、銀河に戻り始めていた。,
+ending.scene3.1,星々の光を道しるべに、宇宙船が再び銀河を行き交う。,
+ending.scene3.2,長く途絶えていた航路が開かれ、人々の暮らしにも少しずつ平穏が戻っていった。,
+ending.scene4.1,そして、一人のパイロットもまた、新たな航海へと旅立つ。,
+ending.scene4.2,今度は、あの日失われた北極星の光に導かれながら。,
 intro.draw,お手本の線に沿って描く（クリックで開始）,Follow the example path; click to begin
 intro.confirm,お手本をなぞり、もう一度クリックで突進,"Follow the example, then click again to dash"
 intro.touch,「描く」を押し、お手本の線をなぞる,"Tap Draw, then follow the example path"

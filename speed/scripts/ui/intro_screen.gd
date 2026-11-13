@@ -4,6 +4,8 @@ extends Control
 const STORY := preload("res://scripts/ui/intro_story.gd")
 const ART_SIZE := Vector2(640, 360)
 
+@export var story: Script = STORY
+
 @export_range(5.0, 100.0, 1.0) var characters_per_second := 28.0
 @export_range(0.0, 10.0, 0.1) var text_hold_seconds := 2.8
 @export_range(0.0, 3.0, 0.05) var scene_fade_seconds := 0.8
@@ -123,9 +125,9 @@ func _show_scene(index: int) -> void:
 	_transitioning = true
 	_text.text = ""
 	_next.disabled = true
-	var data: Dictionary = STORY.SCENES[index]
+	var data: Dictionary = story.SCENES[index]
 	var fade_target: CanvasItem
-	if index == 1:
+	if data.get("overlay", false):
 		# Scene1の原画を残し、竜のレイヤーだけを重ねてフェードする。
 		fade_target = _art(data.layers[1], _picture)
 	else:
@@ -158,7 +160,7 @@ func _begin_paragraph() -> void:
 	_transitioning = false
 	_characters = 0.0
 	_hold = 0.0
-	_text.text = tr(STORY.SCENES[scene_index].text[paragraph_index])
+	_text.text = tr(story.SCENES[scene_index].text[paragraph_index])
 	_text.visible_characters = 0
 	_next.disabled = false
 	_next.tooltip_text = tr("intro.reveal")
@@ -187,12 +189,12 @@ func advance() -> void:
 		_next.tooltip_text = tr("intro.next")
 		_hold = 0.0
 		return
-	if paragraph_index + 1 < STORY.SCENES[scene_index].text.size():
+	if paragraph_index + 1 < story.SCENES[scene_index].text.size():
 		paragraph_index += 1
 		_begin_paragraph()
 	elif not _stars.is_empty():
 		_fade_stars()
-	elif scene_index + 1 < STORY.SCENES.size():
+	elif scene_index + 1 < story.SCENES.size():
 		_show_scene(scene_index + 1)
 	else:
 		_finish()
@@ -214,7 +216,8 @@ func _gui_input(event: InputEvent) -> void:
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
-		GameManager.back()
+		if story.IS_ENDING: _finish()
+		else: GameManager.back()
 	elif event.is_action_pressed("ui_accept") or (event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed) or (event is InputEventScreenTouch and event.pressed):
 		get_viewport().set_input_as_handled()
 		advance()
@@ -225,4 +228,5 @@ func _finish() -> void:
 	_ending = true
 	if _transition != null:
 		_transition.kill()
-	GameManager.finish_intro()
+	if story.IS_ENDING: GameManager.finish_ending()
+	else: GameManager.finish_intro()
