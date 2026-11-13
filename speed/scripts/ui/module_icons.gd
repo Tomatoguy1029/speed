@@ -9,8 +9,11 @@ const IDS := [
 	"T07", "T34", "T10", "T31", "T35", "T36", "T11", "T12", "T37",
 ]
 
+## 原画ではミラージュが8枠目、アークフィールドが9枠目。図鑑順はIDSに保つ。
+const SLOT_OVERRIDES := {"W17": 8, "W27": 7}
+
 static func texture_for(definition: Resource) -> Texture2D:
-	var index := IDS.find(String(definition.id))
+	var index: int = SLOT_OVERRIDES.get(String(definition.id), IDS.find(String(definition.id)))
 	if index < 0:
 		return definition.icon_texture
 	var atlas := AtlasTexture.new()
