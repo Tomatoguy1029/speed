@@ -12,6 +12,7 @@ const SCREENS := {
 	GameManager.Screen.ENCYCLOPEDIA: "res://scenes/app/encyclopedia.tscn",
 	GameManager.Screen.RESULT: "res://scenes/app/result.tscn",
 	GameManager.Screen.INTRO: "res://scenes/app/intro.tscn",
+	GameManager.Screen.ENDING: "res://scenes/app/ending.tscn",
 }
 
 var _current: Node = null
@@ -51,7 +52,8 @@ func _show(screen: GameManager.Screen) -> void:
 	var request := _screen_request
 	var fade: bool = (
 		(_displayed_screen == GameManager.Screen.STAGE_SELECT and screen == GameManager.Screen.RUN)
-		or (_displayed_screen == GameManager.Screen.RUN and screen == GameManager.Screen.RESULT)
+		or (_displayed_screen == GameManager.Screen.RUN and screen in [GameManager.Screen.RESULT, GameManager.Screen.ENDING])
+		or (_displayed_screen == GameManager.Screen.ENDING and screen == GameManager.Screen.RESULT)
 		or (_displayed_screen == GameManager.Screen.RESULT and screen in [GameManager.Screen.RUN, GameManager.Screen.MAIN_MENU])
 	)
 	if fade:
@@ -88,7 +90,7 @@ func _sync_screen_music(screen: GameManager.Screen) -> void:
 		AudioManager.play_music(&"music.stage_select", 0.6, self)
 	elif screen == GameManager.Screen.RESULT and not GameManager.last_result.get("cleared", false):
 		AudioManager.play_music(&"music.game_over", 1.0, self)
-	elif screen == GameManager.Screen.INTRO:
+	elif screen in [GameManager.Screen.INTRO, GameManager.Screen.ENDING]:
 		AudioManager.stop_music()
 	else:
 		AudioManager.play_music(&"music.menu", 0.6, self)

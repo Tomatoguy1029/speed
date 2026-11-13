@@ -2575,6 +2575,8 @@
       "cause",
       "source",
       "technique",
+      "borrowed_technique",
+      "borrowed_source",
       "requested",
       "amount",
       "accepted",

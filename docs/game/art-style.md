@@ -112,6 +112,10 @@
 
 編集元は `speed/assets/ui/intro/template.aseprite`。制作時に `speed/tools/art/export_intro.lua` で各レイヤーを原寸キャンバスのPNGへ書き出し、再生時は `scripts/ui/intro_story.gd` の固定参照を使う。場面のフェード時間・文字速度・全文表示後の待機時間・星の消える速さは導入シーンのInspectorで調整する。
 
+### エンディング
+
+`assets/ui/ending/ending_scene1.png`〜`ending_scene4.png` を原画の640×360の配置で表示する。北極星の解放、銀河の星々の解放、航路とコロニーの復旧、パイロットの旅立ちの順に再生する。`scripts/ui/ending_story.gd` が場面を保持し、導入と同じ画面・共通フレーム・フォント・文字送り・自動再生設定・フェードを使う。文章は[ゲーム内文言](text.md)、再生の入口と出口は[画面の流れ](../spec.md#3-画面の流れ)に従う。
+
 ### 3.9 星のかけら
 
 | 種類 | 基調色 |

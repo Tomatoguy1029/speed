@@ -995,7 +995,7 @@ inline bool event_field_allowed(EventType type, std::string_view field) {
     case EventType::ClipGroupEnd: return field=="clip" || field=="key";
     case EventType::ClipGroup: return field=="clip" || field=="key" || field=="n";
     case EventType::CombatDamage: return field=="pos" || field=="target" || field=="struck_id" || field=="target_id" || field=="cause" || field=="weapon_id" || field=="requested" || field=="resolved" || field=="applied" || field=="overkill" || field=="discarded" || field=="hp_before" || field=="hp_after" || field=="reason" || field=="impact" || field=="shatter_depth";
-    case EventType::CombatPlayerDamage: return field=="pos" || field=="cause" || field=="source" || field=="technique" || field=="requested" || field=="amount" || field=="accepted" || field=="reason" || field=="hp_before" || field=="hp_after" || field=="observation_id" || field=="effect_id";
+    case EventType::CombatPlayerDamage: return field=="pos" || field=="cause" || field=="source" || field=="technique" || field=="borrowed_technique" || field=="borrowed_source" || field=="requested" || field=="amount" || field=="accepted" || field=="reason" || field=="hp_before" || field=="hp_after" || field=="observation_id" || field=="effect_id";
     case EventType::CriticalHit: return field=="pos" || field=="enemy_pos" || field=="r" || field=="dir";
     case EventType::DebrisTrail: return field=="points" || field=="color" || field=="life";
     case EventType::DrawStart: return false;

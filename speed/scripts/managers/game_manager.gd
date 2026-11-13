@@ -4,7 +4,7 @@
 ## screen_changed を受けて、対応する画面のシーンに差し替える。
 extends Node
 
-enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB, BACKGROUND_LAB, INTRO }
+enum Screen { TITLE, SETTINGS, MAIN_MENU, STAGE_SELECT, UPGRADE, ENCYCLOPEDIA, RUN, RESULT, ENEMY_LAB, BACKGROUND_LAB, INTRO, ENDING }
 
 signal screen_ready(view: Control)
 ## 起動側から加える画面。
@@ -36,7 +36,7 @@ func goto(next: Screen, push := true) -> void:
 		return
 	if screen == Screen.INTRO and next == Screen.INTRO:
 		return
-	if push and screen != next and screen != Screen.RUN and screen != Screen.RESULT:
+	if push and screen != next and screen != Screen.RUN and screen != Screen.RESULT and screen != Screen.ENDING:
 		_history.append(screen)
 	screen = next
 	screen_changed.emit(next)
@@ -75,6 +75,15 @@ func start_run(stage: int, endless := false) -> void:
 func finish_run(result: Dictionary) -> void:
 	if not SaveManager.record_run(result): return
 	last_result = result
+	var stage := ContentManager.stage(int(result.get("stage", 0)))
+	if result.get("cleared", false) and not result.get("endless", false) and stage != null and stage.boss_id == &"draco":
+		goto(Screen.ENDING, false)
+	else:
+		goto(Screen.RESULT, false)
+
+## 報酬・記録はラン終了時に確定済み。EDの終了では画面だけを進める。
+func finish_ending() -> void:
+	if screen != Screen.ENDING or screen_transition_active: return
 	goto(Screen.RESULT, false)
 
 ## ランを途中でやめてメインメニューへ戻る。そのランの部品と記録は残さない（仕様書 3）。
