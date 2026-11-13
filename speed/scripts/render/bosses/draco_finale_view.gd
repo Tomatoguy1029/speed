@@ -7,12 +7,10 @@ const SHIP := preload("res://assets/pixel/airship.png")
 const FINAL_SHIP := preload("res://assets/pixel/legendary/starship_final.png")
 const FINAL_SHIP_SIZE := Vector2(39,57)
 const FLAME := preload("res://assets/pixel/airship_blue_flame.png")
-## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。決着の光の層へ描く。
+## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。決着の光の層へ金の濃淡で塗って描く。
 const URSA_MINOR := preload("res://assets/pixel/ursa_minor/ursa_minor.png")
 const URSA_FRAME := Vector2(200,160)
 const URSA_SCALE := 2.0
-## 光の層へ足す濃さ。
-const BEAR_LIGHT := 0.5
 ## 各コマの尾の先。コマの中心からの位置で、北極星をここへ置く。
 const URSA_TAILS := [Vector2(-56,-57),Vector2(-56,-57),Vector2(-76,-45),Vector2(-96,-30)]
 ## 決着で合体する順番：船尾、竜骨、帆、羅針盤。
@@ -43,6 +41,8 @@ var f := {}
 var stage := ""
 var t := 0.0
 var clock := 0.0
+var _bear_canvas: Node2D
+var _bear_material: ShaderMaterial
 var zoom := 1.0
 var view_rect := Rect2()
 var times := {}
@@ -91,6 +91,14 @@ func _ready() -> void:
 	_dim = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_dim)
 	_fx_port = _port(FX_SIZE)
 	_fx = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_fx,_fx_port)
+	_bear_canvas = Node2D.new()
+	_bear_material = ShaderMaterial.new()
+	_bear_material.shader = preload("res://shaders/draco_finale_bear.gdshader")
+	_bear_material.set_shader_parameter("noise",preload("res://assets/effects/build/boss_finish_noise.png"))
+	_bear_canvas.material = _bear_material
+	_bear_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_bear_canvas.draw.connect(_draw_bear)
+	_fx.add_child(_bear_canvas)
 	_wide_port = _port(Vector2i(160,90),_fx_port)
 	_far_port = _port(Vector2i(48,27),_wide_port)
 	_fine_port = _port(Vector2i(1280,720))
@@ -294,6 +302,8 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_under.queue_redraw()
 	_stage_shake()
 	for node: Node2D in [_grade,_back,_dim,_fx,_hi,_mix,_top,_over]: node.queue_redraw()
+	_bear_material.set_shader_parameter("time",clock)
+	_bear_canvas.queue_redraw()
 
 func set_shake_offset(offset: Vector2) -> void:
 	_shake_offset = offset
@@ -452,7 +462,6 @@ func _fx_release() -> void:
 	var bear := _bear()
 	if bear.fade<=0.0: return
 	var inhale := _smooth(2.25,2.7,rel)*(1.0-_smooth(2.7,2.8,rel))
-	if bear.form>0.0: _draw_bear(bear,BEAR_LIGHT)
 	_star(core.lerp(bear.tail,_smooth(1.1,2.0,rel)) if bear.form>0.0 else core,(60.0+inhale*40.0)*(1.0+exp(-q*3.0)),Color("#cfe8ff"),bear.fade)
 
 ## こぐま座の位置・濃さ・コマ。核の解放で現れ、合体の始めに消える。
@@ -463,10 +472,14 @@ func _bear() -> Dictionary:
 	return {"at":at,"frame":frame,"tail":at+Vector2(URSA_TAILS[frame])*URSA_SCALE,
 		"form":_smooth(1.2,2.2,rel),"fade":1.0-_smooth(0.4,1.2,t) if stage=="combine" else 1.0}
 
-## 光の層へ描き、決着の光の合成でにじませて光でできた像にする。
-func _draw_bear(bear: Dictionary, alpha: float) -> void:
+## 光の層の中で金の濃淡に塗り、決着の光の合成でにじませて光でできた像にする。
+func _draw_bear() -> void:
+	if stage!="release" and stage!="combine": return
+	var bear := _bear()
+	var alpha := float(bear.form)*float(bear.fade)
+	if alpha<=0.0: return
 	var size_ := URSA_FRAME*URSA_SCALE
-	_fx.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,float(bear.form)*float(bear.fade)*alpha))
+	_bear_canvas.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,alpha))
 
 func _star(at: Vector2, radius: float, color: Color, alpha: float) -> void:
 	_glow(at,radius*1.4,color,alpha)
