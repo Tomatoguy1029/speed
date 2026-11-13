@@ -7,10 +7,12 @@ const SHIP := preload("res://assets/pixel/airship.png")
 const FINAL_SHIP := preload("res://assets/pixel/legendary/starship_final.png")
 const FINAL_SHIP_SIZE := Vector2(39,57)
 const FLAME := preload("res://assets/pixel/airship_blue_flame.png")
-## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。
+## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。決着の光の層へ描く。
 const URSA_MINOR := preload("res://assets/pixel/ursa_minor/ursa_minor.png")
 const URSA_FRAME := Vector2(200,160)
 const URSA_SCALE := 2.0
+## 光の層へ足す濃さ。
+const BEAR_LIGHT := 0.5
 ## 各コマの尾の先。コマの中心からの位置で、北極星をここへ置く。
 const URSA_TAILS := [Vector2(-56,-57),Vector2(-56,-57),Vector2(-76,-45),Vector2(-96,-30)]
 ## 決着で合体する順番：船尾、竜骨、帆、羅針盤。
@@ -450,7 +452,7 @@ func _fx_release() -> void:
 	var bear := _bear()
 	if bear.fade<=0.0: return
 	var inhale := _smooth(2.25,2.7,rel)*(1.0-_smooth(2.7,2.8,rel))
-	if bear.form>0.0: _draw_bear(_fx,bear,0.35)
+	if bear.form>0.0: _draw_bear(bear,BEAR_LIGHT)
 	_star(core.lerp(bear.tail,_smooth(1.1,2.0,rel)) if bear.form>0.0 else core,(60.0+inhale*40.0)*(1.0+exp(-q*3.0)),Color("#cfe8ff"),bear.fade)
 
 ## こぐま座の位置・濃さ・コマ。核の解放で現れ、合体の始めに消える。
@@ -461,9 +463,10 @@ func _bear() -> Dictionary:
 	return {"at":at,"frame":frame,"tail":at+Vector2(URSA_TAILS[frame])*URSA_SCALE,
 		"form":_smooth(1.2,2.2,rel),"fade":1.0-_smooth(0.4,1.2,t) if stage=="combine" else 1.0}
 
-func _draw_bear(canvas: Node2D, bear: Dictionary, alpha: float) -> void:
+## 光の層へ描き、決着の光の合成でにじませて光でできた像にする。
+func _draw_bear(bear: Dictionary, alpha: float) -> void:
 	var size_ := URSA_FRAME*URSA_SCALE
-	canvas.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,float(bear.form)*float(bear.fade)*alpha))
+	_fx.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,float(bear.form)*float(bear.fade)*alpha))
 
 func _star(at: Vector2, radius: float, color: Color, alpha: float) -> void:
 	_glow(at,radius*1.4,color,alpha)
@@ -902,12 +905,7 @@ func _docked_count() -> int:
 
 func _draw_top() -> void:
 	match stage:
-		"release":
-			var bear := _bear()
-			if bear.form>0.0: _draw_bear(_top,bear,1.0)
 		"combine":
-			var bear := _bear()
-			if bear.form>0.0 and bear.fade>0.0: _draw_bear(_top,bear,1.0)
 			for i in 4:
 				var start := 0.25+i*0.16
 				var dock := DOCK_FIRST+i*DOCK_STEP

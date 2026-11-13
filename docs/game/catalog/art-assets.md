@@ -83,7 +83,7 @@
 
 本体の元データは `speed/assets/pixel/draco/draco_with_normals_planar.aseprite`。同フォルダの部位画像と法線を [`draco_parts.gd`](../../../speed/scripts/bosses/draco_parts.gd) で表示する。口の独立素材・開閉差分と核の専用絵の要否は未決。用途と動作は[通常攻撃](../bosses/draco.md#4-通常攻撃)・[主な技](../bosses/draco.md#5-主な技)、見た目は[素材と演出](../bosses/draco.md#8-素材と演出)を参照。
 
-子犬の絵は[最終決着](../bosses/draco.md#23-hp0から最終決着)の核の解放で現れる「こぐま座」として使う。0〜2コマ目を溜めに、3コマ目を吠える姿に当て、尾の先に北極星を置く。表示は [`draco_finale_view.gd`](../../../speed/scripts/render/bosses/draco_finale_view.gd) が行う。
+子犬の絵は[最終決着](../bosses/draco.md#23-hp0から最終決着)の核の解放で現れる「こぐま座」として使う。0〜2コマ目を溜めに、3コマ目を吠える姿に当て、尾の先に北極星を置く。絵は決着の光の層へ描き、光の合成でにじませて光でできた像として見せる。表示は [`draco_finale_view.gd`](../../../speed/scripts/render/bosses/draco_finale_view.gd) が行う。
 
 ピカロは竜の全身複製も含め、元の敵・竜本体の原画を共用する。見た目と生成演出は[りゅう座仕様](../bosses/draco.md#82-ピカロの表現と生成)、グラフィックス側の調整は[グラフィック改善ポイントの GFX-008](../graphics-improvements.md#ピカロの見た目)を参照する。
 
