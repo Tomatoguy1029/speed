@@ -7,8 +7,9 @@ const SHIP := preload("res://assets/pixel/airship.png")
 const FINAL_SHIP := preload("res://assets/pixel/legendary/starship_final.png")
 const FINAL_SHIP_SIZE := Vector2(39,57)
 const FLAME := preload("res://assets/pixel/airship_blue_flame.png")
-## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。決着の光の層へ金の濃淡で塗って描く。
-const URSA_MINOR := preload("res://assets/pixel/ursa_minor/ursa_minor.png")
+## 核の解放で吠えるこぐま座。200×160の4コマを横に並べた絵で、溜めてから3コマ目で吠える。
+## 体は琥珀の星雲に塗ってくっきり描き、外側の光だけを決着の光の層でにじませる。
+const URSA_MINOR := preload("res://assets/pixel/ursa_minor/ursa_minor_parts.png")
 const URSA_FRAME := Vector2(200,160)
 const URSA_SCALE := 2.0
 ## 各コマの尾の先。コマの中心からの位置で、北極星をここへ置く。
@@ -42,6 +43,7 @@ var stage := ""
 var t := 0.0
 var clock := 0.0
 var _bear_canvas: Node2D
+var _bear_halo: Node2D
 var _bear_material: ShaderMaterial
 var zoom := 1.0
 var view_rect := Rect2()
@@ -91,14 +93,9 @@ func _ready() -> void:
 	_dim = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_dim)
 	_fx_port = _port(FX_SIZE)
 	_fx = _canvas(CanvasItemMaterial.BLEND_MODE_ADD,_draw_fx,_fx_port)
-	_bear_canvas = Node2D.new()
-	_bear_material = ShaderMaterial.new()
-	_bear_material.shader = preload("res://shaders/draco_finale_bear.gdshader")
-	_bear_material.set_shader_parameter("noise",preload("res://assets/effects/build/boss_finish_noise.png"))
-	_bear_canvas.material = _bear_material
-	_bear_canvas.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	_bear_canvas.draw.connect(_draw_bear)
-	_fx.add_child(_bear_canvas)
+	var halo_material := ShaderMaterial.new()
+	halo_material.shader = preload("res://shaders/draco_finale_bear_halo.gdshader")
+	_bear_halo = _bear_layer(halo_material,_fx)
 	_wide_port = _port(Vector2i(160,90),_fx_port)
 	_far_port = _port(Vector2i(48,27),_wide_port)
 	_fine_port = _port(Vector2i(1280,720))
@@ -117,6 +114,10 @@ func _ready() -> void:
 	_mix.material = _mix_material
 	_top = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_top)
 	_top.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_bear_material = ShaderMaterial.new()
+	_bear_material.shader = preload("res://shaders/draco_finale_bear.gdshader")
+	_bear_material.set_shader_parameter("noise",preload("res://assets/effects/build/boss_finish_noise.png"))
+	_bear_canvas = _bear_layer(_bear_material,_top)
 	_over = _canvas(CanvasItemMaterial.BLEND_MODE_MIX,_draw_over)
 	var gradient := Gradient.new()
 	gradient.offsets = PackedFloat32Array([0.0,0.18,0.5,1.0])
@@ -302,8 +303,10 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_under.queue_redraw()
 	_stage_shake()
 	for node: Node2D in [_grade,_back,_dim,_fx,_hi,_mix,_top,_over]: node.queue_redraw()
-	_bear_material.set_shader_parameter("time",clock)
+	_bear_material.set_shader_parameter("time",t if stage=="release" else 4.0+t)
+	_bear_material.set_shader_parameter("linear_output",linear)
 	_bear_canvas.queue_redraw()
+	_bear_halo.queue_redraw()
 
 func set_shake_offset(offset: Vector2) -> void:
 	_shake_offset = offset
@@ -472,14 +475,21 @@ func _bear() -> Dictionary:
 	return {"at":at,"frame":frame,"tail":at+Vector2(URSA_TAILS[frame])*URSA_SCALE,
 		"form":_smooth(1.2,2.2,rel),"fade":1.0-_smooth(0.4,1.2,t) if stage=="combine" else 1.0}
 
-## 光の層の中で金の濃淡に塗り、決着の光の合成でにじませて光でできた像にする。
-func _draw_bear() -> void:
+func _bear_layer(material_: ShaderMaterial, parent: Node2D) -> Node2D:
+	var node := Node2D.new()
+	node.material = material_
+	node.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	node.draw.connect(_draw_bear.bind(node))
+	parent.add_child(node)
+	return node
+
+func _draw_bear(canvas: Node2D) -> void:
 	if stage!="release" and stage!="combine": return
 	var bear := _bear()
 	var alpha := float(bear.form)*float(bear.fade)
 	if alpha<=0.0: return
 	var size_ := URSA_FRAME*URSA_SCALE
-	_bear_canvas.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,alpha))
+	canvas.draw_texture_rect_region(URSA_MINOR,Rect2(Vector2(bear.at)-size_*0.5,size_),Rect2(Vector2(int(bear.frame)*URSA_FRAME.x,0),URSA_FRAME),Color(1,1,1,alpha))
 
 func _star(at: Vector2, radius: float, color: Color, alpha: float) -> void:
 	_glow(at,radius*1.4,color,alpha)

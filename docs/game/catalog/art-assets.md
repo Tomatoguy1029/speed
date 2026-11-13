@@ -79,11 +79,11 @@
 | 竜の尾 | 必須 | 通常攻撃の薙ぎ払いに使う尾。長い全身につながる形 | `tail_joint.png`・`tail_tip.png` と法線を組込済み。背骨の最後の2節に配置 |
 | 合体後の伝説の機体 | 必須 | 最終決着で4部品が合体した後の機体。連撃・残像・最後の突進に使用 | `assets/pixel/legendary/starship_final.aseprite` と同名PNGを組込済み。元画像60×150、表示は39×57の2コマを各100msで再生 |
 | 北極星の核 | 必須 | 竜の核となる、こぐま座の北極星。HP0で解放される部分 | サイズ・本体との分割・位置や見せ方・差分・枚数は未決 |
-| 最後のカットシーンで吠える子犬 | 必須 | 最後のカットシーンで、子犬が吠える姿 | `assets/pixel/ursa_minor/ursa_minor.aseprite` と同名PNGを組込済み。1コマ200×160の4コマ（溜めから吠えるまで）を横に並べ、2倍で表示 |
+| 最後のカットシーンで吠える子犬 | 必須 | 最後のカットシーンで、子犬が吠える姿 | `assets/pixel/ursa_minor/ursa_minor.aseprite` を組込済み。1コマ200×160の4コマ（溜めから吠えるまで）。レイヤーは後ろ脚・胴・脚・頭・尾。表示は2倍 |
 
 本体の元データは `speed/assets/pixel/draco/draco_with_normals_planar.aseprite`。同フォルダの部位画像と法線を [`draco_parts.gd`](../../../speed/scripts/bosses/draco_parts.gd) で表示する。口の独立素材・開閉差分と核の専用絵の要否は未決。用途と動作は[通常攻撃](../bosses/draco.md#4-通常攻撃)・[主な技](../bosses/draco.md#5-主な技)、見た目は[素材と演出](../bosses/draco.md#8-素材と演出)を参照。
 
-子犬の絵は[最終決着](../bosses/draco.md#23-hp0から最終決着)の核の解放で現れる「こぐま座」として使う。0〜2コマ目を溜めに、3コマ目を吠える姿に当て、尾の先に北極星を置く。絵からは形と部位の重なりだけを読み、[`draco_finale_bear.gdshader`](../../../speed/shaders/draco_finale_bear.gdshader) が重なりの深さに応じた金の濃淡と淡い金のふちで塗り、流れる光の筋と瞬く点を乗せる。決着の光の層へ描き、光の合成でにじませる。表示は [`draco_finale_view.gd`](../../../speed/scripts/render/bosses/draco_finale_view.gd) が行う。
+子犬の絵は[最終決着](../bosses/draco.md#23-hp0から最終決着)の核の解放で現れる「こぐま座」として使う。0〜2コマ目を溜めに、3コマ目を吠える姿に当て、尾の先に北極星を置く。部位のレイヤーを後ろ脚が一番奥になるように重ね、[`bake_ursa_minor.py`](../../../speed/tools/art/bake_ursa_minor.py) が形・見えている後ろ脚・ふちまでの距離・上下の高さを `ursa_minor_parts.png` に焼く。絵を差し替えたらこの道具を実行し直す。[`draco_finale_bear.gdshader`](../../../speed/shaders/draco_finale_bear.gdshader) が体の中を琥珀から金の星雲とまばらに瞬く星で塗り、上ほど明るく、後ろ脚を暗く、外側のふちを淡い金に光らせる。外側の光は決着の光の層でにじませる。表示は [`draco_finale_view.gd`](../../../speed/scripts/render/bosses/draco_finale_view.gd) が行う。
 
 ピカロは竜の全身複製も含め、元の敵・竜本体の原画を共用する。見た目と生成演出は[りゅう座仕様](../bosses/draco.md#82-ピカロの表現と生成)、グラフィックス側の調整は[グラフィック改善ポイントの GFX-008](../graphics-improvements.md#ピカロの見た目)を参照する。
 
