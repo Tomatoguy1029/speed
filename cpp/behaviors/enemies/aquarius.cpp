@@ -77,6 +77,6 @@ void AquariusBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     std::vector<AttackHandle> volley;
     for (uint32_t k=0;k<p.beams;++k) {BeamParams beam;beam.position=source;beam.angle=angle+k*godot::Math::TAU/p.beams;beam.length=p.beam_length;beam.half_width=p.half_width*p.fx_size;beam.arc=p.spread;beam.delay=p.telegraph;beam.active=p.beam_time;beam.damage=p.damage;beam.color=color;beam.owner=self;if (e.attack_managed) beam.budget.value=budget.token(owner);const auto h=FloodSystem::emit(r,beam);if (const auto *record=AttackSystem::get(s,h)) {auto &visual=std::get<BeamHazard>(s.hazards[record->row].shape);visual.flood_index=k;visual.flood_reference=true;volley.push_back(h);}}
     if (!volley.empty()) {const int64_t group=AttackSystem::get(s,volley.front())->id;for (auto h:volley) if (const auto *record=AttackSystem::get(s,h)) std::get<BeamHazard>(s.hazards[record->row].shape).flood_group=group;}
-    e.mode=EnemyMode::Windup;e.timer=p.telegraph+p.beam_time;godot::Dictionary charge;charge["id"]=e.id;charge["row"]=row;FrameBuilder::append(r,"enemy_laser_charge",charge);
+    e.mode=EnemyMode::Windup;e.timer=p.telegraph+p.beam_time;godot::Dictionary charge;charge["id"]=e.id;charge["row"]=row;charge["time"]=p.telegraph;FrameBuilder::append(r,"enemy_laser_charge",charge);
 }
 }

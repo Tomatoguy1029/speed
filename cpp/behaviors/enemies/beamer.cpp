@@ -8,8 +8,8 @@
 #include <algorithm>
 namespace speed {
 namespace {
-void sound(RunRuntime &run,const char *type,uint32_t row,bool include_row=false) {
-    godot::Dictionary event;event["id"]=run.state.enemies[row].id;if (include_row) event["row"]=int64_t(row);
+void sound(RunRuntime &run,const char *type,uint32_t row,bool include_row=false,double time=0) {
+    godot::Dictionary event;event["id"]=run.state.enemies[row].id;if (include_row) {event["row"]=int64_t(row);event["time"]=time;}
     FrameBuilder::append(run,type,event);
 }
 }
@@ -29,7 +29,7 @@ void BeamerBehavior::step(RunRuntime &run,uint32_t row,double dt) {
         const TrackingPolicy tracking{state.draw.tracing,enemy.held,state.enemy_handles.contains(enemy.pump_owner)};
         const double angle=tracking.angle(enemy.facing,(state.enemy_aim-enemy.pos).angle());
         enemy.facing=angle;enemy.mode=Mode::Windup;enemy.timer=beam.telegraph+beam.beam_time;
-        sound(run,"enemy_laser_charge",row,true);
+        sound(run,"enemy_laser_charge",row,true,beam.telegraph);
         BeamParams params;params.owner=handle;params.style=BeamStyle::Guide;
         params.length=beam.beam_length;params.half_width=beam.half_width;params.delay=beam.telegraph;params.active=beam.beam_time;
         params.damage=beam.damage;params.color=definition.color.lightened(0.3);

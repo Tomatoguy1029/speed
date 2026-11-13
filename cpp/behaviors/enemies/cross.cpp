@@ -25,6 +25,6 @@ void CrossBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     EnemyMotion::steer(e,goal,e.speed,p.accel,dt,tracking);e.facing+=dt*1.5;e.fire_t-=dt;
     if (std::min(std::abs(delta.x),std::abs(delta.y))>p.align_tol || e.fire_t>0 || delta.length()>p.beam_length*0.8) return;
     BeamParams beam;beam.position=e.pos;beam.angle=0;beam.length=p.beam_length;beam.half_width=p.half_width;beam.delay=p.telegraph;beam.active=p.beam_time;beam.damage=p.damage;beam.color=d.color.lightened(0.3);beam.owner=self;if (e.attack_managed) beam.budget.value=budget.token(owner);
-    CrossSystem::emit(r,beam);e.vel={};e.mode=EnemyMode::Windup;e.timer=p.telegraph;e.facing=0;godot::Dictionary ev;ev["id"]=e.id;ev["row"]=row;FrameBuilder::append(r,"enemy_laser_charge",ev);
+    CrossSystem::emit(r,beam);e.vel={};e.mode=EnemyMode::Windup;e.timer=p.telegraph;e.facing=0;godot::Dictionary ev;ev["id"]=e.id;ev["row"]=row;ev["time"]=p.telegraph;FrameBuilder::append(r,"enemy_laser_charge",ev);
 }
 }

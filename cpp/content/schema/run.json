@@ -2761,7 +2761,8 @@
     ],
     "enemy_laser_charge": [
       "id",
-      "row"
+      "row",
+      "time"
     ],
     "enemy_laser_fire": [
       "id"

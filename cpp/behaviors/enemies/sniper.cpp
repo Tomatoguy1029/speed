@@ -13,7 +13,7 @@
 namespace speed {
 namespace {
 const SniperDefinition &definition(const RunRuntime &r,uint32_t row) {return r.content->snipers[r.content->definitions[r.state.enemies[row].definition].sniper_definition-1];}
-void event(RunRuntime &r,const char *name,uint32_t row) {godot::Dictionary d;d["id"]=r.state.enemies[row].id;if (std::string(name)=="enemy_laser_charge") d["row"]=int64_t(row);FrameBuilder::append(r,name,d);}
+void event(RunRuntime &r,const char *name,uint32_t row,double time=0) {godot::Dictionary d;d["id"]=r.state.enemies[row].id;if (std::string(name)=="enemy_laser_charge") {d["row"]=int64_t(row);d["time"]=time;}FrameBuilder::append(r,name,d);}
 void search(RunRuntime &r,uint32_t row,double dt) {
     auto &e=r.state.enemies[row];const auto &p=definition(r,row);const TrackingPolicy tracking{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)};
     const double sway=std::sin(e.age*2.0*godot::Math::PI/p.search_period+double(e.id))*p.search_sway;
@@ -76,6 +76,6 @@ void SniperBehavior::step(RunRuntime &r,uint32_t row,double dt) {
         godot::Dictionary out;out["pos"]=beam.position;out["angle"]=beam.angle;out["length"]=beam.length;out["width"]=p.laser_half_width*2.0;FrameBuilder::append(r,"telescope_fire",out);
         e.charge=0;e.mode=EnemyMode::Recover;e.timer=recovery;return;
     }
-    e.charge=std::min(1.0,e.charge+dt/p.lock_fill);if (e.charge>=1.0) {e.mode=EnemyMode::Windup;e.timer=p.laser_charge;godot::Dictionary out;out["pos"]=lens(e);FrameBuilder::append(r,"telescope_charge",out);event(r,"enemy_laser_charge",row);}
+    e.charge=std::min(1.0,e.charge+dt/p.lock_fill);if (e.charge>=1.0) {e.mode=EnemyMode::Windup;e.timer=p.laser_charge;godot::Dictionary out;out["pos"]=lens(e);FrameBuilder::append(r,"telescope_charge",out);event(r,"enemy_laser_charge",row,p.laser_charge);}
 }
 }
