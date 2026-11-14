@@ -15,12 +15,14 @@ speed/tools/audio/apply_sound_board.gd で speed/assets/audio/sound_table.tres �
 import argparse
 import base64
 import json
+import math
 import os
 import re
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import wave
 from pathlib import Path
 
@@ -121,6 +123,27 @@ def uncut(d: dict) -> bool:
 def number(d: dict, key: str, default: float) -> float:
     value = d.get(key)
     return float(value) if isinstance(value, (int, float)) else default
+
+
+# 取り込んだ時の値の印に使う値と、値がない時の値。音づけ表のページも同じ式で今の値の印を作り、
+# 取り込み後に変わった欄を示す。
+RECORD_KEYS = (("asset", ""), ("trim_start", 0), ("trim_end", 0), ("volume_db", 0), ("pitch_min", 1),
+               ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False))
+
+
+def record_sign(d: dict) -> str:
+    parts = []
+    for key, default in RECORD_KEYS:
+        value = d.get(key)
+        if value is None:
+            value = default
+        if isinstance(value, bool):
+            parts.append("1" if value else "0")
+        elif isinstance(value, (int, float)):
+            parts.append(str(math.floor(value * 1000 + 0.5)))
+        else:
+            parts.append(str(value))
+    return "|".join(parts)
 
 
 def split_presets(docs: list[dict]) -> tuple[list[dict], dict[str, dict]]:
@@ -233,6 +256,7 @@ def main() -> None:
     parser.add_argument("--slots", required=True, type=Path, help="音づけ表の欄の JSON を置いたフォルダ")
     parser.add_argument("--assets", type=Path, help="上げられた音（素材ID.json）を置いたフォルダ")
     parser.add_argument("--project", type=Path, default=ROOT / "speed", help="Godot プロジェクトのフォルダ")
+    parser.add_argument("--record", type=Path, help="取り込んだ時の値の印を書き出す JSON（音づけ表の imports/last へ上げる）")
     args = parser.parse_args()
     if shutil.which("afconvert") is None:
         sys.exit("afconvert がありません（macOS で実行してください）")
@@ -249,6 +273,9 @@ def main() -> None:
     finally:
         os.unlink(plan_path)
     add_uids(project)
+    if args.record:
+        record = {"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "slots": {d["_id"]: record_sign(d) for d in slots}}
+        args.record.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")
     linked = sum(1 for r in plan if r["preset"])
     print(f"{len(plan)}欄を取り込みました（音あり {sum(1 for r in plan if r['stream'])}欄、プリセット {len(presets)}個を {linked}欄で使用）")
 
