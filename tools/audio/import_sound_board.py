@@ -30,6 +30,12 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 GODOT = "/Applications/Godot.app/Contents/MacOS/Godot"
 SFX_BOARD = "assets/audio/sfx/board"
+# りゅう座の決着の「叩き込む」で通り抜けるたびの欄。1発の音を連撃の各一撃の時刻へ並べた1本の音にして取り込む
+RUSH_SLOT = "scene.finale.pass"
+RUSH_DATA = "data/visuals/draco_finale_rush.tres"
+RUSH_STRIDE = 9
+# 重ねた音がこれを超えるときは全体を縮めて割れを防ぐ（16bit の最大の 98%）
+RUSH_PEAK = 32767 * 0.98
 MUSIC_BOARD = "assets/audio/music/board"
 # 素材のない間だけ鳴らす仮の合成音（開始Hz・終了Hz・秒・波形）。素材に差し替えたら使わない。
 SYNTH = {
@@ -155,9 +161,8 @@ def shape(channels: list[list[float]], rate: int, speed: float, fade_in: float, 
     return channels
 
 
-def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path,
-            speed: float = 1.0, fade_in: float = 0.0, fade_out: float = 0.0) -> None:
-    """使う範囲を切り出し、速さとフェードを当てて 16bit の wav に書く。"""
+def read_clip(raw: bytes, suffix: str, start: float, end: float) -> tuple[list[list[float]], int, tuple]:
+    """音を 16bit の PCM にして使う範囲を切り出し、チャンネルごとの値の並びで返す。"""
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / ("src" + suffix)
         src.write_bytes(raw)
@@ -171,24 +176,100 @@ def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path,
             reader.setpos(first)
             data = reader.readframes(last - first)
             params = reader.getparams()
-        if abs(speed - 1.0) >= 1e-6 or fade_in > 0.0 or fade_out > 0.0:
-            samples = array.array("h", data)
-            if sys.byteorder == "big":
-                samples.byteswap()
-            n = params.nchannels
-            channels = [[float(v) for v in samples[c::n]] for c in range(n)]
-            channels = shape(channels, rate, speed, fade_in, fade_out)
-            count = len(channels[0])
-            mixed = array.array("h", [0]) * (count * n)
-            for c, ch in enumerate(channels):
-                mixed[c::n] = array.array("h", (max(-32768, min(32767, int(round(v)))) for v in ch))
-            if sys.byteorder == "big":
-                mixed.byteswap()
-            data = mixed.tobytes()
-        out.parent.mkdir(parents=True, exist_ok=True)
-        with wave.open(str(out), "wb") as writer:
-            writer.setparams(params)
-            writer.writeframes(data)
+    samples = array.array("h", data)
+    if sys.byteorder == "big":
+        samples.byteswap()
+    n = params.nchannels
+    return [[float(v) for v in samples[c::n]] for c in range(n)], rate, params
+
+
+def write_wav(out: Path, channels: list[list[float]], params: tuple) -> None:
+    n = len(channels)
+    count = len(channels[0]) if channels else 0
+    mixed = array.array("h", [0]) * (count * n)
+    for c, ch in enumerate(channels):
+        mixed[c::n] = array.array("h", (max(-32768, min(32767, int(round(v)))) for v in ch))
+    if sys.byteorder == "big":
+        mixed.byteswap()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    with wave.open(str(out), "wb") as writer:
+        writer.setparams(params)
+        writer.writeframes(mixed.tobytes())
+
+
+def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path,
+            speed: float = 1.0, fade_in: float = 0.0, fade_out: float = 0.0) -> None:
+    """使う範囲を切り出し、速さとフェードを当てて 16bit の wav に書く。"""
+    channels, rate, params = read_clip(raw, suffix, start, end)
+    write_wav(out, shape(channels, rate, speed, fade_in, fade_out), params)
+
+
+def resample(channels: list[list[float]], ratio: float) -> list[list[float]]:
+    """ratio 倍の速さで読み進める（速さと音の高さが一緒に変わる。ゲームのピッチと同じ）。"""
+    if abs(ratio - 1.0) < 1e-6:
+        return channels
+    length = len(channels[0])
+    count = max(1, int(length / ratio))
+    outs = []
+    for ch in channels:
+        out = [0.0] * count
+        for i in range(count):
+            x = i * ratio
+            j = int(x)
+            if j + 1 < length:
+                f = x - j
+                out[i] = ch[j] * (1.0 - f) + ch[j + 1] * f
+            elif j < length:
+                out[i] = ch[j]
+        outs.append(out)
+    return outs
+
+
+def rush_hits(project: Path) -> list[tuple[float, float]]:
+    """りゅう座の決着の連撃の、各一撃の時刻と次までの間隔。"""
+    text = (project / RUSH_DATA).read_text(encoding="utf-8")
+    found = re.search(r"^hits = PackedFloat32Array\(([^)]*)\)", text, re.M)
+    if not found:
+        sys.exit(f"連撃の時刻が読めません: {RUSH_DATA}")
+    values = [float(v) for v in found.group(1).split(",")]
+    return [(values[i], values[i + 1]) for i in range(0, len(values) - RUSH_STRIDE + 1, RUSH_STRIDE)]
+
+
+def rush_progress(hits: list[tuple[float, float]], curve: str) -> list[float]:
+    """各一撃の進み具合（0〜1）。"time" は時刻、それ以外は間隔の縮み具合で決める。"""
+    if curve == "time":
+        last = hits[-1][0] or 1.0
+        return [t / last for t, _ in hits]
+    first, final = hits[0][1], hits[-1][1]
+    span = first - final or 1.0
+    return [max(0.0, min(1.0, (first - g) / span)) for _, g in hits]
+
+
+def bake_rush(raw: bytes, suffix: str, d: dict, hits: list[tuple[float, float]], out: Path) -> None:
+    """1発の音を、連撃の各一撃の時刻へ、進み具合に合わせたピッチと速さで並べて1本の音にする。"""
+    channels, rate, params = read_clip(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0))
+    fade_in, fade_out = number(d, "fade_in", 0.0), number(d, "fade_out", 0.0)
+    pitch = (number(d, "rush_pitch_from", 1.0), number(d, "rush_pitch_to", 1.0))
+    speed = (number(d, "rush_speed_from", 1.0), number(d, "rush_speed_to", 1.0))
+    progress = rush_progress(hits, str(d.get("rush_curve") or "gap"))
+    parts = []
+    for (t, _), u in zip(hits, progress):
+        s = clamp(speed[0] + (speed[1] - speed[0]) * u, 0.5, 2.0)
+        p = clamp(pitch[0] + (pitch[1] - pitch[0]) * u, 0.25, 4.0)
+        one = resample(shape([list(ch) for ch in channels], rate, s, fade_in, fade_out), p)
+        parts.append((int(round(t * rate)), one))
+    total = max(at + len(one[0]) for at, one in parts)
+    track = [[0.0] * total for _ in channels]
+    for at, one in parts:
+        for c, ch in enumerate(one):
+            dst = track[c]
+            for i, v in enumerate(ch):
+                dst[at + i] += v
+    peak = max((abs(v) for ch in track for v in ch), default=0.0)
+    if peak > RUSH_PEAK:
+        scale = RUSH_PEAK / peak
+        track = [[v * scale for v in ch] for ch in track]
+    write_wav(out, track, params)
 
 
 def uncut(d: dict) -> bool:
@@ -212,7 +293,8 @@ def number(d: dict, key: str, default: float) -> float:
 # 取り込み後に変わった欄を示す。
 RECORD_KEYS = (("asset", ""), ("trim_start", 0), ("trim_end", 0), ("volume_db", 0), ("pitch_min", 1),
                ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False),
-               ("fade_out", 0), ("fade_in", 0), ("speed", 1))
+               ("fade_out", 0), ("fade_in", 0), ("speed", 1), ("rush_pitch_from", 1), ("rush_pitch_to", 1),
+               ("rush_speed_from", 1), ("rush_speed_to", 1), ("rush_curve", "gap"))
 
 
 def record_sign(d: dict) -> str:
@@ -255,7 +337,7 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
     for d in slots:
         sid, music = d["_id"], d.get("kind") == "music"
         # プリセットの欄は、プリセットごとの1つのファイルを共有する
-        name = d.get("_preset") or sid
+        name = sid if sid == RUSH_SLOT else (d.get("_preset") or sid)
         row = {
             "id": sid,
             "stream": "",
@@ -280,7 +362,12 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             raw, suffix = unpack(find_asset(assets, asset_id))
             folder = "music" if music else "sfx"
             original = project / "assets/audio" / folder / d["repo"] if d.get("repo") else None
-            if original is not None and original.exists() and original.read_bytes() == raw and (music or uncut(d)):
+            if sid == RUSH_SLOT and not music:
+                out = project / SFX_BOARD / (name + ".wav")
+                bake_rush(raw, suffix, d, rush_hits(project), out)
+                row["pitch_min"] = row["pitch_max"] = 1.0
+                row["loop"] = False
+            elif original is not None and original.exists() and original.read_bytes() == raw and (music or uncut(d)):
                 row["stream"] = f"res://assets/audio/{folder}/{d['repo']}"
             elif music:
                 out = project / MUSIC_BOARD / (name + suffix)
