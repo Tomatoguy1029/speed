@@ -30,6 +30,9 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 GODOT = "/Applications/Godot.app/Contents/MacOS/Godot"
 SFX_BOARD = "assets/audio/sfx/board"
+# 音の高さを変えない速さの範囲（音づけ表の SPEED_MIN・SPEED_MAX と同じ）
+SPEED_MIN = 0.5
+SPEED_MAX = 10.0
 # りゅう座の決着の「叩き込む」で通り抜けるたびの欄。1発の音を連撃の各一撃の時刻へ並べた1本の音にして取り込む
 RUSH_SLOT = "scene.finale.pass"
 RUSH_DATA = "data/visuals/draco_finale_rush.tres"
@@ -254,7 +257,7 @@ def bake_rush(raw: bytes, suffix: str, d: dict, hits: list[tuple[float, float]],
     progress = rush_progress(hits, str(d.get("rush_curve") or "gap"))
     parts = []
     for (t, _), u in zip(hits, progress):
-        s = clamp(speed[0] + (speed[1] - speed[0]) * u, 0.5, 2.0)
+        s = clamp(speed[0] + (speed[1] - speed[0]) * u, SPEED_MIN, SPEED_MAX)
         p = clamp(pitch[0] + (pitch[1] - pitch[0]) * u, 0.25, 4.0)
         one = resample(shape([list(ch) for ch in channels], rate, s, fade_in, fade_out), p)
         parts.append((int(round(t * rate)), one))
@@ -379,7 +382,7 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
                 if out not in kept:
                     looped = bool(d.get("loop"))
                     cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out,
-                            clamp(number(d, "speed", 1.0), 0.5, 2.0),
+                            clamp(number(d, "speed", 1.0), SPEED_MIN, SPEED_MAX),
                             0.0 if looped else number(d, "fade_in", 0.0), 0.0 if looped else number(d, "fade_out", 0.0))
             if not row["stream"]:
                 kept.add(out)
