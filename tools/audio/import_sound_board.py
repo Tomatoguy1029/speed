@@ -13,6 +13,7 @@ speed/tools/audio/apply_sound_board.gd で speed/assets/audio/sound_table.tres �
 音の変換は macOS の afconvert を使う。Godot は無音で起動する。
 """
 import argparse
+import array
 import base64
 import json
 import math
@@ -44,7 +45,7 @@ SYNTH = {
 
 
 # プリセットから欄へ写す値。音なし・ループするかどうかは欄ごとに持つ。
-PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start")
+PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start", "fade_out")
 
 
 def load_slots(folder: Path) -> list[dict]:
@@ -94,7 +95,8 @@ def find_asset(folder: Path, asset_id: str) -> Path:
     sys.exit(f"上げられた音が見つかりません: {asset_id}")
 
 
-def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> None:
+def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path, fade: float = 0.0) -> None:
+    """使う範囲を切り出し、fade 秒あれば終わりへ向けて音量を直線で0まで下げる。"""
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / ("src" + suffix)
         src.write_bytes(raw)
@@ -108,6 +110,21 @@ def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> Non
             reader.setpos(first)
             data = reader.readframes(last - first)
             params = reader.getparams()
+        if fade > 0.0:
+            samples = array.array("h", data)
+            if sys.byteorder == "big":
+                samples.byteswap()
+            channels = params.nchannels
+            count = len(samples) // channels
+            length = max(1, min(count, int(round(fade * rate))))
+            for i in range(length):
+                gain = (length - 1 - i) / length
+                at = (count - length + i) * channels
+                for c in range(channels):
+                    samples[at + c] = int(samples[at + c] * gain)
+            if sys.byteorder == "big":
+                samples.byteswap()
+            data = samples.tobytes()
         out.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(out), "wb") as writer:
             writer.setparams(params)
@@ -117,7 +134,8 @@ def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> Non
 def uncut(d: dict) -> bool:
     """効果音の使う範囲が音全体のままなら True。"""
     end = number(d, "trim_end", 0.0)
-    return number(d, "trim_start", 0.0) <= 0.0005 and (end <= 0.0 or end >= number(d, "duration", 0.0) - 0.0005)
+    return (number(d, "trim_start", 0.0) <= 0.0005 and (end <= 0.0 or end >= number(d, "duration", 0.0) - 0.0005)
+            and number(d, "fade_out", 0.0) <= 0.0)
 
 
 def number(d: dict, key: str, default: float) -> float:
@@ -128,7 +146,8 @@ def number(d: dict, key: str, default: float) -> float:
 # 取り込んだ時の値の印に使う値と、値がない時の値。音づけ表のページも同じ式で今の値の印を作り、
 # 取り込み後に変わった欄を示す。
 RECORD_KEYS = (("asset", ""), ("trim_start", 0), ("trim_end", 0), ("volume_db", 0), ("pitch_min", 1),
-               ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False))
+               ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False),
+               ("fade_out", 0))
 
 
 def record_sign(d: dict) -> str:
@@ -206,7 +225,8 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             else:
                 out = project / SFX_BOARD / (name + ".wav")
                 if out not in kept:
-                    cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out)
+                    fade = 0.0 if d.get("loop") else number(d, "fade_out", 0.0)
+                    cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out, fade)
             if not row["stream"]:
                 kept.add(out)
                 row["stream"] = "res://" + out.relative_to(project).as_posix()
