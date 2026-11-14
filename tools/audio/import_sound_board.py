@@ -13,6 +13,7 @@ speed/tools/audio/apply_sound_board.gd で speed/assets/audio/sound_table.tres �
 音の変換は macOS の afconvert を使う。Godot は無音で起動する。
 """
 import argparse
+import array
 import base64
 import json
 import math
@@ -44,7 +45,7 @@ SYNTH = {
 
 
 # プリセットから欄へ写す値。音なし・ループするかどうかは欄ごとに持つ。
-PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start")
+PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start", "fade_out", "fade_in", "speed")
 
 
 def load_slots(folder: Path) -> list[dict]:
@@ -94,7 +95,69 @@ def find_asset(folder: Path, asset_id: str) -> Path:
     sys.exit(f"上げられた音が見つかりません: {asset_id}")
 
 
-def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> None:
+def stretch(channels: list[list[float]], rate: int, speed: float) -> list[list[float]]:
+    """音の高さを変えずに長さを 1/speed 倍にする（WSOLA）。音づけ表の試し聞きも同じ手順で伸び縮みさせる。"""
+    if abs(speed - 1.0) < 1e-6 or not channels or not channels[0]:
+        return channels
+    size = max(64, int(round(0.04 * rate)) // 2 * 2)
+    hop = size // 2
+    tol = max(4, int(round(0.01 * rate)))
+    window = [0.5 - 0.5 * math.cos(2.0 * math.pi * i / size) for i in range(size)]
+    length = len(channels[0])
+    mono = [sum(ch[i] for ch in channels) / len(channels) for i in range(length)]
+    padded = mono + [0.0] * (size * 2 + tol * 2)
+    out_len = int(math.ceil(length / speed))
+    outs = [[0.0] * (out_len + size) for _ in channels]
+    prev = 0
+    k = 0
+    while k * hop < out_len:
+        natural = int(round(k * hop * speed))
+        best = max(0, min(length - 1, natural))
+        if k > 0:
+            target = prev + hop
+            best_score = None
+            for step, lo, hi in ((4, natural - tol, natural + tol), (1, None, None)):
+                if step == 1:
+                    lo, hi = best - 3, best + 3
+                for cand in range(lo, hi + 1, step):
+                    if cand < 0 or cand >= length:
+                        continue
+                    score = 0.0
+                    for i in range(0, hop, 4):
+                        score += padded[cand + i] * padded[target + i]
+                    if best_score is None or score > best_score:
+                        best_score, best = score, cand
+        at = k * hop
+        for ch, out in zip(channels, outs):
+            for i in range(size):
+                src = best + i
+                if src < length:
+                    out[at + i] += ch[src] * window[i]
+        prev = best
+        k += 1
+    return [out[:out_len] for out in outs]
+
+
+def shape(channels: list[list[float]], rate: int, speed: float, fade_in: float, fade_out: float) -> list[list[float]]:
+    """速さを変え、始まりと終わりの指定秒を直線で無音から・無音へつなぐ。"""
+    channels = stretch(channels, rate, speed)
+    count = len(channels[0]) if channels else 0
+    if count and fade_in > 0.0:
+        n = max(1, min(count, int(round(fade_in * rate))))
+        for ch in channels:
+            for i in range(n):
+                ch[i] *= i / n
+    if count and fade_out > 0.0:
+        n = max(1, min(count, int(round(fade_out * rate))))
+        for ch in channels:
+            for i in range(n):
+                ch[count - n + i] *= (n - 1 - i) / n
+    return channels
+
+
+def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path,
+            speed: float = 1.0, fade_in: float = 0.0, fade_out: float = 0.0) -> None:
+    """使う範囲を切り出し、速さとフェードを当てて 16bit の wav に書く。"""
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / ("src" + suffix)
         src.write_bytes(raw)
@@ -108,6 +171,20 @@ def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> Non
             reader.setpos(first)
             data = reader.readframes(last - first)
             params = reader.getparams()
+        if abs(speed - 1.0) >= 1e-6 or fade_in > 0.0 or fade_out > 0.0:
+            samples = array.array("h", data)
+            if sys.byteorder == "big":
+                samples.byteswap()
+            n = params.nchannels
+            channels = [[float(v) for v in samples[c::n]] for c in range(n)]
+            channels = shape(channels, rate, speed, fade_in, fade_out)
+            count = len(channels[0])
+            mixed = array.array("h", [0]) * (count * n)
+            for c, ch in enumerate(channels):
+                mixed[c::n] = array.array("h", (max(-32768, min(32767, int(round(v)))) for v in ch))
+            if sys.byteorder == "big":
+                mixed.byteswap()
+            data = mixed.tobytes()
         out.parent.mkdir(parents=True, exist_ok=True)
         with wave.open(str(out), "wb") as writer:
             writer.setparams(params)
@@ -117,7 +194,13 @@ def cut_sfx(raw: bytes, suffix: str, start: float, end: float, out: Path) -> Non
 def uncut(d: dict) -> bool:
     """効果音の使う範囲が音全体のままなら True。"""
     end = number(d, "trim_end", 0.0)
-    return number(d, "trim_start", 0.0) <= 0.0005 and (end <= 0.0 or end >= number(d, "duration", 0.0) - 0.0005)
+    return (number(d, "trim_start", 0.0) <= 0.0005 and (end <= 0.0 or end >= number(d, "duration", 0.0) - 0.0005)
+            and number(d, "fade_out", 0.0) <= 0.0 and number(d, "fade_in", 0.0) <= 0.0
+            and abs(number(d, "speed", 1.0) - 1.0) < 1e-6)
+
+
+def clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
 
 
 def number(d: dict, key: str, default: float) -> float:
@@ -128,7 +211,8 @@ def number(d: dict, key: str, default: float) -> float:
 # 取り込んだ時の値の印に使う値と、値がない時の値。音づけ表のページも同じ式で今の値の印を作り、
 # 取り込み後に変わった欄を示す。
 RECORD_KEYS = (("asset", ""), ("trim_start", 0), ("trim_end", 0), ("volume_db", 0), ("pitch_min", 1),
-               ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False))
+               ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False),
+               ("fade_out", 0), ("fade_in", 0), ("speed", 1))
 
 
 def record_sign(d: dict) -> str:
@@ -206,7 +290,10 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             else:
                 out = project / SFX_BOARD / (name + ".wav")
                 if out not in kept:
-                    cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out)
+                    looped = bool(d.get("loop"))
+                    cut_sfx(raw, suffix, number(d, "trim_start", 0.0), number(d, "trim_end", 0.0), out,
+                            clamp(number(d, "speed", 1.0), 0.5, 2.0),
+                            0.0 if looped else number(d, "fade_in", 0.0), 0.0 if looped else number(d, "fade_out", 0.0))
             if not row["stream"]:
                 kept.add(out)
                 row["stream"] = "res://" + out.relative_to(project).as_posix()
