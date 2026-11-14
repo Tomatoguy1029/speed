@@ -30,16 +30,18 @@ static func _stream(entry: SoundEntry, music: bool) -> AudioStream:
 	if entry.silent: return null
 	if entry.stream == null:
 		if entry.synth_wave == "" or entry.synth_seconds <= 0.0: return null
-		return _looped(_tone(entry.synth_from_hz, entry.synth_to_hz, entry.synth_seconds, entry.synth_wave), entry.loop, 0.0)
-	return _looped(entry.stream.duplicate(), entry.loop, entry.loop_start if music else 0.0)
+		return _looped(_tone(entry.synth_from_hz, entry.synth_to_hz, entry.synth_seconds, entry.synth_wave), entry.loop, 0.0, 0.0)
+	return _looped(entry.stream.duplicate(), entry.loop, entry.loop_start, 0.0 if music else entry.loop_end)
 
-static func _looped(stream: AudioStream, loop: bool, loop_start: float) -> AudioStream:
+## loop_end が0より大きい wav は、その位置で戻る位置へ戻す（効果音の頭と終わりの音をループから外す）。
+static func _looped(stream: AudioStream, loop: bool, loop_start: float, loop_end: float) -> AudioStream:
 	if stream is AudioStreamWAV:
 		var wav := stream as AudioStreamWAV
 		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD if loop else AudioStreamWAV.LOOP_DISABLED
 		if loop:
-			wav.loop_begin = int(loop_start * wav.mix_rate)
-			wav.loop_end = int(wav.get_length() * wav.mix_rate)
+			var last := int(wav.get_length() * wav.mix_rate)
+			wav.loop_end = clampi(int(loop_end * wav.mix_rate), 1, last) if loop_end > 0.0 else last
+			wav.loop_begin = clampi(int(loop_start * wav.mix_rate), 0, wav.loop_end - 1)
 	elif stream is AudioStreamMP3:
 		stream.loop = loop
 		stream.loop_offset = loop_start

@@ -16,6 +16,10 @@ extends Resource
 @export_range(0, 32) var max_voices := 0
 ## 止めるまで繰り返す。
 @export var loop := false
+## ループで戻る位置（秒）。効果音は切り出した音の頭から、曲はファイルの頭から数える。
+@export var loop_start := 0.0
+## ループの終わり（秒、効果音だけ）。ここまで鳴ったら戻る位置へ戻る。0は音の終わり。
+@export var loop_end := 0.0
 ## 使っているプリセットの名前。空ならこの欄だけの音。同じプリセットの欄は同じ音のファイルと設定で鳴る。
 @export var preset := ""
 
@@ -24,8 +28,6 @@ extends Resource
 @export var trim_start := 0.0
 ## 曲の終わりとして扱う位置（秒）。0はファイルの最後。
 @export var trim_end := 0.0
-## ループで戻る位置（秒）。
-@export var loop_start := 0.0
 
 @export_group("合成音")
 ## 素材がない間だけ鳴らす仮の音の波形（square・sine・saw・noise）。空なら鳴らさない。素材に差し替えたら使わない。

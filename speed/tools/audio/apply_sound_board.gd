@@ -34,6 +34,7 @@ func _init() -> void:
 		entry.trim_start = float(row.trim_start)
 		entry.trim_end = float(row.trim_end)
 		entry.loop_start = float(row.loop_start)
+		entry.loop_end = float(row.get("loop_end", 0.0))
 		entry.preset = String(row.get("preset", ""))
 		var synth: Dictionary = row.get("synth", {})
 		if entry.synth_wave == "" and not synth.is_empty():
