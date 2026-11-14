@@ -39,6 +39,9 @@ RUSH_DATA = "data/visuals/draco_finale_rush.tres"
 RUSH_STRIDE = 9
 # 重ねた音がこれを超えるときは全体を縮めて割れを防ぐ（16bit の最大の 98%）
 RUSH_PEAK = 32767 * 0.98
+# 同時に鳴らす一撃の数の上限の初期値と、上限を超えた古い一撃を消すまでの秒
+RUSH_OVERLAP = 3
+RUSH_CHOKE = 0.01
 MUSIC_BOARD = "assets/audio/music/board"
 # 素材のない間だけ鳴らす仮の合成音（開始Hz・終了Hz・秒・波形）。素材に差し替えたら使わない。
 SYNTH = {
@@ -254,13 +257,29 @@ def bake_rush(raw: bytes, suffix: str, d: dict, hits: list[tuple[float, float]],
     fade_in, fade_out = number(d, "fade_in", 0.0), number(d, "fade_out", 0.0)
     pitch = (number(d, "rush_pitch_from", 1.0), number(d, "rush_pitch_to", 1.0))
     speed = (number(d, "rush_speed_from", 1.0), number(d, "rush_speed_to", 1.0))
+    volume = (number(d, "rush_volume_from", 0.0), number(d, "rush_volume_to", 0.0))
+    # 同時に鳴らす一撃の数の上限。超えるときは一番古い一撃を、上限ぶん後の一撃の頭で短く消す。0は上限なし
+    overlap = int(number(d, "rush_overlap", RUSH_OVERLAP))
     progress = rush_progress(hits, str(d.get("rush_curve") or "gap"))
+    starts = [int(round(t * rate)) for t, _ in hits]
+    fade = max(1, int(round(RUSH_CHOKE * rate)))
     parts = []
-    for (t, _), u in zip(hits, progress):
+    for i, ((t, _), u) in enumerate(zip(hits, progress)):
         s = clamp(speed[0] + (speed[1] - speed[0]) * u, SPEED_MIN, SPEED_MAX)
         p = clamp(pitch[0] + (pitch[1] - pitch[0]) * u, 0.25, 4.0)
+        gain = 10.0 ** ((volume[0] + (volume[1] - volume[0]) * u) / 20.0)
         one = resample(shape([list(ch) for ch in channels], rate, s, fade_in, fade_out), p)
-        parts.append((int(round(t * rate)), one))
+        if overlap > 0 and i + overlap < len(starts):
+            cut = max(1, starts[i + overlap] - starts[i])
+            for c, ch in enumerate(one):
+                ch = ch[:cut]
+                n = min(fade, len(ch))
+                for k in range(n):
+                    ch[len(ch) - n + k] *= (n - 1 - k) / n
+                one[c] = ch
+        if abs(gain - 1.0) > 1e-9:
+            one = [[v * gain for v in ch] for ch in one]
+        parts.append((starts[i], one))
     total = max(at + len(one[0]) for at, one in parts)
     track = [[0.0] * total for _ in channels]
     for at, one in parts:
@@ -298,7 +317,8 @@ def number(d: dict, key: str, default: float) -> float:
 RECORD_KEYS = (("asset", ""), ("trim_start", 0), ("trim_end", 0), ("volume_db", 0), ("pitch_min", 1),
                ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False),
                ("fade_out", 0), ("fade_in", 0), ("speed", 1), ("rush_pitch_from", 1), ("rush_pitch_to", 1),
-               ("rush_speed_from", 1), ("rush_speed_to", 1), ("rush_curve", "gap"), ("loop_end", 0))
+               ("rush_speed_from", 1), ("rush_speed_to", 1), ("rush_curve", "gap"), ("loop_end", 0),
+               ("rush_volume_from", 0), ("rush_volume_to", 0), ("rush_overlap", RUSH_OVERLAP))
 
 
 def record_sign(d: dict) -> str:
