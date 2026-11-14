@@ -54,7 +54,7 @@ SYNTH = {
 
 
 # プリセットから欄へ写す値。音なし・ループするかどうかは欄ごとに持つ。
-PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start", "fade_out", "fade_in", "speed")
+PRESET_KEYS = ("asset", "file_name", "duration", "trim_start", "trim_end", "volume_db", "pitch_min", "pitch_max", "max_voices", "loop_start", "fade_out", "fade_in", "speed", "loop_end")
 
 
 def load_slots(folder: Path) -> list[dict]:
@@ -280,7 +280,8 @@ def uncut(d: dict) -> bool:
     end = number(d, "trim_end", 0.0)
     return (number(d, "trim_start", 0.0) <= 0.0005 and (end <= 0.0 or end >= number(d, "duration", 0.0) - 0.0005)
             and number(d, "fade_out", 0.0) <= 0.0 and number(d, "fade_in", 0.0) <= 0.0
-            and abs(number(d, "speed", 1.0) - 1.0) < 1e-6)
+            and abs(number(d, "speed", 1.0) - 1.0) < 1e-6
+            and not (d.get("loop") and (number(d, "loop_start", 0.0) > 0.0 or number(d, "loop_end", 0.0) > 0.0)))
 
 
 def clamp(value: float, low: float, high: float) -> float:
@@ -297,7 +298,7 @@ def number(d: dict, key: str, default: float) -> float:
 RECORD_KEYS = (("asset", ""), ("trim_start", 0), ("trim_end", 0), ("volume_db", 0), ("pitch_min", 1),
                ("pitch_max", 1), ("max_voices", 0), ("loop", False), ("loop_start", 0), ("silent", False),
                ("fade_out", 0), ("fade_in", 0), ("speed", 1), ("rush_pitch_from", 1), ("rush_pitch_to", 1),
-               ("rush_speed_from", 1), ("rush_speed_to", 1), ("rush_curve", "gap"))
+               ("rush_speed_from", 1), ("rush_speed_to", 1), ("rush_curve", "gap"), ("loop_end", 0))
 
 
 def record_sign(d: dict) -> str:
@@ -334,6 +335,23 @@ def split_presets(docs: list[dict]) -> tuple[list[dict], dict[str, dict]]:
     return slots, presets
 
 
+def sfx_loop(d: dict) -> tuple[float, float]:
+    """効果音のループ区間を、切り出して速さを当てた音の頭からの秒に直す。音づけ表はファイルの頭からの秒で持つ。"""
+    if not d.get("loop"):
+        return 0.0, 0.0
+    first = number(d, "trim_start", 0.0)
+    last = number(d, "trim_end", 0.0) or number(d, "duration", 0.0)
+    speed = clamp(number(d, "speed", 1.0), SPEED_MIN, SPEED_MAX)
+    begin, end = number(d, "loop_start", 0.0), number(d, "loop_end", 0.0)
+    start = max(0.0, begin - first) / speed
+    if end <= 0.0:
+        return start, 0.0
+    if last > 0.0:
+        end = min(end, last)
+    stop = (end - first) / speed
+    return (start, stop) if stop > start + 0.01 else (start, 0.0)
+
+
 def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[dict]:
     plan = []
     kept: set[Path] = set()
@@ -353,11 +371,14 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
             "trim_start": 0.0,
             "trim_end": 0.0,
             "loop_start": number(d, "loop_start", 0.0),
+            "loop_end": 0.0,
             "preset": d.get("_preset_label", ""),
         }
         if music:
             row["trim_start"] = number(d, "trim_start", 0.0)
             row["trim_end"] = number(d, "trim_end", 0.0)
+        else:
+            row["loop_start"], row["loop_end"] = sfx_loop(d)
         asset_id = d.get("asset") or ""
         if asset_id:
             if assets is None:
