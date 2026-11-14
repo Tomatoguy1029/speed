@@ -274,7 +274,10 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_far_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		_fine_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	f = finale
+	var before := stage
 	stage = str(finale.get("stage",""))
+	# 叩き込むの52発は、取り込みで連撃の時刻どおりに並べた1本の音なので、始まりに1回だけ鳴らす
+	if stage=="strikes" and before!="strikes": AudioManager.play(&"scene.finale.pass")
 	t = float(finale.get("time",0.0))
 	clock = world_clock
 	zoom = maxf(view_zoom,0.01)
