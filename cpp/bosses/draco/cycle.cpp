@@ -44,6 +44,8 @@ bool DracoCycle::begin_initial(RunRuntime &r,BossBodyState &b) {
     if (!rule(r,b)) return false;if (b.draco->cycle.stage!=DracoCycleStage::None) cancel(r,b);auto &v=b.draco->cycle;auto &s=r.state;auto &e=s.enemies[b.actor.slot];DracoCinematic::capture(r,v.saved);v.first=true;v.stage=DracoCycleStage::Roar;v.time=0;v.generated=0;v.home=v.from=e.pos;v.zoom=std::max(0.1,s.control.camera_zoom);capture_pose(r,b);s.control.cinematic_camera=true;s.controls_locked=true;s.control.cinematic_bars=1;s.encounter_protected=true;s.draw.drawing=s.draw.tracing=false;s.ship.vel={};e.guard=1;return true;
 }
 bool DracoCycle::begin_deep(RunRuntime &r,BossBodyState &b) {
+    // 通常攻撃が姿勢を更新している間は、奥への移動を始めない。
+    if (std::any_of(r.state.bosses->techniques.begin(),r.state.bosses->techniques.end(),[&](const auto &t){return same_handle(t.actor,b.actor) && t.stage<TechniqueStage::Finished;})) return false;
     if (!rule(r,b) || b.draco->cycle.stage!=DracoCycleStage::None) return false;auto &v=b.draco->cycle;v.first=false;v.stage=DracoCycleStage::Collect;v.time=0;v.generated=0;v.home=v.from=r.state.enemies[b.actor.slot].pos;capture_pose(r,b);r.state.enemies[b.actor.slot].guard=1;b.draco->picaro_attacking=true;return true;
 }
 bool DracoCycle::tick(RunRuntime &r,BossBodyState &b,double dt) {
