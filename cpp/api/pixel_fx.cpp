@@ -117,7 +117,9 @@ struct Painter {
     void glow(double x,double y,double r,C32 c,double k=0.5) {
         if (r<1 || k<=0.004) return;
         const double cx=to_x(x,y),cy=to_y(x,y);
-        const int x0=int(std::floor(cx-r)),x1=int(std::ceil(cx+r)),y0=int(std::floor(cy-r)),y1=int(std::ceil(cy+r));
+        // 画面外の光はaddで破棄されるので、距離計算の前に描画範囲へ絞る。
+        const int x0=std::max(int(std::floor(cx-r)),f->ox),x1=std::min(int(std::ceil(cx+r)),f->ox+f->w-1);
+        const int y0=std::max(int(std::floor(cy-r)),f->oy),y1=std::min(int(std::ceil(cy+r)),f->oy+f->h-1);
         for (int sy=y0;sy<=y1;++sy) {
             const double dy=(sy+0.5-cy)/r;
             for (int sx=x0;sx<=x1;++sx) {const double dx=(sx+0.5-cx)/r,d=dx*dx+dy*dy;if (d>=1) continue;const double q=1-std::sqrt(d);add(sx,sy,c,q*q*k);}
@@ -561,6 +563,12 @@ PackedByteArray SpeedPixelFx::render() {
     const int n=f.w*f.h;
     for (int i=0;i<n;++i) {
         const C32 c=f.C[i],l=f.L[i]&0xffffffu;
+        if (!l) {
+            // 光が重ならない画素は、既に確定したRGBAをそのまま渡す。
+            uint8_t *q=o+i*4;
+            q[0]=uint8_t(c);q[1]=uint8_t(c>>8);q[2]=uint8_t(c>>16);q[3]=uint8_t(c>>24);
+            continue;
+        }
         double r,g,b,a;const int ca=int(c>>24);
         r=c&255;g=(c>>8)&255;b=(c>>16)&255;a=ca;
         if (l) {

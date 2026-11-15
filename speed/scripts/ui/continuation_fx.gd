@@ -120,6 +120,7 @@ func _exit_tree() -> void:
 	_items.clear()
 
 func reset() -> void:
+	set_process(false)
 	_screen = {}
 	_chain = {}
 	_hold_t = 0.0
@@ -141,6 +142,7 @@ func reset() -> void:
 
 ## 連鎖を始める。step 1 は3択の写しを閉じ、2 は前の継続画面を閉じ、3 は shard_snapshot を割る。
 func begin(step: int, card: Texture2D, shard_snapshot: Texture2D = null) -> void:
+	set_process(true)
 	_cards[step] = card
 	if step == 1:
 		_screen = {kind = &"select"}

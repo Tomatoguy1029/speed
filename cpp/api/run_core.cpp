@@ -167,6 +167,21 @@ Dictionary copy_frame_delivery(const Dictionary &frame,const Variant &ui_fields,
         }
         source["events"]=selected;
     }
+    if (presentation && Dictionary(source["ui"]).has("boss_bodies")) {
+        // 通知の命中先判定には識別子だけを渡す。姿勢・部位・演出はRenderFrameが所有する。
+        Dictionary selected_ui=Dictionary(source["ui"]).duplicate();
+        const Array bodies=ui.get("boss_bodies",Array());Array targets;
+        for (int64_t i=0;i<bodies.size();++i) {
+            const Dictionary body=bodies[i];Dictionary target;
+            target["kind"]=body["kind"];target["actor"]=body["actor"];
+            const Array clones=body.get("clones",Array());Array clone_ids;
+            for (int64_t j=0;j<clones.size();++j) {
+                Dictionary clone;clone["id"]=Dictionary(clones[j])["id"];clone_ids.push_back(clone);
+            }
+            target["clones"]=clone_ids;targets.push_back(target);
+        }
+        selected_ui["boss_bodies"]=targets;source["ui"]=selected_ui;
+    }
     return source.duplicate(true);
 }
 }
