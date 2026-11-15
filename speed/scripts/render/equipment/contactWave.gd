@@ -15,13 +15,15 @@ func setup_frame(parent: Node2D, pixel: float) -> void:
 	parent.add_child(_painter)
 func sync_frame(values: Array, dt: float) -> void:
 	var alive := {}
+	var by_id := {}
+	for quake: Dictionary in quakes: by_id[quake.get("id", 0)] = quake
 	for value: Dictionary in values:
 		alive[value.id] = true
 		if not _frame_seen.has(value.id):
 			on_event({"type":&"space_quake","pos":value.pos,"radius":value.radius})
 			quakes[-1].id = value.id
-		for quake: Dictionary in quakes:
-			if quake.get("id",0)==value.id: quake.age = value.visual_age-dt
+			by_id[value.id] = quakes[-1]
+		if by_id.has(value.id): by_id[value.id].age = value.visual_age-dt
 	_frame_seen = alive
 	quakes = quakes.filter(func(quake): return alive.has(quake.get("id",0)))
 

@@ -16,6 +16,9 @@ var sparks := PixelSparks.new()
 var _hexes: PixelShapes
 var _cells: Array[Vector2] = []
 var _cells_radius := -1.0
+var _shell_cells: Array[Vector2] = []
+var _ring_cells: Dictionary = {}
+var _wave_cells: Dictionary = {}
 
 func setup_frame(parent: Node2D, pixel: float) -> void:
 	_painter = PixelPainter.new()
@@ -51,13 +54,26 @@ func _lattice(radius_cells: float) -> Array[Vector2]:
 	if absf(radius_cells - _cells_radius) < 0.5: return _cells
 	_cells_radius = radius_cells
 	_cells.clear()
+	_shell_cells.clear()
+	_ring_cells.clear()
+	_wave_cells.clear()
 	var w := sqrt(3.0) * HEX
 	var rows := ceili(radius_cells / (HEX * 1.5)) + 1
 	var cols := ceili(radius_cells / w) + 1
 	for row in range(-rows, rows + 1):
 		for col in range(-cols, cols + 1):
 			var at := Vector2(col * w + (w / 2.0 if row % 2 != 0 else 0.0), row * HEX * 1.5)
-			if at.length() < radius_cells: _cells.append(at)
+			var distance := at.length()
+			if distance >= radius_cells: continue
+			_cells.append(at)
+			if distance >= 13.0 and distance <= 24.0: _shell_cells.append(at)
+			var ring := roundi(distance / w)
+			if not _ring_cells.has(ring): _ring_cells[ring] = []
+			_ring_cells[ring].append(at)
+			# 隣り合う2段を元のマス順で保持し、明るい段と残光の重なり順を保つ。
+			for step in [ring, ring + 1]:
+				if not _wave_cells.has(step): _wave_cells[step] = []
+				_wave_cells[step].append(at)
 	return _cells
 
 ## 六角形のマス（頂点までの半径 3.6 ドット）。GPU でまとめて描く。
@@ -68,11 +84,9 @@ func _hit(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 	var a: float = h.age
 	var ring_width := sqrt(3.0) * HEX
 	var last := _last_ring(h.radius, p.px)
-	var cells := _lattice((last + 0.6) * ring_width)
+	_lattice((last + 0.6) * ring_width)
 	if a < SPIN + STEP:
-		for at in cells:
-			var d := at.length()
-			if d < 13.0 or d > 24.0: continue
+		for at in _shell_cells:
 			var da := absf(angle_difference(at.angle(), h.angle))
 			var lit := a - da / PI * SPIN
 			if lit < 0.0: continue
@@ -80,18 +94,16 @@ func _hit(p: PixelPainter, h: Dictionary, center: Vector2) -> void:
 	if a < SPIN + STEP: return
 	var k := FIRST_RING + floori((a - SPIN - STEP) / STEP)
 	if k > last + 1: return
-	for at in cells:
+	for at: Vector2 in _wave_cells.get(k, []):
 		var ring := roundi(at.length() / ring_width)
 		if ring == k and k <= last: _hex(p, center, at, Color("#e6f3ff"))
 		elif ring == k - 1 and k - 1 >= FIRST_RING: _hex(p, center, at, Color(Color("#76aaff"), 0.45))
 	if h.broken and k == last + 1 and not h.shattered:
 		h.shattered = true
-		var outer: Array[Vector2] = []
-		for at in cells:
-			if roundi(at.length() / ring_width) == last:
-				outer.append(at)
-				_hex(p, center, at, Color.WHITE)
-				crosses.append({"pos": center + at * p.px, "age": 0.0})
+		var outer: Array = _ring_cells.get(last, [])
+		for at: Vector2 in outer:
+			_hex(p, center, at, Color.WHITE)
+			crosses.append({"pos": center + at * p.px, "age": 0.0})
 		for j in maxi(1, outer.size()) * 6:
 			var pa := randf() * TAU
 			var pr := (last - 0.6 + randf() * 1.1) * ring_width
@@ -131,9 +143,8 @@ func _shards(p: PixelPainter, dt: float) -> void:
 
 func _restore(p: PixelPainter, r: Dictionary, center: Vector2, heading: float) -> void:
 	var a: float = r.age
-	for at in _lattice(maxf(_cells_radius, 25.0)):
-		var d := at.length()
-		if d < 13.0 or d > 24.0: continue
+	_lattice(maxf(_cells_radius, 25.0))
+	for at in _shell_cells:
 		var lit := a - absf(angle_difference(at.angle(), heading)) / PI * 0.3
 		if lit < 0.0: continue
 		if a < 0.3: _hex(p, center, at, Color.WHITE if lit < 0.06 else Color("#76aaff"))

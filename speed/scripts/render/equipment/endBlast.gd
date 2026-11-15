@@ -18,6 +18,7 @@ var booms: Array[Dictionary] = []
 var _plasmas: PlasmaBursts
 var _frame_parent: Node2D
 var _frame_seen := {}
+var _geometry_dirty := true
 
 func _effect_key() -> String: return "weapon/endBlast"
 
@@ -58,6 +59,7 @@ func claims(ev: Dictionary) -> bool:
 	return ev.type == &"explode" and ev.get("cause", &"") == &"endBlast"
 
 func _add(ev: Dictionary) -> void:
+	_geometry_dirty = true
 	var rad: float = float(ev.radius)/(_painter).px*0.96
 	plasmas().add(ev.pos,rad,BALL)
 	var rng := RandomNumberGenerator.new()
@@ -75,14 +77,20 @@ func _add(ev: Dictionary) -> void:
 
 func frame_tick(dt: float) -> void:
 	var p: PixelPainter = _painter
-	p.begin()
+	var redraw := dt != 0.0 or _geometry_dirty
+	if redraw: p.begin()
+	var kept := 0
 	for b in booms:
 		b.age += dt
 		_step(b, dt)
-		_draw(p, b)
-	booms = booms.filter(func(b): return b.age < LIFE)
+		if redraw: _draw(p, b)
+		if b.age < LIFE:
+			booms[kept] = b
+			kept += 1
+	booms.resize(kept)
 	if _plasmas != null: _plasmas.step(dt)
-	p.end()
+	if redraw: p.end()
+	_geometry_dirty = false
 
 ## 粒を進める。殻の膨らむあいだは殻から星屑がこぼれる。
 func _step(b: Dictionary, dt: float) -> void:
