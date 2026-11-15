@@ -44,6 +44,8 @@ func sync_frame(values: Dictionary, ship: Dictionary, clock: float, view: Rect2)
 	charges.clear()
 	for pending: Dictionary in values.pending: charges.append({"from":pending.from,"to":pending.to,"age":CHARGE_SECONDS-pending.delay})
 	var alive := {}
+	var by_id := {}
+	for item: Dictionary in beams: by_id[item.get("id", -1)] = item
 	for beam: Dictionary in values.beams:
 		alive[beam.id] = true
 		if not _frame_seen.has(beam.id):
@@ -51,8 +53,8 @@ func sync_frame(values: Dictionary, ship: Dictionary, clock: float, view: Rect2)
 			beams[-1].age = beam.age
 			beams[-1].id = beam.id
 			_flash = maxf(0.0,0.1-beam.age)
-		for item: Dictionary in beams:
-			if item.get("id",-1)==beam.id: item.age = beam.age
+			by_id[beam.id] = beams[-1]
+		if by_id.has(beam.id): by_id[beam.id].age = beam.age
 	# 寿命が尽きた個体には次の年齢が届かないので、フレームから消えた時点で回収する。
 	for i in range(beams.size()-1,-1,-1):
 		if not alive.has(beams[i].get("id",-1)):

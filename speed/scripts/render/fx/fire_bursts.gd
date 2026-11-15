@@ -11,6 +11,7 @@ var px := 2.366
 ## 戦闘エフェクトツールの装備キー（ShaderTuning）
 var key := ""
 var _items: Array[Dictionary] = []
+var _idle: Array[Dictionary] = []
 static var _quad: ArrayMesh
 
 func setup(cell: float) -> void:
@@ -19,38 +20,54 @@ func setup(cell: float) -> void:
 
 ## delay 秒たってから燃え始める。
 func add(pos: Vector2, radius: float, life: float, colors: Array = EMBER, delay := 0.0) -> void:
-	var node := MeshInstance2D.new()
-	node.mesh = _mesh()
+	var item: Dictionary = _idle.pop_back() if not _idle.is_empty() else {}
+	var node: MeshInstance2D = item.get("node")
+	if node == null:
+		node = MeshInstance2D.new()
+		node.mesh = _mesh()
+		add_child(node)
+	else:
+		move_child(node, get_child_count() - 1)
 	var center := (pos / px).round()
 	var half := ceilf(radius * 1.25) + 3.0
 	node.position = center * px
 	node.scale = Vector2.ONE * half * px
-	var mat := ShaderMaterial.new()
-	mat.shader = SHADER
-	mat.set_shader_parameter("value_noise", VALUE_NOISE)
+	var mat := node.material as ShaderMaterial
+	var revision: int = ShaderTuning.SETTINGS.preview_revision
+	if mat == null or item.tuning_revision != revision or item.tuning_key != key or item.colors != colors:
+		mat = ShaderMaterial.new()
+		mat.shader = SHADER
+		mat.set_shader_parameter("value_noise", VALUE_NOISE)
+		for i in 4: mat.set_shader_parameter("c%d" % i, colors[i])
+		ShaderTuning.apply(mat, key)
+		node.material = mat
 	mat.set_shader_parameter("half_cells", half)
 	mat.set_shader_parameter("radius", radius)
 	mat.set_shader_parameter("origin", center)
 	mat.set_shader_parameter("seed", randf() * 9.0)
-	for i in 4: mat.set_shader_parameter("c%d" % i, colors[i])
-	ShaderTuning.apply(mat, key)
-	node.material = mat
-	add_child(node)
+	mat.set_shader_parameter("life", 0.0)
 	node.visible = delay <= 0.0
-	_items.append({"node": node, "age": -delay, "life": life, "tuning_revision": ShaderTuning.SETTINGS.preview_revision, "tuning_key": key})
-	if _items.size() > 96: _items.pop_front().node.queue_free()
+	_items.append({"node": node, "age": -delay, "life": life, "colors": colors.duplicate(), "tuning_revision": revision, "tuning_key": key})
+	if _items.size() > 96: _recycle(_items.pop_front())
+
+func _recycle(item: Dictionary) -> void:
+	item.node.hide()
+	if _idle.size() < 96: _idle.append(item)
+	else: item.node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
 	var time_scale := ShaderTuning.burst_time_scale(key)
 	var revision: int = ShaderTuning.SETTINGS.preview_revision
+	var preview := ShaderTuning.previewing()
+	var kept := 0
 	for item in _items:
 		item.age += dt
 		var age: float = item.age / time_scale
 		var life := maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life))
 		item.node.visible = age >= 0.0 and age < life
-		if age >= life and not ShaderTuning.previewing():
-			item.node.queue_free()
+		if age >= life and not preview:
+			_recycle(item)
 			continue
 		var mat := item.node.material as ShaderMaterial
 		mat.set_shader_parameter("life", maxf(0.0, age) / life)
@@ -58,8 +75,9 @@ func step(dt: float) -> void:
 			ShaderTuning.apply(mat, key)
 			item.tuning_revision = revision
 			item.tuning_key = key
-	if not ShaderTuning.previewing():
-		_items = _items.filter(func(item): return item.age / time_scale < maxf(0.01, ShaderTuning.burst_number(key, "burst_fire_seconds", item.life)))
+		_items[kept] = item
+		kept += 1
+	_items.resize(kept)
 
 static func _mesh() -> ArrayMesh:
 	if _quad != null: return _quad

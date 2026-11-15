@@ -16,6 +16,7 @@ var live_edit := false
 ## 単独プレビューの形を調整する間、粒の並びを保つ。負数で爆発ごとに選ぶ。
 var seed_override := -1.0
 var _items: Array[Dictionary] = []
+var _idle_fixed: Array[Dictionary] = []
 ## shader の上限と同じ粒数。各粒の四角は共有し、頂点で現在の軌道へ置く。
 const PARTICLE_COUNTS := {1: 24, 2: 96, 3: 64}
 static var _particle_meshes: Dictionary = {}
@@ -62,35 +63,59 @@ func add(pos: Vector2, radius: float, delay := 0.0) -> void:
 
 ## 固定passの素材を複製し、発生位置・半径・種だけを設定する。
 func _add_fixed(pos: Vector2, radius: float, delay: float, fixed: Dictionary) -> void:
-	var node := Node2D.new()
+	var item: Dictionary = {}
+	while not _idle_fixed.is_empty():
+		var candidate: Dictionary = _idle_fixed.pop_back()
+		if candidate.profile_key == key:
+			item = candidate
+			break
+		candidate.node.queue_free()
+	var node: Node2D = item.get("node")
+	var materials: Array[ShaderMaterial] = []
+	if node == null:
+		node = Node2D.new()
+		for spec: Dictionary in fixed.passes:
+			var surface := MeshInstance2D.new()
+			var mode := int(spec.mode)
+			surface.mesh = FireBursts._mesh() if mode == 0 else _particle_mesh(mode, int(spec.count))
+			var mat := RUNTIME.material(spec)
+			surface.material = mat
+			node.add_child(surface)
+			materials.append(mat)
+		add_child(node)
+	else:
+		materials = item.materials
+		move_child(node, get_child_count() - 1)
 	var center := (pos / px).round()
 	var half := ceilf(radius * RUNTIME.reach(fixed, radius)) + 3.0
 	var seed := seed_override if seed_override >= 0.0 else randf() * 9.0
 	node.position = center * px
 	node.scale = Vector2.ONE * half * px
 	var dynamic := {"half_cells": half, "radius": radius, "origin": center, "seed": seed}
-	var materials: Array[ShaderMaterial] = []
-	for spec: Dictionary in fixed.passes:
-		var surface := MeshInstance2D.new()
-		var mode := int(spec.mode)
-		surface.mesh = FireBursts._mesh() if mode == 0 else _particle_mesh(mode, int(spec.count))
-		var mat := RUNTIME.material(spec)
+	for i in fixed.passes.size():
+		var spec: Dictionary = fixed.passes[i]
+		var mat: ShaderMaterial = materials[i]
 		for name: String in dynamic:
 			if name in spec.parameters: mat.set_shader_parameter(name, dynamic[name])
-		surface.material = mat
-		node.add_child(surface)
-		materials.append(mat)
-	add_child(node)
+		mat.set_shader_parameter("age", 0.0)
 	node.visible = delay <= 0.0
 	_items.append({"node": node, "materials": materials, "age": -delay, "life": float(fixed.life),
-		"baked": true, "time_scale": float(fixed.time_scale)})
-	if _items.size() > 96: _items.pop_front().node.queue_free()
+		"baked": true, "time_scale": float(fixed.time_scale), "profile_key": key})
+	if _items.size() > 96: _recycle(_items.pop_front())
+
+## 通常用の固定素材だけを再利用する。編集用の可変素材は従来どおり解放する。
+func _recycle(item: Dictionary) -> void:
+	item.node.hide()
+	if item.baked and _idle_fixed.size() < 96: _idle_fixed.append(item)
+	else: item.node.queue_free()
 
 ## dt は世界の秒。
 func step(dt: float) -> void:
 	var revision: int = ShaderTuning.SETTINGS.preview_revision
 	var fixed := RUNTIME.profile(key, live_edit)
 	var time_scale := float(fixed.time_scale) if not fixed.is_empty() else ShaderTuning.burst_time_scale(key)
+	var preview := ShaderTuning.previewing()
+	var kept := 0
 	for item in _items:
 		item.age += dt
 		var retune: bool = not item.baked and (item.tuning_revision != revision or item.tuning_key != key)
@@ -103,15 +128,17 @@ func step(dt: float) -> void:
 			for mat: ShaderMaterial in item.materials: mat.set_shader_parameter("half_cells", half)
 		var age: float = item.age / (item.time_scale if item.baked else time_scale)
 		item.node.visible = age >= 0.0 and age < item.life
-		if age >= item.life and not ShaderTuning.previewing():
-			item.node.queue_free()
+		if age >= item.life and not preview:
+			_recycle(item)
 			continue
 		for mat: ShaderMaterial in item.materials:
 			mat.set_shader_parameter("age", maxf(0.0, age))
 		if not item.baked:
 			item.tuning_revision = revision
 			item.tuning_key = key
-	if not ShaderTuning.previewing(): _items = _items.filter(func(item): return item.age / (item.time_scale if item.baked else time_scale) < item.life)
+		_items[kept] = item
+		kept += 1
+	_items.resize(kept)
 
 ## 上限分の四角を1枚のmeshにまとめる。UV.xへ粒番号を埋め、順序と頂点数を固定する。
 static func _particle_mesh(mode: int, count := -1) -> ArrayMesh:

@@ -512,7 +512,7 @@ UIは同じ出力の位相・カード・HP等を表示し、入力結果を命�
 
 `SpeedInstanceBuffer` は `InstanceBatch` の2D変換と色を12要素のMultiMesh配列へまとめ、敵の顎・部位の支点・軸方向の変形も同じ丸めで求め、じょうぎ座の上下を同じ描画順で反映する。表示部品はこの配列を寿命内で再利用し、同じ本体・装甲の束へ共有する。RenderFrameの検査は型・長さ・値域・形状ごとの規則を表示側で確認し、Packed浮動小数配列の全要素の有限値検査をC++へまとめる。
 
-共通の `PixelSparks` と `ShotFlashes` は、粒子と命中閃光の配列を表示順のまま再利用し、更新中に期限切れを整理する。命中閃光は種類ごとの描画時間と共通の保持期限を持つ。
+共通の `PixelSparks` と `ShotFlashes` は、粒子と命中閃光の配列を表示順のまま再利用し、更新中に期限切れを整理する。命中閃光は種類ごとの描画時間と共通の保持期限を持つ。 `PlasmaBursts`・`FireBursts` と `BlastBursts` の通常用固定素材は、終了した描画ノードと材質を非表示で保持して次の爆発に再利用する。待機分の上限はプラズマ48個、炎と固定爆発は各96個とし、表示部品の破棄とともに解放する。再利用時に位置・大きさ・種・経過時間を設定し、子の末尾へ移して発生順を保つ。プラズマと炎は設定の版・用途・炎の配色が変われば材質を作り直し、固定爆発は用途の一致する部品を使う。
 
 図鑑は `CodexAnimation` の固定の実演配置（演出の試作の描画命令）を `data/codex/*.res` から読み、`SubViewport` の中で同じ描画部品（`PixelPainter`・炎・レンズ・空間の歪みの shader・`GearFire`）で再生する。命令の番号は [codex_demonstration.gd](../speed/scripts/ui/codex_demonstration.gd) の冒頭にある。共通生成の `build_codex_thumbnails.gd` は実演の42%の1コマを `.content/codex_thumbnail_*.res` へ保存し、生成物の欠落検査とexportへ含める。たる型の対応表は固定画像を読み、投影の走査線・横ずれ・段階色・ディザはshaderで合成する。
 

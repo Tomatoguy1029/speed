@@ -2,17 +2,20 @@ extends WeaponVisual
 
 var _frame: Array = []
 var _zoom := 1.0
+var _life := 0.0
 var _probe: Sprite2D
 func setup_frame(parent: Node2D, ship_parent: Node2D, texture: Texture2D, factor: float) -> void:
 	node = Node2D.new()
 	parent.add_child(node)
 	node.draw.connect(func():
 		var lightning = preload("res://scripts/render/pixel_lightning.gd")
+		var pixel := 2.0 * EFFECT_SETTINGS.number("weapon/contactArc", "pixel_scale", 1.0) / maxf(_zoom, 0.01)
+		var color := EFFECT_SETTINGS.tinted("weapon/contactArc", Color("#ffcf3a"))
 		for value: Dictionary in _frame:
-			var alpha: float = lightning.intensity(value.age,value.life)
+			var alpha: float = lightning.intensity(value.age,_life)
 			var shape: int = int(value.age/lightning.SHAPE_INTERVAL)
 			for i in range(0,value.segments.size(),2):
-				lightning.draw(node,value.segments[i],value.segments[i+1],2.0*EFFECT_SETTINGS.number("weapon/contactArc","pixel_scale",1.0)/maxf(_zoom,0.01),int(value.id)*7919+i*313+shape*101,alpha,EFFECT_SETTINGS.tinted("weapon/contactArc",Color("#ffcf3a")),Color("#fff8d6")))
+				lightning.draw(node,value.segments[i],value.segments[i+1],pixel,int(value.id)*7919+i*313+shape*101,alpha,color,Color("#fff8d6")))
 	_probe = Sprite2D.new()
 	var white := ShaderMaterial.new()
 	white.shader = preload("res://shaders/ship_contact_white.gdshader")
@@ -22,8 +25,8 @@ func setup_frame(parent: Node2D, ship_parent: Node2D, texture: Texture2D, factor
 	_probe.scale = Vector2.ONE*factor
 	ship_parent.add_child(_probe)
 func frame_tick(data: Dictionary, ship: Dictionary, zoom: float, visible: bool) -> void:
-	_frame = data.visuals.duplicate(true)
-	for value: Dictionary in _frame: value.life = data.visual_life
+	_frame = data.visuals
+	_life = data.visual_life
 	_zoom = zoom
 	node.queue_redraw()
 	_probe.position = ship.ship_pos
