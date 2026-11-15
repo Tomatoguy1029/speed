@@ -232,6 +232,7 @@ func _begin_next() -> void:
 		_continuation.picked_rect = _to_bonus(picked_rect) if picked_rect.size.x > 0.0 else Rect2()
 		picked_rect = Rect2()
 	_continuation.begin(step, card, _capture_screen() if step == 3 else null)
+	AudioManager.play(&"growth.cards.combo")
 	AudioManager.play(&"growth.level.levelup_step", 1.0 + 0.12 * (step - 1))
 
 func _begin_ult() -> void:

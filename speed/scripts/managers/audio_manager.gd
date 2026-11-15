@@ -83,7 +83,7 @@ const EVENT_SOUNDS := {
 ## 中身で鳴らす欄を選ぶイベント。EVENT_SOUNDS と合わせて購読する。
 const EVENT_SPECIAL := [&"kill", &"weapon_fire", &"launch", &"trace_end", &"game_over", &"pickup", &"xp_collect", &"explode", &"shoot", &"hero_power",
 	&"audio_cue", &"hit", &"shot_hit", &"beam", &"bonus", &"hero_power_end", &"end_hole", &"hydra_cue", &"centaurus_cue", &"canis_cue", &"draco_cue",
-	&"run_finished", &"choice", &"level_bonus", &"reroll", &"offer", &"enemy_retire"]
+	&"run_finished", &"choice", &"reroll", &"offer", &"enemy_retire"]
 ## 同じイベントで EVENT_SOUNDS などの欄に重ねて鳴らす欄。
 const EVENT_EXTRA := {
 	&"boss_phase": [&"boss.common.roar"],
@@ -659,7 +659,6 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 				if kind in ["weapon", "trait"] and int(data.get("level", 1)) > 1: id = &"growth.cards.level_up_item"
 				if id != &"": play(id)
 				play(&"growth.cards.apply")
-			&"level_bonus": play(&"growth.cards.combo", 1.0 + 0.06 * minf(float(data.get("count", 1)) - 1.0, 8.0))
 			&"reroll": play(&"growth.cards.reroll")
 			&"enemy_retire": _stop_enemy_loops(int(data.get("id", 0)))
 			&"kill":
