@@ -335,6 +335,7 @@ func _play_stage_sounds() -> void:
 		"input":
 			if entered: AudioManager.play(&"scene.finale.freeze")
 			if f.get("began", false): AudioManager.start_loop(&"scene.finale.draw")
+			else: AudioManager.stop_loop(&"scene.finale.draw")
 			# HUD が案内を出す時刻（hud.gd の _draw_finale_text）に合わせる。
 			if not f.get("began", false) and crossed.call(5.0): AudioManager.play(&"scene.finale.hint")
 		"strikes":

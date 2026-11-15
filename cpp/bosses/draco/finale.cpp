@@ -24,6 +24,8 @@ using Stage=DracoFinaleStage;
 constexpr double POSE_WAY[][2]={{-226,-205},{-140,-182},{40,-176},{170,-140},{214,-70},{150,-12},{-60,0},{-205,30},{-235,92},{-170,144},{10,158},{130,146},{190,108}};
 // 帯は見せず、戦闘HUDだけ隠したままにする値。
 constexpr double HUD_HIDDEN_BARS=0.001;
+// なぞった線の長さをワールド座標で測る。標準画面では横幅の約4割。
+constexpr double MIN_STROKE_LENGTH=600;
 constexpr double DOCK_FIRST=0.9,DOCK_STEP=0.42,UNLOCK_AT=2.6,ROAR_AT=2.72,BURST_AT=0.92;
 const char *const MODULES[]={"legendary_stern","legendary_keel","legendary_sail","legendary_compass"};
 double smooth(double a,double b,double x) {const double f=std::clamp((x-a)/(b-a),0.0,1.0);return f*f*(3-2*f);}
@@ -94,7 +96,22 @@ bool DracoFinale::tick(RunRuntime &r,double dt,const InputFrame &input,godot::Ve
         settle(r,b,std::clamp(v.time/p->pose_time,0.0,1.0));s.ship_pos=s.ship.pos=v.ship_rest.lerp(v.center+godot::Vector2(0,396),smooth(0.2,2.2,v.time));s.ship.heading={0,-1};
         if (v.time>=p->pose_time) {next(v,Stage::Input);s.controls_locked=false;s.control.cinematic_bars=HUD_HIDDEN_BARS;for (uint32_t j=0;j<=320;++j) {const double u=j/320.0,a=u*TAU+0.05*std::sin(u*TAU*5+0.6),radius=345*std::cos(4*a)*(1+0.14*std::sin(u*TAU*3+1));v.guide.push_back(v.center+godot::Vector2::from_angle(a)*radius);}}
         break;
-    case Stage::Input:if ((input.press || input.alt_press || input.finale_pressed) && !v.began) {v.began=true;v.strokes.push_back(input.finale_pen);}if (v.began && input.has_cursor && (v.strokes.empty() || v.strokes.back().distance_to(input.finale_pen)>3)) v.strokes.push_back(input.finale_pen);if (v.began && (input.pen_release || input.finale_released)) {next(v,Stage::Strikes);s.controls_locked=true;s.draw.drawing=false;s.control.cinematic_bars=1;s.control.cinematic_hide_ship=true;}else s.draw.drawing=v.began;break;
+    case Stage::Input: {
+        if ((input.press || input.alt_press || input.finale_pressed) && !v.began) {v.began=true;v.strokes.push_back(input.finale_pen);}
+        const bool released=input.pen_release || input.finale_released;
+        if (v.began && (input.has_cursor || released) && (v.strokes.empty() || v.strokes.back().distance_to(input.finale_pen)>3)) v.strokes.push_back(input.finale_pen);
+        if (v.began && released) {
+            double length=0;
+            for (size_t j=1;j<v.strokes.size();++j) length+=v.strokes[j-1].distance_to(v.strokes[j]);
+            if (length>=MIN_STROKE_LENGTH) {
+                next(v,Stage::Strikes);s.controls_locked=true;s.control.cinematic_bars=1;s.control.cinematic_hide_ship=true;
+            } else {
+                v.began=false;v.strokes.clear();
+            }
+        }
+        s.draw.drawing=v.stage==Stage::Input && v.began;
+        break;
+    }
     case Stage::Strikes:if (v.time>=p->rush_time) {next(v,Stage::Charge);s.ship_pos=s.ship.pos=v.center+godot::Vector2(0,385);s.ship.heading={0,-1};}break;
     case Stage::Charge:if (v.time>=p->charge_time+p->hold_time) next(v,Stage::Flash);break;
     case Stage::Flash:if (v.time>=flash_time(*p)) next(v,Stage::Sight);break;
