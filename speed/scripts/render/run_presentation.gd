@@ -168,7 +168,7 @@ func sync_canvas_layers() -> void:
 
 func _present_cpp(delta: float) -> void:
 	if frame_view==null: return
-	var snapshot: Dictionary = bridge.latest_frame(false)
+	var snapshot: Dictionary = bridge.latest_presentation_frame()
 	if not snapshot.ok:
 		frame_view.hide()
 		return
@@ -198,6 +198,8 @@ func _present_cpp(delta: float) -> void:
 		frame_view.hide()
 		return
 	frame_view.show()
+	# 描画用に取得済みのボス状態を、同じフレームの演出とHUDでも使う。
+	frame.ui.boss_bodies = render.value.get("boss_bodies",[])
 	# 反発が始まる半径を世界原点に描く。専用の闘技場ではそちらの壁を使う。
 	_update_field_boundary(float(frame.ui.hero.field_radius),render.value.get("boss_bodies",[]))
 	var effects_start := Time.get_ticks_usec() if frame_view.perf.active else 0
