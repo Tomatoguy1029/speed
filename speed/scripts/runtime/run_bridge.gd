@@ -21,6 +21,7 @@ var _metrics_record := {}
 var _metrics_bytes := 0
 var _latest_bytes := 0
 var _latest_view_bytes := -1
+var _latest_presentation_bytes := -1
 var _delivery_bytes := 0
 var _delivery_sizes := {}
 var _resource_wait_started := 0
@@ -228,6 +229,7 @@ func restore(id: int) -> Dictionary:
 	_latest = {}
 	_latest_bytes = 0
 	_latest_view_bytes = -1
+	_latest_presentation_bytes = -1
 	_delivery_bytes = 0
 	_delivery_sizes = {}
 	_delivery = {}
@@ -258,6 +260,7 @@ func dispose() -> Dictionary:
 		_latest = {}
 		_latest_bytes = 0
 		_latest_view_bytes = -1
+		_latest_presentation_bytes = -1
 		_delivery_bytes = 0
 		_delivery_sizes = {}
 		_ui = {}
@@ -287,10 +290,11 @@ func _read_locked(public_copy := true) -> Dictionary:
 	_latest.ui = _ui
 	_latest_bytes = _packed_bytes(_latest)
 	_latest_view_bytes = -1
+	_latest_presentation_bytes = -1
 	perf.since(&"bridge_copy",began)
 	return _copy_latest() if public_copy else _ok(_latest)
 
-func _copy_latest(include_events := true) -> Dictionary:
+func _copy_latest(include_events := true, include_boss_bodies := true) -> Dictionary:
 	var began := Time.get_ticks_usec() if perf.active else 0
 	var source := _latest
 	var copied_bytes := _latest_bytes
@@ -298,8 +302,15 @@ func _copy_latest(include_events := true) -> Dictionary:
 		# 表示の更新は通知購読を使うので、同じ通知列をsnapshotでもう一度複製しない。
 		source = _latest.duplicate()
 		source.events = []
-		if _latest_view_bytes<0: _latest_view_bytes = _packed_bytes(source)
-		copied_bytes = _latest_view_bytes
+		if include_boss_bodies:
+			if _latest_view_bytes<0: _latest_view_bytes = _packed_bytes(source)
+			copied_bytes = _latest_view_bytes
+		else:
+			# 描画は直後に読むRenderFrameのボス表示を使う。重い部位の二重コピーを省く。
+			source.ui = source.ui.duplicate()
+			source.ui.erase("boss_bodies")
+			if _latest_presentation_bytes<0: _latest_presentation_bytes = _packed_bytes(source)
+			copied_bytes = _latest_presentation_bytes
 	var snapshot := _ok(source.duplicate(true))
 	_metrics_bytes += copied_bytes
 	perf.since(&"bridge_copy",began)
@@ -313,6 +324,15 @@ func latest_frame(include_events := true) -> Dictionary:
 		var result := _read_locked(false)
 		if not result.ok: return result
 	return _copy_latest(include_events)
+
+## 通知とボスの表示データは、それぞれ専用の購読とread_renderから受け取る。
+func latest_presentation_frame() -> Dictionary:
+	if _busy: return _error(7,"latest_presentation_frame","配信中は読めません")
+	if _core==null: return _error(4,"latest_presentation_frame","破棄済みです")
+	if _latest.is_empty():
+		var result := _read_locked(false)
+		if not result.ok: return result
+	return _copy_latest(false,false)
 
 func read_metrics(reader: StringName = &"") -> Dictionary:
 	if _busy: return _error(7,"read_metrics","更新中は読めません")

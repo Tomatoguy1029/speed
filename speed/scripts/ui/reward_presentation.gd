@@ -159,6 +159,7 @@ func cancel() -> void:
 	if is_acquiring(): _tell_acquired()
 	_current = {}
 	_clear_ult_details()
+	_continuation.reset()
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	hide()
 	active_changed.emit(false)
@@ -214,6 +215,7 @@ func _begin_next() -> void:
 	_bonus_output.visible = not ult
 	_bonus_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED if ult else SubViewport.UPDATE_ALWAYS
 	if ult:
+		_continuation.reset()
 		_begin_ult()
 		return
 	var step := clampi(int(_current.count), 1, 3)
