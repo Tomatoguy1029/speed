@@ -1,6 +1,6 @@
 extends Control
 
-const MENU_RECT := Rect2(49, 81, 205, 197)
+const MENU_RECT := Rect2(49, 103, 205, 146)
 const UPGRADE_RECT := Rect2(430, 70, 177, 256)
 const CYAN := Color("5bc8db")
 const MENU_FILL := Color("0a2228")
