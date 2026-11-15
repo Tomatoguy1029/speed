@@ -722,12 +722,12 @@ pitch_max = 0.7
 [sub_resource type="Resource" id="Resource_adlc5"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("58_hnagr")
-volume_db = -2.0
+volume_db = -9.0
 
 [sub_resource type="Resource" id="Resource_6nuhk"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
@@ -739,14 +739,14 @@ synth_seconds = 0.04
 [sub_resource type="Resource" id="Resource_5tuxr"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("60_6ptu1")
-volume_db = -7.5
+volume_db = -16.0
 pitch_min = 2.3
 pitch_max = 2.3
 
 [sub_resource type="Resource" id="Resource_k5hkg"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
@@ -754,14 +754,14 @@ preset = "命中 の音"
 [sub_resource type="Resource" id="Resource_nsg38"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("61_shyfm")
-volume_db = -2.0
+volume_db = -7.5
 pitch_min = 1.5
 pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_ncwlu"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
@@ -846,7 +846,7 @@ volume_db = -18.0
 [sub_resource type="Resource" id="Resource_q7nmt"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
@@ -1123,7 +1123,7 @@ loop = true
 [sub_resource type="Resource" id="Resource_fas4s"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
@@ -1164,7 +1164,7 @@ preset = "星のような風音、ふたご座"
 [sub_resource type="Resource" id="Resource_5js2b"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
@@ -1207,7 +1207,7 @@ preset = "装甲に弾かれる の音"
 [sub_resource type="Resource" id="Resource_hnagr"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("59_ig44c")
-volume_db = -12.0
+volume_db = -15.0
 pitch_min = 2.1
 pitch_max = 2.1
 preset = "命中 の音"
