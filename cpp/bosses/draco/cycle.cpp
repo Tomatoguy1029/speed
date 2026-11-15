@@ -44,8 +44,7 @@ Way path_at(const DracoCycleState &v,double s,int &zone) {
     zone=0;return along(v.out,v.out_z,v.out_arc,s);
 }
 // 周回の出口（帰りの道の入口）のうち、s 以降で最初のもの。
-// 出口は周回の下端（右向きに進む位置）。
-double next_exit(const DracoCycleState &v,double s) {const double first=v.loop_start+RADIUS*PI,lap=RADIUS*PI*2;return first+lap*std::max(0.0,std::ceil((s-first)/lap));}
+double next_exit(const DracoCycleState &v,double s) {const double first=v.loop_start+RADIUS*PI*1.75,lap=RADIUS*PI*2;return first+lap*std::max(0.0,std::ceil((s-first)/lap));}
 double end_s(const DracoCycleState &v) {return v.exit_s+v.back_arc.back();}
 // 道の原点。試作の画面と同じく、画面の中心から見た位置に置く。
 godot::Vector2 origin(const RunRuntime &r,double mirror) {return r.state.view_center-flip(VIEW,mirror);}
@@ -82,12 +81,11 @@ void launch(RunRuntime &r,BossBodyState &b) {
     measure(v.out,v.out_arc);v.s=v.out_arc[before];v.far_s=v.out_arc[at_far];v.loop_start=v.out_arc.back();
     v.exit_s=v.rise_time=v.stop_time=-1;v.speed=v.far_time=v.settle=0;v.leaving=v.first;v.landed=false;v.face=e.facing;v.landing=v.anchor;
 }
-// 周回の下端から右へ抜け、浮かび上がりながら画面の上・左・下の縁に沿って回り込み、機体へ顔を向けて止まる道。
-// 手前に出てからの点は画面の中心から見た位置で、全身が画面の中に収まる。
+// 周回から回りながら浮かび上がり、機体へ顔を向けて止まる道。
 void bake_return(DracoCycleState &v) {
-    const auto at=[&](double x,double y){return flip(godot::Vector2(float(x),float(y))+VIEW,v.mirror);};
-    std::vector<Way> c{{loop_point(225,v.mirror),FAR},{loop_point(270,v.mirror),FAR},{at(-100,-300),800},{at(350,-420),500},{at(200,-610),220},
-        {at(-300,-370),0},{at(-680,-300),0},{at(-790,50),0},{at(-660,330),0},{at(-430,260),0},{at(-250,150),0}};
+    std::vector<Way> c;for (double a:{360.0,405.0}) c.push_back({loop_point(a,v.mirror),FAR});
+    c.push_back({loop_point(450,v.mirror),560});c.push_back({loop_point(495,v.mirror),60});c.push_back({loop_point(540,v.mirror),0});c.push_back({loop_point(585,v.mirror),0});
+    for (auto p:{godot::Vector2(-960,-640),godot::Vector2(-660,-420),godot::Vector2(-520,-300)}) c.push_back({flip(p,v.mirror),0});
     v.back.clear();v.back_z.clear();spline(c,1,c.size()-2,v.back,v.back_z);measure(v.back,v.back_arc);
 }
 // 浮かび上がる先は機体を追い、頭が手前へ出たところで決める。止まる位置はフィールドの中に収める。
