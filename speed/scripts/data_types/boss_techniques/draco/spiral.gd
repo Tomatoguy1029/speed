@@ -43,7 +43,7 @@ extends BossTechnique
 		coil_time = value
 		_values_dirty = true
 ## 逃げる時間（秒）
-@export_range(0.8,3,0.01) var pause := 1.6:
+@export_range(0.8,5,0.01) var pause := 1.6:
 	set(value):
 		pause = value
 		_values_dirty = true
