@@ -1,10 +1,21 @@
 [gd_resource type="Resource" script_class="StageDef" format=3 uid="uid://c1oc0arox6d64"]
 
 [ext_resource type="Script" uid="uid://blsxyxxogr32i" path="res://scripts/data_types/background_placement.gd" id="1_tpwl5"]
+[ext_resource type="Texture2D" uid="uid://c3cwwuke74vrn" path="res://assets/pixel/background/colony.png" id="2_7bvd6"]
 [ext_resource type="PackedScene" uid="uid://gua8dfi6p1wd" path="res://data/formations/pump.tscn" id="3_b421h"]
+[ext_resource type="Texture2D" uid="uid://104f8bgabkvf" path="res://assets/pixel/background/satellite_b_damaged.png" id="3_rji3b"]
+[ext_resource type="Texture2D" uid="uid://clpquq7aoceco" path="res://assets/pixel/background/space_debris.png" id="4_5rvwg"]
 [ext_resource type="PackedScene" uid="uid://cc5rfloat4luf" path="res://data/formations/cross.tscn" id="5_b421h"]
+[ext_resource type="Texture2D" uid="uid://c3iyce7kbg8je" path="res://assets/pixel/background/moon.png" id="5_u0rn4"]
+[ext_resource type="Texture2D" uid="uid://rkin7mrvujlr" path="res://assets/pixel/background/driller.png" id="6_xw0ar"]
+[ext_resource type="Texture2D" uid="uid://bm5vcus8rav4n" path="res://assets/pixel/background/asteroid_b.png" id="7_a17jf"]
+[ext_resource type="Texture2D" uid="uid://v002o3j21ch0" path="res://assets/pixel/background/asteroid_a.png" id="8_1k58g"]
+[ext_resource type="Texture2D" uid="uid://bm5mbtuu1o5mj" path="res://assets/pixel/background/planet_b.png" id="9_th2d7"]
 [ext_resource type="PackedScene" uid="uid://dix03w6vstef7" path="res://data/formations/s2_crab.tscn" id="10_l47qx"]
+[ext_resource type="Texture2D" uid="uid://tjjeljuu2pbc" path="res://assets/pixel/background/planet_f.png" id="10_onu8u"]
+[ext_resource type="Texture2D" uid="uid://x2vwl62iaak0" path="res://assets/pixel/background/planet_e.png" id="11_1vqqk"]
 [ext_resource type="PackedScene" uid="uid://bxl2barjiuk3s" path="res://data/formations/dolphin.tscn" id="11_l47qx"]
+[ext_resource type="Texture2D" uid="uid://d1fo4ol823m6g" path="res://assets/pixel/background/radar_base.png" id="12_xwns6"]
 [ext_resource type="PackedScene" uid="uid://p6qopama1bp6" path="res://data/formations/aquila.tscn" id="aquila"]
 [ext_resource type="PackedScene" uid="uid://kb2gn6nbf7dj" path="res://data/formations/auriga.tscn" id="auriga"]
 [ext_resource type="PackedScene" uid="uid://dcsv22ppl5x8w" path="res://data/formations/cepheus.tscn" id="cepheus"]
@@ -15,17 +26,110 @@
 [ext_resource type="Script" uid="uid://cgahr8ogvc3po" path="res://scripts/data_types/stage_def.gd" id="stage"]
 [ext_resource type="PackedScene" uid="uid://cagn3eqtiqrgr" path="res://data/formations/s2_telescope.tscn" id="telescope"]
 
-[ext_resource type="Texture2D" uid="uid://c3cwwuke74vrn" path="res://assets/pixel/background/colony.png" id="2_7bvd6"]
-[ext_resource type="Texture2D" uid="uid://104f8bgabkvf" path="res://assets/pixel/background/satellite_b_damaged.png" id="3_rji3b"]
-[ext_resource type="Texture2D" uid="uid://clpquq7aoceco" path="res://assets/pixel/background/space_debris.png" id="4_5rvwg"]
-[ext_resource type="Texture2D" uid="uid://c3iyce7kbg8je" path="res://assets/pixel/background/moon.png" id="5_u0rn4"]
-[ext_resource type="Texture2D" uid="uid://rkin7mrvujlr" path="res://assets/pixel/background/driller.png" id="6_xw0ar"]
-[ext_resource type="Texture2D" uid="uid://bm5vcus8rav4n" path="res://assets/pixel/background/asteroid_b.png" id="7_a17jf"]
-[ext_resource type="Texture2D" uid="uid://v002o3j21ch0" path="res://assets/pixel/background/asteroid_a.png" id="8_1k58g"]
-[ext_resource type="Texture2D" uid="uid://bm5mbtuu1o5mj" path="res://assets/pixel/background/planet_b.png" id="9_th2d7"]
-[ext_resource type="Texture2D" uid="uid://tjjeljuu2pbc" path="res://assets/pixel/background/planet_f.png" id="10_onu8u"]
-[ext_resource type="Texture2D" uid="uid://x2vwl62iaak0" path="res://assets/pixel/background/planet_e.png" id="11_1vqqk"]
-[ext_resource type="Texture2D" uid="uid://d1fo4ol823m6g" path="res://assets/pixel/background/radar_base.png" id="12_xwns6"]
+[sub_resource type="Resource" id="Resource_hkp0b"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("2_7bvd6")
+offset = Vector2(-63.402237, 245.50711)
+parallax = 0.4
+texture_path = "res://assets/pixel/background/colony.png"
+used_rect = Rect2(469, 160, 497, 331)
+
+[sub_resource type="Resource" id="Resource_yarhb"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("3_rji3b")
+offset = Vector2(1247.3674, -407.33655)
+parallax = 0.8
+scale = 2.0
+rotation_degrees = 30.0
+texture_path = "res://assets/pixel/background/satellite_b_damaged.png"
+used_rect = Rect2(77, 210, 628, 247)
+
+[sub_resource type="Resource" id="Resource_ryby2"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("4_5rvwg")
+offset = Vector2(223.24759, 61.170666)
+parallax = 0.9
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
+
+[sub_resource type="Resource" id="Resource_4tho1"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("4_5rvwg")
+offset = Vector2(-407.34918, 461.60858)
+parallax = 0.4
+scale = 0.5
+rotation_degrees = -20.0
+texture_path = "res://assets/pixel/background/space_debris.png"
+used_rect = Rect2(166, 114, 301, 172)
+
+[sub_resource type="Resource" id="Resource_1ec65"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("5_u0rn4")
+offset = Vector2(2661.79, 383.91837)
+parallax = 0.7
+texture_path = "res://assets/pixel/background/moon.png"
+used_rect = Rect2(3, 1, 94, 94)
+
+[sub_resource type="Resource" id="Resource_r6cuo"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("6_xw0ar")
+offset = Vector2(3500.641, -1600.4805)
+scale = 2.0
+rotation_degrees = 15.0
+texture_path = "res://assets/pixel/background/driller.png"
+used_rect = Rect2(108, 60, 375, 327)
+
+[sub_resource type="Resource" id="Resource_otlal"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("7_a17jf")
+offset = Vector2(1794.5883, 1445.8906)
+parallax = 0.8
+scale = 2.0
+texture_path = "res://assets/pixel/background/asteroid_b.png"
+used_rect = Rect2(43, 26, 77, 76)
+
+[sub_resource type="Resource" id="Resource_4rcrr"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("8_1k58g")
+offset = Vector2(1148.1484, 1282.6079)
+parallax = 0.8
+scale = 3.0
+texture_path = "res://assets/pixel/background/asteroid_a.png"
+used_rect = Rect2(29, 9, 94, 99)
+
+[sub_resource type="Resource" id="Resource_u8man"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("9_th2d7")
+offset = Vector2(3924.3987, 291.32962)
+parallax = 0.4
+texture_path = "res://assets/pixel/background/planet_b.png"
+used_rect = Rect2(35, 174, 747, 355)
+
+[sub_resource type="Resource" id="Resource_ft0cr"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("10_onu8u")
+offset = Vector2(3646.2742, 2139.051)
+parallax = 0.4
+scale = 0.8
+texture_path = "res://assets/pixel/background/planet_f.png"
+used_rect = Rect2(68, 90, 630, 634)
+
+[sub_resource type="Resource" id="Resource_e1cvc"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("11_1vqqk")
+offset = Vector2(1776.2665, 2549.472)
+parallax = 0.3
+scale = 0.5
+texture_path = "res://assets/pixel/background/planet_e.png"
+used_rect = Rect2(116, 92, 572, 564)
+
+[sub_resource type="Resource" id="Resource_spyxo"]
+script = ExtResource("1_tpwl5")
+texture = ExtResource("12_xwns6")
+offset = Vector2(4467.978, 1143.797)
+scale = 1.7
+texture_path = "res://assets/pixel/background/radar_base.png"
+used_rect = Rect2(193, 57, 396, 453)
 
 [sub_resource type="Resource" id="Clip_0"]
 script = ExtResource("clip")
@@ -511,111 +615,6 @@ points = PackedVector2Array(0, 18, 10, 32, 25, 52, 36, 38, 45, 18, 55, 42, 68, 4
 script = ExtResource("curve")
 type = &"bomber"
 points = PackedVector2Array(0, 0, 10, 0, 25, 0, 36, 0, 45, 0, 57, 5, 68, 3, 80, 8, 90, 3, 99, 4, 107, 3, 115, 4, 128, 10, 141, 6, 156, 14, 170, 5, 178, 6, 187, 5, 195, 6, 210, 16, 225, 8, 242, 20, 255, 12, 265, 7, 273, 7, 282, 7, 290, 8, 306, 24, 321, 12, 337, 28, 351, 16, 362, 30, 370, 8, 379, 10, 387, 8, 395, 10, 409, 32, 423, 18, 437.5, 22, 450, 36, 462, 20, 473, 40, 477, 20, 480, 0, 724, 0, 728, 36)
-
-[sub_resource type="Resource" id="Resource_hkp0b"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("2_7bvd6")
-offset = Vector2(-63.402237, 245.50711)
-parallax = 0.4
-texture_path = "res://assets/pixel/background/colony.png"
-used_rect = Rect2(469, 160, 497, 331)
-
-[sub_resource type="Resource" id="Resource_yarhb"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("3_rji3b")
-offset = Vector2(1247.3674, -407.33655)
-parallax = 0.8
-scale = 2.0
-rotation_degrees = 30.0
-texture_path = "res://assets/pixel/background/satellite_b_damaged.png"
-used_rect = Rect2(77, 210, 628, 247)
-
-[sub_resource type="Resource" id="Resource_ryby2"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("4_5rvwg")
-offset = Vector2(223.24759, 61.170666)
-parallax = 0.9
-texture_path = "res://assets/pixel/background/space_debris.png"
-used_rect = Rect2(166, 114, 301, 172)
-
-[sub_resource type="Resource" id="Resource_4tho1"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("4_5rvwg")
-offset = Vector2(-407.34918, 461.60858)
-parallax = 0.4
-scale = 0.5
-rotation_degrees = -20.0
-texture_path = "res://assets/pixel/background/space_debris.png"
-used_rect = Rect2(166, 114, 301, 172)
-
-[sub_resource type="Resource" id="Resource_1ec65"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("5_u0rn4")
-offset = Vector2(2661.79, 383.91837)
-parallax = 0.7
-texture_path = "res://assets/pixel/background/moon.png"
-used_rect = Rect2(3, 1, 94, 94)
-
-[sub_resource type="Resource" id="Resource_r6cuo"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("6_xw0ar")
-offset = Vector2(3500.641, -1600.4805)
-scale = 2.0
-rotation_degrees = 15.0
-texture_path = "res://assets/pixel/background/driller.png"
-used_rect = Rect2(108, 60, 375, 327)
-
-[sub_resource type="Resource" id="Resource_otlal"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("7_a17jf")
-offset = Vector2(1794.5883, 1445.8906)
-parallax = 0.8
-scale = 2.0
-texture_path = "res://assets/pixel/background/asteroid_b.png"
-used_rect = Rect2(43, 26, 77, 76)
-
-[sub_resource type="Resource" id="Resource_4rcrr"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("8_1k58g")
-offset = Vector2(1148.1484, 1282.6079)
-parallax = 0.8
-scale = 3.0
-texture_path = "res://assets/pixel/background/asteroid_a.png"
-used_rect = Rect2(29, 9, 94, 99)
-
-[sub_resource type="Resource" id="Resource_u8man"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("9_th2d7")
-offset = Vector2(3924.3987, 291.32962)
-parallax = 0.4
-texture_path = "res://assets/pixel/background/planet_b.png"
-used_rect = Rect2(35, 174, 747, 355)
-
-[sub_resource type="Resource" id="Resource_ft0cr"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("10_onu8u")
-offset = Vector2(3646.2742, 2139.051)
-parallax = 0.4
-scale = 0.8
-texture_path = "res://assets/pixel/background/planet_f.png"
-used_rect = Rect2(68, 90, 630, 634)
-
-[sub_resource type="Resource" id="Resource_e1cvc"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("11_1vqqk")
-offset = Vector2(1776.2665, 2549.472)
-parallax = 0.3
-scale = 0.5
-texture_path = "res://assets/pixel/background/planet_e.png"
-used_rect = Rect2(116, 92, 572, 564)
-
-[sub_resource type="Resource" id="Resource_spyxo"]
-script = ExtResource("1_tpwl5")
-texture = ExtResource("12_xwns6")
-offset = Vector2(4467.978, 1143.797)
-scale = 1.7
-texture_path = "res://assets/pixel/background/radar_base.png"
-used_rect = Rect2(193, 57, 396, 453)
 
 [resource]
 script = ExtResource("stage")
