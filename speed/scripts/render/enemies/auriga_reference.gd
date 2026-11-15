@@ -5,8 +5,13 @@ const SETTINGS := preload("res://data/visuals/fx_reference.tres")
 const FX := preload("res://scripts/render/fx/fx_reference_primitives.gd")
 var _raster := SpeedFxRaster.new()
 var _settings: Dictionary = SETTINGS.for_id("G12-auriga")
+## 炎の帯が燃えている間だけ鳴らすループの音
+const FLAME_SOUND := &"elite.auriga.flame"
+const FLAME_FADE := 0.3
+var _flame: AudioStreamPlayer
 
 func render(rows: Array, canvas, clock: float) -> void:
+	_flame_sound(not rows.is_empty())
 	var groups := {}
 	for row: Dictionary in rows:
 		var key := "%s/%s" % [row.owner_id, row.side]
@@ -44,3 +49,26 @@ func _draw_trail(rows: Array, canvas, clock: float) -> int:
 		strengths.append(k)
 	var width: float = float(rows[0].width) * 0.5 * canvas.world_scale * float(_settings.size)
 	return _raster.auriga_trail(points, strengths, width, PackedColorArray(FX.ramp(Color(_settings.color))), clock, canvas.back.fade, canvas.back.light_strength)
+
+## 帯が1つでも残っている間は炎の音を繰り返し、すべて消えたら短く消す。
+## 再生口は今の場面の下に置き、ランを抜けると一緒に消え、ポーズ中は止まる。
+func _flame_sound(active: bool) -> void:
+	if active:
+		if _flame != null and is_instance_valid(_flame): return
+		var stream := AudioManager.sound(FLAME_SOUND)
+		var tree := Engine.get_main_loop() as SceneTree
+		if stream == null or tree == null or tree.current_scene == null: return
+		_flame = AudioStreamPlayer.new()
+		_flame.bus = &"SFX"
+		_flame.stream = stream
+		_flame.volume_db = float(AudioManager.settings(FLAME_SOUND).get("volume_db", 0.0))
+		_flame.pitch_scale = AudioManager.pitch(FLAME_SOUND)
+		tree.current_scene.add_child(_flame)
+		_flame.play()
+	elif _flame != null:
+		var player := _flame
+		_flame = null
+		if not is_instance_valid(player): return
+		var tween := player.create_tween()
+		tween.tween_property(player, "volume_db", -60.0, FLAME_FADE)
+		tween.tween_callback(player.queue_free)
