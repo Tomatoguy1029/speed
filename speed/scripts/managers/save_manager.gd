@@ -221,10 +221,10 @@ func _migrate(loaded: Dictionary, d: Dictionary) -> Dictionary:
 func default_settings() -> Dictionary:
 	return {
 		"review_guide_title": false, "review_guide_map": false, "review_guide_run": false, "review_guide_pause": false,
-		"master_volume": 0.8,
-		"sfx_volume": 0.8,
-		"music_volume": 0.5,
-		"engine_volume": 0.6,
+		"master_volume": 1.0,
+		"sfx_volume": 1.0,
+		"music_volume": 1.0,
+		"engine_volume": 1.0,
 		"muted": true,
 		"window_mode": "windowed",
 		"screen_shake": 1.0,

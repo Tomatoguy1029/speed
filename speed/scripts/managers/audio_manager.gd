@@ -554,7 +554,7 @@ func _apply_volumes() -> void:
 	_set_bus(&"Master", float(s.master_volume), bool(s.muted))
 	_set_bus(&"SFX", float(s.sfx_volume) * slow_gain, false)
 	_set_bus(&"Engine", float(s.engine_volume) * slow_gain, false)
-	_set_bus(&"Music", float(s.get("music_volume", 0.5)) * slow_gain, false)
+	_set_bus(&"Music", float(s.get("music_volume", 1.0)) * slow_gain, false)
 	_set_bus(&"Dash", float(s.sfx_volume), false)
 
 func _set_bus(bus: StringName, linear: float, muted: bool) -> void:
