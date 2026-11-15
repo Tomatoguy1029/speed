@@ -63,10 +63,14 @@ enum class DracoCycleStage : uint8_t { None,Roar,Collect,WaitBeams,Return,Genera
 struct DracoCycleState {
     DracoCinematicState saved;
     DracoCycleStage stage=DracoCycleStage::None;
-    bool first=false;
+    bool first=false,leaving=false,landed=false;
     uint32_t generated=0;
-    double time=0,next_cycle=12,zoom=1,return_depth=1,return_alpha=1,return_angle=0;
-    godot::Vector2 home,from,return_from;
+    double time=0,next_cycle=12,zoom=1;
+    // 頭が進んだ道のり。奥へ向かう道・奥の周回・帰りの道を続けてたどる。
+    double s=0,speed=0,far_s=0,loop_start=0,exit_s=-1,mirror=1,face=0,far_time=0,rise_time=-1,stop_time=-1,stop_distance=0,stop_duration=0,settle=0,swim=0;
+    godot::Vector2 home,anchor,landing;
+    std::vector<godot::Vector2> out,back,spots;
+    std::vector<double> out_z,out_arc,back_z,back_arc;
 };
 struct DracoImpact {godot::Vector2 position;double time=0,radius=0;uint32_t technique=0;};
 struct DracoClosingWall {AttackHandle attack;godot::Vector2 from;double time=0.3,duration=0.3,delay=0,length=0,half_width=0,angle=0;};
@@ -97,6 +101,8 @@ struct DracoBodyState {
     std::vector<EnemyHandle> picaro_pending;
     bool picaro_attacking=true;
     std::vector<godot::Vector2> trail,pose,override_points;
+    // 点ごとの遠近の倍率。空なら全身が手前にいる。
+    std::vector<double> scales;
     double width=154,head_scale=1.35,depth=1,alpha=1;
 };
 struct DracoCloneUnit {TechniqueState inner;HydraNeckState neck;std::vector<EnemyHandle> parts;std::vector<godot::Vector2> points,trail;double face=0;godot::Vector2 origin;uint32_t index=0;bool entry_hit=false;};

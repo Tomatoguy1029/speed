@@ -1,4 +1,5 @@
 #include "interceptor.h"
+#include "../../bosses/draco/cycle.h"
 #include "../../output/event_builder.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/collision_query.h"
@@ -25,6 +26,7 @@ void InterceptorBehavior::step(RunRuntime &r,double dt) {
         return best;
     };
     for (size_t i=0;i<w.drones.size();++i) {auto &d=w.drones[i];const double angle=w.clock*w.orbit_speed+i*6.283185307179586/w.drones.size();d.pos=s.ship.pos+godot::Vector2::from_angle(angle)*w.orbit-godot::Vector2::from_angle(d.angle)*d.kick;d.kick=std::max(0.0,d.kick-dt*12*1.82*r.content->config.character_scale);d.flash=std::max(0.0,d.flash-dt);
+        if (DracoCycle::background(s,d.target)) {d.target={};d.target_id=0;}
         const auto aim=d.left && s.enemy_handles.contains(d.target)?d.target:nearest(d.pos);if (s.enemy_handles.contains(aim)) d.angle+=angle_difference((s.enemies[aim.slot].pos-d.pos).angle()-d.angle)*std::min(dt*14,1.0);
         if (s.draw.drawing || s.draw.tracing || w.clock<d.next) continue;
         EnemyHandle target;if (!d.left) {target=aim;if (!s.enemy_handles.contains(target)) continue;d.left=w.burst;}else if (s.enemy_handles.contains(d.target) && !s.enemies[d.target.slot].dead) target=d.target;else target=nearest(d.pos);
