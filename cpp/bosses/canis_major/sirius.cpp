@@ -1,4 +1,5 @@
 #include "sirius.h"
+#include "../../output/event_builder.h"
 #include "flames.h"
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
@@ -12,7 +13,7 @@
 namespace speed {
 namespace {
 const CanisSiriusDefinition &rule(const ContentBundle &c,uint32_t definition) {return *std::find_if(c.canis_sirius.begin(),c.canis_sirius.end(),[&](const auto &v){return v.technique==definition;});}
-void start_shot(RunRuntime &r,TechniqueState &t) {auto &v=t.detail.get<CanisSiriusState>();v.age=0;v.fired=false;t.locked=false;t.stage=TechniqueStage::Windup;CanisTechnique::cue(r,t,"telegraph");}
+void start_shot(RunRuntime &r,TechniqueState &t) {auto &v=t.detail.get<CanisSiriusState>();v.age=0;v.fired=false;t.locked=false;t.stage=TechniqueStage::Windup;EventBuilder::audio(r,"boss.canis_major.scorch_charge",r.state.enemies[t.actor.slot].pos);CanisTechnique::cue(r,t,"telegraph");}
 }
 bool CanisSirius::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {const auto *b=PhaseController::find(r,actor);return b && !b->canis->barking && !b->canis->calling && r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead && std::any_of(r.content->canis_sirius.begin(),r.content->canis_sirius.end(),[&](const auto &p){return p.technique==definition;});}
 double CanisSirius::attack_length(const RunRuntime &r,uint32_t definition) {const auto &p=rule(*r.content,definition);const auto &base=r.content->boss_techniques[definition-1];return p.shots*(base.warn+base.active)+std::max(int64_t(0),int64_t(p.shots)-1)*p.shot_gap+0.1;}

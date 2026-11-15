@@ -1,4 +1,5 @@
 #include "leo.h"
+#include "../../output/event_builder.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/combat_resolver.h"
 #include "../../content/content_bundle.h"
@@ -37,6 +38,7 @@ void LeoBehavior::contact(RunRuntime &run,godot::Vector2 from,godot::Vector2 to)
     }
     for (const auto target:rocks) {
         if (!s.enemy_handles.contains(target) || s.enemies[target.slot].dead) continue;
+        EventBuilder::audio(run,"hero.leo.hit",s.enemies[target.slot].pos);
         DamageRequest request;request.struck=target;request.cause=Cause::Ram;request.direction=forward;CombatResolver::kill_enemy(run,request);
         if (s.phase!=godot::RunState::Phase::Play) return;
     }
@@ -48,6 +50,7 @@ void LeoBehavior::contact(RunRuntime &run,godot::Vector2 from,godot::Vector2 to)
         const auto &e=s.enemies[target.slot];
         DamageRequest request;request.struck=target;request.cause=Cause::Ram;request.no_crit=true;request.amount=attack;
         request.direction=forward;request.impact=e.pos;request.has_impact=true;
+        EventBuilder::audio(run,"hero.leo.hit",e.pos);
         CombatResolver::damage_enemy(run,request);
         if (s.phase!=godot::RunState::Phase::Play) return;
     }

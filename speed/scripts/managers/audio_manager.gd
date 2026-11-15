@@ -73,11 +73,76 @@ const EVENT_SOUNDS := {
 	&"hero_freed": &"hero.find.free",
 	&"hero_power_end": &"hero.ult.end",
 	&"meteor_impact": &"hero.hercules.impact",
+	&"wave_release": &"boss.monoceros.horn_wave",
+	&"monoceros_slash_release": &"boss.monoceros.sword",
+	&"lance_launch": &"boss.monoceros.lance",
 }
 ## 中身で鳴らす欄を選ぶイベント。EVENT_SOUNDS と合わせて購読する。
-const EVENT_SPECIAL := [&"kill", &"weapon_fire", &"launch", &"trace_end", &"game_over", &"pickup", &"xp_collect", &"explode", &"shoot", &"hero_power"]
-const PICKUP_SOUNDS := {&"heal": &"field.repair.pick", &"magnet": &"field.beacon.pick", &"comet_weapon": &"weapon.get.capsule_pick"}
-const EXPLODE_SOUNDS := {"endBlast": &"weapon.end_blast.blast", "mine": &"weapon.mine.blast", "runUp": &"trait.run_up.area", "pump_burst": &"elite.pump.release"}
+const EVENT_SPECIAL := [&"kill", &"weapon_fire", &"launch", &"trace_end", &"game_over", &"pickup", &"xp_collect", &"explode", &"shoot", &"hero_power",
+	&"audio_cue", &"hit", &"shot_hit", &"beam", &"bonus", &"hero_power_end", &"end_hole", &"hydra_cue", &"centaurus_cue", &"canis_cue", &"draco_cue",
+	&"run_finished", &"choice", &"level_bonus", &"reroll", &"offer", &"enemy_retire"]
+## 同じイベントで EVENT_SOUNDS などの欄に重ねて鳴らす欄。
+const EVENT_EXTRA := {
+	&"boss_phase": [&"boss.common.roar"],
+	&"boss_spawn": [&"boss.common.spawn", &"boss.common.roar"],
+	&"barrier_hit": [&"weapon.barrier.wave"],
+	&"hole_recover": [&"ship.combat.heal"],
+	&"crash": [&"field.planet.bump"],
+	&"sonic_push": [&"weapon.sonic_boom.push"],
+	&"hull_scatter": [&"enemy.debris.fly"],
+	&"summon_mark": [&"elite.cepheus.reinforce"],
+	&"aquarius_aim": [&"elite.aquarius.charge"],
+	&"final_strike": [&"scene.time_up.charge"],
+	&"boss_defeated": [&"boss.common.final_strike"],
+	&"boss_finish": [&"scene.boss_finish.replay", &"scene.boss_finish.victory"],
+	&"boss_explode": [&"scene.boss_finish.vanish", &"scene.boss_finish.clear_field"],
+	&"ship_death": [&"scene.defeat.last_hit"],
+	&"game_over": [&"scene.defeat.text"],
+}
+## 命中（hit）の原因 → 欄。
+const HIT_SOUNDS := {"ram": &"ship.combat.hit", "afterimage": &"weapon.mirage.hit", "hullDebris": &"enemy.debris.hit", "saw": &"field.saw.hit", "corona_throw": &"elite.corona.crash"}
+## loop_for で鳴らし終えたときに続けて鳴らす欄。
+const LOOP_ENDS := {&"field.saw.fly": &"field.saw.stop"}
+## 弾の命中（shot_hit）の見た目 → 欄。
+const SHOT_HIT_SOUNDS := {"weapon/forward": &"weapon.blaster.hit", "weapon/rear": &"weapon.blaster.hit", "weapon/scatter": &"weapon.spread.hit",
+	"weapon/interceptor": &"weapon.strike_wing.hit", "weapon/massTow": &"weapon.anchor.hit"}
+const BEAM_SOUNDS := {"weapon/bipolar": &"weapon.bipolar.beam", "enemy/reticle": &"elite.reticle.beam"}
+const KILL_SOUNDS := {&"splitter": &"enemy.splitter.split", &"iron": &"field.iron.break", &"meteor": &"field.meteor.break", &"triangle_star": &"elite.triangle.break"}
+## うみへび座の技 → [予兆, 発動] の欄。hydra_cue の warning_started・target_locked で予兆、attack_started で発動を鳴らす。
+const HYDRA_SOUNDS := {
+	"bite_thrust": [&"boss.hydra.bite_tell", &"boss.hydra.bite"],
+	"bite_sweep": [&"boss.hydra.sweep_tell", &"boss.hydra.sweep"],
+	"wind_band": [&"", &"boss.hydra.wind_band"],
+	"wind_blades": [&"", &"boss.hydra.wind_blade"],
+	"rubble_lump": [&"", &"boss.hydra.rock_throw"],
+	"rubble_fan": [&"", &"boss.hydra.scatter"],
+	"beam_fixed": [&"boss.hydra.fixed_charge", &"boss.hydra.fixed_beam"],
+	"beam_bolt": [&"", &"boss.hydra.orb"],
+	"thunder_headbutt": [&"boss.hydra.charge_up", &"boss.hydra.headbutt"],
+	"thunder_drop": [&"boss.hydra.bolt_tell", &"boss.hydra.bolt"],
+	"north": [&"boss.hydra.triple_tell", &"boss.hydra.triple"],
+	"sequence": [&"", &"boss.hydra.chain_bite"],
+	"curve": [&"boss.hydra.spin_charge", &"boss.hydra.spin_beam"],
+	"grid": [&"boss.hydra.grid_tell", &"boss.hydra.grid_beam"],
+	"swarm": [&"boss.hydra.pounce_tell", &"boss.hydra.pounce"],
+}
+const HYDRA_CUES := {"gather_started": &"boss.hydra.debris_tornado", "rubble_shattered": &"boss.hydra.debris_shatter",
+	"separation_started": &"boss.hydra.separate", "head_destroyed": &"boss.hydra.neck_kill"}
+## ケンタウルス座・おおいぬ座の合図 → 欄。名前が技をまたいで重なる合図（telegraph など）は C++ が audio_cue で鳴らす。
+const CENTAURUS_CUES := {"shower_mark": &"boss.centaurus.fall_tell", "shower_landed": &"boss.centaurus.fall", "rain_started": &"boss.centaurus.rain_up", "rain_trace": &"boss.centaurus.rain",
+	"stomp": &"boss.centaurus.stomp", "strike": &"boss.centaurus.back", "fan_windup": &"boss.centaurus.fan_draw", "fan_released": &"boss.centaurus.fan",
+	"sail_windup": &"boss.centaurus.sail", "sail_run": &"boss.centaurus.sail_run", "sail_shot": &"boss.centaurus.sail_shot", "leap": &"boss.centaurus.leap"}
+const CANIS_CUES := {"pounce": &"boss.canis_major.pounce", "command": &"boss.canis_major.command", "stream_windup": &"boss.canis_major.command",
+	"bay_bark": &"boss.canis_major.bark", "howl": &"boss.canis_major.howl", "sirius": &"boss.canis_major.scorch", "flame_start": &"boss.canis_major.sirius_light",
+	"nova_windup": &"boss.canis_major.flash_charge", "nova_flash": &"boss.canis_major.flash", "blaze_ignite": &"boss.canis_major.burn_ignite",
+	"blaze_explode": &"boss.canis_major.burn", "relay_fire": &"boss.canis_major.relay"}
+const DRACO_CUES := {"core_released": &"scene.finale.polaris", "bear_roar": &"scene.finale.ursa_roar"}
+const CHOICE_SOUNDS := {"weapon": &"growth.cards.new_weapon", "trait": &"growth.cards.new_trait", "post_max": &"growth.cards.post_max"}
+## 戦闘の phase のうち、ループする欄を鳴らし続ける段階（Play・Finishing）。
+const LOOP_PHASES := [0, 4]
+const PICKUP_SOUNDS := {&"heal": &"field.repair.pick", &"magnet": &"field.beacon.pick", &"comet_weapon": &"weapon.get.capsule_pick", &"coin": &"field.parts.pick"}
+## エンドブラストの爆発は外周の小爆発と分けるため C++ が audio_cue で鳴らす。
+const EXPLODE_SOUNDS := {"mine": &"weapon.mine.blast", "runUp": &"trait.run_up.area", "pump_burst": &"elite.pump.release"}
 const HERO_SOUNDS := {"leo": &"hero.leo.transform", "perseus": &"hero.perseus.cast", "gemini": &"hero.gemini.split", "hercules": &"hero.hercules.cast"}
 const XP_RANK := {"low": 0, "mid": 1, "high": 2}
 
@@ -122,6 +187,7 @@ func _ready() -> void:
 		add_child(p)
 		_players.append(p)
 	_reload_bank()
+	get_tree().node_added.connect(watch_button)
 	SaveManager.settings_changed.connect(_apply_volumes)
 	_apply_volumes()
 
@@ -162,10 +228,27 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func toggle_mute() -> void:
 	SaveManager.set_setting("muted", not bool(SaveManager.settings.muted))
+	play(&"ui.settings.mute")
 
 ## 欄の音。音のない欄は null。
 func sound(id: StringName) -> AudioStream:
 	return _sounds.get(id)
+
+## 欄に曲があるか。曲のない欄へ切り替えずに前の曲を続けるかを、呼び出し側が決めるときに使う。
+func has_music(id: StringName) -> bool:
+	return _music.get(id) != null
+
+## ボタンにカーソルを合わせた音と、使えないボタンを押した音をつなぐ。画面のボタンが増えるたびに呼ばれる。
+## 画面が自分の欄で鳴らすボタンは、メタデータ own_hover（true）・denied_sound（欄ID）で共通の音を差し替える。
+func watch_button(node: Node) -> void:
+	var button := node as BaseButton
+	if button == null or button.has_meta(&"audio_watched"): return
+	button.set_meta(&"audio_watched", true)
+	button.mouse_entered.connect(func():
+		if not button.disabled and not button.get_meta(&"own_hover", false): play(&"ui.common.hover"))
+	button.gui_input.connect(func(event: InputEvent):
+		if button.disabled and event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+			play(button.get_meta(&"denied_sound", &"ui.common.denied")))
 
 ## 欄の鳴らし方。音の表にない欄は空。
 func settings(id: StringName) -> Dictionary:
@@ -237,6 +320,33 @@ func stop_loop(id: StringName, key: Variant = null, fade_seconds := 0.15) -> voi
 	var tween := create_tween().set_ignore_time_scale(true)
 	tween.tween_property(player, "volume_db", -60.0, fade_seconds)
 	tween.tween_callback(player.queue_free)
+
+## start_loop で鳴らしている音をすべて止める。戦闘画面の退出で使う。
+func stop_loops() -> void:
+	for key: Variant in _loops.keys(): stop_loop(&"", key, 0.05)
+
+## 敵ごとに鳴らしているループ（欄が enemy.・elite. で始まり、key が敵ID）を止める。
+func _stop_enemy_loops(id: int) -> void:
+	var suffix := "#%d" % id
+	for key: Variant in _loops.keys():
+		if key is String and key.ends_with(suffix) and (key.begins_with("enemy.") or key.begins_with("elite.")): stop_loop(&"", key)
+
+## ポーズ・カード選択の間はループする欄を一時停止する。
+func pause_loops(paused: bool) -> void:
+	for player: AudioStreamPlayer in _loops.values():
+		if is_instance_valid(player): player.stream_paused = paused
+
+## ループする欄を seconds 秒だけ鳴らす。同じ key で呼び直すと止める時刻を延ばす。
+func loop_for(id: StringName, key: Variant, seconds: float) -> void:
+	start_loop(id, key)
+	var player: AudioStreamPlayer = _loops.get(key)
+	if not is_instance_valid(player): return
+	var until := Time.get_ticks_msec() + int(seconds * 1000.0)
+	player.set_meta(&"until", until)
+	get_tree().create_timer(seconds, false).timeout.connect(func():
+		if _loops.get(key) != player or int(player.get_meta(&"until", 0)) > Time.get_ticks_msec(): return
+		stop_loop(id, key)
+		if LOOP_ENDS.has(id): play(LOOP_ENDS[id]))
 
 func _reload_bank() -> void:
 	var bank := ResourceLoader.load("res://.content/audio.res", "", ResourceLoader.CACHE_MODE_IGNORE) as AudioBank
@@ -381,6 +491,7 @@ func heartbeat_phase() -> float:
 func set_slow_motion(enabled: bool) -> void:
 	if _slow_motion == enabled: return
 	_slow_motion = enabled
+	play(&"scene.run.slow_in" if enabled else &"scene.run.slow_out")
 	if _slow_fade != null: _slow_fade.kill()
 	_slow_fade = create_tween().set_ignore_time_scale(true)
 	_slow_fade.tween_method(_set_slow_gain, _slow_gain, 0.35 if enabled else 1.0, 0.15 if enabled else 0.25)
@@ -415,21 +526,98 @@ func _ensure_bus(bus: StringName) -> void:
 
 ## 戦闘の音を鳴らすために購読するイベント。
 func event_types() -> Array:
-	return EVENT_SOUNDS.keys() + EVENT_SPECIAL
+	var types: Array = EVENT_SOUNDS.keys() + EVENT_SPECIAL
+	for type: StringName in EVENT_EXTRA:
+		if type not in types: types.append(type)
+	return types
+
+## 中身で欄を変えるイベント。ほかは EVENT_SOUNDS の欄。
+func _event_sound(type: StringName, data: Dictionary) -> StringName:
+	match type:
+		&"block_impact":
+			if data.get("armor_bounce", false): return &"ship.combat.armor_block"
+		&"barrier_hit":
+			if data.get("broken", false): return &"weapon.barrier.break"
+		&"chain_shock":
+			if int(data.get("generation", 0)) > 0: return &"trait.chain_shock.chain"
+		&"boss_phase":
+			match String(data.get("boss", "")):
+				"draco": return &"boss.draco.stage_shift"
+				"canis_major": return &"boss.canis_major.sirius_wake"
+	return EVENT_SOUNDS[type]
 
 ## C++側の通知を読むだけで、戦闘の更新や乱数には触れない。
 func consume_cpp_frame(frame: Dictionary) -> bool:
+	var ui: Dictionary = frame.get("ui", {})
+	if ui.has("phase"): pause_loops(int(ui.phase) not in LOOP_PHASES)
 	for event: Dictionary in frame.events:
 		var data: Dictionary = event.payload
 		var type := StringName(event.type)
+		for extra: StringName in EVENT_EXTRA.get(type, []): play(extra)
 		if EVENT_SOUNDS.has(type):
-			play(EVENT_SOUNDS[type])
+			play(_event_sound(type, data))
 			continue
 		match type:
+			&"audio_cue":
+				var cue := StringName(data.get("cue", &""))
+				if data.has("life"): loop_for(cue, "%s#%d" % [cue, int(data.get("key", 0))], float(data.life))
+				elif not data.has("loop"): play(cue)
+				elif data.loop: start_loop(cue, "%s#%d" % [cue, int(data.get("key", 0))])
+				else: stop_loop(cue, "%s#%d" % [cue, int(data.get("key", 0))])
+			&"hit":
+				var id: StringName = HIT_SOUNDS.get(String(data.get("cause", "")), &"")
+				if id != &"": play(id)
+			&"shot_hit":
+				var id: StringName = SHOT_HIT_SOUNDS.get(String(data.get("visual_key", "")), &"")
+				if id != &"": play(id)
+			&"beam":
+				var id: StringName = BEAM_SOUNDS.get(String(data.get("visual_key", "")), &"")
+				if id != &"": play(id)
+			&"bonus": play(&"field.bonus.enter" if data.get("enter", false) else &"field.bonus.exit")
+			&"hero_power_end":
+				match String(data.get("id", "")):
+					"leo":
+						stop_loop(&"hero.leo.run", &"hero.leo.run")
+						play(&"hero.leo.revert")
+					"gemini": play(&"hero.gemini.merge")
+			&"end_hole": loop_for(&"trait.end_hole.pull", &"trait.end_hole.pull", float(data.get("life", 0.0)))
+			&"hydra_cue":
+				var cue := String(data.get("cue", ""))
+				var pair: Array = HYDRA_SOUNDS.get(String(data.get("technique", "")), [&"", &""])
+				var id: StringName = HYDRA_CUES.get(cue, pair[0] if cue in ["warning_started", "target_locked"] else pair[1] if cue == "attack_started" else &"")
+				if id != &"": play(id)
+			&"centaurus_cue":
+				var id: StringName = CENTAURUS_CUES.get(String(data.get("cue", "")), &"")
+				if id != &"": play(id)
+			&"canis_cue":
+				var id: StringName = CANIS_CUES.get(String(data.get("cue", "")), &"")
+				if id != &"": play(id)
+			&"draco_cue":
+				var id: StringName = DRACO_CUES.get(String(data.get("cue", "")), &"")
+				if id != &"": play(id)
+			&"run_finished":
+				if String(data.get("kind", "")) == "Clear": play(&"field.stage.clear")
+			&"offer":
+				if data.get("initial", false): play(&"growth.cards.start_choice")
+			&"choice":
+				var kind := String(data.get("kind", ""))
+				var id: StringName = CHOICE_SOUNDS.get(kind, &"")
+				if kind in ["weapon", "trait"] and int(data.get("level", 1)) > 1: id = &"growth.cards.level_up_item"
+				if id != &"": play(id)
+				play(&"growth.cards.apply")
+			&"level_bonus": play(&"growth.cards.combo", 1.0 + 0.06 * minf(float(data.get("count", 1)) - 1.0, 8.0))
+			&"reroll": play(&"growth.cards.reroll")
+			&"enemy_retire": _stop_enemy_loops(int(data.get("id", 0)))
 			&"kill":
-				if not data.get("silent", false): play(&"ship.combat.kill")
+				_stop_enemy_loops(int(data.get("id", 0)))
+				if data.get("silent", false): continue
+				play(&"ship.combat.kill")
+				if data.get("elite", false): play(&"ship.combat.elite_kill")
+				var id: StringName = KILL_SOUNDS.get(StringName(data.get("enemy_type", &"")), &"")
+				if id != &"": play(id)
 			&"weapon_fire":
 				if data.get("id") in [&"W01", &"W23"]: play(&"weapon.blaster.fire")
+				elif data.get("id") == &"W02": play(&"weapon.spread.fire")
 			&"launch": start_dash()
 			&"trace_end": end_dash()
 			&"game_over":
@@ -438,6 +626,8 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 			&"pickup":
 				var id: StringName = PICKUP_SOUNDS.get(StringName(data.get("kind", &"")), &"")
 				if id != &"": play(id)
+				if StringName(data.get("kind", &"")) == &"heal": play(&"ship.combat.heal")
+				elif StringName(data.get("kind", &"")) == &"magnet": play(&"field.beacon.rush")
 			&"xp_collect":
 				var rank := -1
 				for gem: Dictionary in data.get("gems", []): rank = maxi(rank, int(XP_RANK.get(String(gem.get("kind", "")), 0)))
@@ -450,4 +640,5 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 			&"hero_power":
 				var id: StringName = HERO_SOUNDS.get(String(data.get("id", "")), &"")
 				if id != &"": play(id)
+				if String(data.get("id", "")) == "leo": start_loop(&"hero.leo.run", &"hero.leo.run")
 	return true

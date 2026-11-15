@@ -60,6 +60,7 @@ func _ready() -> void:
 	else:
 		show_screen(GameManager.screen, false)
 	if GameManager.screen == GameManager.Screen.TITLE:
+		AudioManager.play(&"ui.title.logo")
 		var guide := preload("res://scripts/ui/review_guide.gd").new()
 		add_child(guide)
 		guide.set_meta("title_screen", self)
@@ -329,6 +330,7 @@ func can_morph_to_upgrade() -> bool:
 
 func transition_to_upgrade() -> void:
 	_morphing = true
+	AudioManager.play(&"ui.menu.frame_morph")
 	_menu_options.hide()
 	_menu_back.hide()
 	var accessory := menu_accessory
@@ -343,6 +345,7 @@ func transition_to_upgrade() -> void:
 
 func _transition_from_upgrade() -> void:
 	_morphing = true
+	AudioManager.play(&"ui.menu.frame_morph")
 	_menu_options.hide()
 	_menu_back.hide()
 	_menu_frame.position = MORPH_PANEL.UPGRADE_RECT.position

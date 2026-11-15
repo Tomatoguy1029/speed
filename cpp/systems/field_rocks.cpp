@@ -3,6 +3,7 @@
 #include "attack_system.h"
 #include "attacks/friend_hull.h"
 #include "../api/run_core.h"
+#include "../output/event_builder.h"
 #include "../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
@@ -73,24 +74,29 @@ void FieldSystem::stream_rocks(RunRuntime &run,double dt) {
     auto &state=run.state;auto &field=state.field;const auto &config=run.content->rock_fields.front();
     for (auto &rock:field.rocks) {
         if (!rock.proxy.generation) continue;
+        const int64_t key=int64_t(&rock-field.rocks.data());
         if (!state.enemy_handles.contains(rock.proxy) || state.enemies[rock.proxy.slot].dead) {
             if (!state.enemy_handles.contains(rock.proxy) || !state.enemies[rock.proxy.slot].hull_scattered) rock.destroyed=true;
+            if (rock.kind==RockKind::Saw) EventBuilder::audio_loop(run,"field.saw.spin",key,false);
             rock.proxy={};continue;
         }
         auto &enemy=state.enemies[rock.proxy.slot];enemy.pos=rock_at(run,rock);enemy.vel=rock.velocity;enemy.facing=rock.facing+rock.spin*state.world_time;
-        if (rock.kind==RockKind::Comet && state.world_time>=rock.gone) rock.destroyed=true;
-        if (rock.destroyed || (!rock.manual && !near(run,enemy.pos,650.0))) {EnemySystem::retire(run,rock.proxy,RetireReason::Outside);rock.proxy={};}
+        if (rock.kind==RockKind::Comet && state.world_time>=rock.gone) {rock.destroyed=true;EventBuilder::audio_loop(run,"field.comet.pass",key,false);}
+        if (rock.destroyed || (!rock.manual && !near(run,enemy.pos,650.0))) {
+            if (rock.kind==RockKind::Saw) EventBuilder::audio_loop(run,"field.saw.spin",key,false);
+            EnemySystem::retire(run,rock.proxy,RetireReason::Outside);rock.proxy={};
+        }
     }
     field.stream_t-=dt;if (field.stream_t>0) return;field.stream_t=0.2;
     for (uint32_t i=0;i<field.rocks.size();++i) {
         auto &rock=field.rocks[i];if (rock.destroyed || rock.proxy.generation) continue;
-        if (rock.kind==RockKind::Comet && state.world_time>=rock.gone) {rock.destroyed=true;continue;}
+        if (rock.kind==RockKind::Comet && state.world_time>=rock.gone) {rock.destroyed=true;EventBuilder::audio_loop(run,"field.comet.pass",int64_t(i),false);continue;}
         const auto at=rock_at(run,rock);if (!rock.manual && !near(run,at,300.0)) continue;
         const uint32_t definition=rock.kind==RockKind::Iron?config.iron:rock.kind==RockKind::Saw?config.saw:config.meteor;
         EnemySpawn params;params.position=at;params.velocity=rock.velocity;params.facing=rock.facing;params.rock=field.rock_handles.at(i);
         params.size=(rock.kind==RockKind::Belt || rock.kind==RockKind::Drift)?(i%2==0?60.0:40.0):rock.size;
         const auto id=EnemySystem::spawn_base(run,definition-1,params);
-        if (id>0) {rock.proxy=state.enemy_handles.at(uint32_t(state.rows_by_id.at(id)));if (rock.rare_weapon) {auto &enemy=state.enemies[rock.proxy.slot];enemy.max_hp*=run.content->comet.rare_hp_mult;enemy.hp=enemy.max_hp;}}
+        if (id>0) {rock.proxy=state.enemy_handles.at(uint32_t(state.rows_by_id.at(id)));if (rock.kind==RockKind::Saw) EventBuilder::audio_loop(run,"field.saw.spin",int64_t(i),true);if (rock.rare_weapon) {auto &enemy=state.enemies[rock.proxy.slot];enemy.max_hp*=run.content->comet.rare_hp_mult;enemy.hp=enemy.max_hp;}}
     }
 }
 bool FieldSystem::contact_rock(godot::SpeedRunCore &core,uint32_t row,godot::Vector2 direction,godot::Vector2 from,double speed) {
@@ -99,7 +105,7 @@ bool FieldSystem::contact_rock(godot::SpeedRunCore &core,uint32_t row,godot::Vec
     const auto &config=run.content->rock_fields.front();const auto u=direction.is_zero_approx()?(enemy.pos-from).normalized():direction;
     FriendHullParams shot;shot.saw=true;shot.position=enemy.pos;shot.velocity=u*std::max(config.saw_speed,speed);shot.radius=enemy.radius;
     shot.damage=state.combat_config.base_attack*state.combat_config.attack_mult*state.combat_config.atk_scale*config.saw_power;shot.life=config.saw_life;
-    FriendHullSystem::emit(run,shot);
+    FriendHullSystem::emit(run,shot);EventBuilder::audio(run,"field.saw.kick",enemy.pos);EventBuilder::audio_for(run,"field.saw.fly",enemy.id,config.saw_life,enemy.pos);
     godot::Dictionary event;event["pos"]=enemy.pos;event["normal"]=-u;event["enemy_pos"]=enemy.pos;event["r"]=enemy.radius;core.emit_event("block_impact",event);
     EnemySystem::retire(core.runtime,state.enemy_handles.at(row),RetireReason::Development);return true;
 }

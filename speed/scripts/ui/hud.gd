@@ -106,6 +106,12 @@ var _swap_keep_index := -1
 var _loadout_icons: Control
 var _loadout_key := ""
 var _music_started := false
+## ボーナスステージ・最終決着の間だけ曲を差し替え、終わったら戦闘の曲へ戻す。
+var _finale_music := false
+## 前のフレームの phase。ポーズから戻った時の音に使う。
+var _sound_phase := -1
+## カードが並ぶ音を鳴らし終えた選択肢の番号。同じ選択肢を描き直しても鳴らし直さない。
+var _dealt_offer := 0
 var _health_fill: AtlasTexture
 var _experience_fill: AtlasTexture
 var _pause_box: Control
@@ -525,6 +531,7 @@ func _confirm_abort() -> void:
 	dialog.input_delay = card_input_delay
 	add_child(dialog)
 	show_menu_overlay(dialog)
+	AudioManager.play(&"ui.pause.exit_confirm")
 	dialog.finished.connect(func(confirmed: bool):
 		if confirmed:
 			# 遷移が完了するまで確認画面が入力を受け止める。
@@ -737,6 +744,7 @@ func _exit_tree() -> void:
 	AudioManager.set_slow_motion(false)
 	AudioManager.stop_music(self)
 	AudioManager.end_dash()
+	AudioManager.stop_loops()
 
 ## C++の値のスナップショットだけを保持する。表示時計と乱数はHUDが所有する。
 ## 英雄の力の獲得演出の英雄と経過秒（reward_presentation.acquire_state）。フィールドの演出とカメラが読む
@@ -794,7 +802,7 @@ func _ready_cpp() -> void:
 			_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
-	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
+	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner","bonus"])
 	var guides := preload("res://scripts/ui/navigation_guides.gd").new()
 	guides.name = "NavigationGuides"
 	add_child(guides)
@@ -985,7 +993,15 @@ func _show_cpp_cards() -> void:
 		var button := CARD_VIEW.create(card_info(card),i,width,10,entry,card.kind=="post_max")
 		button.position = Vector2(left+i*(width+16),83)
 		button.pressed.connect(func(): _card_command(&"choose_card",{"index":i}))
+		button.set_meta(&"own_hover", true)
+		button.mouse_entered.connect(func(): AudioManager.play(&"growth.cards.card_hover"))
 		_cards_row.add_child(button)
+	var offer := int(state.get("offer_id",0))
+	if not swap and offer!=0 and offer!=_dealt_offer and not cards.is_empty():
+		_dealt_offer = offer
+		# 1枚ずつ出る音。同じ欄の重なりはまとめずに鳴らすため、少しずつずらす。
+		for i in cards.size():
+			get_tree().create_timer(0.07*i,false).timeout.connect(func(): AudioManager.play(&"growth.cards.deal"))
 	_cards_title.text = "準備に失敗しました。もう一度準備するか、選び直してください。" if int(state.get("error_code",0))<0 else "準備しています…" if state.get("preparing",false) else tr("hud.start_title") if state.get("initial",false) else tr("hud.levelup_title")
 	var remaining := int(_cpp_ui.get("rerolls_left",0))
 	_reroll_button.text = tr("hud.reroll").format({n=remaining,key=OS.get_keycode_string(InputActions.key_of(&"reroll"))})
@@ -1066,11 +1082,17 @@ func _input_cpp(event: InputEvent) -> void:
 
 func _receive_cpp_frame(frame: Dictionary) -> bool:
 	apply_snapshot(frame.ui)
+	var phase := int(_cpp_ui.get("phase",-1))
+	if _sound_phase==Phase.Paused and phase==Phase.Play: AudioManager.play(&"ui.pause.resume")
+	_sound_phase = phase
 	if not _music_started:
 		_music_started = true
 		if not _cpp_ui.get("lab_mode",false):
 			var boss_spawned: bool = _cpp_ui.get("boss_bodies",[]).any(func(body): return body.get("boss_spawned",false))
-			AudioManager.play_music(&"music.boss" if boss_spawned else &"music.battle",0.6,self)
+			AudioManager.play_music(_boss_music() if boss_spawned else &"music.battle",0.6,self)
+	if not _finale_music and _cpp_ui.get("boss_bodies",[]).any(func(body): return body.get("finale",{}).get("active",false)):
+		_finale_music = true
+		AudioManager.play_music(&"music.finale",1.0,self)
 	for event: Dictionary in frame.events:
 		if event.type=="hero_discovered": _hero_notice_t = 1.8
 		if event.type=="level_bonus" and int(_cpp_ui.phase) not in [Phase.Finishing,Phase.Ended]:
@@ -1079,7 +1101,10 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_rewards.enqueue_bonus(reward)
 		if event.type=="boss_spawn":
 			_warning_t = 3.0
-			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(&"music.boss",1.0,self)
+			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(_boss_music(),1.0,self)
+		if event.type=="bonus" and not _cpp_ui.get("lab_mode",false):
+			if event.payload.get("enter",false): AudioManager.play_music(&"music.bonus",0.6,self)
+			else: AudioManager.play_music(&"music.battle",0.6,self)
 		if event.type=="full_burst_ready":
 			_ring_flash_t = 0.1
 			_ring_flash_max = 0.1
@@ -1096,7 +1121,14 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_banner = tr("hud.clear")
 			_banner_cleared = true
 			_banner_t = 0.0
+			AudioManager.play_music(&"music.clear",0.6,self)
 	return true
+
+## ボス戦の曲。りゅう座はラスボスの曲を使い、曲がなければボスの曲にする。
+func _boss_music() -> StringName:
+	var stage := ContentManager.stage(GameManager.run_stage)
+	if stage != null and stage.boss_id == &"draco" and AudioManager.has_music(&"music.final_boss"): return &"music.final_boss"
+	return &"music.boss"
 
 ## 地図は自機を原点にして、世界の方角と縮尺を保つ。
 func _minimap_offset(world_pos: Vector2) -> Vector2:

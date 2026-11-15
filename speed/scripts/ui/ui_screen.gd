@@ -20,7 +20,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		_on_back()
 
 func _on_back() -> void:
-	AudioManager.play(&"ui.common.confirm")
+	AudioManager.play(&"ui.common.cancel")
 	if close_fn.is_valid():
 		close_fn.call()
 	else:

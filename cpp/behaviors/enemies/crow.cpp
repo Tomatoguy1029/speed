@@ -1,4 +1,5 @@
 #include "crow.h"
+#include "../../output/event_builder.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/pickup_system.h"
 #include "../../content/content_bundle.h"
@@ -10,7 +11,7 @@ void CrowBehavior::spawned(RunRuntime &r,EnemyHandle h,bool member) {
     const double x=s.control.rng.randf_range(-p.aim_spread,p.aim_spread)*s.view_half.x;const double y=s.control.rng.randf_range(-p.aim_spread,p.aim_spread)*s.view_half.y;
     const auto target=s.view_center+godot::Vector2(x,y);
     if (target.distance_to(leader.pos)>std::min(s.view_half.x,s.view_half.y)*0.25) s.enemies[h.slot].facing=(target-leader.pos).angle();
-    s.enemies[h.slot].mode=EnemyMode::Dash;const double facing=s.enemies[h.slot].facing;const auto u=godot::Vector2::from_angle(facing);const godot::Vector2 side(-u.y,u.x);
+    s.enemies[h.slot].mode=EnemyMode::Dash;EventBuilder::audio(r,"elite.crow.pass",leader.pos);const double facing=s.enemies[h.slot].facing;const auto u=godot::Vector2::from_angle(facing);const godot::Vector2 side(-u.y,u.x);
     const godot::Vector2 formation[]={godot::Vector2(-1,-1.1),godot::Vector2(-1.1,1),godot::Vector2(-2.1,0.2)};
     for (int64_t k=0;k<std::min<int64_t>(int64_t(p.flock)-1,3);++k) {
         EnemySpawn options;options.origin=leader.origin;options.picaro_owner=leader.picaro_owner;options.position=leader.pos+(u*formation[k].x+side*formation[k].y)*p.flock_gap;options.facing=facing;options.has_facing=true;options.elite=leader.elite;options.flock_member=true;
@@ -33,7 +34,7 @@ void CrowBehavior::gather(RunRuntime &r,double dt) {
             const auto rel=gem.pos-e.pos;if (rel.length_squared()>=reach*reach) continue;const double along=rel.dot(u);
             if (along>e.radius*0.3 || along<-p.gather_behind || std::abs(rel.cross(u))>p.gather_width) continue;
             const auto delta=feet-gem.pos;const double distance=delta.length();
-            if (distance<=step+4) PickupSystem::carry(r,s.enemy_handles.at(uint32_t(row)),crystal);
+            if (distance<=step+4) {PickupSystem::carry(r,s.enemy_handles.at(uint32_t(row)),crystal);EventBuilder::audio(r,"elite.crow.pick",e.pos);}
             else s.pickups.move_gem(crystal,gem.pos+delta/distance*step);
         }
     }

@@ -1,4 +1,5 @@
 #include "massTow.h"
+#include "../../output/event_builder.h"
 #include "../../runtime/run_runtime.h"
 #include "../../systems/attacks/friend_hull.h"
 #include "../../systems/combat_resolver.h"
@@ -21,9 +22,12 @@ bool MassTowBehavior::capture(RunRuntime &r,const DeathContext &death) {
         twin=true;
     }
     w.cargo.push_back({e.pos,e.pos-at,e.radius,e.facing,e.definition,e.id,false,twin});
-    godot::Dictionary event;event["id"]=e.id;event["pos"]=e.pos;event["to"]=at-heading*70;FrameBuilder::append(r,"anchor_capture",event);return true;
+    godot::Dictionary event;event["id"]=e.id;event["pos"]=e.pos;event["to"]=at-heading*70;FrameBuilder::append(r,"anchor_capture",event);EventBuilder::audio_loop(r,"weapon.anchor.tow",0,true);return true;
 }
-void MassTowBehavior::end(RunRuntime &r) {auto &w=r.state.loadout->mass_tow;if (!w.ready) return;for (auto &c:w.cargo) if (!c.twin) c.ready=true;w.fire.remaining=w.hold;}
+void MassTowBehavior::end(RunRuntime &r) {
+    auto &w=r.state.loadout->mass_tow;if (!w.ready) return;for (auto &c:w.cargo) if (!c.twin) c.ready=true;w.fire.remaining=w.hold;
+    EventBuilder::audio_loop(r,"weapon.anchor.tow",0,false);if (!w.cargo.empty()) EventBuilder::audio(r,"weapon.anchor.hold",r.state.ship.pos);
+}
 void MassTowBehavior::step(RunRuntime &r,double dt) {
     auto &s=r.state;auto &w=s.loadout->mass_tow;if (!w.ready || dt<=0 || w.cargo.empty()) return;
     // 牽く敵は、つかんだ機（機体か、ふたご座の影）の後ろへ集まる
