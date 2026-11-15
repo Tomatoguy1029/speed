@@ -36,7 +36,7 @@ const EVENT_SOUNDS := {
 	&"time_limit_reached": &"field.stage.time_limit",
 	&"wave": &"field.stage.wave",
 	&"rock_break": &"field.rock.break",
-	&"clear_banner": &"scene.boss_finish.clear",
+	&"clear_banner": &"field.stage.clear",
 	&"ship_explode": &"scene.defeat.explode",
 	&"space_quake": &"weapon.space_quake.spawn",
 	&"sonic_impact": &"weapon.sonic_boom.impact",
