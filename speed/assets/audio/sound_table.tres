@@ -870,14 +870,14 @@ volume_db = -10.0
 [sub_resource type="Resource" id="Resource_hjh31"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("73_dn6jy")
-volume_db = -9.0
+volume_db = -18.0
 pitch_min = 3.0
 pitch_max = 3.0
 
 [sub_resource type="Resource" id="Resource_lxqq7"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("74_gos13")
-volume_db = -12.0
+volume_db = -22.0
 pitch_min = 2.0
 pitch_max = 2.0
 
@@ -918,13 +918,13 @@ volume_db = -17.0
 [sub_resource type="Resource" id="Resource_ulr4w"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("81_rhxkt")
-volume_db = -13.5
+volume_db = -20.0
 preset = "爆発 の音"
 
 [sub_resource type="Resource" id="Resource_gn2m6"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("81_rhxkt")
-volume_db = -13.5
+volume_db = -20.0
 preset = "爆発 の音"
 
 [sub_resource type="Resource" id="Resource_m5rkr"]
@@ -2681,7 +2681,7 @@ trim_end = 136.0457142857143
 [sub_resource type="Resource" id="Resource_rhst1"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("293_wys3s")
-volume_db = -27.0
+volume_db = -25.0
 loop = true
 trim_end = 65.43673469387755
 
