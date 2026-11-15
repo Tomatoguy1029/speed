@@ -1,3 +1,4 @@
+#include "../../output/event_builder.h"
 #include "finish.h"
 #include "../flow/phase_controller.h"
 #include "../../runtime/lifecycle.h"
@@ -76,7 +77,7 @@ bool BossFinish::check(RunRuntime &r) {
         return true;
     }
     if (s.control.time_limit_reached && !f.final_started) {f.final_started=true;bool started=false;for (auto &b:s.bosses->bodies) if (r.content->bosses[r.content->boss_bodies[b.definition-1].boss-1].kind!=4 && b.mode<BossMode::Final && s.enemy_handles.contains(b.actor) && !s.enemies[b.actor.slot].dead) {started=PhaseController::begin_final(r,b.actor,p.time_up_charge_time);break;}if (!started) {godot::Dictionary event;event["t"]=s.time;FrameBuilder::append(r,"final_strike",event);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;CombatResolver::ship_damage(r,request);}}
-    else if (s.control.time_limit_reached && f.final_started && s.time>=s.control.time_limit+p.time_up_charge_time) {s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;CombatResolver::ship_damage(r,request);}
+    else if (s.control.time_limit_reached && f.final_started && s.time>=s.control.time_limit+p.time_up_charge_time) {EventBuilder::audio(r,"scene.time_up.strike",s.ship_pos);s.invincible=false;s.ship.invuln=s.ship.shield_t=0;ShipDamageRequest request;request.amount=s.ship.hp+1;request.cause=Cause::FinalStrike;CombatResolver::ship_damage(r,request);}
     return false;
 }
 void BossFinish::step(RunRuntime &r,double dt) {

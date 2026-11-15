@@ -1,4 +1,5 @@
 #include "lynx.h"
+#include "../../output/event_builder.h"
 #include "gunner.h"
 #include "pursuit.h"
 #include "../../systems/enemy_motion.h"
@@ -35,7 +36,9 @@ void LynxBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     const auto delta=e.pos-s.enemy_aim;const auto u=delta/std::max(1.0,double(delta.length()));const auto room=s.view_half-godot::Vector2(1,1)*(e.radius+40.0);
     const auto goal=(s.enemy_aim+u*p.keep).clamp(s.view_center-room,s.view_center+room);
     EnemyMotion::steer(e,goal,e.speed,p.accel,dt,tracking);EnemyMotion::turn(e,(s.ship_pos-e.pos).angle(),d.turn,dt,tracking);
-    if (!GunnerTiming::advance(e.fire_t,e.charge,dt,p.warn,d.fire_interval)) return;
+    const double charged=e.charge;const bool fire=GunnerTiming::advance(e.fire_t,e.charge,dt,p.warn,d.fire_interval);
+    if (charged<=0 && e.charge>0) EventBuilder::audio(r,"elite.lynx.stance",e.pos);
+    if (!fire) return;
     e.charge=0;
     auto &state=std::get<LynxState>(e.behavior_state);const double side=state.buds%2==0?1:-1;state.buds=state.buds==INT32_MAX?INT32_MIN:state.buds+1;
     const double angle=tracking.angle(e.facing,(s.ship_pos-e.pos).angle());SlashParams shot;shot.position=e.pos+godot::Vector2::from_angle(angle)*e.radius;shot.angle=angle;shot.speed=p.slash_speed;shot.size=p.slash_size;shot.range=p.slash_range;shot.damage=p.damage;shot.side=side;
@@ -44,6 +47,6 @@ void LynxBehavior::step(RunRuntime &r,uint32_t row,double dt) {
     const auto paw=e.pos-body_forward*(e.radius*0.28)+paw_forward*(e.radius*0.55)+paw_side*(side*e.radius*0.6);
     shot.lynx_definition=d.lynx_definition;shot.paw_offset=paw-shot.position;
     if (e.attack_managed) shot.budget.value=budget.token(owner);
-    if (const auto result=SlashSystem::emit(r,shot);AttackSystem::get(s,result)) {state.last_fire=s.world_time;state.last_side=int32_t(side);}
+    if (const auto result=SlashSystem::emit(r,shot);AttackSystem::get(s,result)) {state.last_fire=s.world_time;state.last_side=int32_t(side);EventBuilder::audio(r,"elite.lynx.slash",e.pos);}
 }
 }

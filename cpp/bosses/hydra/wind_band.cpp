@@ -1,4 +1,5 @@
 #include "normal_attack.h"
+#include "../../output/event_builder.h"
 #include "body.h"
 #include "swim.h"
 #include "squad.h"
@@ -23,7 +24,7 @@ void HydraNormalAttack::step_wind(RunRuntime &r,TechniqueState &t,double dt,cons
     if (time<p.warn) {
         aim(r,*b,n,(n.target-from).angle(),dt,ctx);n.glow=time/std::max(p.warn,0.001);
     } else {
-        if (!n.locked) {n.locked=true;n.strike_pos=n.strike_from=free?from:base+godot::Vector2::from_angle(n.angle)*n.length;n.sweep=free?n.look_angle:n.angle;if (!n.emission.generation) emission(free?n.free_pos:n.strike_pos,n.sweep,0);cue(r,*b,n,"attack_started",t.definition,0,0,ctx);}
+        if (!n.locked) {n.locked=true;n.strike_pos=n.strike_from=free?from:base+godot::Vector2::from_angle(n.angle)*n.length;n.sweep=free?n.look_angle:n.angle;if (!n.emission.generation) emission(free?n.free_pos:n.strike_pos,n.sweep,0);cue(r,*b,n,"attack_started",t.definition,0,0,ctx);if (!ctx) EventBuilder::audio_for(r,"boss.hydra.wind_loop",r.state.enemy_handles.entity_id(t.actor),p.active,from);}
         if (free) {if (n.normal_phase==1) n.look_angle=n.sweep;update_emission(n.free_pos,n.sweep);n.glow=0;}
     }
     t.aim=n.target;t.locked=n.locked;t.direction=godot::Vector2::from_angle(free?n.look_angle:n.angle);t.stage=time<p.warn?TechniqueStage::Windup:time<p.warn+p.active?TechniqueStage::Active:TechniqueStage::Recovery;

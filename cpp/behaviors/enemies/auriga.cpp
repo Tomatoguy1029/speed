@@ -1,4 +1,5 @@
 #include "auriga.h"
+#include "../../output/event_builder.h"
 #include "../../systems/enemy_motion.h"
 #include "../../systems/enemy_system.h"
 #include "../../systems/attack_budget.h"

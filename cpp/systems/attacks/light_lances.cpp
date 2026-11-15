@@ -57,7 +57,7 @@ std::vector<uint64_t> LightLancesSystem::fire(RunRuntime &run,const LightLancePa
 }
 void LightLancesSystem::step(RunRuntime &run,double dt) {
     if (!std::isfinite(dt) || dt<=0 || run.state.closed) return;
-    auto &items=run.state.attacks.lances;for (auto &item:items) item.life-=dt;
+    auto &items=run.state.attacks.lances;for (auto &item:items) {const bool alive=item.life>0;item.life-=dt;if (alive && item.life<=0) EventBuilder::audio(run,"trait.critical_lance.shatter",item.from);}
     items.erase(std::remove_if(items.begin(),items.end(),[](const auto &item){return item.life<=0;}),items.end());
 }
 }

@@ -1,4 +1,5 @@
 #include "pounce.h"
+#include "../../output/event_builder.h"
 #include "technique_common.h"
 #include "../flow/phase_controller.h"
 #include "../../systems/field.h"
@@ -13,7 +14,7 @@ namespace speed {
 namespace {
 const CanisPounceDefinition &rule(const ContentBundle &c,uint32_t definition) {return *std::find_if(c.canis_pounces.begin(),c.canis_pounces.end(),[&](const auto &v){return v.technique==definition;});}
 void aim(RunRuntime &r,TechniqueState &t,CanisPounceState &v,double dt) {const auto &p=rule(*r.content,v.definition);auto &e=r.state.enemies[t.actor.slot];t.aim=TrackingPolicy{r.state.draw.tracing,e.held,r.state.enemy_handles.contains(e.pump_owner)}.target(e.pos,e.facing,r.state.ship_pos+r.state.ship.vel*(std::max(0.0,v.warn_time-v.stage_time)+p.lead_extra));CanisTechnique::face(r,t,t.aim,r.content->bosses[r.content->boss_techniques[v.definition-1].boss-1].turn,dt);}
-void prepare(RunRuntime &r,TechniqueState &t,CanisPounceState &v) {v.stage_time=0;v.jumping=false;t.stage=TechniqueStage::Windup;t.locked=t.hit=false;r.state.enemies[t.actor.slot].vel={};aim(r,t,v,0);CanisTechnique::cue(r,t,"telegraph");}
+void prepare(RunRuntime &r,TechniqueState &t,CanisPounceState &v) {v.stage_time=0;v.jumping=false;t.stage=TechniqueStage::Windup;t.locked=t.hit=false;r.state.enemies[t.actor.slot].vel={};aim(r,t,v,0);EventBuilder::audio(r,"boss.canis_major.pounce_tell",r.state.enemies[t.actor.slot].pos);CanisTechnique::cue(r,t,"telegraph");}
 }
 bool CanisPounce::ready(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {const auto *b=PhaseController::find(r,actor);return b && !b->canis->barking && !b->canis->calling && r.state.enemy_handles.contains(actor) && !r.state.enemies[actor.slot].dead && std::any_of(r.content->canis_pounces.begin(),r.content->canis_pounces.end(),[&](const auto &p){return p.technique==definition;});}
 double CanisPounce::cooldown(const RunRuntime &r,EnemyHandle actor,uint32_t definition) {const auto &p=rule(*r.content,definition);const auto *b=PhaseController::find(r,actor);return b && b->canis->led.size()<p.alone_hounds?p.cd_alone:r.content->boss_techniques[definition-1].cd;}
