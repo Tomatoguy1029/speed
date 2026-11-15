@@ -225,7 +225,7 @@ func default_settings() -> Dictionary:
 		"sfx_volume": 0.8,
 		"music_volume": 0.5,
 		"engine_volume": 0.6,
-		"muted": true,
+		"muted": false,
 		"window_mode": "windowed",
 		"screen_shake": 1.0,
 		"hitstop": true,
