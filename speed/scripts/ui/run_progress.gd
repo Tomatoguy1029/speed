@@ -36,7 +36,7 @@ static func project(ui: Dictionary) -> Dictionary:
 	elif boss_at>=0.0 and not clock.get("boss_spawned",false):
 		view.progress_alpha=1.0
 	var limit:=float(clock.get("time_limit",-1.0))
-	if limit>=0.0 and limit-elapsed<=300.0:
+	if not body.is_empty() and limit>=0.0 and limit-elapsed<=300.0:
 		var seconds:=maxi(0,ceili(limit-elapsed))
 		view.countdown="%d:%02d" % [seconds/60,seconds%60]
 	return view

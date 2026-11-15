@@ -40,8 +40,7 @@ func _ready() -> void:
 	for remaining in [301.0,300.0,299.0,0.0]:
 		var sample: Dictionary=ui.duplicate(true)
 		sample.run_time=float(ui.stage_clock.time_limit)-remaining
-		var expected: String="" if remaining>300.0 else "%d:%02d" % [int(remaining)/60,int(remaining)%60]
-		check(progress_script.project(sample).countdown==expected,"制限時間の残り%.0f秒の表示境界" % remaining)
+		check(progress_script.project(sample).countdown=="","ボス登場前は残り%.0f秒でもカウントダウンしない" % remaining)
 	var unlimited: Dictionary=ui.duplicate(true)
 	unlimited.stage_clock.time_limit=-1.0
 	check(progress_script.project(unlimited).countdown=="","時間制限なしではカウントダウンしない")
@@ -49,6 +48,14 @@ func _ready() -> void:
 	ui=bridge.read_frame().value.ui
 	check(ui.run_time==ui.stage_clock.boss_at and not ui.boss_bodies.is_empty(),"予定時刻への移動と登場を同じフレームで読む")
 	if ui.boss_bodies.is_empty():bridge.dispose();get_tree().quit(1);return
+	for remaining in [301.0,300.0,299.0,225.0,0.0]:
+		var sample: Dictionary=ui.duplicate(true)
+		sample.run_time=float(ui.stage_clock.time_limit)-remaining
+		var expected: String="" if remaining>300.0 else "%d:%02d" % [int(remaining)/60,int(remaining)%60]
+		check(progress_script.project(sample).countdown==expected,"ボス登場後は終了時刻から残り%.0f秒を計算する" % remaining)
+	unlimited=ui.duplicate(true)
+	unlimited.stage_clock.time_limit=-1.0
+	check(progress_script.project(unlimited).countdown=="","ボス登場後も時間制限なしではカウントダウンしない")
 	for seconds in [0.0,0.8,1.6,2.1,2.6,90.0]:
 		var sample: Dictionary=ui.duplicate(true)
 		sample.boss_bodies[0].clock=seconds
