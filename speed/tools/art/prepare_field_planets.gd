@@ -7,6 +7,7 @@ const PLANETS := {
 	"planet_d": Rect2i(108, 134, 562, 558),
 	"planet_e": Rect2i(116, 92, 572, 564),
 	"planet_f": Rect2i(68, 90, 630, 634),
+	"planet_g": Rect2i(68, 90, 630, 634),
 	"moon": Rect2i(3, 1, 94, 94),
 }
 func _initialize() -> void:
