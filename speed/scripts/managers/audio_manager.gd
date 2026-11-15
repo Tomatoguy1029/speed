@@ -603,6 +603,7 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 		frozen = int(ui.phase) not in LOOP_PHASES or bool(ui.get("presentation_frozen", false))
 		pause_loops(frozen)
 		if is_instance_valid(_dash_voice): _dash_voice.set_paused(frozen)
+		_heartbeat_player.stream_paused = frozen
 	for event: Dictionary in frame.events:
 		var data: Dictionary = event.payload
 		var type := StringName(event.type)
