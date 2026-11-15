@@ -30,8 +30,11 @@ void VortexBehavior::step(RunRuntime &run,double dt) {
             for (auto target:targets) {
                 if (!run.state.enemy_handles.contains(target)) continue;
                 const auto enemy=run.state.enemies[target.slot];
-                if (!enemy.alive || enemy.dead || instance.hits.count(enemy.id) || enemy.pos.distance_squared_to(instance.pos)>(instance.radius+enemy.radius)*(instance.radius+enemy.radius)) continue;
-                instance.hits.insert(enemy.id);const bool lethal=!enemy.is_boss && enemy.hp<=instance.damage;
+                if (!enemy.alive || enemy.dead || enemy.pos.distance_squared_to(instance.pos)>(instance.radius+enemy.radius)*(instance.radius+enemy.radius)) continue;
+                // 渦の寿命中は、HPを共有する本体への命中を一度だけ数える。
+                const auto health_target=CombatResolver::damage_target(run,target);
+                if (!run.state.enemy_handles.contains(health_target) || !instance.hits.insert(run.state.enemy_handles.entity_id(health_target)).second) continue;
+                const bool lethal=!enemy.is_boss && enemy.hp<=instance.damage;
                 if (lethal) run.state.enemies[target.slot].hull_scattered=true;
                 DamageRequest request;request.struck=target;request.amount=instance.damage;request.cause=Cause::Vortex;request.knock=0;
                 CombatResolver::damage_enemy(run,request);EventBuilder::flush_combat(run);
