@@ -67,6 +67,7 @@ struct DracoCycleState {
     uint32_t generated=0;
     double time=0,next_cycle=12,zoom=1,return_depth=1,return_alpha=1,return_angle=0;
     godot::Vector2 home,from,return_from;
+    std::vector<godot::Vector2> pose;
 };
 struct DracoImpact {godot::Vector2 position;double time=0,radius=0;uint32_t technique=0;};
 struct DracoClosingWall {AttackHandle attack;godot::Vector2 from;double time=0.3,duration=0.3,delay=0,length=0,half_width=0,angle=0;};
