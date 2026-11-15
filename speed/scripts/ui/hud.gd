@@ -1092,7 +1092,10 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			AudioManager.play_music(_boss_music() if boss_spawned else &"music.battle",0.6,self)
 	if not _finale_music and _cpp_ui.get("boss_bodies",[]).any(func(body): return body.get("finale",{}).get("active",false)):
 		_finale_music = true
-		AudioManager.play_music(&"music.finale",1.0,self)
+		if AudioManager.has_music(&"music.finale"):
+			AudioManager.play_music(&"music.finale",1.0,self)
+		else:
+			AudioManager.stop_music(self)
 	for event: Dictionary in frame.events:
 		if event.type=="hero_discovered": _hero_notice_t = 1.8
 		if event.type=="level_bonus" and int(_cpp_ui.phase) not in [Phase.Finishing,Phase.Ended]:
