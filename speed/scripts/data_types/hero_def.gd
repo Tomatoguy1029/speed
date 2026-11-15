@@ -29,7 +29,7 @@ const EDITOR_ORDER := 9
 ## 単位：番号
 @export var links: PackedInt32Array
 ## クールダウン
-## 力を使ってから、次に使えるまでの時間（効いている時間を含む）。
+## 力の効果が終わってから、次に使えるまでの時間。
 ## 単位：実秒
 @export var cooldown: float
 ## 効いている時間
