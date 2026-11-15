@@ -444,6 +444,32 @@ def build_plan(slots: list[dict], assets: Path | None, project: Path) -> list[di
     return plan
 
 
+def loud_slots(plan: list[dict], project: Path) -> list[tuple[str, float]]:
+    """音量を当てた時の最大の大きさが 0dBFS を超える効果音の欄（ゲームでは Master のリミッターで抑える）。"""
+    loud = []
+    for row in plan:
+        stream = row.get("stream") or ""
+        if row.get("silent") or not stream.endswith(".wav"):
+            continue
+        path = project / stream.removeprefix("res://")
+        try:
+            with wave.open(str(path), "rb") as reader:
+                if reader.getsampwidth() != 2:
+                    continue
+                samples = array.array("h", reader.readframes(reader.getnframes()))
+        except (OSError, wave.Error):
+            continue
+        if sys.byteorder == "big":
+            samples.byteswap()
+        peak = max((abs(v) for v in samples), default=0)
+        if peak <= 0:
+            continue
+        level = 20.0 * math.log10(peak / 32768.0) + float(row.get("volume_db", 0.0))
+        if level > 0.0:
+            loud.append((row["id"], round(level, 1)))
+    return loud
+
+
 def add_uids(project: Path) -> None:
     """保存した音の表の外部参照へ、参照先の uid を付ける。"""
     table = project / "assets/audio/sound_table.tres"
@@ -491,6 +517,8 @@ def main() -> None:
     finally:
         os.unlink(plan_path)
     add_uids(project)
+    for sid, level in loud_slots(plan, project):
+        print(f"注意: {sid} は音量を当てると最大 {level:+.1f}dBFS（ゲームでは Master のリミッターで抑える）")
     if args.record:
         record = {"at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "slots": {d["_id"]: record_sign(d) for d in slots}}
         args.record.write_text(json.dumps(record, ensure_ascii=False), encoding="utf-8")

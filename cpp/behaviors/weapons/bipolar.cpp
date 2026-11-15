@@ -22,7 +22,7 @@ void fire(RunRuntime &r,const BipolarPending &p) {
     for (auto position:{p.from,p.to}) {godot::Dictionary ring;ring["pos"]=position;ring["radius"]=65.0;ring["color"]=godot::Color::hex(w.color);ring["life"]=w.life;ring["visual_key"]="weapon/bipolar";FrameBuilder::append(r,"ring",ring);}
 }
 }
-void BipolarBehavior::launch(RunRuntime &r) {auto &w=r.state.loadout->bipolar;if (!w.ready) return;w.origin=r.state.ship.pos;w.active=true;w.started=r.state.world_time;}
+void BipolarBehavior::launch(RunRuntime &r) {auto &w=r.state.loadout->bipolar;if (!w.ready) return;w.origin=r.state.ship.pos;w.active=true;w.started=r.state.world_time;EventBuilder::audio(r,"weapon.bipolar.place",w.origin);}
 void BipolarBehavior::end(RunRuntime &r) {auto &w=r.state.loadout->bipolar;if (!w.ready || !w.active) return;w.active=false;const auto to=r.state.ship.pos;if (w.origin.distance_to(to)<=w.min_length) return;w.pending.push_back({w.origin,to,w.next_id++,w.delay});godot::Dictionary e;e["from"]=w.origin;e["to"]=to;FrameBuilder::append(r,"bipolar_charge",e);}
 void BipolarBehavior::step(RunRuntime &r,double dt) {auto &w=r.state.loadout->bipolar;if (!w.ready || dt<=0) return;for (auto &v:w.beams) v.age+=dt;w.beams.erase(std::remove_if(w.beams.begin(),w.beams.end(),[&](const auto &v){return v.age>=w.visual_life;}),w.beams.end());for (auto &p:w.pending) {p.delay-=dt;if (p.delay<=0) fire(r,p);}w.pending.erase(std::remove_if(w.pending.begin(),w.pending.end(),[](const auto &p){return p.delay<=0;}),w.pending.end());}
 }

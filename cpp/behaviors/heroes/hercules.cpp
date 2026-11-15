@@ -29,12 +29,12 @@ void burn(RunRuntime &r,Vector2 center,double radius,double damage) {
 }
 // 発動の画面の熾火が燃え広がりきるまで（start_delay 実秒）待ってから、最初の隕石を出す
 void HerculesBehavior::activate(RunRuntime &r) {
-    auto &h=r.state.heroes;for (const auto &p:r.content->hercules) if (h.power==p.hero) h.hercules.fire_time=p.start_delay;
+    auto &h=r.state.heroes;for (const auto &p:r.content->hercules) if (h.power==p.hero) {h.hercules.fire_time=p.start_delay;EventBuilder::audio(r,"hero.hercules.spread",r.state.ship.pos);}
 }
 void HerculesBehavior::step(RunRuntime &r,double dt) {
     auto &s=r.state;auto &h=s.heroes;auto &fire=h.hercules;
     for (const auto &p:r.content->hercules) {
-        if (h.power==p.hero && h.active>0) {fire.fire_time-=dt;if (fire.fire_time<=0) {fire.fire_time=p.interval;fire.falls.push_back({target(r),float(p.fall_time)});}}
+        if (h.power==p.hero && h.active>0) {fire.fire_time-=dt;if (fire.fire_time<=0) {fire.fire_time=p.interval;fire.falls.push_back({target(r),float(p.fall_time)});EventBuilder::audio(r,"hero.hercules.fall",fire.falls.back().position);}}
         const double damage=CombatResolver::attack_power(r)*p.power;
         for (size_t i=fire.falls.size();i-->0;) {auto &f=fire.falls[i];f.remaining=float(f.remaining-dt);if (f.remaining>0) continue;const auto at=f.position;fire.falls.erase(fire.falls.begin()+i);burn(r,at,p.radius,damage);godot::Dictionary event;event["pos"]=at;event["radius"]=p.radius;EventBuilder::flush_combat(r);FrameBuilder::append(r,"meteor_impact",event);fire.burns.push_back({at,float(p.burn_time)});}
         fire.burn_tick-=dt;const bool tick=fire.burn_tick<=0;if (tick) fire.burn_tick=0.25;

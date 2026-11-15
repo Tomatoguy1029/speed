@@ -58,6 +58,14 @@ var _mooks: Array[Dictionary] = []
 # 1フレーム分の値
 var f := {}
 var t := 0.0
+## 段階に入った瞬間に鳴らす欄。崩壊（burst）の音は C++ の boss_explode が鳴らす。
+## 伝説のモジュールの3段階（cool・show・take）は、モジュールを見せるクリアだけで鳴らす。
+const STAGE_SOUNDS := {"stop": &"scene.boss_finish.stop", "slow": &"scene.boss_finish.slow", "crack": &"scene.boss_finish.crack",
+	"hold": &"scene.boss_finish.hold", "settle": &"scene.boss_finish.settle", "cool": &"scene.boss_finish.module",
+	"show": &"scene.boss_finish.module_name", "take": &"scene.boss_finish.module_take"}
+## スキップなどで段階を飛び越えた時は、この秒より遅れた段階の音を鳴らさない
+const STAGE_SOUND_LATE := 0.25
+var _sounded := {}
 var cs := 1.0
 var at := {}
 var view_rect := Rect2()
@@ -129,6 +137,7 @@ func set_module_art(texture: Texture2D) -> void:
 	_module_art = texture
 
 func hide_view() -> void:
+	_sounded.clear()
 	if not visible: return
 	visible = false
 	for layer: CanvasLayer in [_boss_layer,_over_layer]: if layer!=null: layer.visible = false
@@ -299,6 +308,7 @@ func apply(finish: Dictionary, character_scale: float, ship_heading: Vector2) ->
 		visible = true
 		for layer: CanvasLayer in [_boss_layer,_over_layer]: layer.visible = true
 		for port: SubViewport in [_capture,_fx_port,_fine_port]: port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	_stage_sounds()
 	_place()
 	_boss_motion()
 	_update_body(shape)
@@ -308,6 +318,16 @@ func apply(finish: Dictionary, character_scale: float, ship_heading: Vector2) ->
 		if _pipeline!=null: _pipeline.add_wave(_origin,1600.0,0.8)
 	for node: Node2D in [_body,_body_stop,_fx_body,_fx_draw,_fine_draw,_stop_back,_stop_top,_under,_module,_light,_flash]: node.queue_redraw()
 	for child in _over_layer.get_children(): if child is Node2D: child.queue_redraw()
+
+func _stage_sounds() -> void:
+	for stage: String in STAGE_SOUNDS:
+		if _sounded.has(stage) or t < _start(stage): continue
+		_sounded[stage] = true
+		if stage in ["cool", "show", "take"] and not f.get("reveal", false): continue
+		if t - _start(stage) > STAGE_SOUND_LATE: continue
+		AudioManager.play(STAGE_SOUNDS[stage])
+		# ブーストのとどめは、止まる瞬間に光の切り口の音も重ねる
+		if stage == "stop" and f.get("boost", true): AudioManager.play(&"scene.boss_finish.slash")
 
 func _place() -> void:
 	var canvas := get_viewport().get_canvas_transform()

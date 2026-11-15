@@ -16,7 +16,6 @@
 [ext_resource type="AudioStream" uid="uid://uthqbivs1ea3" path="res://assets/audio/sfx/dash_end.wav" id="9_i461e"]
 [ext_resource type="AudioStream" uid="uid://cv2f5oi6p57bg" path="res://assets/audio/sfx/high_speed.mp3" id="10_qrhg2"]
 [ext_resource type="AudioStream" uid="uid://cje8gh1vy7h34" path="res://assets/audio/sfx/board/ui.menu.codex_tab.wav" id="11_t2thb"]
-[ext_resource type="AudioStream" uid="uid://d56ls1tgfddu" path="res://assets/audio/sfx/khoamthanh-punch-sound-effect-7ehhx2evi5k-500092.mp3" id="11_yao0a"]
 [ext_resource type="AudioStream" uid="uid://d1ww6n3qyv08g" path="res://assets/audio/sfx/board/ui.menu.codex_projection.wav" id="12_04oa7"]
 [ext_resource type="AudioStream" uid="uid://cdgnkqstuavck" path="res://assets/audio/sfx/bounce_robot.mp3" id="12_7m7c5"]
 [ext_resource type="AudioStream" uid="uid://3sj823hjregl" path="res://assets/audio/sfx/board/ui.map.map_rotate.wav" id="14_gcbt4"]
@@ -33,7 +32,6 @@
 [ext_resource type="AudioStream" uid="uid://dmblw8wmau3oo" path="res://assets/audio/music/kulakovka-space-283176.mp3" id="22_us7m1"]
 [ext_resource type="AudioStream" uid="uid://b487yfx3hlqnr" path="res://assets/audio/sfx/board/ui.result.record.wav" id="22_uyd07"]
 [ext_resource type="AudioStream" uid="uid://3jks0jofd4wx" path="res://assets/audio/sfx/board/ui.result.module.wav" id="23_xa6tu"]
-[ext_resource type="AudioStream" uid="uid://b67pe5wt0pyhr" path="res://assets/audio/music/nastelbom-war-391660.mp3" id="23_xif7w"]
 [ext_resource type="AudioStream" uid="uid://2510tvu1qml1" path="res://assets/audio/sfx/board/growth.cards.start_choice.wav" id="24_0tf6p"]
 [ext_resource type="AudioStream" uid="uid://c8qgipkgn82qv" path="res://assets/audio/music/luminewave-i-know-this-is-the-end-short-version-621150.mp3" id="24_g2ahs"]
 [ext_resource type="AudioStream" uid="uid://dd0f13j4yfqgn" path="res://assets/audio/sfx/board/growth.cards.deal.wav" id="25_4s1iu"]
@@ -55,6 +53,7 @@
 [ext_resource type="AudioStream" uid="uid://btpw4bka545i5" path="res://assets/audio/sfx/board/ship.combat.hit.wav" id="43_606nr"]
 [ext_resource type="AudioStream" uid="uid://bpmbo5qpv647s" path="res://assets/audio/sfx/board/preset.mwf8d073vkr.wav" id="44_tjcee"]
 [ext_resource type="AudioStream" uid="uid://cvqswct0nc3lt" path="res://assets/audio/sfx/board/ship.combat.critical.wav" id="45_fsmop"]
+[ext_resource type="AudioStream" uid="uid://dqq00rfjvniu1" path="res://assets/audio/sfx/board/ship.combat.kill.wav" id="46_8thr4"]
 [ext_resource type="AudioStream" uid="uid://csokv50v5mxl0" path="res://assets/audio/sfx/board/ship.combat.elite_kill.wav" id="47_pf5rg"]
 [ext_resource type="AudioStream" uid="uid://d3ksbnds4cl06" path="res://assets/audio/sfx/board/ship.combat.hurt.wav" id="49_bavcp"]
 [ext_resource type="AudioStream" uid="uid://bdimjbqwio3ll" path="res://assets/audio/sfx/board/preset.mwf6zvfzswg.wav" id="51_5js2b"]
@@ -121,13 +120,19 @@
 [ext_resource type="AudioStream" uid="uid://c63rjmh63t4n0" path="res://assets/audio/sfx/board/hero.ult.denied.wav" id="112_axorp"]
 [ext_resource type="AudioStream" uid="uid://dvauydv0aiup3" path="res://assets/audio/sfx/board/hero.ult.end.wav" id="113_7r0lf"]
 [ext_resource type="AudioStream" uid="uid://dfdx0to1vck6w" path="res://assets/audio/sfx/board/hero.leo.revert.wav" id="114_7xjrq"]
+[ext_resource type="AudioStream" uid="uid://bao5hxwqegmnj" path="res://assets/audio/sfx/board/hero.leo.transform.wav" id="114_g5jlx"]
 [ext_resource type="AudioStream" uid="uid://c142gnlx26j3b" path="res://assets/audio/sfx/board/hero.perseus.crumble.wav" id="115_2masr"]
+[ext_resource type="AudioStream" uid="uid://bhbexejhof5hb" path="res://assets/audio/sfx/board/hero.leo.run.wav" id="115_xk8di"]
 [ext_resource type="AudioStream" uid="uid://cx6j00jt4w367" path="res://assets/audio/sfx/board/hero.hercules.spread.wav" id="116_xsfpy"]
 [ext_resource type="AudioStream" uid="uid://dvk8gn0ttylwp" path="res://assets/audio/sfx/board/preset.mwf8hfs0ckg.wav" id="117_0mllc"]
+[ext_resource type="AudioStream" uid="uid://dpm00hfjmr3x1" path="res://assets/audio/sfx/board/hero.perseus.eye.wav" id="117_bk1ro"]
 [ext_resource type="AudioStream" uid="uid://hx3wgnvd1iyf" path="res://assets/audio/sfx/board/field.comet.appear.wav" id="118_nq4jg"]
 [ext_resource type="AudioStream" uid="uid://dmml5jpwp2ad1" path="res://assets/audio/sfx/board/field.rare_comet.appear.wav" id="119_hrw53"]
+[ext_resource type="AudioStream" uid="uid://c1gv5bvjo37p4" path="res://assets/audio/sfx/board/preset.mwg9agtihqk.wav" id="119_iyh48"]
 [ext_resource type="AudioStream" uid="uid://cm5xrf4i76825" path="res://assets/audio/sfx/board/field.gravity.spawn.wav" id="120_kn7jj"]
+[ext_resource type="AudioStream" uid="uid://bslh8sjgsx6oo" path="res://assets/audio/sfx/board/hero.hercules.fall.wav" id="121_50jdq"]
 [ext_resource type="AudioStream" uid="uid://rt2uesw4ve31" path="res://assets/audio/sfx/board/field.gravity.pull.wav" id="121_dvoqp"]
+[ext_resource type="AudioStream" uid="uid://jtci3lhm738g" path="res://assets/audio/sfx/board/hero.hercules.impact.wav" id="122_2qcmi"]
 [ext_resource type="AudioStream" uid="uid://cwwuwir7hyd4t" path="res://assets/audio/sfx/board/field.gravity.fade.wav" id="122_auhqa"]
 [ext_resource type="AudioStream" uid="uid://d2hq0qjd8ie0t" path="res://assets/audio/sfx/board/field.repair.pick.wav" id="123_ek5if"]
 [ext_resource type="AudioStream" uid="uid://db1tpjbty4s74" path="res://assets/audio/sfx/board/field.beacon.drop.wav" id="124_5ho4r"]
@@ -136,8 +141,11 @@
 [ext_resource type="AudioStream" uid="uid://bpcap1mi8jc4a" path="res://assets/audio/sfx/board/field.warp.appear.wav" id="127_8cc4q"]
 [ext_resource type="AudioStream" uid="uid://c3et5aafhksc4" path="res://assets/audio/sfx/board/field.warp.idle.wav" id="128_ur1ba"]
 [ext_resource type="AudioStream" uid="uid://gi7qwqyyp1si" path="res://assets/audio/sfx/board/field.warp.vanish.wav" id="129_np88q"]
+[ext_resource type="AudioStream" uid="uid://dtde8iq8pv6hh" path="res://assets/audio/sfx/board/field.iron.break.wav" id="129_y3h1j"]
 [ext_resource type="AudioStream" uid="uid://dg2n327epmyn0" path="res://assets/audio/sfx/board/field.warp.enter.wav" id="130_4qjjb"]
+[ext_resource type="AudioStream" uid="uid://da35qwx7br152" path="res://assets/audio/sfx/board/field.saw.kick.wav" id="130_d2nb6"]
 [ext_resource type="AudioStream" uid="uid://dhr0yjhbqp66e" path="res://assets/audio/sfx/board/field.bonus.enter.wav" id="131_3qi5p"]
+[ext_resource type="AudioStream" uid="uid://ci0c2pphi3ljg" path="res://assets/audio/sfx/board/preset.mw9ac6fhgmv.wav" id="131_xsh6f"]
 [ext_resource type="AudioStream" uid="uid://do3wt5pdfmgl8" path="res://assets/audio/sfx/board/field.bonus.warning.wav" id="132_bctvv"]
 [ext_resource type="AudioStream" uid="uid://f74iieieb8dn" path="res://assets/audio/sfx/board/field.bonus.exit.wav" id="133_576sx"]
 [ext_resource type="AudioStream" uid="uid://dhw7hptcdjmry" path="res://assets/audio/sfx/board/field.stage.wave.wav" id="134_dhvty"]
@@ -155,6 +163,139 @@
 [ext_resource type="AudioStream" uid="uid://dip0xgx3jo151" path="res://assets/audio/sfx/board/scene.run.hitstop.wav" id="147_kycbw"]
 [ext_resource type="AudioStream" uid="uid://pq7v7ispik12" path="res://assets/audio/sfx/board/scene.run.slow_in.wav" id="148_bgpop"]
 [ext_resource type="AudioStream" uid="uid://nspnijnf4133" path="res://assets/audio/sfx/board/scene.run.slow_out.wav" id="149_cw73a"]
+[ext_resource type="AudioStream" uid="uid://cq37dp3b8fdsf" path="res://assets/audio/sfx/board/elite.pump.suck.wav" id="151_2y60h"]
+[ext_resource type="AudioStream" uid="uid://cv3mgfevwhwsc" path="res://assets/audio/sfx/board/elite.pump.fire.wav" id="152_107r8"]
+[ext_resource type="AudioStream" uid="uid://bihbpknimo0pj" path="res://assets/audio/sfx/board/elite.pump.release.wav" id="153_n5umc"]
+[ext_resource type="AudioStream" uid="uid://bb4tn37au0raq" path="res://assets/audio/sfx/board/elite.shield.reflect.wav" id="155_hka5f"]
+[ext_resource type="AudioStream" uid="uid://cmhimxpgiypwq" path="res://assets/audio/sfx/board/elite.shield.stolen.wav" id="156_7tw2a"]
+[ext_resource type="AudioStream" uid="uid://du7njjo6xsdji" path="res://assets/audio/sfx/board/elite.ruler.line.wav" id="157_g0ax8"]
+[ext_resource type="AudioStream" uid="uid://weedhl8rr00d" path="res://assets/audio/sfx/board/elite.lynx.slash.wav" id="158_w5oti"]
+[ext_resource type="AudioStream" uid="uid://dw1gc62os5ua6" path="res://assets/audio/sfx/board/elite.reticle.tell.wav" id="159_gqe22"]
+[ext_resource type="AudioStream" uid="uid://c11yhde6nsk08" path="res://assets/audio/sfx/board/elite.cross.fire.wav" id="161_4yg6m"]
+[ext_resource type="AudioStream" uid="uid://dchvkh8aq857e" path="res://assets/audio/sfx/board/elite.dolphin.wave.wav" id="162_apxbx"]
+[ext_resource type="AudioStream" uid="uid://eh3diitcrt08" path="res://assets/audio/sfx/board/elite.crab.attack.wav" id="163_8qv8m"]
+[ext_resource type="AudioStream" uid="uid://d4i1gq62re61d" path="res://assets/audio/sfx/board/elite.auriga.flame.wav" id="166_n5k7h"]
+[ext_resource type="AudioStream" uid="uid://dx5snoihdq875" path="res://assets/audio/sfx/board/elite.corona.capture.wav" id="167_80d3y"]
+[ext_resource type="AudioStream" uid="uid://fq663cege7co" path="res://assets/audio/sfx/board/elite.corona.throw.wav" id="168_vyij3"]
+[ext_resource type="AudioStream" uid="uid://bs36n6ppfeqc3" path="res://assets/audio/sfx/board/elite.phoenix.leave.wav" id="169_2gorg"]
+[ext_resource type="AudioStream" uid="uid://cps816b1louyc" path="res://assets/audio/sfx/board/elite.phoenix.tell.wav" id="170_jenda"]
+[ext_resource type="AudioStream" uid="uid://0jdfkhyu61wo" path="res://assets/audio/sfx/board/elite.phoenix.dive.wav" id="171_5ub5p"]
+[ext_resource type="AudioStream" uid="uid://dt4m2l2goq0se" path="res://assets/audio/sfx/board/elite.cepheus.summon.wav" id="172_h0lri"]
+[ext_resource type="AudioStream" uid="uid://dt4u3q6yqcpch" path="res://assets/audio/sfx/board/elite.cepheus.reinforce.wav" id="173_t0sws"]
+[ext_resource type="AudioStream" uid="uid://0k2iwmp0stt4" path="res://assets/audio/sfx/board/elite.aquarius.charge.wav" id="174_b26tq"]
+[ext_resource type="AudioStream" uid="uid://chb5x8v6vkqik" path="res://assets/audio/sfx/board/elite.aquarius.flow.wav" id="175_uoy7g"]
+[ext_resource type="AudioStream" uid="uid://yjeqs86sarvb" path="res://assets/audio/sfx/board/elite.aquila.aim.wav" id="176_kd62j"]
+[ext_resource type="AudioStream" uid="uid://bvslbqxhucp3d" path="res://assets/audio/sfx/board/elite.aquila.dive.wav" id="177_u8e0w"]
+[ext_resource type="AudioStream" uid="uid://u5jvrlhgu2yr" path="res://assets/audio/sfx/board/boss.common.roar.wav" id="179_4pp5x"]
+[ext_resource type="AudioStream" uid="uid://w4dy45mgv45p" path="res://assets/audio/sfx/board/boss.common.damage.wav" id="180_fs7uf"]
+[ext_resource type="AudioStream" uid="uid://cfkye1wpi28vv" path="res://assets/audio/sfx/board/boss.common.final_strike.wav" id="181_osw5b"]
+[ext_resource type="AudioStream" uid="uid://dgpprl1simhd2" path="res://assets/audio/sfx/board/boss.common.explode.wav" id="182_6nc3n"]
+[ext_resource type="AudioStream" uid="uid://jg8i8l6ays3g" path="res://assets/audio/sfx/board/boss.hydra.bite.wav" id="183_yjhi6"]
+[ext_resource type="AudioStream" uid="uid://cgwy3kke4h2yy" path="res://assets/audio/sfx/board/boss.hydra.sweep.wav" id="184_7kl1n"]
+[ext_resource type="AudioStream" uid="uid://dvx1v4trnagou" path="res://assets/audio/sfx/board/boss.hydra.wind_band.wav" id="185_w2kuj"]
+[ext_resource type="AudioStream" uid="uid://drg6bv4as6uke" path="res://assets/audio/sfx/board/boss.hydra.wind_loop.wav" id="186_ef5xx"]
+[ext_resource type="AudioStream" uid="uid://lmgxo2l0wocp" path="res://assets/audio/sfx/board/boss.hydra.wind_blade.wav" id="187_qdq4l"]
+[ext_resource type="AudioStream" uid="uid://c2tjje85ipvvs" path="res://assets/audio/sfx/board/boss.hydra.rock_throw.wav" id="188_nq3ap"]
+[ext_resource type="AudioStream" uid="uid://otg6l1dl1uoq" path="res://assets/audio/sfx/board/boss.hydra.scatter.wav" id="189_hoo43"]
+[ext_resource type="AudioStream" uid="uid://by14oqogc7xgi" path="res://assets/audio/sfx/board/boss.hydra.fixed_charge.wav" id="190_72er8"]
+[ext_resource type="AudioStream" uid="uid://cv1lpx75kw3hj" path="res://assets/audio/sfx/board/boss.hydra.fixed_beam.wav" id="191_ohfx6"]
+[ext_resource type="AudioStream" uid="uid://bs0kn7vofmyvw" path="res://assets/audio/sfx/board/boss.hydra.orb.wav" id="192_sb711"]
+[ext_resource type="AudioStream" uid="uid://cdalfxejxrfwo" path="res://assets/audio/sfx/board/boss.hydra.charge_up.wav" id="193_ldg4a"]
+[ext_resource type="AudioStream" uid="uid://38d8tne8xtwx" path="res://assets/audio/sfx/board/boss.hydra.headbutt.wav" id="194_q0r80"]
+[ext_resource type="AudioStream" uid="uid://bba4lt43di23k" path="res://assets/audio/sfx/board/boss.hydra.bolt_tell.wav" id="195_8hxih"]
+[ext_resource type="AudioStream" uid="uid://bsp31pecfyryi" path="res://assets/audio/sfx/board/boss.hydra.bolt.wav" id="196_nhjiq"]
+[ext_resource type="AudioStream" uid="uid://eywkl2w8nnie" path="res://assets/audio/sfx/board/boss.hydra.triple.wav" id="197_gcqet"]
+[ext_resource type="AudioStream" uid="uid://i0fs38y27vsr" path="res://assets/audio/sfx/board/boss.hydra.chain_bite.wav" id="198_ai2kj"]
+[ext_resource type="AudioStream" uid="uid://b07jatwo86tfb" path="res://assets/audio/sfx/board/boss.hydra.spin_charge.wav" id="199_fufyw"]
+[ext_resource type="AudioStream" uid="uid://cnpna8drb75o8" path="res://assets/audio/sfx/board/boss.hydra.spin_beam.wav" id="200_a2vvk"]
+[ext_resource type="AudioStream" uid="uid://djv8qmb1id2j8" path="res://assets/audio/sfx/board/boss.hydra.grid_tell.wav" id="201_6kuqc"]
+[ext_resource type="AudioStream" uid="uid://csr31daq7i7so" path="res://assets/audio/sfx/board/boss.hydra.grid_beam.wav" id="202_xx68c"]
+[ext_resource type="AudioStream" uid="uid://11sv51dql42k" path="res://assets/audio/sfx/board/boss.hydra.pounce.wav" id="203_tolwn"]
+[ext_resource type="AudioStream" uid="uid://bhwc3q7fqeusi" path="res://assets/audio/sfx/board/boss.hydra.debris_tornado.wav" id="204_nrmfq"]
+[ext_resource type="AudioStream" uid="uid://1ojv0rsi1e85" path="res://assets/audio/sfx/board/boss.hydra.separate.wav" id="205_06u6x"]
+[ext_resource type="AudioStream" uid="uid://cv21u32o46rod" path="res://assets/audio/sfx/board/boss.hydra.neck_kill.wav" id="206_eh0tm"]
+[ext_resource type="AudioStream" uid="uid://c0ftf4byeigh3" path="res://assets/audio/sfx/board/boss.monoceros.rush_stance.wav" id="207_i7026"]
+[ext_resource type="AudioStream" uid="uid://b3oce6sbtfgii" path="res://assets/audio/sfx/board/boss.monoceros.rush_jet.wav" id="208_ynoo7"]
+[ext_resource type="AudioStream" uid="uid://b5seu4oes6gbj" path="res://assets/audio/sfx/board/boss.monoceros.step.wav" id="209_6mn4e"]
+[ext_resource type="AudioStream" uid="uid://bug1157bxoif6" path="res://assets/audio/sfx/board/boss.monoceros.sweep.wav" id="210_03mxq"]
+[ext_resource type="AudioStream" uid="uid://bqaslxrq4kjy1" path="res://assets/audio/sfx/board/boss.monoceros.horn_glow.wav" id="211_sns8x"]
+[ext_resource type="AudioStream" uid="uid://cemg5updi3bo0" path="res://assets/audio/sfx/board/boss.monoceros.horn_wave.wav" id="212_lnwbl"]
+[ext_resource type="AudioStream" uid="uid://c402mk4cjxgvw" path="res://assets/audio/sfx/board/boss.monoceros.sword.wav" id="213_pn3xf"]
+[ext_resource type="AudioStream" uid="uid://vfifskay48wu" path="res://assets/audio/sfx/board/boss.monoceros.kick.wav" id="214_wox32"]
+[ext_resource type="AudioStream" uid="uid://bo6gue73xah0e" path="res://assets/audio/sfx/board/boss.monoceros.lance_charge.wav" id="215_1q6md"]
+[ext_resource type="AudioStream" uid="uid://clmt63rqygbi3" path="res://assets/audio/sfx/board/boss.monoceros.lance.wav" id="216_3o2br"]
+[ext_resource type="AudioStream" uid="uid://dvf87r5kp5xrh" path="res://assets/audio/sfx/board/boss.monoceros.dance_charge.wav" id="217_vh5ll"]
+[ext_resource type="AudioStream" uid="uid://c7s7mqtqu2ubo" path="res://assets/audio/sfx/board/boss.monoceros.dance.wav" id="218_s1fsp"]
+[ext_resource type="AudioStream" uid="uid://bxhv7vua6ybs1" path="res://assets/audio/sfx/board/preset.mwgic6qxeay.wav" id="219_xguke"]
+[ext_resource type="AudioStream" uid="uid://b8jlh81elhu6n" path="res://assets/audio/sfx/board/boss.centaurus.bow_draw.wav" id="220_rfw64"]
+[ext_resource type="AudioStream" uid="uid://lef2o1holvpj" path="res://assets/audio/sfx/board/boss.centaurus.bow_shot.wav" id="221_5bbx4"]
+[ext_resource type="AudioStream" uid="uid://cevv17e7o5r1j" path="res://assets/audio/sfx/board/boss.centaurus.rain_up.wav" id="222_w4lc8"]
+[ext_resource type="AudioStream" uid="uid://cflr23teneykr" path="res://assets/audio/sfx/board/boss.centaurus.rain.wav" id="223_4hq8m"]
+[ext_resource type="AudioStream" uid="uid://dtgii8vudu8wv" path="res://assets/audio/sfx/board/boss.centaurus.fall_tell.wav" id="224_5kn7u"]
+[ext_resource type="AudioStream" uid="uid://bcw7aai4hna1t" path="res://assets/audio/sfx/board/preset.mw9acpra75v.wav" id="225_d58si"]
+[ext_resource type="AudioStream" uid="uid://1144lr0gvfje" path="res://assets/audio/sfx/board/boss.centaurus.fan_draw.wav" id="226_6v0yr"]
+[ext_resource type="AudioStream" uid="uid://b1ncdgfx3v6sq" path="res://assets/audio/sfx/board/boss.centaurus.sail.wav" id="227_gcrvd"]
+[ext_resource type="AudioStream" uid="uid://brbcm6vrdrlbv" path="res://assets/audio/sfx/board/boss.centaurus.sail_run.wav" id="228_21qiv"]
+[ext_resource type="AudioStream" uid="uid://gf55psxkkmg8" path="res://assets/audio/sfx/board/boss.centaurus.leap.wav" id="229_6wuve"]
+[ext_resource type="AudioStream" uid="uid://etwdmhl6fsk5" path="res://assets/audio/sfx/board/boss.canis_major.command.wav" id="230_ukcbd"]
+[ext_resource type="AudioStream" uid="uid://dxkpf8rk843x0" path="res://assets/audio/sfx/board/boss.canis_major.bark.wav" id="231_2senr"]
+[ext_resource type="AudioStream" uid="uid://ue0q7wlhjgil" path="res://assets/audio/sfx/board/boss.canis_major.call.wav" id="232_ogttj"]
+[ext_resource type="AudioStream" uid="uid://cvhsee1ujrlky" path="res://assets/audio/sfx/board/boss.canis_major.howl.wav" id="233_mo08r"]
+[ext_resource type="AudioStream" uid="uid://dsduv5xx75g61" path="res://assets/audio/sfx/board/boss.canis_major.sirius_light.wav" id="234_ot14j"]
+[ext_resource type="AudioStream" uid="uid://chb6ovqyu8qmi" path="res://assets/audio/sfx/board/boss.canis_major.scorch.wav" id="235_qqyja"]
+[ext_resource type="AudioStream" uid="uid://cwygmc8xl0b8r" path="res://assets/audio/sfx/board/boss.canis_major.burn_ignite.wav" id="236_8fa8g"]
+[ext_resource type="AudioStream" uid="uid://e0rghg3pnugq" path="res://assets/audio/sfx/board/boss.canis_major.burn.wav" id="237_cf714"]
+[ext_resource type="AudioStream" uid="uid://bm4peyy64oxo1" path="res://assets/audio/sfx/board/boss.canis_major.relay.wav" id="238_wq0pw"]
+[ext_resource type="AudioStream" uid="uid://cwkguhwh5w25v" path="res://assets/audio/sfx/board/boss.canis_major.flash_charge.wav" id="239_881h4"]
+[ext_resource type="AudioStream" uid="uid://c7kdmcx8t1m5y" path="res://assets/audio/sfx/board/boss.canis_major.flash.wav" id="240_ifnew"]
+[ext_resource type="AudioStream" uid="uid://gvrf15y82d1d" path="res://assets/audio/sfx/board/boss.draco.tail_sweep.wav" id="241_1mx22"]
+[ext_resource type="AudioStream" uid="uid://bc1h5joku4fgu" path="res://assets/audio/sfx/board/boss.draco.star_shot.wav" id="242_ho75d"]
+[ext_resource type="AudioStream" uid="uid://ba86qhitmtrew" path="res://assets/audio/sfx/board/boss.draco.bite_tell.wav" id="243_vv10k"]
+[ext_resource type="AudioStream" uid="uid://k83w5rwku0xx" path="res://assets/audio/sfx/board/boss.draco.bite.wav" id="244_kv4pe"]
+[ext_resource type="AudioStream" uid="uid://bilpbbob80ofx" path="res://assets/audio/sfx/board/boss.draco.meteor_throw.wav" id="245_whann"]
+[ext_resource type="AudioStream" uid="uid://cdn8rj613oepd" path="res://assets/audio/sfx/board/boss.draco.breath.wav" id="246_bbmg0"]
+[ext_resource type="AudioStream" uid="uid://cjcstyvwkc8pj" path="res://assets/audio/sfx/board/boss.draco.slam.wav" id="247_nbxwq"]
+[ext_resource type="AudioStream" uid="uid://cp8o1b1w5aa82" path="res://assets/audio/sfx/board/boss.draco.rush_tell.wav" id="248_gbisu"]
+[ext_resource type="AudioStream" uid="uid://kbo3lgp08hgo" path="res://assets/audio/sfx/board/boss.draco.rush.wav" id="249_b0k15"]
+[ext_resource type="AudioStream" uid="uid://om41hcjbsmpx" path="res://assets/audio/sfx/board/boss.draco.volley.wav" id="250_v723a"]
+[ext_resource type="AudioStream" uid="uid://boabptmq1kff3" path="res://assets/audio/sfx/board/boss.draco.pounce_tell.wav" id="251_ky2ih"]
+[ext_resource type="AudioStream" uid="uid://hbjqkrqtuyhp" path="res://assets/audio/sfx/board/boss.draco.pounce.wav" id="252_vm48g"]
+[ext_resource type="AudioStream" uid="uid://b1moap6xed4fy" path="res://assets/audio/sfx/board/boss.draco.clone.wav" id="253_hlg5g"]
+[ext_resource type="AudioStream" uid="uid://bgtkd1f011u4w" path="res://assets/audio/sfx/board/boss.draco.spiral.wav" id="254_nte8h"]
+[ext_resource type="AudioStream" uid="uid://bi2nnr2civvxj" path="res://assets/audio/sfx/board/boss.draco.contract.wav" id="255_u70ab"]
+[ext_resource type="AudioStream" uid="uid://btthnlkigygc7" path="res://assets/audio/sfx/board/boss.draco.claw.wav" id="256_30sgv"]
+[ext_resource type="AudioStream" uid="uid://durnerdgwutmt" path="res://assets/audio/sfx/board/boss.draco.rift.wav" id="257_jmmks"]
+[ext_resource type="AudioStream" uid="uid://b1qhdy17h1eao" path="res://assets/audio/sfx/board/boss.draco.inhale.wav" id="258_fy5oy"]
+[ext_resource type="AudioStream" uid="uid://bxihp34cif5wa" path="res://assets/audio/sfx/board/boss.draco.exhale.wav" id="259_2vp5j"]
+[ext_resource type="AudioStream" uid="uid://b1wxumb3rvmpj" path="res://assets/audio/sfx/board/boss.draco.picaro_spawn.wav" id="260_klmeq"]
+[ext_resource type="AudioStream" uid="uid://dri8yrjr67c0u" path="res://assets/audio/sfx/board/boss.draco.picaro_kill.wav" id="261_qwgwu"]
+[ext_resource type="AudioStream" uid="uid://yykve3opy54m" path="res://assets/audio/sfx/board/scene.defeat.last_hit.wav" id="265_gc07s"]
+[ext_resource type="AudioStream" uid="uid://2wvl8gabh7ib" path="res://assets/audio/sfx/board/scene.defeat.explode.wav" id="266_rrr3r"]
+[ext_resource type="AudioStream" uid="uid://dt0ddsrar1v4g" path="res://assets/audio/sfx/board/scene.time_up.charge.wav" id="267_gkv0m"]
+[ext_resource type="AudioStream" uid="uid://bxkjwtdbe2ous" path="res://assets/audio/sfx/board/scene.time_up.strike.wav" id="268_1ijh5"]
+[ext_resource type="AudioStream" uid="uid://dvibhncfbufpd" path="res://assets/audio/sfx/board/scene.boss_finish.slash.wav" id="269_bqbl5"]
+[ext_resource type="AudioStream" uid="uid://dhoywp8x0xm65" path="res://assets/audio/sfx/board/scene.boss_finish.crack.wav" id="270_nu0ql"]
+[ext_resource type="AudioStream" uid="uid://b2tndaj67lk0u" path="res://assets/audio/sfx/board/scene.boss_finish.vanish.wav" id="271_omrrg"]
+[ext_resource type="AudioStream" uid="uid://x2ymkbdfg4h4" path="res://assets/audio/sfx/board/scene.boss_finish.module.wav" id="272_h53t7"]
+[ext_resource type="AudioStream" uid="uid://ccenp0dx7lhc8" path="res://assets/audio/sfx/board/scene.boss_finish.module_take.wav" id="273_fg7bk"]
+[ext_resource type="AudioStream" uid="uid://cv11s23gsml47" path="res://assets/audio/sfx/board/scene.finale.writhe.wav" id="274_pjsgy"]
+[ext_resource type="AudioStream" uid="uid://ct63x2ui3obfu" path="res://assets/audio/sfx/board/scene.finale.core_swell.wav" id="275_n7ghr"]
+[ext_resource type="AudioStream" uid="uid://blw38ry2s5157" path="res://assets/audio/sfx/board/scene.finale.ursa_roar.wav" id="276_2fxqd"]
+[ext_resource type="AudioStream" uid="uid://bhc6loofejpm4" path="res://assets/audio/sfx/board/scene.finale.gather.wav" id="277_qd4jf"]
+[ext_resource type="AudioStream" uid="uid://cays8c8smb505" path="res://assets/audio/sfx/board/scene.finale.attach.wav" id="278_kwktg"]
+[ext_resource type="AudioStream" uid="uid://ce3dx8yxbot1y" path="res://assets/audio/sfx/board/scene.finale.unlock.wav" id="279_nw3i7"]
+[ext_resource type="AudioStream" uid="uid://c3e5tqpjg6pht" path="res://assets/audio/sfx/board/scene.finale.coil.wav" id="280_jarvf"]
+[ext_resource type="AudioStream" uid="uid://bywh4j6jdtdnn" path="res://assets/audio/sfx/board/scene.finale.freeze.wav" id="281_h6p10"]
+[ext_resource type="AudioStream" uid="uid://cmgtrebmobhdl" path="res://assets/audio/sfx/board/scene.finale.draw.wav" id="282_yl252"]
+[ext_resource type="AudioStream" uid="uid://bokqm1iour2d4" path="res://assets/audio/sfx/board/scene.finale.pass.wav" id="283_2s7ik"]
+[ext_resource type="AudioStream" uid="uid://2fqucid8mtke" path="res://assets/audio/sfx/board/scene.finale.charge.wav" id="284_cpppx"]
+[ext_resource type="AudioStream" uid="uid://bw20qjnlcdmk7" path="res://assets/audio/sfx/board/scene.finale.line.wav" id="285_xcbvb"]
+[ext_resource type="AudioStream" uid="uid://bqc33cqe8m0m4" path="res://assets/audio/sfx/board/scene.finale.explode.wav" id="286_j5w18"]
+[ext_resource type="AudioStream" uid="uid://b3q3hlrkg4jo6" path="res://assets/audio/sfx/board/scene.finale.afterglow.wav" id="287_ley2x"]
+[ext_resource type="AudioStream" uid="uid://b1i6crssgc0os" path="res://assets/audio/sfx/board/scene.ending.type.wav" id="288_fn6fo"]
+[ext_resource type="AudioStream" uid="uid://drd0ires6dau7" path="res://assets/audio/music/board/music.boss.mp3" id="292_b1y8w"]
+[ext_resource type="AudioStream" uid="uid://b0sdw7yaxod28" path="res://assets/audio/music/board/music.final_boss.mp3" id="293_wys3s"]
+[ext_resource type="AudioStream" uid="uid://dkvt04vqbbdfm" path="res://assets/audio/music/board/music.ending.mp3" id="294_ckfo2"]
 
 [sub_resource type="Resource" id="Resource_x0dgv"]
 script = ExtResource("1_6fvma")
@@ -278,12 +419,15 @@ stream = ExtResource("14_gcbt4")
 
 [sub_resource type="Resource" id="Resource_acns4"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("15_sm8er")
 
 [sub_resource type="Resource" id="Resource_fbhwi"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("16_3h2ld")
-volume_db = -9.5
+volume_db = -18.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_sjpit"]
 script = ExtResource("1_6fvma")
@@ -298,9 +442,9 @@ stream = ExtResource("18_jpavp")
 [sub_resource type="Resource" id="Resource_ha78d"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("19_1jift")
-volume_db = -4.0
-pitch_min = 0.8
-pitch_max = 0.8
+volume_db = -15.0
+pitch_min = 0.5
+pitch_max = 0.5
 
 [sub_resource type="Resource" id="Resource_scwkc"]
 script = ExtResource("1_6fvma")
@@ -328,6 +472,7 @@ stream = ExtResource("23_xa6tu")
 
 [sub_resource type="Resource" id="Resource_uikmq"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("24_0tf6p")
 
 [sub_resource type="Resource" id="Resource_s6r8e"]
@@ -373,6 +518,9 @@ pitch_max = 1.2
 [sub_resource type="Resource" id="Resource_vg6kj"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("29_8gqlh")
+volume_db = -15.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_tj0nf"]
 script = ExtResource("1_6fvma")
@@ -397,19 +545,19 @@ volume_db = -12.0
 [sub_resource type="Resource" id="Resource_jxrjk"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("33_22i00")
-volume_db = -12.5
+volume_db = -26.0
 preset = "経験値の回収（水色） の音"
 
 [sub_resource type="Resource" id="Resource_m8lji"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("33_22i00")
-volume_db = -12.5
+volume_db = -26.0
 preset = "経験値の回収（水色） の音"
 
 [sub_resource type="Resource" id="Resource_hj7sn"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("33_22i00")
-volume_db = -12.5
+volume_db = -26.0
 preset = "経験値の回収（水色） の音"
 
 [sub_resource type="Resource" id="Resource_neu5h"]
@@ -425,15 +573,17 @@ pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_ivu25"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("35_6nqk0")
 
 [sub_resource type="Resource" id="Resource_hxvou"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("36_iao2c")
-loop = true
 
 [sub_resource type="Resource" id="Resource_3rhui"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("37_debd5")
 
 [sub_resource type="Resource" id="Resource_nqu5x"]
@@ -495,11 +645,8 @@ volume_db = -13.0
 
 [sub_resource type="Resource" id="Resource_jgxkx"]
 script = ExtResource("1_6fvma")
-silent = true
-stream = ExtResource("11_yao0a")
-volume_db = -10.0
-pitch_min = 0.9
-pitch_max = 1.2
+stream = ExtResource("46_8thr4")
+volume_db = -5.0
 
 [sub_resource type="Resource" id="Resource_wrhkw"]
 script = ExtResource("1_6fvma")
@@ -771,13 +918,13 @@ volume_db = -17.0
 [sub_resource type="Resource" id="Resource_ulr4w"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("81_rhxkt")
-volume_db = -10.0
+volume_db = -13.5
 preset = "爆発 の音"
 
 [sub_resource type="Resource" id="Resource_gn2m6"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("81_rhxkt")
-volume_db = -10.0
+volume_db = -13.5
 preset = "爆発 の音"
 
 [sub_resource type="Resource" id="Resource_m5rkr"]
@@ -816,7 +963,7 @@ stream = ExtResource("87_qaxu4")
 [sub_resource type="Resource" id="Resource_wjymb"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("88_sq2a2")
-volume_db = -10.0
+volume_db = -12.0
 pitch_min = 3.0
 pitch_max = 3.0
 preset = "溜め の音"
@@ -908,16 +1055,19 @@ stream = ExtResource("102_d5xnm")
 
 [sub_resource type="Resource" id="Resource_4s1iu"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("103_iogms")
 
 [sub_resource type="Resource" id="Resource_18f3i"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("104_4gmfn")
 
 [sub_resource type="Resource" id="Resource_nxrbw"]
 script = ExtResource("1_6fvma")
 silent = true
 stream = ExtResource("105_h2c5k")
+volume_db = -15.0
 
 [sub_resource type="Resource" id="Resource_gbcor"]
 script = ExtResource("1_6fvma")
@@ -937,14 +1087,17 @@ volume_db = -12.0
 [sub_resource type="Resource" id="Resource_signu"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("109_jo6le")
+volume_db = -7.0
 
 [sub_resource type="Resource" id="Resource_22i00"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("110_dq0u4")
 
 [sub_resource type="Resource" id="Resource_k6o8c"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("111_wmput")
+volume_db = -6.5
 
 [sub_resource type="Resource" id="Resource_6nqk0"]
 script = ExtResource("1_6fvma")
@@ -958,9 +1111,13 @@ stream = ExtResource("113_7r0lf")
 
 [sub_resource type="Resource" id="Resource_debd5"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("114_g5jlx")
+volume_db = -15.0
 
 [sub_resource type="Resource" id="Resource_sk5l5"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("115_xk8di")
+volume_db = -12.0
 loop = true
 
 [sub_resource type="Resource" id="Resource_fas4s"]
@@ -982,6 +1139,10 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_tjcee"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("117_bk1ro")
+volume_db = -18.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_fsmop"]
 script = ExtResource("1_6fvma")
@@ -994,6 +1155,11 @@ volume_db = -17.0
 
 [sub_resource type="Resource" id="Resource_bavcp"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("119_iyh48")
+volume_db = -19.0
+pitch_min = 1.6
+pitch_max = 1.6
+preset = "星のような風音、ふたご座"
 
 [sub_resource type="Resource" id="Resource_5js2b"]
 script = ExtResource("1_6fvma")
@@ -1005,6 +1171,11 @@ preset = "命中 の音"
 
 [sub_resource type="Resource" id="Resource_bv1xq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("119_iyh48")
+volume_db = -19.0
+pitch_min = 1.6
+pitch_max = 1.6
+preset = "星のような風音、ふたご座"
 
 [sub_resource type="Resource" id="Resource_gkc50"]
 script = ExtResource("1_6fvma")
@@ -1017,9 +1188,13 @@ volume_db = -3.0
 
 [sub_resource type="Resource" id="Resource_me25p"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("121_50jdq")
+volume_db = -21.0
 
 [sub_resource type="Resource" id="Resource_k6oar"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("122_2qcmi")
+volume_db = -17.5
 
 [sub_resource type="Resource" id="Resource_8epw4"]
 script = ExtResource("1_6fvma")
@@ -1105,6 +1280,8 @@ preset = "装甲に弾かれる の音"
 
 [sub_resource type="Resource" id="Resource_qfhox"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("129_y3h1j")
+volume_db = -21.0
 
 [sub_resource type="Resource" id="Resource_wos51"]
 script = ExtResource("1_6fvma")
@@ -1113,6 +1290,8 @@ loop = true
 
 [sub_resource type="Resource" id="Resource_0t5w8"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("130_d2nb6")
+volume_db = -12.5
 
 [sub_resource type="Resource" id="Resource_dn6jy"]
 script = ExtResource("1_6fvma")
@@ -1121,6 +1300,9 @@ loop = true
 
 [sub_resource type="Resource" id="Resource_gos13"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("131_xsh6f")
+volume_db = -6.0
+preset = "当たり2"
 
 [sub_resource type="Resource" id="Resource_hauwd"]
 script = ExtResource("1_6fvma")
@@ -1141,6 +1323,9 @@ silent = true
 [sub_resource type="Resource" id="Resource_1f12o"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("123_ek5if")
+volume_db = -17.5
+pitch_min = 0.85
+pitch_max = 0.85
 
 [sub_resource type="Resource" id="Resource_pnp7h"]
 script = ExtResource("1_6fvma")
@@ -1179,10 +1364,17 @@ stream = ExtResource("129_np88q")
 [sub_resource type="Resource" id="Resource_qaxu4"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("130_4qjjb")
+volume_db = -20.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_sq2a2"]
 script = ExtResource("1_6fvma")
+silent = true
 stream = ExtResource("131_3qi5p")
+volume_db = -20.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_87b2c"]
 script = ExtResource("1_6fvma")
@@ -1191,8 +1383,10 @@ volume_db = -5.0
 
 [sub_resource type="Resource" id="Resource_li3pr"]
 script = ExtResource("1_6fvma")
-silent = true
 stream = ExtResource("133_576sx")
+volume_db = -20.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_q7c6p"]
 script = ExtResource("1_6fvma")
@@ -1207,6 +1401,7 @@ stream = ExtResource("135_62lsm")
 [sub_resource type="Resource" id="Resource_675ql"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("136_vbsk6")
+volume_db = -13.0
 
 [sub_resource type="Resource" id="Resource_7exgi"]
 script = ExtResource("1_6fvma")
@@ -1254,7 +1449,7 @@ silent = true
 [sub_resource type="Resource" id="Resource_4gmfn"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("88_sq2a2")
-volume_db = -10.0
+volume_db = -12.0
 pitch_min = 3.0
 pitch_max = 3.0
 preset = "溜め の音"
@@ -1303,18 +1498,28 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_7r0lf"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("151_2y60h")
+volume_db = -10.0
+pitch_min = 1.2
+pitch_max = 1.2
 loop = true
 
 [sub_resource type="Resource" id="Resource_7xjrq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("152_107r8")
+volume_db = -14.0
 
 [sub_resource type="Resource" id="Resource_2masr"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("153_n5umc")
+volume_db = -20.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_xsfpy"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("88_sq2a2")
-volume_db = -10.0
+volume_db = -12.0
 pitch_min = 3.0
 pitch_max = 3.0
 preset = "溜め の音"
@@ -1353,9 +1558,10 @@ synth_seconds = 0.08
 
 [sub_resource type="Resource" id="Resource_dvoqp"]
 script = ExtResource("1_6fvma")
-volume_db = -10.0
-pitch_min = 1.8
-pitch_max = 1.8
+stream = ExtResource("155_hka5f")
+volume_db = -17.5
+pitch_min = 0.6
+pitch_max = 0.6
 synth_wave = "square"
 synth_from_hz = 180.0
 synth_to_hz = 140.0
@@ -1363,9 +1569,10 @@ synth_seconds = 0.08
 
 [sub_resource type="Resource" id="Resource_auhqa"]
 script = ExtResource("1_6fvma")
-volume_db = -5.0
-pitch_min = 0.7
-pitch_max = 0.7
+stream = ExtResource("156_7tw2a")
+volume_db = -17.0
+pitch_min = 0.8
+pitch_max = 0.8
 synth_wave = "sine"
 synth_from_hz = 880.0
 synth_to_hz = 1200.0
@@ -1377,6 +1584,10 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_5ho4r"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("157_g0ax8")
+volume_db = -20.0
+pitch_min = 0.4
+pitch_max = 0.4
 
 [sub_resource type="Resource" id="Resource_otel3"]
 script = ExtResource("1_6fvma")
@@ -1392,9 +1603,15 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_ur1ba"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("158_w5oti")
+volume_db = -14.0
 
 [sub_resource type="Resource" id="Resource_np88q"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("159_gqe22")
+volume_db = -10.0
+pitch_min = 4.0
+pitch_max = 4.0
 
 [sub_resource type="Resource" id="Resource_4qjjb"]
 script = ExtResource("1_6fvma")
@@ -1405,12 +1622,14 @@ preset = "ビーム の音"
 [sub_resource type="Resource" id="Resource_3qi5p"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("143_vsrii")
-volume_db = -10.0
-pitch_min = 3.0
-pitch_max = 3.0
+volume_db = -12.5
 
 [sub_resource type="Resource" id="Resource_bctvv"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("161_4yg6m")
+volume_db = -8.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_576sx"]
 script = ExtResource("1_6fvma")
@@ -1418,6 +1637,8 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_dhvty"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("162_apxbx")
+volume_db = -6.0
 
 [sub_resource type="Resource" id="Resource_62lsm"]
 script = ExtResource("1_6fvma")
@@ -1426,6 +1647,10 @@ loop = true
 
 [sub_resource type="Resource" id="Resource_vbsk6"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("163_8qv8m")
+volume_db = -30.0
+pitch_min = 2.3
+pitch_max = 2.3
 
 [sub_resource type="Resource" id="Resource_40rvn"]
 script = ExtResource("1_6fvma")
@@ -1438,8 +1663,8 @@ pitch_max = 4.0
 script = ExtResource("1_6fvma")
 stream = ExtResource("145_3i6ta")
 volume_db = -17.0
-pitch_min = 0.5
-pitch_max = 0.5
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_m2wg8"]
 script = ExtResource("1_6fvma")
@@ -1448,6 +1673,9 @@ loop = true
 
 [sub_resource type="Resource" id="Resource_my5wa"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("166_n5k7h")
+volume_db = -18.0
+loop = true
 
 [sub_resource type="Resource" id="Resource_2n7mf"]
 script = ExtResource("1_6fvma")
@@ -1455,12 +1683,22 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_vsrii"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("167_80d3y")
+volume_db = -13.5
+loop = true
+loop_start = 0.487
+loop_end = 8.6251
 
 [sub_resource type="Resource" id="Resource_susmw"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_3i6ta"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("168_vyij3")
+volume_db = -20.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_d6hpl"]
 script = ExtResource("1_6fvma")
@@ -1468,40 +1706,73 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_kycbw"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("169_2gorg")
+volume_db = -13.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_bgpop"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("170_jenda")
 
 [sub_resource type="Resource" id="Resource_cw73a"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("171_5ub5p")
+volume_db = -10.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_kj6a0"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("172_h0lri")
+volume_db = -5.5
+pitch_min = 0.4
+pitch_max = 0.4
 
 [sub_resource type="Resource" id="Resource_0fqip"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("173_t0sws")
+volume_db = -4.0
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_gm3q5"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("174_b26tq")
+volume_db = -19.0
 
 [sub_resource type="Resource" id="Resource_8thr4"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("175_uoy7g")
+volume_db = -13.0
 
 [sub_resource type="Resource" id="Resource_g5jlx"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("176_kd62j")
+volume_db = -6.0
+pitch_min = 1.1
+pitch_max = 1.1
 
 [sub_resource type="Resource" id="Resource_xk8di"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("177_u8e0w")
+volume_db = -10.0
 
 [sub_resource type="Resource" id="Resource_bk1ro"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("146_d6hpl")
+volume_db = -16.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_iyh48"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_50jdq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("179_4pp5x")
+volume_db = -13.0
 synth_wave = "saw"
 synth_from_hz = 90.0
 synth_to_hz = 38.0
@@ -1509,15 +1780,24 @@ synth_seconds = 1.0
 
 [sub_resource type="Resource" id="Resource_2qcmi"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_y3h1j"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("180_fs7uf")
+volume_db = -15.0
 
 [sub_resource type="Resource" id="Resource_d2nb6"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("181_osw5b")
+volume_db = -9.0
+pitch_min = 1.4
+pitch_max = 1.4
 
 [sub_resource type="Resource" id="Resource_xsh6f"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("182_6nc3n")
+volume_db = -10.0
 synth_wave = "noise"
 synth_from_hz = 120.0
 synth_to_hz = 30.0
@@ -1529,6 +1809,10 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_107r8"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("183_yjhi6")
+volume_db = -30.0
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_n5umc"]
 script = ExtResource("1_6fvma")
@@ -1536,46 +1820,91 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_hka5f"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("184_7kl1n")
+volume_db = -12.0
+pitch_min = 1.2
+pitch_max = 1.2
 
 [sub_resource type="Resource" id="Resource_7tw2a"]
 script = ExtResource("1_6fvma")
+silent = true
+stream = ExtResource("185_w2kuj")
+volume_db = -20.0
 
 [sub_resource type="Resource" id="Resource_g0ax8"]
 script = ExtResource("1_6fvma")
-loop = true
+stream = ExtResource("186_ef5xx")
+volume_db = -19.0
 
 [sub_resource type="Resource" id="Resource_w5oti"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("187_qdq4l")
+volume_db = -16.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_gqe22"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("188_nq3ap")
+volume_db = -16.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_4yg6m"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_apxbx"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("189_hoo43")
+volume_db = -16.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_8qv8m"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("190_72er8")
+volume_db = -12.0
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_n5k7h"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("191_ohfx6")
+volume_db = -8.0
 
 [sub_resource type="Resource" id="Resource_80d3y"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("192_sb711")
+volume_db = -12.0
+pitch_min = 2.0
+pitch_max = 2.0
 
 [sub_resource type="Resource" id="Resource_vyij3"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("193_ldg4a")
+volume_db = -11.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_2gorg"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("194_q0r80")
+volume_db = -12.0
 
 [sub_resource type="Resource" id="Resource_jenda"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("195_8hxih")
+volume_db = -6.0
+pitch_min = 1.1
+pitch_max = 1.1
 
 [sub_resource type="Resource" id="Resource_5ub5p"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("196_nhjiq")
+volume_db = -13.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_h0lri"]
 script = ExtResource("1_6fvma")
@@ -1583,262 +1912,506 @@ silent = true
 
 [sub_resource type="Resource" id="Resource_t0sws"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("197_gcqet")
+volume_db = -22.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_b26tq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("198_ai2kj")
+volume_db = -30.0
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_uoy7g"]
 script = ExtResource("1_6fvma")
-stream = ExtResource("88_sq2a2")
+stream = ExtResource("199_fufyw")
 volume_db = -10.0
-pitch_min = 3.0
-pitch_max = 3.0
-preset = "溜め の音"
+pitch_min = 1.4
+pitch_max = 1.4
 
 [sub_resource type="Resource" id="Resource_kd62j"]
 script = ExtResource("1_6fvma")
-loop = true
+stream = ExtResource("200_a2vvk")
+volume_db = -13.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_u8e0w"]
 script = ExtResource("1_6fvma")
-silent = true
+stream = ExtResource("201_6kuqc")
+volume_db = -10.0
+pitch_min = 1.4
+pitch_max = 1.4
 
 [sub_resource type="Resource" id="Resource_4pp5x"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("202_xx68c")
+volume_db = -10.0
 
 [sub_resource type="Resource" id="Resource_fs7uf"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_osw5b"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("203_tolwn")
+volume_db = -13.0
+pitch_min = 2.0
+pitch_max = 2.0
 
 [sub_resource type="Resource" id="Resource_6nc3n"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("204_nrmfq")
+volume_db = -10.0
 
 [sub_resource type="Resource" id="Resource_yjhi6"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("117_0mllc")
+volume_db = -15.0
+pitch_min = 1.3
+pitch_max = 1.3
+preset = "壊れる の音"
 
 [sub_resource type="Resource" id="Resource_7kl1n"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("205_06u6x")
+volume_db = -15.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_w2kuj"]
 script = ExtResource("1_6fvma")
+silent = true
+stream = ExtResource("206_eh0tm")
+volume_db = -17.5
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_ef5xx"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("207_i7026")
 
 [sub_resource type="Resource" id="Resource_qdq4l"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("208_ynoo7")
 
 [sub_resource type="Resource" id="Resource_nq3ap"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_hoo43"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_72er8"]
 script = ExtResource("1_6fvma")
+silent = true
+stream = ExtResource("209_6mn4e")
+volume_db = -13.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_ohfx6"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("210_03mxq")
+volume_db = -10.0
+pitch_min = 2.0
+pitch_max = 2.0
 
 [sub_resource type="Resource" id="Resource_sb711"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("211_sns8x")
+volume_db = -13.0
+pitch_min = 1.4
+pitch_max = 1.4
 
 [sub_resource type="Resource" id="Resource_ldg4a"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("212_lnwbl")
+volume_db = -15.5
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_q0r80"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("213_pn3xf")
+volume_db = -6.0
 
 [sub_resource type="Resource" id="Resource_8hxih"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("214_wox32")
+volume_db = -13.0
+pitch_min = 2.0
+pitch_max = 2.0
 
 [sub_resource type="Resource" id="Resource_nhjiq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("215_1q6md")
+volume_db = -14.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_gcqet"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("216_3o2br")
+volume_db = -3.0
+pitch_min = 2.2
+pitch_max = 2.2
 
 [sub_resource type="Resource" id="Resource_ai2kj"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("217_vh5ll")
+volume_db = -12.5
+pitch_min = 1.4
+pitch_max = 1.4
 
 [sub_resource type="Resource" id="Resource_fufyw"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("218_s1fsp")
+volume_db = -6.5
 
 [sub_resource type="Resource" id="Resource_a2vvk"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_6kuqc"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_xx68c"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("219_xguke")
+volume_db = -7.5
+pitch_min = 1.4
+pitch_max = 1.4
+preset = "弓、短め、単発"
 
 [sub_resource type="Resource" id="Resource_tolwn"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("220_rfw64")
+volume_db = -12.0
 
 [sub_resource type="Resource" id="Resource_nrmfq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("221_5bbx4")
+volume_db = -8.5
 
 [sub_resource type="Resource" id="Resource_06u6x"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("222_w4lc8")
+volume_db = -9.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_eh0tm"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("223_4hq8m")
+volume_db = -20.0
 
 [sub_resource type="Resource" id="Resource_i7026"]
 script = ExtResource("1_6fvma")
+silent = true
+stream = ExtResource("224_5kn7u")
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_ynoo7"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_6mn4e"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("225_d58si")
+volume_db = -13.0
+preset = "着地っぽい"
 
 [sub_resource type="Resource" id="Resource_03mxq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("225_d58si")
+volume_db = -13.0
+preset = "着地っぽい"
 
 [sub_resource type="Resource" id="Resource_sns8x"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("226_6v0yr")
+volume_db = -6.0
+pitch_min = 1.4
+pitch_max = 1.4
 
 [sub_resource type="Resource" id="Resource_lnwbl"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("219_xguke")
+volume_db = -7.5
+pitch_min = 1.4
+pitch_max = 1.4
+preset = "弓、短め、単発"
 
 [sub_resource type="Resource" id="Resource_pn3xf"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("227_gcrvd")
+volume_db = -6.0
 
 [sub_resource type="Resource" id="Resource_wox32"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("228_21qiv")
+volume_db = -12.0
 loop = true
 
 [sub_resource type="Resource" id="Resource_1q6md"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("219_xguke")
+volume_db = -7.5
+pitch_min = 1.4
+pitch_max = 1.4
+preset = "弓、短め、単発"
 
 [sub_resource type="Resource" id="Resource_3o2br"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("229_6wuve")
+volume_db = -13.0
+pitch_min = 2.0
+pitch_max = 2.0
 
 [sub_resource type="Resource" id="Resource_vh5ll"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_s1fsp"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("225_d58si")
+volume_db = -13.0
+preset = "着地っぽい"
 
 [sub_resource type="Resource" id="Resource_xguke"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("230_ukcbd")
+volume_db = -5.0
+pitch_min = 1.8
+pitch_max = 1.8
 
 [sub_resource type="Resource" id="Resource_rfw64"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("231_2senr")
+volume_db = -5.0
+pitch_min = 1.8
+pitch_max = 1.8
 
 [sub_resource type="Resource" id="Resource_5bbx4"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("232_ogttj")
+volume_db = -5.0
+pitch_min = 1.8
+pitch_max = 1.8
 
 [sub_resource type="Resource" id="Resource_w4lc8"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("233_mo08r")
+volume_db = -5.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_4hq8m"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_5kn7u"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("234_ot14j")
+volume_db = -17.5
 
 [sub_resource type="Resource" id="Resource_d58si"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_6v0yr"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("235_qqyja")
+volume_db = -17.5
+pitch_min = 1.3
+pitch_max = 1.3
 
 [sub_resource type="Resource" id="Resource_gcrvd"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("236_8fa8g")
+volume_db = -14.5
 
 [sub_resource type="Resource" id="Resource_21qiv"]
 script = ExtResource("1_6fvma")
-loop = true
+stream = ExtResource("237_cf714")
+volume_db = -7.0
 
 [sub_resource type="Resource" id="Resource_6wuve"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("238_wq0pw")
+volume_db = -19.0
+pitch_min = 1.8
+pitch_max = 1.8
 
 [sub_resource type="Resource" id="Resource_ukcbd"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("239_881h4")
+volume_db = -13.0
+pitch_min = 0.75
+pitch_max = 0.75
 
 [sub_resource type="Resource" id="Resource_2senr"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("240_ifnew")
+volume_db = -20.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_ogttj"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_mo08r"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("241_1mx22")
+volume_db = -10.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_ot14j"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("242_ho75d")
+volume_db = -21.5
 
 [sub_resource type="Resource" id="Resource_qqyja"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("243_vv10k")
+pitch_min = 0.6
+pitch_max = 0.6
 
 [sub_resource type="Resource" id="Resource_8fa8g"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("244_kv4pe")
+volume_db = -28.0
 
 [sub_resource type="Resource" id="Resource_cf714"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("245_whann")
+volume_db = -13.0
+pitch_min = 0.5
+pitch_max = 0.5
 
 [sub_resource type="Resource" id="Resource_wq0pw"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_881h4"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("246_bbmg0")
+volume_db = -14.5
+pitch_min = 0.5
+pitch_max = 0.5
 
 [sub_resource type="Resource" id="Resource_ifnew"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_1mx22"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("247_nbxwq")
+volume_db = -7.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_ho75d"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("248_gbisu")
+pitch_min = 0.6
+pitch_max = 0.6
 
 [sub_resource type="Resource" id="Resource_vv10k"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("249_b0k15")
+volume_db = -20.0
+pitch_min = 1.6
+pitch_max = 1.6
 
 [sub_resource type="Resource" id="Resource_kv4pe"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("250_v723a")
+volume_db = -21.5
 
 [sub_resource type="Resource" id="Resource_whann"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("251_ky2ih")
+pitch_min = 0.6
+pitch_max = 0.6
 
 [sub_resource type="Resource" id="Resource_bbmg0"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("252_vm48g")
+volume_db = -10.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_nbxwq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("253_hlg5g")
+volume_db = -15.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_gbisu"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("254_nte8h")
+volume_db = -9.0
+pitch_min = 1.5
+pitch_max = 1.5
 
 [sub_resource type="Resource" id="Resource_b0k15"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("255_u70ab")
+volume_db = -8.5
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_v723a"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("256_30sgv")
+volume_db = -22.0
 
 [sub_resource type="Resource" id="Resource_ky2ih"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("257_jmmks")
+volume_db = 4.0
+pitch_min = 0.3
+pitch_max = 0.3
 
 [sub_resource type="Resource" id="Resource_vm48g"]
 script = ExtResource("1_6fvma")
-loop = true
+stream = ExtResource("258_fy5oy")
+volume_db = -3.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_hlg5g"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("259_2vp5j")
+volume_db = -18.0
+pitch_min = 0.4
+pitch_max = 0.4
 
 [sub_resource type="Resource" id="Resource_nte8h"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("260_klmeq")
+volume_db = -15.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_u70ab"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("261_qwgwu")
+volume_db = -13.5
 
 [sub_resource type="Resource" id="Resource_30sgv"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_jmmks"]
 script = ExtResource("1_6fvma")
@@ -1857,126 +2430,215 @@ stream = ExtResource("149_cw73a")
 
 [sub_resource type="Resource" id="Resource_klmeq"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("265_gc07s")
+volume_db = -16.0
 
 [sub_resource type="Resource" id="Resource_qwgwu"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("266_rrr3r")
+volume_db = -11.0
+pitch_min = 1.45
+pitch_max = 1.45
 
 [sub_resource type="Resource" id="Resource_gc07s"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_rrr3r"]
 script = ExtResource("1_6fvma")
-loop = true
+stream = ExtResource("267_gkv0m")
+volume_db = -10.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_gkv0m"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("268_1ijh5")
+volume_db = -18.0
+pitch_min = 0.4
+pitch_max = 0.4
 
 [sub_resource type="Resource" id="Resource_1ijh5"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_bqbl5"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("269_bqbl5")
+volume_db = -8.0
 
 [sub_resource type="Resource" id="Resource_icqni"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_1dekc"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("270_nu0ql")
+volume_db = -18.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_wntrw"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_nu0ql"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("271_omrrg")
+volume_db = -12.0
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_omrrg"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_q7btw"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_fg7bk"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("272_h53t7")
+volume_db = -14.0
+pitch_min = 0.4
+pitch_max = 0.4
 
 [sub_resource type="Resource" id="Resource_3rv83"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_u1g5u"]
 script = ExtResource("1_6fvma")
-
-[sub_resource type="Resource" id="Resource_h53t7"]
-script = ExtResource("1_6fvma")
+stream = ExtResource("273_fg7bk")
+volume_db = -12.0
 
 [sub_resource type="Resource" id="Resource_pjsgy"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("274_pjsgy")
+volume_db = -5.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_n7ghr"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("275_n7ghr")
+volume_db = -8.5
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_2fxqd"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_qd4jf"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("276_2fxqd")
+volume_db = -10.0
 
 [sub_resource type="Resource" id="Resource_kwktg"]
 script = ExtResource("1_6fvma")
-loop = true
+stream = ExtResource("277_qd4jf")
+volume_db = -14.0
+pitch_min = 0.8
+pitch_max = 0.8
 
 [sub_resource type="Resource" id="Resource_nw3i7"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("278_kwktg")
+volume_db = -27.0
+pitch_min = 0.9
+pitch_max = 0.9
 
 [sub_resource type="Resource" id="Resource_jarvf"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("279_nw3i7")
+volume_db = -10.0
+pitch_min = 1.2
+pitch_max = 1.2
 
 [sub_resource type="Resource" id="Resource_h6p10"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("280_jarvf")
+volume_db = -4.0
 
 [sub_resource type="Resource" id="Resource_yl252"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("281_h6p10")
+volume_db = -3.5
+pitch_min = 0.7
+pitch_max = 0.7
 
 [sub_resource type="Resource" id="Resource_2s7ik"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("282_yl252")
+volume_db = -13.0
+pitch_min = 0.9
+pitch_max = 0.9
 loop = true
+loop_start = 0.25
+loop_end = 4.057
 
 [sub_resource type="Resource" id="Resource_cpppx"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_xcbvb"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_j5w18"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("283_2s7ik")
+volume_db = -16.0
 
 [sub_resource type="Resource" id="Resource_ley2x"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("284_cpppx")
+volume_db = -5.0
 
 [sub_resource type="Resource" id="Resource_fn6fo"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_b1y8w"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("285_xcbvb")
+volume_db = -8.0
 
 [sub_resource type="Resource" id="Resource_wys3s"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_ckfo2"]
 script = ExtResource("1_6fvma")
+silent = true
 
 [sub_resource type="Resource" id="Resource_2twbd"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("286_j5w18")
+volume_db = -12.0
+pitch_min = 0.6
+pitch_max = 0.6
 
 [sub_resource type="Resource" id="Resource_hl7jy"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("287_ley2x")
+volume_db = -5.0
 
 [sub_resource type="Resource" id="Resource_whf5d"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("288_fn6fo")
 
 [sub_resource type="Resource" id="Resource_72kop"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("4_y0op0")
+preset = "決定 の音"
 
 [sub_resource type="Resource" id="Resource_xa547"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("4_y0op0")
+preset = "決定 の音"
 
 [sub_resource type="Resource" id="Resource_rod0d"]
 script = ExtResource("1_6fvma")
@@ -1994,9 +2656,9 @@ script = ExtResource("1_6fvma")
 stream = ExtResource("21_7gpho")
 volume_db = -7.0
 loop = true
+loop_start = 26.0
 trim_start = 25.6232
 trim_end = 159.1902
-loop_start = 26.0
 
 [sub_resource type="Resource" id="Resource_jtr0v"]
 script = ExtResource("1_6fvma")
@@ -2005,45 +2667,46 @@ loop = true
 [sub_resource type="Resource" id="Resource_mj8hk"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("22_us7m1")
-volume_db = -11.0
+volume_db = -29.5
 loop = true
 trim_end = 132.049
 
-[sub_resource type="Resource" id="Resource_kaf53"]
-script = ExtResource("1_6fvma")
-loop = true
-
 [sub_resource type="Resource" id="Resource_kakva"]
 script = ExtResource("1_6fvma")
-stream = ExtResource("23_xif7w")
-volume_db = -9.5
+stream = ExtResource("292_b1y8w")
+volume_db = -18.0
 loop = true
-trim_end = 65.4367
+trim_end = 136.0457142857143
 
 [sub_resource type="Resource" id="Resource_rhst1"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("293_wys3s")
+volume_db = -17.0
 loop = true
+trim_end = 65.43673469387755
 
 [sub_resource type="Resource" id="Resource_xfdks"]
 script = ExtResource("1_6fvma")
+silent = true
 loop = true
 
 [sub_resource type="Resource" id="Resource_akmji"]
 script = ExtResource("1_6fvma")
+stream = ExtResource("294_ckfo2")
+volume_db = -22.0
 loop = true
-
-[sub_resource type="Resource" id="Resource_b8o6f"]
-script = ExtResource("1_6fvma")
-loop = true
+trim_end = 129.6457
 
 [sub_resource type="Resource" id="Resource_32ecx"]
 script = ExtResource("1_6fvma")
 stream = ExtResource("24_g2ahs")
 volume_db = -12.0
+trim_start = 0.4955
 trim_end = 16.6139
 
 [sub_resource type="Resource" id="Resource_noqya"]
 script = ExtResource("1_6fvma")
+silent = true
 loop = true
 
 [resource]
@@ -2298,9 +2961,7 @@ entries = {
 &"hero.ult.end": SubResource("Resource_iao2c"),
 &"hero.ult.ready": SubResource("Resource_k6o8c"),
 &"music.battle": SubResource("Resource_mj8hk"),
-&"music.bonus": SubResource("Resource_kaf53"),
 &"music.boss": SubResource("Resource_kakva"),
-&"music.clear": SubResource("Resource_b8o6f"),
 &"music.ending": SubResource("Resource_akmji"),
 &"music.final_boss": SubResource("Resource_rhst1"),
 &"music.finale": SubResource("Resource_xfdks"),
@@ -2310,7 +2971,6 @@ entries = {
 &"music.menu": SubResource("Resource_memdp"),
 &"music.result": SubResource("Resource_noqya"),
 &"music.stage_select": SubResource("Resource_gykgn"),
-&"scene.boss_finish.clear": SubResource("Resource_h53t7"),
 &"scene.boss_finish.clear_field": SubResource("Resource_omrrg"),
 &"scene.boss_finish.crack": SubResource("Resource_1dekc"),
 &"scene.boss_finish.hold": SubResource("Resource_wntrw"),

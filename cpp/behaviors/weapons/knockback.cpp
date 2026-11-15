@@ -20,11 +20,11 @@ void KnockbackBehavior::defeated(RunRuntime &run,const DeathContext &death) {
     scatter.radius_mult=p.effects.area*(1+k.area_increment*double(p.post_area_stacks));
     scatter.life_mult=k.base_life>0?k.life/k.base_life*(1+k.duration_increment*double(p.post_duration_stacks)):0;
     EventBuilder::flush_combat(run);
-    if (FriendDebrisSystem::scatter(run,scatter)) k.visuals.push_back({death.corpse.pos,++k.serial,false,run.state.world_time});
+    if (FriendDebrisSystem::scatter(run,scatter)) {k.visuals.push_back({death.corpse.pos,++k.serial,false,run.state.world_time});EventBuilder::audio(run,"weapon.star_shatter.shatter",death.corpse.pos);}
 }
 void KnockbackBehavior::step(RunRuntime &run,double) {
     auto &k=run.state.loadout->knockback;
     k.visuals.erase(std::remove_if(k.visuals.begin(),k.visuals.end(),[&](const auto &v){return run.state.world_time-v.born_world_time>=(v.hit?0.3:0.8);}),k.visuals.end());
 }
-void KnockbackBehavior::hit(RunRuntime &run,godot::Vector2 position) {auto &k=run.state.loadout->knockback;if (k.ready) k.visuals.push_back({position,++k.serial,true,run.state.world_time});}
+void KnockbackBehavior::hit(RunRuntime &run,godot::Vector2 position) {auto &k=run.state.loadout->knockback;if (k.ready) {k.visuals.push_back({position,++k.serial,true,run.state.world_time});EventBuilder::audio(run,"weapon.star_shatter.hit",position);}}
 }

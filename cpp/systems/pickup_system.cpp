@@ -225,8 +225,8 @@ void PickupSystem::drop_enemy(RunRuntime &run,const Corpse &enemy) {
     collect_enemy_coins(run,count);
     if (meteor) {
         const auto &config=run.content->rock_fields.front();
-        if (state.control.rng.randf()<config.meteor_heal_chance) state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Heal});
-        if (state.control.rng.randf()<config.meteor_magnet_chance) state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Magnet});
+        if (state.control.rng.randf()<config.meteor_heal_chance) {state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Heal});EventBuilder::audio(run,"field.repair.drop",enemy.pos);}
+        if (state.control.rng.randf()<config.meteor_magnet_chance) {state.pickups.capsules.push_back({enemy.pos,0,godot::RunState::CapsuleKind::Magnet});EventBuilder::audio(run,"field.beacon.drop",enemy.pos);}
         if (enemy.rare_weapon) state.pickups.capsules.push_back({enemy.pos,0,CapsuleKind::CometWeapon,enemy.rare_weapon,false});
     }
 }
