@@ -279,10 +279,7 @@ func apply_frame(finale: Dictionary, world_clock: float, view_center: Vector2, v
 		_far_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 		_fine_port.render_target_update_mode = SubViewport.UPDATE_ALWAYS
 	f = finale
-	var before := stage
 	stage = str(finale.get("stage",""))
-	# 叩き込むの52発は、取り込みで連撃の時刻どおりに並べた1本の音なので、始まりに1回だけ鳴らす
-	if stage=="strikes" and before!="strikes": AudioManager.play(&"scene.finale.pass")
 	t = float(finale.get("time",0.0))
 	clock = world_clock
 	zoom = maxf(view_zoom,0.01)
@@ -341,10 +338,10 @@ func _play_stage_sounds() -> void:
 			# HUD が案内を出す時刻（hud.gd の _draw_finale_text）に合わせる。
 			if not f.get("began", false) and crossed.call(5.0): AudioManager.play(&"scene.finale.hint")
 		"strikes":
-			if entered: AudioManager.play(&"scene.finale.barrage")
-			var hits := RUSH.hits
-			for row in range(0, hits.size(), DracoFinaleRush.HIT_FIELDS):
-				if crossed.call(hits[row]): AudioManager.play(&"scene.finale.pass")
+			# 通り抜けるたびの音は、取り込みで52発を連撃の時刻どおりに並べた1本の音なので、始まりに1回だけ鳴らす
+			if entered:
+				AudioManager.play(&"scene.finale.barrage")
+				AudioManager.play(&"scene.finale.pass")
 		"charge":
 			if entered: AudioManager.play(&"scene.finale.charge")
 		"flash":
