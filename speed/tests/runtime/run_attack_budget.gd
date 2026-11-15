@@ -8,7 +8,8 @@ func check(ok: bool,label: String) -> void:
 		push_error(label)
 func _ready() -> void:
 	check_director_lifecycle()
-	check_biter_budget_path()
+	if not "--director-only" in OS.get_cmdline_user_args(): check_biter_budget_path()
+	check_relocated_waiter()
 	print("[run_attack_budget] failed=%d" % failed)
 	get_tree().quit(1 if failed else 0)
 
@@ -131,4 +132,25 @@ func check_biter_budget_path() -> void:
 			reclaimed = bridge._core.attack_token(str(id))==0
 			break
 	check(saw_hazard and reclaimed,"予算更新後に噛みつきを発射し、残留終了後に枠を戻す")
+	bridge.dispose()
+
+func check_relocated_waiter() -> void:
+	var bridge = director_fixture([], &"dolphin")
+	var core = bridge._core
+	var first: Dictionary = bridge.command("dev_spawn",{"definition_id":"dolphin","position":Vector2(3000,0)})
+	var second: Dictionary = bridge.command("dev_spawn",{"definition_id":"dolphin","position":Vector2(500,0)})
+	check(first.ok and second.ok,"再配置するいるかと後続のいるかを出す")
+	var cats := PackedStringArray(["wave"])
+	core.configure_attack_budget({"enabled":true,"budget":0.0,"jitter":0.0})
+	check(not core.request_attack(str(first.value),cats,first.value,1.3,0.0,1.0),"先頭のいるかを攻撃待ちにする")
+	check(not core.request_attack(str(second.value),cats,second.value,1.3,0.0,1.0),"次のいるかを同じ待機列に入れる")
+	check(bridge.command("dev_relocate",{"entity_id":first.value,"position":Vector2(-1000,0)}).ok,"待機中のいるかを画面外から戻す")
+	core.configure_attack_budget({"enabled":true,"budget":1.0,"jitter":0.0})
+	check(core.request_attack(str(second.value),cats,second.value,1.3,0.0,1.0),"再配置で攻撃準備に戻った先頭が後続の攻撃を止めない")
+	var token: int = core.attack_token(str(second.value))
+	var remaining := retained_attack(bridge,second.value,token)
+	check(bridge.command("dev_relocate",{"entity_id":second.value,"position":Vector2(1000,0)}).ok,"攻撃済みのいるかも再配置する")
+	check(core.advance_attack_budget(0.1) and core.attack_token(str(second.value))==token and not core.owns_attack(str(second.value),second.value),"再配置で予約を閉じても発射済みの弾の枠は保つ")
+	bridge.command("dev_end_attack",{"handle":remaining.handle})
+	check(core.advance_attack_budget(0.1) and core.attack_budget_snapshot().used==0.0,"発射済みの弾が消えたら再配置前の枠を返す")
 	bridge.dispose()

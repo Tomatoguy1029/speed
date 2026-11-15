@@ -147,6 +147,8 @@ bool EnemySystem::relocate(RunRuntime &run,EnemyHandle handle,godot::Vector2 pos
     auto &state=run.state;
     if (!state.enemy_handles.contains(handle) || !position.is_finite()) return false;
     auto &enemy=state.enemies[handle.slot];if (enemy.dead || enemy.held) return false;
+    // 攻撃準備をやり直す個体を先頭待ちに残さない。発射済みの残留枠は寿命まで保つ。
+    AttackBudgetSystem(run).cancel(AttackBudgetSystem::owner(state,enemy.id,enemy.attack_group),enemy.id);
     CoronaVortex::release(run,handle);PumpBehavior::gone(run,handle,false);
     PhaseController::cancel(run,handle);
     AttackSystem::source_ended(state,handle,AttackEndReason::Relocate);
