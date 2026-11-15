@@ -100,7 +100,8 @@ void HeroesSystem::place(RunRuntime &run,uint32_t id) {
 bool HeroesSystem::captive(const RunRuntime &run) {const auto &h=run.state.heroes;return h.hero && std::find(h.lit.begin(),h.lit.end(),0)!=h.lit.end();}
 void HeroesSystem::step(RunRuntime &run,double real_dt,double world_dt) {
     auto &s=run.state;auto &h=s.heroes;const auto &cfg=run.content->hero_config;
-    const double cooling=h.cooldown;h.cooldown=std::max(0.0,h.cooldown-real_dt);
+    const double charge_dt=std::max(0.0,real_dt-h.active);
+    const double cooling=h.cooldown;h.cooldown=std::max(0.0,h.cooldown-charge_dt);
     if (cooling>0 && h.cooldown<=0 && h.power) EventBuilder::audio(run,"hero.ult.ready",s.ship.pos);
     if (h.active>0) {const double before=h.active;h.active=std::max(0.0,h.active-real_dt);PerseusBehavior::step(run,before,h.active);if (h.active<=0) {Dictionary data;data["id"]=name(run,h.power);emit(run,"hero_power_end",data);}}
     if (h.next>=0) {h.next-=real_dt;if (h.next<0) place(run,random_hero(run,h.power));}
