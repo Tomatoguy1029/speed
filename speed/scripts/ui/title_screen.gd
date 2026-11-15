@@ -197,7 +197,7 @@ func _build_start_panel(canvas: Control) -> void:
 		var button := Button.new()
 		button.text = labels[i]
 		_style_menu_button(button)
-		button.position = Vector2(56, [88, 138, 188][i])
+		button.position = Vector2(56, [110, 160, 210][i])
 		_menu_options.add_child(button)
 		button.pressed.connect(_go.bind(destinations[i]))
 		if i == 0:
