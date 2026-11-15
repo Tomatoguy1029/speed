@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1")
-radius = 90.0
+radius = 180.0
 use_def_stats = true
 hp = 3000.0
 armor = 12.0
