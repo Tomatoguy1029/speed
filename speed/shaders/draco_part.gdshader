@@ -29,6 +29,8 @@ uniform float entrance_eyes = 0.0;
 uniform vec2 rift_viewport = vec2(1280.0, 720.0);
 uniform vec4 rift_ends = vec4(0.0);
 uniform vec4 rift_shape = vec4(0.0);
+// 奥への往復のあいだ、遠い部位ほど宇宙の色へ沈める。
+uniform float depth_dark = 0.0;
 varying vec2 world_at;
 varying vec2 axis_x;
 varying vec2 axis_y;
@@ -83,6 +85,7 @@ void fragment() {
 		bool eye = entrance_head && albedo.r > 0.2 && albedo.r > albedo.g * 1.6 && albedo.r > albedo.b * 1.4;
 		if (eye) { result = mix(result, vec3(1.0, 0.157, 0.196), entrance_eyes); }
 	}
+	result = mix(result, vec3(0.0275, 0.0392, 0.0863), depth_dark);
 	result = mix(result, vec3(1.0), boss_hit_white);
 	COLOR = vec4(srgb_light ? pow(max(result, vec3(0.0)), vec3(2.2)) : result, pixel.a) * vertex_tint;
 }

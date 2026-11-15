@@ -29,6 +29,9 @@ var _entrance_length := 1.0
 var _entrance_width := 1.0
 var _entrance_head_scale := 1.0
 var _entrance_on := false
+## 奥への往復のあいだ、部位ごとに持つ暗さつきの素材と、元の並び順。
+var _depth_materials := {}
+var _depth_home: Array = []
 var _eye_copy: BackBufferCopy
 var _eye_light: Sprite2D
 ## 登場中の胸の位置（この節点の座標）。
@@ -91,13 +94,15 @@ func _sprite(part: StringName) -> Sprite2D:
 	add_child(sprite)
 	return sprite
 
-func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 1.0, cosmic := false, hit := 0.0, split_origin := Vector2.ZERO, split_axis := Vector2.ZERO) -> void:
+## scales は点ごとの遠近の倍率、length は遠近を掛ける前の体長。渡すと、部位ごとに小さく暗くして奥の部位から先に描く。
+func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 1.0, cosmic := false, hit := 0.0, split_origin := Vector2.ZERO, split_axis := Vector2.ZERO, scales := PackedFloat32Array(), length := 0.0) -> void:
 	visible = points.size() >= 2 and alpha > 0.001
 	if not visible: return
 	modulate.a = alpha
 	_lighting.set_shader_parameter("cosmic", cosmic)
 	_lighting.set_shader_parameter("boss_hit_white", hit)
-	var total := FORM.length(points)
+	var deep := length > 0.0 and scales.size() == points.size()
+	var total := length if deep else FORM.length(points)
 	_entrance_length = maxf(1.0,total)
 	_entrance_width = width
 	_entrance_head_scale = head_scale
@@ -124,7 +129,8 @@ func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 
 			elif i == count - 2: part = &"tail_joint"
 			else: part = [&"body_e", &"body_c", &"body_b", &"body_a", &"body_d"][mini(4, int(i * 5.0 / maxi(1, count - 2)))]
 			_segments.append(_sprite(part))
-	var samples := _sample_positions(points, distances)
+	var samples := _sample_index(points, distances, total) if deep else _sample_positions(points, distances)
+	var nears := {}
 	for i in count:
 		var sprite := _segments[i]
 		_entrance_distances[sprite] = distances[i]
@@ -134,34 +140,93 @@ func pose(points: PackedVector2Array, width: float, head_scale: float, alpha := 
 		# The final authored arrow points up; all preceding plates point down.
 		sprite.rotation = direction.angle() + (PI * 0.5 if i == count - 1 else -PI * 0.5)
 		var part_width := float(sprite.texture.get_width())
-		sprite.scale = Vector2.ONE * width * FORM.taper(t) / part_width
+		var near := _near_at(scales, distances[i] / total) if deep else 1.0
+		sprite.scale = Vector2.ONE * width * FORM.taper(t) / part_width * near
+		if deep: nears[sprite] = near
 		sprite.position = _split(at, split_origin, split_axis)
 	_entrance_distances[_head] = 0.0
 	_head.position = _split(points[0], split_origin, split_axis)
 	_head.rotation = -PI * 0.5
-	_head.scale = Vector2.ONE * head_scale * 2.0
-	_pose_arms(points, width, total, split_origin, split_axis)
+	_head.scale = Vector2.ONE * head_scale * 2.0 * (scales[0] if deep else 1.0)
+	if deep: nears[_head] = scales[0]
+	_pose_arms(points, width, total, split_origin, split_axis, scales if deep else PackedFloat32Array(), nears)
+	_depth(nears)
 
-func _pose_arms(points: PackedVector2Array, width: float, total: float, split_origin: Vector2, split_axis: Vector2) -> void:
+func _pose_arms(points: PackedVector2Array, width: float, total: float, split_origin: Vector2, split_axis: Vector2, scales := PackedFloat32Array(), nears := {}) -> void:
+	var deep := not scales.is_empty()
 	for i in 4:
 		var distance := minf(total, width * 0.9) if i < 2 else total * 0.66
-		var samples := _sample_positions(points, PackedFloat32Array([distance, minf(total, distance + 2.0)]))
+		var pair := PackedFloat32Array([distance, minf(total, distance + 2.0)])
+		var samples := _sample_index(points, pair, total) if deep else _sample_positions(points, pair)
 		var tangent := (samples[2] - samples[1]).normalized()
 		var normal := tangent.orthogonal()
-		var unit := width * FORM.taper(distance / maxf(1.0, total)) / 57.0
+		var near := _near_at(scales, distance / total) if deep else 1.0
+		var unit := width * FORM.taper(distance / maxf(1.0, total)) / 57.0 * near
 		var side := -1.0 if i % 2 == 0 else 1.0
 		var arm := _arms[i]
 		var direction := (normal * side - tangent * 0.3).normalized()
 		var wrist := (ARM_WRIST - ARM_ROOT) * Vector2(-side, 1)
 		arm.rotation = direction.angle() - wrist.angle() + arm_turns[i]
 		arm.scale = Vector2(-side, 1) * unit
-		arm.position = _split(samples[1] + normal * side * width * FORM.taper(distance / maxf(1.0, total)) * 0.32, split_origin, split_axis)
+		arm.position = _split(samples[1] + normal * side * width * FORM.taper(distance / maxf(1.0, total)) * 0.32 * near, split_origin, split_axis)
 		_entrance_distances[arm] = distance
 		var claw := _claws[i]
 		_entrance_distances[claw] = distance
 		claw.rotation = arm.rotation
 		claw.scale = arm.scale
 		claw.position = arm.position + wrist.rotated(arm.rotation) * unit
+		if deep:
+			nears[arm] = near
+			nears[claw] = near
+
+## 点は遠近を掛ける前の道のりで等間隔に並ぶ。頭からの道のりを点の番号に直して位置を取る。
+func _sample_index(points: PackedVector2Array, distances: PackedFloat32Array, total: float) -> PackedVector2Array:
+	var result := PackedVector2Array([points[0]])
+	var last := points.size() - 1
+	for distance in distances:
+		var f := clampf(distance / total, 0.0, 1.0) * last
+		var i := mini(int(f), last - 1)
+		result.append(points[i].lerp(points[i + 1], f - i))
+	return result
+
+func _near_at(scales: PackedFloat32Array, fraction: float) -> float:
+	var last := scales.size() - 1
+	var f := clampf(fraction, 0.0, 1.0) * last
+	var i := mini(int(f), last - 1)
+	return lerpf(scales[i], scales[i + 1], f - i)
+
+## 奥の部位ほど宇宙の色へ沈め、先に描く。同じ奥行きはいつもの順（手・胴・頭）で重ねる。
+## 並び順は子の順で決める。負のZは戦闘の背景より奥へ落ちる。
+func _depth(nears: Dictionary) -> void:
+	if nears.is_empty():
+		if _depth_home.is_empty(): return
+		for row: Array in _depth_materials.values():
+			if is_instance_valid(row[0]): row[0].material = _lighting
+		_depth_materials.clear()
+		var slot := 0
+		for node in _depth_home:
+			if not is_instance_valid(node): continue
+			move_child(node, slot)
+			slot += 1
+		_depth_home.clear()
+		_head.z_index = 1
+		return
+	if _depth_home.is_empty(): _depth_home = get_children()
+	_head.z_index = 0
+	var rows := []
+	for sprite: Sprite2D in nears:
+		var near := float(nears[sprite])
+		var id := sprite.get_instance_id()
+		if not _depth_materials.has(id): _depth_materials[id] = [sprite, _lighting.duplicate()]
+		var mat: ShaderMaterial = _depth_materials[id][1]
+		sprite.material = mat
+		mat.set_shader_parameter("boss_hit_white", _lighting.get_shader_parameter("boss_hit_white"))
+		mat.set_shader_parameter("depth_dark", pow(clampf(650.0 * (1.0 / near - 1.0) / 1150.0, 0.0, 1.0), 0.7) * 0.5)
+		var rank := 100000 if sprite == _head else _segments.find(sprite)
+		if rank < 0: rank = -10 + 2 * _arms.find(sprite) if sprite in _arms else -9 + 2 * _claws.find(sprite)
+		rows.append([snappedf(near, 0.004), rank, sprite])
+	rows.sort_custom(func(a, b): return a[0] < b[0] if a[0] != b[0] else a[1] < b[1])
+	for row in rows: move_child(row[2], -1)
 
 func _split(point: Vector2, origin: Vector2, axis: Vector2) -> Vector2:
 	return point + axis * (-1.0 if (point - origin).dot(axis) < 0.0 else 1.0)

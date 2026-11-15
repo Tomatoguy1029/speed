@@ -1,6 +1,7 @@
 #include "heroes.h"
 #include "../behaviors/heroes/leo.h"
 #include "combat_resolver.h"
+#include "../bosses/draco/cycle.h"
 #include "../behaviors/enemies/defender.h"
 #include "combat_hooks.h"
 #include "../behaviors/enemies/shield.h"
@@ -78,7 +79,7 @@ CombatReason protection(const RunRuntime &run,EnemyHandle target) {
     const auto &enemy=state.enemies[target.slot];
     if (enemy.dead) return CombatReason::Dead;
     if (state.phase!=godot::RunState::Phase::Play) return CombatReason::RunPhase;
-    if (enemy.guard>0) return CombatReason::Guard;
+    if (enemy.guard>0 || DracoCycle::background(state,target)) return CombatReason::Guard;
     if (state.controls_locked) return CombatReason::ControlsLocked;
     if (state.encounter_protected) return CombatReason::EncounterProtected;
     return CombatReason::Applied;
@@ -111,6 +112,7 @@ EnemyHandle CombatResolver::damage_target(const RunRuntime &run,EnemyHandle stru
 }
 GateResult CombatResolver::gate(const RunRuntime &run,EnemyHandle target,const DamageRequest &request) {
     const auto &s=run.state;if (!s.enemy_handles.contains(target)) return GateResult::Pass;
+    if (DracoCycle::background(s,target)) return GateResult::Pass;
     const auto &e=s.enemies[target.slot];const auto &d=run.content->definitions[e.definition];const bool ram=request.cause==Cause::Ram;
     const auto &p=run.combat_hooks.enemy_policy(d.kind);if (p.passes && p.passes(run,target)) return GateResult::Pass;
     if (d.kind==EnemyDefinition::Kind::Shield) return ShieldBehavior::blocks_front(run,target,request.has_impact?request.impact:e.pos,request.direction)?(ram?GateResult::Bounce:GateResult::Pass):GateResult::Allow;

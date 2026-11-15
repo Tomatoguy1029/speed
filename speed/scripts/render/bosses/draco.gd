@@ -81,12 +81,15 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	var points := PackedVector2Array()
 	for point: Vector2 in body.body_points: points.append(to_local(point))
 	var finale: Dictionary=body.get("finale",{})
-	_pose = _present(points,body,current)
+	var cycle: Dictionary = body.get("cycle",{})
+	var scales: PackedFloat32Array = body.get("body_scales",PackedFloat32Array())
+	var deep := scales.size()==points.size()
+	_pose = _cycle_pose(points,scales,body,cycle) if int(cycle.get("stage",0))!=0 else _present(points,body,current)
 	points = _pose.points
 	points = FINALE_VIEW.kink(points,finale)
 	_parts.set_finale_tone(finale_view.tone() if finale_view!=null and finale_view.visible else {})
 	_parts.arm_turns = _pose.arms
-	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0)
+	_parts.pose(points,float(body.body_width)*float(body.perspective_scale),float(body.head_scale)*float(body.perspective_scale),0.0 if finale.get("stage","")=="explode" and float(finale.get("time",0.0))>0.1 else float(body.alpha),bool(current.get("cosmic_body",false)),hit,to_local(finale.get("center",Vector2.ZERO)),Vector2.RIGHT.rotated(-rotation)*float(finale.get("split",0.0))*90.0,scales if deep else PackedFloat32Array(),float(body.get("body_length",0.0)))
 	_parts.entrance(intro,_rift_frame,float(body.get("entrance_quiet",2.5)))
 	# 登場のあいだだけ、胸の北極星の強い光を体の上へ重ねる。
 	var flare := float(intro.get("chest_flare",0.0)) if intro.get("active",false) else 0.0
@@ -125,12 +128,6 @@ func apply_frame(body: Dictionary, current: Dictionary = {}, _appearance: Dictio
 	queue_redraw()
 func _draw() -> void:
 	if state.is_empty() or not visible: return
-	var cycle: Dictionary = state.get("cycle",{})
-	if cycle.get("stage",0)==2:
-		for j in 16:
-			var k := fmod(float(cycle.time)*0.5+j/16.0,1.0)
-			var at := Vector2.from_angle(j*2.399963)*450.0*(1.0-k)
-			draw_circle(at,4.0,Color(0.8,0.9,1.0,k))
 	var intro: Dictionary = state.get("intro",{})
 	var glow: float = float(intro.chest_glow) if intro.get("active",false) else 1.0
 	var finale: Dictionary=state.get("finale",{})
@@ -138,6 +135,9 @@ func _draw() -> void:
 	var depth := float(state.perspective_scale)
 	var core := Vector2(-110.0*float(state.head_scale)*depth,0)
 	if intro.get("active",false) and intro.has("path"): core = _parts.entrance_chest
+	if _pose.has("chest"):
+		core = _pose.chest
+		depth = float(_pose.chest_near)
 	var pulse := 0.85+sin(float(state.clock)*3.0)*0.15
 	draw_circle(core,core_glow_radius*depth,Color(core_glow_color,core_glow_opacity*pulse*float(state.alpha)*glow))
 	preload("res://scripts/bosses/draco_form.gd").star(self,core,27.0*depth,Color(0.85,0.96,1.0,float(state.alpha)*glow))
@@ -259,6 +259,105 @@ func _present(points: PackedVector2Array, body: Dictionary, current: Dictionary)
 			arms[i] = wrapf(want-base,-PI,PI)*(k if windup else maxf(1.0-settle if local>=0.0 else 1.0,lift))
 	return {"points":out,"facing":world_facing+turn,"arms":arms,"charge":charge,"claws":_claws(out,float(body.body_width),arms)}
 
+## 奥への往復とピカロ生成の体の動き。値と式は承認済みの試作のまま。
+## 体はうねり続け、吐くたびに首が短く引かれてから突き出る。奥の部位は遠近の分だけ動きも小さくなる。
+func _cycle_pose(points: PackedVector2Array, scales: PackedFloat32Array, body: Dictionary, cycle: Dictionary) -> Dictionary:
+	var t := float(body.clock)
+	var last := points.size()-1
+	var length := float(body.get("body_length",1500.0))
+	var settle := float(cycle.get("settle",0.0))
+	var swim := float(cycle.get("swim",0.0))
+	var kick := _cycle_kick(cycle)*46.0*settle
+	var deep := scales.size()==points.size()
+	var out := PackedVector2Array()
+	for i in points.size():
+		var u := float(i)/last
+		var d := length*u
+		var along := (points[mini(last,i+1)]-points[maxi(0,i-1)]).normalized()
+		var near := scales[i] if deep else 1.0
+		var wave := 0.62*sin(d*0.0071-t*3.3)+0.42*sin(d*0.0029+t*1.7)+0.3*sin(d*0.016-t*6.1)
+		var amp := 30.0*_smooth(0.04,0.4,u)*(0.55+0.45*settle)*wave*swim
+		out.append(points[i]+(Vector2(-along.y,along.x)*amp+Vector2.RIGHT*kick*(1.0-_smooth(0.0,0.3,u)))*near)
+	var f := 148.0/length*last
+	var at := mini(int(f),last-1)
+	return {"points":out,"facing":float(body.facing),"arms":[0.0,0.0,0.0,0.0],"charge":0.0,"chest":out[at].lerp(out[at+1],f-at),"chest_near":lerpf(scales[at],scales[at+1],f-at) if deep else 1.0,"near":scales[0] if deep else 1.0}
+
+## 吐き出す時刻からの経過（負は吐く前）。ピカロ生成の段でだけ意味を持つ。
+func _cycle_shot_age(cycle: Dictionary, index: int) -> float:
+	if int(cycle.get("stage",0))!=5: return -INF
+	return float(cycle.time)-float(cycle.shot_first)-float(cycle.shot_step)*index
+
+func _cycle_kick(cycle: Dictionary) -> float:
+	var kick := 0.0
+	for i in cycle.get("spots",PackedVector2Array()).size():
+		var a := _cycle_shot_age(cycle,i)
+		if a>=0.0: kick -= 1.1*exp(-a/0.12)*(1.0-exp(-a/0.015))
+		elif a>-0.45: kick -= 0.55*_smooth(-0.45,-0.05,a)
+	return kick
+
+## 奥で星を口へ吸い込み、胸の光を強める。手前へ戻ったら、胸の星を口へ送って顔の前へ1体ずつ吐き出す。
+func _draw_cycle(canvas, t: float, mouth: Vector2) -> void:
+	var cycle: Dictionary = state.get("cycle",{})
+	var stage := int(cycle.get("stage",0))
+	if stage==0 or not _pose.has("chest"): return
+	var p = canvas.front
+	var wl := float(canvas.world_scale)
+	var near := float(_pose.near)
+	var glow := func(at: Vector2, radius: float, color: Color, alpha: float) -> void:
+		var q: Vector2 = canvas.to_logical(at)
+		p.glow(q.x,q.y,radius*wl,color,minf(1.0,alpha))
+	var far := float(cycle.get("far",0.0))
+	var rise := float(cycle.get("rise",-1.0))
+	# 奥で集める星：口のまわりから渦を巻いて飛び込む。浮かび上がり始めたら新しい星は出さない。
+	if far>0.0 and stage<5:
+		var rate := 90.0/4.37
+		var until := far-maxf(0.0,rise)-0.05
+		var newest := int(floor((minf(far,until)-0.15)*rate))
+		for n in range(maxi(0,newest-18),newest+1):
+			var age := far-0.15-n/rate
+			if age<0.0 or age>0.75: continue
+			var k := age/0.75
+			var e := k*k
+			var radius := (260.0+FX._hash(n*1.7+3.0)*520.0)*near*(1.0-e)
+			var at := mouth+Vector2.from_angle(FX._hash(n*5.3+1.0)*TAU+e*1.7)*radius
+			glow.call(at,(7.0+10.0*k)*1.2,Color("#ffb0ea") if FX._hash(n*9.1+2.0)>0.6 else Color("#9fd8ff"),_smooth(0.0,0.15,k)*(1.0-_smooth(0.9,1.0,k)))
+			glow.call(at,3.0,Color.WHITE,_smooth(0.0,0.15,k))
+	# 胸の星：集めるほど強く光り、吐くたびに弱まる。
+	var count: int = cycle.get("spots",PackedVector2Array()).size()
+	var spent := clampf(_cycle_shot_age(cycle,0)/(float(cycle.shot_step)*maxi(1,count)),0.0,1.0) if stage==5 else 0.0
+	var stored := _smooth(0.0,4.77,far)*(1.0-spent)
+	var chest: Vector2 = to_global(_pose.chest)
+	var chest_near := float(_pose.chest_near)
+	var dark := pow(clampf(650.0*(1.0/chest_near-1.0)/1150.0,0.0,1.0),0.7)*0.5
+	if stored>0.004:
+		glow.call(chest,(60.0+70.0*stored)*chest_near*2.0,Color("#9fd8ff"),0.5*1.1*stored*(1.0-dark*0.5))
+		glow.call(chest,(60.0+70.0*stored)*chest_near*0.5,Color.WHITE,1.1*stored)
+	if stage!=5: return
+	var spots: PackedVector2Array = cycle.spots
+	var fly := float(cycle.fly)
+	for i in spots.size():
+		var a := _cycle_shot_age(cycle,i)
+		if a>-0.6 and a<0.0:
+			var k := _smooth(-0.6,0.0,a)
+			for j in 7:
+				var u := clampf(k*1.25-j*0.05,0.0,1.0)
+				if u>0.0 and u<1.0: glow.call(chest.lerp(mouth,u),9.0,Color("#9fd8ff"),0.8)
+			glow.call(mouth,30.0+50.0*k,Color("#b48cff"),0.9*k)
+			glow.call(mouth,10.0+14.0*k,Color.WHITE,k)
+		if a>=0.0 and a<0.22:
+			var k := a/0.22
+			glow.call(mouth,70.0*(1.0-0.4*k),Color("#e6c8ff"),1.0-k)
+			glow.call(mouth,26.0,Color.WHITE,1.0-k)
+		if a>=0.0 and a<fly:
+			# 口から顔の前へ飛ぶ種
+			var k := a/fly
+			for j in range(6,0,-1):
+				var back := 1.0-pow(1.0-clampf(k-j*0.035,0.0,1.0),2.2)
+				glow.call(mouth.lerp(spots[i],back),16.0-j*1.6,Color("#8a5cf0"),0.5-j*0.07)
+			var at := mouth.lerp(spots[i],1.0-pow(1.0-k,2.2))
+			glow.call(at,22.0,Color("#c9a6ff"),1.0)
+			glow.call(at,8.0,Color.WHITE,1.0)
+
 ## 爪先の位置。腕の根元と手首の長さは絵の画素から求める。
 func _claws(pts: PackedVector2Array, width: float, arms: Array) -> PackedVector2Array:
 	var total := FORM.length(pts)
@@ -312,7 +411,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 	_draw_under(canvas,t,st,stage,tech)
 	if _field!=null: _field.draw_reference(canvas,_real_dt)
 	var ready: bool = attack.get("staging_ready",true)
-	var scale_head := float(state.head_scale)*float(state.perspective_scale)
+	var scale_head := float(state.head_scale)*float(state.perspective_scale)*float(_pose.get("near",1.0))
 	var head: Vector2 = to_global(_pose.points[0])
 	var body_angle := float(state.facing)
 	var world_facing := float(_pose.facing)
@@ -422,6 +521,7 @@ func draw_reference(canvas, _real_dt: float) -> void:
 		elif effect.technique=="picaro_wall": FX.dark_blast(canvas,effect.position,age,radius,seed)
 		else: FX.impact(canvas,effect.position,age,radius*1.1,seed,_cracks(seed,radius*1.1*float(canvas.world_scale)))
 	if str(state.get("finale",{}).get("stage","")).is_empty(): canvas.front.glow(canvas.to_logical(chest).x,canvas.to_logical(chest).y,10.0,Color("#8dbdff"),0.35)
+	_draw_cycle(canvas,t,mouth)
 	_draw_heavy(canvas,t,st,stage,tech,mouth,world_facing)
 	if tech=="rifts": FX.rift_tells(canvas,attack.get("rift_tears",[]),float(attack.get("rift_tell",0.5)),float(attack.get("rift_open",0.16)),float(attack.get("rift_close",0.55)),t)
 	_draw_rocks(canvas,t,tech,stage)
