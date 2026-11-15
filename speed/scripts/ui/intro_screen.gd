@@ -71,7 +71,7 @@ func _ready() -> void:
 	_update_playback_labels()
 	var skip := _button("SkipIntro", tr("intro.skip"), Vector2(548, 10), Vector2(80, 23))
 	skip.pressed.connect(func():
-		AudioManager.play(&"ui.title.intro_skip")
+		AudioManager.play(_sound(&"skip"))
 		_finish())
 	resized.connect(_layout)
 	_layout()
@@ -121,7 +121,7 @@ func _art(texture: Texture2D, parent: Control) -> TextureRect:
 	return art
 
 func _show_scene(index: int) -> void:
-	if index > 0: AudioManager.play(&"ui.title.intro_scene")
+	if index > 0: AudioManager.play(_sound(&"scene"))
 	scene_index = index
 	paragraph_index = 0
 	_stars.clear()
@@ -176,7 +176,7 @@ func _process(delta: float) -> void:
 		_characters += delta * characters_per_second
 		var shown := _text.visible_characters
 		_text.visible_characters = mini(int(_characters), total)
-		if _text.visible_characters > shown: AudioManager.play(&"ui.title.intro_type")
+		if _text.visible_characters > shown: AudioManager.play(_sound(&"type"))
 		if _text.visible_characters == total:
 			_next.tooltip_text = tr("intro.next")
 	elif _auto_play.button_pressed:
@@ -235,3 +235,8 @@ func _finish() -> void:
 		_transition.kill()
 	if story.IS_ENDING: GameManager.finish_ending()
 	else: GameManager.finish_intro()
+
+## 導入とエンディングで、同じ文字送り・場面切り替え・スキップの音を別の欄から鳴らす。
+func _sound(kind: StringName) -> StringName:
+	if story.IS_ENDING: return {&"skip": &"scene.ending.skip", &"scene": &"scene.ending.scene", &"type": &"scene.ending.type"}[kind]
+	return {&"skip": &"ui.title.intro_skip", &"scene": &"ui.title.intro_scene", &"type": &"ui.title.intro_type"}[kind]

@@ -94,7 +94,6 @@ const EVENT_EXTRA := {
 	&"aquarius_aim": [&"elite.aquarius.charge"],
 	&"final_strike": [&"scene.time_up.charge"],
 	&"boss_defeated": [&"boss.common.final_strike"],
-	&"boss_finish": [&"scene.boss_finish.replay", &"scene.boss_finish.victory"],
 	&"boss_explode": [&"scene.boss_finish.vanish", &"scene.boss_finish.clear_field"],
 	&"ship_death": [&"scene.defeat.last_hit"],
 	&"game_over": [&"scene.defeat.text"],
@@ -140,7 +139,7 @@ const DRACO_CUES := {"core_released": &"scene.finale.polaris", "bear_roar": &"sc
 const CHOICE_SOUNDS := {"weapon": &"growth.cards.new_weapon", "trait": &"growth.cards.new_trait", "post_max": &"growth.cards.post_max"}
 ## 戦闘の phase のうち、ループする欄を鳴らし続ける段階（Play・Finishing）。
 const LOOP_PHASES := [0, 4]
-const PICKUP_SOUNDS := {&"heal": &"field.repair.pick", &"magnet": &"field.beacon.pick", &"comet_weapon": &"weapon.get.capsule_pick", &"coin": &"field.parts.pick"}
+const PICKUP_SOUNDS := {&"heal": &"field.repair.pick", &"magnet": &"field.beacon.pick", &"comet_weapon": &"weapon.get.capsule_pick"}
 ## エンドブラストの爆発は外周の小爆発と分けるため C++ が audio_cue で鳴らす。
 const EXPLODE_SOUNDS := {"mine": &"weapon.mine.blast", "runUp": &"trait.run_up.area", "pump_burst": &"elite.pump.release"}
 const HERO_SOUNDS := {"leo": &"hero.leo.transform", "perseus": &"hero.perseus.cast", "gemini": &"hero.gemini.split", "hercules": &"hero.hercules.cast"}
@@ -171,6 +170,7 @@ var _slow_gain := 1.0
 var _slow_fade: Tween
 
 func _ready() -> void:
+	_install_limiter()
 	_ensure_bus(&"SFX")
 	_ensure_bus(&"Engine")
 	_ensure_bus(&"Music")
@@ -294,6 +294,15 @@ func play(id: StringName, pitch_scale := 1.0) -> void:
 	player.volume_db = float(p.get("volume_db", 0.0))
 	player.pitch_scale = pitch(id, pitch_scale)
 	player.play()
+	# 止める合図のない鳴らし方なので、ループの欄でも1回ぶん鳴らしたら止める（鳴りっぱなしを防ぐ）
+	if p.get("loop", false): _stop_after_once(player, stream, now)
+
+## play で鳴らしたループの欄を、音の長さ1回ぶんで止める。その間に再生口が別の音へ使われていたら触らない。
+func _stop_after_once(player: AudioStreamPlayer, stream: AudioStream, started: int) -> void:
+	var seconds := stream.get_length() / maxf(0.01, player.pitch_scale)
+	if not is_finite(seconds) or seconds <= 0.0: seconds = 2.0
+	get_tree().create_timer(seconds, true, false, true).timeout.connect(func() -> void:
+		if is_instance_valid(player) and player.stream == stream and int(player.get_meta(&"started_at", 0)) == started: player.stop())
 
 ## ループする欄を key ごとに鳴らし続ける。同じ key で呼び直しても鳴らし直さない。
 func start_loop(id: StringName, key: Variant = null) -> void:
@@ -354,6 +363,33 @@ func _reload_bank() -> void:
 		_sounds = bank.sounds.duplicate()
 		_music = bank.music.duplicate()
 		_params = bank.params.duplicate()
+		_guard_volumes()
+
+## 爆音を防ぐ：欄の音量は音づけ表の上限（+12dB）までにする。音づけ表の値を変えるのではなく、壊れた値だけを止める。
+const SLOT_VOLUME_MAX := 12.0
+const SLOT_VOLUME_MIN := -80.0
+## 爆音を防ぐ：全部の音が通る Master の出口に置くリミッターの上限（dB）。重なった音もここを超えない。
+const MASTER_CEILING_DB := -1.0
+
+func _guard_volumes() -> void:
+	for id: StringName in _params:
+		var p: Dictionary = _params[id]
+		var v := float(p.get("volume_db", 0.0))
+		if not is_finite(v) or v > SLOT_VOLUME_MAX or v < SLOT_VOLUME_MIN:
+			var safe := clampf(v if is_finite(v) else 0.0, SLOT_VOLUME_MIN, SLOT_VOLUME_MAX)
+			push_warning("音量が範囲外の欄を %.1fdB にしました: %s（%s）" % [safe, id, str(v)])
+			p = p.duplicate()
+			p["volume_db"] = safe
+			_params[id] = p
+
+func _install_limiter() -> void:
+	var master := AudioServer.get_bus_index(&"Master")
+	if master < 0: return
+	for i in AudioServer.get_bus_effect_count(master):
+		if AudioServer.get_bus_effect(master, i) is AudioEffectHardLimiter: return
+	var limiter := AudioEffectHardLimiter.new()
+	limiter.ceiling_db = MASTER_CEILING_DB
+	AudioServer.add_bus_effect(master, limiter)
 
 ## 単一のBGM再生口。切り替え中の再要求や画面退出は古いTweenを取り消す。曲のない欄では今の曲を続ける。
 func play_music(id: StringName, fade_seconds := 1.0, owner: Node = null) -> void:

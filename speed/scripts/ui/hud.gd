@@ -802,7 +802,7 @@ func _ready_cpp() -> void:
 			_cards_accept_at = Time.get_ticks_usec() + roundi(card_input_delay * 1_000_000.0)
 		_sync_menu_visibility()
 		bridge.call_deferred("command", "set_ui_reward", {"active": active}))
-	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner","bonus"])
+	bridge.subscribe("hud",_receive_cpp_frame,CPP_UI_FIELDS,["hero_discovered","hero_freed","level_bonus","boss_spawn","full_burst_ready","game_over","clear_banner"])
 	var guides := preload("res://scripts/ui/navigation_guides.gd").new()
 	guides.name = "NavigationGuides"
 	add_child(guides)
@@ -1102,9 +1102,6 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 		if event.type=="boss_spawn":
 			_warning_t = 3.0
 			if not _cpp_ui.get("lab_mode",false): AudioManager.play_music(_boss_music(),1.0,self)
-		if event.type=="bonus" and not _cpp_ui.get("lab_mode",false):
-			if event.payload.get("enter",false): AudioManager.play_music(&"music.bonus",0.6,self)
-			else: AudioManager.play_music(&"music.battle",0.6,self)
 		if event.type=="full_burst_ready":
 			_ring_flash_t = 0.1
 			_ring_flash_max = 0.1
@@ -1121,7 +1118,6 @@ func _receive_cpp_frame(frame: Dictionary) -> bool:
 			_banner = tr("hud.clear")
 			_banner_cleared = true
 			_banner_t = 0.0
-			AudioManager.play_music(&"music.clear",0.6,self)
 	return true
 
 ## ボス戦の曲。りゅう座はラスボスの曲を使い、曲がなければボスの曲にする。
