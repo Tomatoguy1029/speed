@@ -6,16 +6,21 @@
 #include "../../content/content_bundle.h"
 #include <algorithm>
 #include <cmath>
+#include <unordered_set>
 namespace speed {
 bool ZoneSystem::explode(RunRuntime &run,godot::Vector2 center,double radius,double damage,Cause cause,double knock,double life,const godot::Color &color,bool no_crit) {
     const double reach=radius+std::max(run.state.combat_config.max_enemy_radius,run.state.grid.max_radius);
     const auto rows=CollisionQuery::enemy_rows(run.state,center-godot::Vector2(reach,reach),center+godot::Vector2(reach,reach));
     std::vector<EnemyHandle> targets;targets.reserve(rows.size());
     for (auto row:rows) targets.push_back(run.state.enemy_handles.at(uint32_t(row)));
+    std::unordered_set<int64_t> hit_ids;
     for (auto target:targets) {
         if (!run.state.enemy_handles.contains(target)) continue;
         const auto &enemy=run.state.enemies[target.slot];if (!enemy.alive || enemy.dead) continue;
         const auto delta=enemy.pos-center;if (delta.length_squared()>(radius+enemy.radius)*(radius+enemy.radius)) continue;
+        // HPを共有する部位へ重なっても、1回の爆発では本体へ一度だけ当てる。
+        const auto health_target=CombatResolver::damage_target(run,target);
+        if (!run.state.enemy_handles.contains(health_target) || !hit_ids.insert(run.state.enemy_handles.entity_id(health_target)).second) continue;
         DamageRequest request;request.struck=target;request.amount=damage;request.cause=cause;request.knock=knock;request.no_crit=no_crit;
         request.direction=delta.length_squared()>0?delta.normalized():godot::Vector2();
         CombatResolver::damage_enemy(run,request);
