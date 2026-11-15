@@ -22,6 +22,11 @@ func _player(voice: Dictionary) -> AudioStreamPlayer:
 	player.pitch_scale = voice.pitch
 	add_child(player)
 	return player
+## 世界が止まっている間は、開始・移動中・終了の音をそのまま一時停止する。
+func set_paused(paused: bool) -> void:
+	for player: AudioStreamPlayer in [attack, sustain, release]:
+		if is_instance_valid(player): player.stream_paused = paused
+
 func finish() -> void:
 	if ending: return
 	ending = true

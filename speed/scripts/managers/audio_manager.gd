@@ -14,6 +14,9 @@ const SAME_SOUND_MERGE_MS := 50
 const MENU_RESUME_TRACKS := [&"music.menu", &"music.stage_select"]
 const MENU_RESUME_WINDOW_MS := 10000
 const DASH_VOICE = preload("res://scripts/managers/dash_audio_voice.gd")
+## なぞっていないのにブーストの音が鳴っている状態が、このフレーム数続いたら止める
+const DASH_UNTRACED_FRAMES := 3
+var _dash_untraced := 0
 const DASH_SOUNDS := [&"ship.boost.dash", &"ship.boost.dash_loop", &"ship.boost.dash_end"]
 const HEARTBEAT := &"ship.combat.low_hp"
 ## 心音の素材で、最初の拍が鳴る位置と拍の間隔（秒）。心音の素材を替えたら合わせる。
@@ -482,7 +485,16 @@ func start_dash() -> void:
 	for id: StringName in DASH_SOUNDS:
 		voices.append({"stream": _sounds.get(id), "volume_db": float(settings(id).get("volume_db", 0.0)), "pitch": pitch(id)})
 	_dash_voice.start(voices)
+## ブーストの終わりの合図を受け取れなかった時の保険。なぞっていない状態が続いたらブーストの音を止める。
+func _guard_dash(ui: Dictionary, frozen: bool) -> void:
+	if not is_instance_valid(_dash_voice) or frozen or not ui.has("tracing"):
+		_dash_untraced = 0
+		return
+	_dash_untraced = 0 if bool(ui.tracing) else _dash_untraced + 1
+	if _dash_untraced >= DASH_UNTRACED_FRAMES: end_dash()
+
 func end_dash() -> void:
+	_dash_untraced = 0
 	if is_instance_valid(_dash_voice): _dash_voice.finish()
 	_dash_voice = null
 
@@ -585,7 +597,12 @@ func _event_sound(type: StringName, data: Dictionary) -> StringName:
 ## C++側の通知を読むだけで、戦闘の更新や乱数には触れない。
 func consume_cpp_frame(frame: Dictionary) -> bool:
 	var ui: Dictionary = frame.get("ui", {})
-	if ui.has("phase"): pause_loops(int(ui.phase) not in LOOP_PHASES)
+	# ポーズ・カード選択・ULT取得の確認など、世界が止まっている間はループとブーストの音を一時停止する
+	var frozen := false
+	if ui.has("phase"):
+		frozen = int(ui.phase) not in LOOP_PHASES or bool(ui.get("presentation_frozen", false))
+		pause_loops(frozen)
+		if is_instance_valid(_dash_voice): _dash_voice.set_paused(frozen)
 	for event: Dictionary in frame.events:
 		var data: Dictionary = event.payload
 		var type := StringName(event.type)
@@ -677,4 +694,5 @@ func consume_cpp_frame(frame: Dictionary) -> bool:
 				var id: StringName = HERO_SOUNDS.get(String(data.get("id", "")), &"")
 				if id != &"": play(id)
 				if String(data.get("id", "")) == "leo": start_loop(&"hero.leo.run", &"hero.leo.run")
+	_guard_dash(ui, frozen)
 	return true
