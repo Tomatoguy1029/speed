@@ -10,10 +10,30 @@ const FADE_IN := 1.0
 const CYAN := Color("#70d8ec")
 const RED := Color("#ff718a")
 const SHIP := preload("res://assets/pixel/airship.png")
-## 目標アイコンの仮素材。ボスHPには付けない。
-const HEAD := preload("res://assets/pixel/monoceros/layers/head_base.png")
-const ARMOR := preload("res://assets/pixel/monoceros/layers/head_armor.png")
-const GOLD := preload("res://assets/pixel/monoceros/layers/head_gold_armor.png")
+## 顔の切り出しと目の位置は元画像の座標。実行中の画像解析は行わない。
+const BOSS_FACES := {
+	&"monoceros": {
+		"textures": [preload("res://assets/pixel/monoceros/layers/head_base.png"), preload("res://assets/pixel/monoceros/layers/head_armor.png"), preload("res://assets/pixel/monoceros/layers/head_gold_armor.png")],
+		"region": Rect2(195,130,74,106), "eyes": [Vector2(221,187),Vector2(241,187)],
+	},
+	&"centaurus": {
+		"textures": [preload("res://assets/pixel/centaurus/base.png"), preload("res://assets/pixel/centaurus/armor.png")],
+		"region": Rect2(107,85,45,64), "eyes": [Vector2(120,116),Vector2(138,116)],
+	},
+	&"canis_major": {
+		"textures": [preload("res://assets/pixel/canis_major/head.png")],
+		"region": Rect2(0,0,48,71), "eyes": [Vector2(12,34),Vector2(35,34)],
+	},
+	&"hydra": {
+		"textures": [preload("res://assets/pixel/hydra/heads/hydra_head.png")],
+		"region": Rect2(0,0,49,49), "eyes": [Vector2(15,15),Vector2(33,15)],
+	},
+	&"draco": {
+		"textures": [preload("res://assets/pixel/draco/head.png")],
+		"region": Rect2(0,0,75,100), "eyes": [Vector2(27,64),Vector2(45,64)],
+	},
+}
+var boss_id: StringName
 var font: Font
 var _view := {"progress":0.0,"progress_alpha":0.0,"hp_alpha":0.0,"hp_ratio":0.0,"countdown":""}
 
@@ -82,6 +102,18 @@ func _draw_health(ratio: float,alpha: float) -> void:
 func _draw_boss(at: Vector2,alpha: float) -> void:
 	draw_circle(at,16,Color(Color("#301825"),alpha))
 	draw_arc(at,16,0,TAU,48,Color(RED,alpha),1)
-	var destination:=Rect2(at-Vector2(10.78,15.4),Vector2(21.56,30.8))
-	for texture: Texture2D in [HEAD,ARMOR,GOLD]:
-		draw_texture_rect_region(texture,destination,Rect2(195,130,74,106),Color(Color("#ffc6d0"),alpha))
+	var face: Dictionary=BOSS_FACES.get(boss_id,{})
+	if face.is_empty():return
+	var region: Rect2=face.region
+	var scale_factor:=minf(26.0/region.size.x,28.0/region.size.y)
+	var extent:=region.size*scale_factor
+	var destination:=Rect2(at-extent*0.5,extent)
+	for texture: Texture2D in face.textures:
+		draw_texture_rect_region(texture,destination,region,Color(Color.BLACK,alpha))
+	for i in face.eyes.size():
+		var eye: Vector2=destination.position+(face.eyes[i]-region.position)*scale_factor
+		draw_circle(eye,2.4,Color(RED,alpha*0.10))
+		draw_circle(eye,1.6,Color(RED,alpha*0.25))
+		var slant:=Vector2(0.7,0.4 if i==0 else -0.4)
+		draw_line(eye-slant,eye+slant,Color(Color("#ff3f62"),alpha),1.5)
+		draw_line(eye-slant*0.65,eye+slant*0.65,Color(Color("#ffe0e7"),alpha),0.7)

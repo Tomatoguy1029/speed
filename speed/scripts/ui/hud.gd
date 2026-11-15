@@ -810,6 +810,9 @@ func _ready_cpp() -> void:
 	_font = get_theme_default_font()
 	_stage_progress=RUN_PROGRESS.new()
 	_stage_progress.font=_font
+	var progress_stage := ContentManager.stage(GameManager.run_stage)
+	if progress_stage != null:
+		_stage_progress.boss_id=progress_stage.boss_id
 	_stage_progress.mouse_filter=Control.MOUSE_FILTER_IGNORE
 	add_child(_stage_progress)
 	_stage_progress.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
