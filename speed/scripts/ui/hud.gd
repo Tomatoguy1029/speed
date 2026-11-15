@@ -1254,10 +1254,13 @@ func _update_cpp_cinematic() -> void:
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		if body.get("finale",{}).get("active",false):finale_shown=true
 	_loadout_icons.visible=not finale_shown and (combat_visible or (active and bars>0.0 and not modules.is_empty()))
-	_entrance_skip.visible=false
+	var entrance_skippable := false
 	for body: Dictionary in _cpp_ui.get("boss_bodies",[]):
 		var intro: Dictionary=body.get("intro",{})
-		if active and intro.get("active",false) and float(intro.get("time",0.0))>=0.4:_entrance_skip.visible=true
+		if active and intro.get("active",false) and float(intro.get("time",0.0))>=0.4:entrance_skippable=true
+	# 毎フレーム隠すと、押下状態が解除され、カーソルが乗るたびの音も繰り返される。
+	if _entrance_skip.visible != entrance_skippable:
+		_entrance_skip.visible = entrance_skippable
 	var factor:=minf(size.x/ART_SIZE.x,size.y/ART_SIZE.y)
 	_loadout_icons.position=(size-ART_SIZE*factor)*0.5
 	_loadout_icons.scale=Vector2.ONE*factor
