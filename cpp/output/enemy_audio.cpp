@@ -8,7 +8,6 @@ using Kind=EnemyDefinition::Kind;
 /// 種類と、入った段階 → 欄。ループする欄は loop を立て、その段階を出たら止める。
 struct ModeSound {Kind kind;EnemyMode mode;const char *cue;bool loop=false;};
 constexpr ModeSound MODE_SOUNDS[]={
-    {Kind::Dash,EnemyMode::Windup,"enemy.charger.tell"},{Kind::Dash,EnemyMode::Dash,"enemy.charger.dash"},
     {Kind::Bomber,EnemyMode::Windup,"enemy.bomber.ignite"},
     {Kind::Pulser,EnemyMode::Windup,"enemy.pulser.charge"},
     {Kind::Aquila,EnemyMode::Windup,"elite.aquila.aim"},{Kind::Aquila,EnemyMode::Dash,"elite.aquila.dive"},
